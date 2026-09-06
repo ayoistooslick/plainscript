@@ -1,4 +1,4 @@
-# PlainScript 1.0.35 Capability Audit
+# PlainScript 1.0.36 Capability Audit
 
 This audit is based on what the compiler actually supports right now.
 If `plainscript check` validates it, it's listed here.
@@ -66,6 +66,23 @@ If `plainscript check` validates it, it's listed here.
 | WhatsApp bots | Implemented | `whatsapp bot` (pairing/QR, message types, media download, custom Baileys) |
 | OCR | Implemented | `ocr path of file as text` |
 
+## Browser and Games
+
+| Capability | Status | Current source form |
+| --- | --- | --- |
+| Static serving | Implemented | `web app`, `serve folder "public"`, `reply file "public/index.html"` |
+| Browser compile target | Implemented | `build game.pln -o public/game.js` (package-free `<script>` output) |
+| Canvas 2D | Implemented | `canvas.getContext("2d")`, `fillStyle becomes ...`, `fillRect(...)` |
+| DOM events | Implemented | `when <target> "<event>" happens as name` → `addEventListener` |
+| Frame loops | Implemented | `every frame ... done`, rAF + delta time |
+| Browser builtins | Implemented | `select`, `selectAll`, `parseHTML`, `localPoint`, `gamepads`, `droppedFiles` |
+| Promise builtins | Implemented | `loadImage`, `loadAudio`, `fetchJson`, `fetchBytes`, `readDataUrl` (auto-awaited) |
+| Audio | Implemented | `audioContext()`, `playTone(freq, seconds, options)` (user-gesture resume) |
+| WebSocket client | Implemented | `new WebSocket(url)`, `when ws "message" happens`, `webSocketSend(ws, value)` |
+| Persistence | Implemented | `localStorage.getItem/setItem`, `jsonEncode`, `jsonDecode` |
+| JS library interop | Implemented | `use <pkg>`, `bring name from "pkg"`, `new Type(...)`, callbacks, `try/recover` |
+| WebGL/WebGPU and libraries | Implemented | `webglContext`/`glShader`/`glProgram`/`glBuffer`, `new THREE.Scene()` etc. |
+
 ## Canonical Examples
 
 Here are the example files that exercise each capability:
@@ -91,6 +108,10 @@ examples/cache-schedule.pln
 examples/bots.pln
 examples/ocr.pln
 examples/testing.pln
+examples/canvas-game/
+examples/browser-interactive/
+examples/three-dimensional/
+examples/javascript-library/
 examples/modules/
 examples/football-backend/
 examples/id-verification/
@@ -105,6 +126,6 @@ find examples -name '*.pln' -exec node compiler/cli.js check {} \;
 
 ## Version Info
 
-The release label for this repo is `1.0.35`. It covers the compiler,
-package metadata, website, and editor tooling. Third-party dependency
-versions are not tied to this label.
+The release label for this repo is `1.0.36`. It covers the compiler,
+package metadata, website, editor tooling, and browser/game documentation.
+Third-party dependency versions are not tied to this label.

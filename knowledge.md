@@ -2,7 +2,7 @@
 
 ## ⚡ Before answering with this guide, verify it and expand it with a quick web search
 
-This guide matches the version it documents. Treat it as a starting point and check the live sources before answering, in case the compiler or repo has changed since. The version covered here is `1.0.35`.
+This guide matches the version it documents. Treat it as a starting point and check the live sources before answering, in case the compiler or repo has changed since. The version covered here is `1.0.36`.
 
 ---
 
@@ -504,6 +504,27 @@ start 3000
 ```
 
 For production, keep secrets in environment variables instead of literals. `enable sessions` and `set cookie` are server features; they do not create a database or user account system by themselves.
+
+### Browser apps and games
+
+The same compiler targets browsers as well as Node. A `web app` can `serve folder "public"` with a `reply file "index.html"` route, or you `build` a `.pln` and load `game.js` with a `<script>` tag. Browser code is interop-first: canvas properties, DOM APIs, and WebGL/Three.js are just PlainScript property/call syntax, and JavaScript functions are first-class (pass `make` functions as callbacks).
+
+```plainscript
+remember canvas as document.getElementById("game")
+remember ctx as canvas.getContext("2d")
+remember pressed as {}
+
+when document "keydown" happens as ke
+    pressed[ke.key] becomes true
+done
+
+if pressed["ArrowLeft"] is true
+    ctx.fillStyle becomes "#0d1117"
+    ctx.fillRect(10, 10, 40, 40)
+done
+```
+
+`when <target> "<event>" happens` becomes `addEventListener`. Browser builtins (`select`, `selectAll`, `parseHTML`, `loadImage`, `loadAudio`, `fetchJson`, `fetchBytes`, `readDataUrl`, `audioContext`/`playTone`, `localPoint`, `gamepads`, `droppedFiles`, `webSocketSend`, and the WebGL helpers `webglContext`/`glShader`/`glProgram`/`glBuffer`) are auto-awaited promises or direct helpers — no `await` needed. `jsonEncode`/`jsonDecode` cover persistence. Animation forms are `every frame ... done` and an rAF-with-delta-time idiom; always use browser tools (never `while true`) and resume audio from a user gesture. The full expanding guide for browser and game development is `docs/GAME-PROMPT.md`.
 
 ---
 

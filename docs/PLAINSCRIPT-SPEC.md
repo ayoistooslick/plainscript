@@ -1,4 +1,4 @@
-# PlainScript 1.0.35 language specification
+# PlainScript 1.0.36 language specification
 
 This reference covers the syntax implemented by `compiler/lexer.js` and
 `compiler/parser.js`. The runtime it generates lives in
@@ -442,6 +442,134 @@ Chart options may include `width`, `height`, `background`, `foreground`,
 `grid`, `accent`, and `muted`. Image values are strings, so they can also be
 returned from a route or inserted into HTML.
 
+## Browser and games
+
+PlainScript compiles to Plain JavaScript that runs in modern browsers. A
+`web app` can serve the page itself, or you compile a `.pln` to `game.js` and
+serve it with any static host. The tested workflows are:
+
+1. **Static**, served by PlainScript — `web app` + `serve folder "public"` +
+   a `reply file` route that returns `index.html`:
+
+   ```plainscript
+   web app
+   serve folder "public"
+   route get "/"
+       reply file "public/index.html"
+   done
+   start 8000
+   ```
+
+2. **Static**, any host — `node compiler/cli.js build game.pln -o public/game.js`
+   and include `<script src="game.js">` after the canvas and any CDN globals.
+
+Canvas apps use the same value/property interop as everything else — canvas
+state is assigned with `becomes`, then a draw call runs:
+
+```plainscript
+remember canvas as document.getElementById("game")
+remember ctx as canvas.getContext("2d")
+ctx.fillStyle becomes "#0d1117"
+ctx.fillRect(0, 0, 320, 240)
+```
+
+Animation is `requestAnimationFrame`. Two native loop forms: `every frame`
+(timing-agnostic) and an explicit rAF callback with delta seconds for
+frame-rate-independent movement — see `docs/GAME-PROMPT.md` for the canonical
+`dt` idiom. Input uses the DOM event form; `when <target> "<event>" happens`
+becomes `addEventListener`, and reading a key map uses a boolean comparison:
+
+```plainscript
+remember keys as {}
+when document "keydown" happens as ke
+    keys[ke.key] becomes true
+done
+when document "keyup" happens as ke
+    keys[ke.key] becomes false
+done
+
+if keys["ArrowLeft"] is true
+    player.x becomes player.x - 4
+done
+```
+
+Browser builtins are either direct helpers or auto-awaited promises — no
+`await` is written for the loaders:
+
+- `select("canvas")` / `selectAll(".card")` / `parseHTML("<div>...</div>")`
+- `loadImage(url)` → `Image`; `loadAudio(url)` → `Audio` element
+- `fetchJson(url)` → `{ok, status, data, text, parseError}`; `fetchBytes(url)`
+  → `{ok, status, data: Uint8Array}`
+- `readDataUrl(file)` → a `data:` URL string for a `File` (from
+  `droppedFiles(event)` or a file input)
+- `audioContext()` + `playTone(frequency, seconds, options)` — start from a
+  user-gesture handler (`ctx.resume()`)
+- `localPoint(event, canvas)` maps client to canvas coordinates
+- `gamepads()` returns connected pads; `droppedFiles(event)` reads drag-drop
+- WebSockets: client side uses `new WebSocket(url)` with `when ws "message"
+  happens`, and `webSocketSend(ws, value)` sends strings as-is or
+  JSON-stringifies anything else
+- Persistence is direct interop: `localStorage.getItem(...)` /
+  `setItem` plus `jsonEncode` / `jsonDecode` (JSON is a builtin data type)
+
+WebGL runs through the WebGL2 canvas API (`webglContext(canvas)`, `glShader`,
+`glProgram`, `glBuffer` — all protected by teaching errors) or a library such
+as Three.js constructed interop-style with `new`. WebGPU is available via its
+canvas API.
+A detailed, expanding guide for browser games lives in
+`docs/GAME-PROMPT.md`.
+
+## JavaScript interop
+
+`.pln` files are JavaScript; any JS API is reachable without sugar. Importing
+uses `use` (bare npm name, bound lowercase) or `bring name from "pkg"`:
+
+```plainscript
+use matter
+bring THREE from "three"
+remember engine as matter.Engine.create()
+remember scene as new THREE.Scene()
+```
+
+Call anything — member chains need no special syntax, and there is no wrapper
+around values:
+
+```plainscript
+crypto.createHash("sha256").update("abc").digest("hex")
+mesh.scale.set(2, 2, 2)
+```
+
+Construct with `new Type(args)` — as a statement, in `remember`, as an
+argument, or bare without parens (`new Enemy`). A `make` function reference is
+a first-class value — pass it as a callback:
+
+```plainscript
+make fitWindow()
+    camera.aspect becomes window.innerWidth / window.innerHeight
+    camera.updateProjectionMatrix()
+done
+window.addEventListener("resize", fitWindow)
+```
+
+Promises are awaited with `await` / `wait for`; errors follow the `try` /
+`recover as err` / `finally` idiom, never `.then` chaining:
+
+```plainscript
+try
+    remember response as await fetch("/api/state")
+    remember data as await response.json()
+    show data
+recover as err
+    show message of err
+done
+```
+
+Typed arrays construct and index like anything else
+(`new Uint8Array(64)`, `buffer[0] becomes 255`). The generated file adds
+`require()` only for `use`/`bring`, and ends with a guarded `module.exports`
+tail so the same output works as a browser `<script>` and under Node. The
+comprehensive guide is `docs/GAME-PROMPT.md`.
+
 ## Native tests
 
 ```plainscript
@@ -457,6 +585,7 @@ Assertions are `equals`, `is`, `contains`, and `raises`.
 ```text
 plainscript check [target]
 plainscript build [file.pln]
+plainscript build <file.pln> -o <output.js>
 plainscript run <file.pln>
 plainscript start
 plainscript fmt <file.pln>
