@@ -1,4 +1,4 @@
-// PlainScript 1.0.35: fixed and provider-backed Telegram replies.
+// PlainScript 1.0.36: fixed and provider-backed Telegram replies.
 
 bot env("TELEGRAM_BOT_TOKEN")
 

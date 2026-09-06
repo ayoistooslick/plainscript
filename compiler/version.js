@@ -1,6 +1,6 @@
 // Single source of truth for the compiler version.
 // Consumed by cli.js help/version output.
 
-const VERSION = '1.0.35';
+const VERSION = '1.0.36';
 
 module.exports = { VERSION };

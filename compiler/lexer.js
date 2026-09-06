@@ -411,6 +411,18 @@ function tokenize(source) {
       continue;
     }
 
+    // Hex number literal (0x... → decimal; supports colors like 0xRRGGBB)
+    if (source[i] === '0' && (source[i + 1] === 'x' || source[i + 1] === 'X')) {
+      let hex = '';
+      let j = i + 2;
+      while (j < source.length && /[0-9a-fA-F]/.test(source[j])) hex += source[j++];
+      if (hex) {
+        tokens.push({ type: TOKEN.NUMBER, value: Number.parseInt(hex, 16), line: tokenLine, col: tokenCol });
+        i = j;
+        continue;
+      }
+    }
+
     // Number literal (may include decimal point or BigInt suffix 'n')
     if (/[0-9]/.test(source[i])) {
       let num = '';

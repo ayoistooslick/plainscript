@@ -1,4 +1,4 @@
-// PlainScript 1.0.35: protected API route.
+// PlainScript 1.0.36: protected API route.
 web app
 require api key from env("API_KEY")
 route get "/private"

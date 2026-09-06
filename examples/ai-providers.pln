@@ -1,4 +1,4 @@
-// PlainScript 1.0.35: provider-backed AI works in ordinary programs.
+// PlainScript 1.0.36: provider-backed AI works in ordinary programs.
 
 remember answer as chatWith("groq", "llama-3.3-70b-versatile", "Explain PlainScript in one sentence")
 show answer

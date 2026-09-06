@@ -1,4 +1,4 @@
-// PlainScript 1.0.35: MRZ parsing for machine-readable travel documents.
+// PlainScript 1.0.36: MRZ parsing for machine-readable travel documents.
 //
 // Depends on the `mrz` npm package, invoked through a method call (mrz.parse).
 // `use mrz` is resolved by the dependency detector as an npm dependency and

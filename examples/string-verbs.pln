@@ -1,4 +1,4 @@
-// PlainScript 1.0.35: natural string verbs — transform a variable in place.
+// PlainScript 1.0.36: natural string verbs — transform a variable in place.
 
 make capitalize(title)
     lowercase title

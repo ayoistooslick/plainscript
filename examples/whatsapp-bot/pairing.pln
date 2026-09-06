@@ -1,4 +1,4 @@
-// PlainScript 1.0.35: WhatsApp pairing login.
+// PlainScript 1.0.36: WhatsApp pairing login.
 // Showcases `use baileys`, message.type branching, media downloads,
 // and button/list reply handling.
 
