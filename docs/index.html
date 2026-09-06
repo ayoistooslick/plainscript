@@ -9,7 +9,7 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500&family=Public+Sans:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="website/style.css">
 </head>
 <body>
@@ -40,17 +40,24 @@
   <main>
     <section class="hero">
       <div class="container hero-content">
-        <p class="hero-badge" data-reveal>1.0.36: Node.js programming for everyone</p>
-        <h1 class="hero-title">Code that reads like plain English.</h1>
-        <p class="hero-lead">Write what you want in plain words. PlainScript turns it into JavaScript — simple, readable, and easy to check.</p>
-        <div class="hero-actions">
-          <a class="button button-primary" href="#quickstart">Start building</a>
-          <a class="button button-secondary" href="#library">Browse examples</a>
-        </div>
-        <pre class="code-window"><code>remember name as "Ada"
+<div class="hero-grid">
+          <div class="hero-headline-block">
+            <p class="hero-badge" data-reveal>an intent-oriented language for node.js</p>
+            <h1 class="hero-title"><span class="kw">remember</span> the sentence <span class="kw">as</span> the program.<br><span class="kw">show</span> the result <span class="kw">when</span> the meaning is clear.</h1>
+            <p class="hero-lead">Write what you want in plain words. PlainScript checks it, then turns it into readable JavaScript — no boilerplate, no hidden steps.</p>
+            <div class="hero-actions">
+              <span class="hero-install-label">install</span>
+              <a class="button" href="#quickstart">npx plainscript new hello</a>
+            </div>
+          </div>
+          <div class="hero-panel">
+            <p class="hero-panel-label">terminal</p>
+            <pre class="code-window"><code>remember name as "Ada"
 if name contains "A"
     show `Hello, ${name}!`
 done</code></pre>
+          </div>
+        </div>
       </div>
     </section>
 
