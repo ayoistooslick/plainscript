@@ -1,4 +1,4 @@
-// PlainScript 1.0.35: minimal server.
+// PlainScript 1.0.36: minimal server.
 web app
 route get "/"
     reply "Hello from PlainScript"

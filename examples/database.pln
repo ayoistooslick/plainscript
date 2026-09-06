@@ -1,4 +1,4 @@
-// PlainScript 1.0.35: SQLite database.
+// PlainScript 1.0.36: SQLite database.
 database "app.db" using "wasm"
 execute
     CREATE TABLE IF NOT EXISTS notes (body TEXT)

@@ -1,3 +1,3 @@
-// PlainScript 1.0.35: concurrent promises.
+// PlainScript 1.0.36: concurrent promises.
 remember result as withTimeout(wait for sleep(10), 1000)
 show result
