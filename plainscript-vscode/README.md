@@ -1,6 +1,6 @@
 # PlainScript Language Support
 
-VS Code syntax support for PlainScript `1.0.35`.
+VS Code syntax support for PlainScript `1.0.36`.
 
 The extension provides:
 

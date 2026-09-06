@@ -256,6 +256,46 @@ start 3000
 
 Routes support `get`, `post`, `put`, `patch`, and `delete`. Read request data with `body of request`, `param("id")`, `query("page")`, and `header("x-name")`.
 
+## Browser games and interactive apps
+
+The same `.pln` you run on Node compiles to a browser script. Drive a canvas,
+handle keyboard, pointer, touch, and gamepad input, run `requestAnimationFrame`
+loops with delta time, load images and audio, and call any JavaScript library
+(Three.js, WebGL, WebGPU, Matter.js) through plain interop — no bundler needed:
+
+```plainscript
+web app
+serve folder "public"
+route get "/"
+    reply file "public/index.html"
+done
+start 8000
+```
+
+```plainscript
+remember canvas as document.getElementById("game")
+remember ctx as canvas.getContext("2d")
+remember keys as {}
+
+when document "keydown" happens as ke
+    keys[ke.key] becomes true
+done
+
+if keys["ArrowLeft"] is true
+    ctx.fillStyle becomes "#40c463"
+    ctx.fillRect(20, 20, 40, 40)
+done
+```
+
+`when <target> "<event>" happens` maps to `addEventListener`. Browser builtins
+(`select`, `selectAll`, `parseHTML`, `loadImage`, `loadAudio`, `fetchJson`,
+`fetchBytes`, `readDataUrl`, `audioContext`/`playTone`, `localPoint`,
+`gamepads`, `droppedFiles`, `webSocketSend`, and the WebGL helpers
+`webglContext`/`glShader`/`glProgram`/`glBuffer`) make canvas apps, games, and
+DOM UI direct. The full browser
+and game development guide — input, loops, assets, audio, state, collision,
+networking, persistence, and interop — is [docs/GAME-PROMPT.md](docs/GAME-PROMPT.md).
+
 ## HTTP client
 
 ```plainscript

@@ -1,4 +1,4 @@
-// PlainScript 1.0.35: upload handling and OCR.
+// PlainScript 1.0.36: upload handling and OCR.
 
 web app
 accept uploads limit "5 MB" allow list with "image/png", "image/jpeg" folder "uploads"

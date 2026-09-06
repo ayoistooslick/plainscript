@@ -1,4 +1,4 @@
-// PlainScript 1.0.35: record kinds and record values.
+// PlainScript 1.0.36: record kinds and record values.
 
 define a kind called "Player" with
     name is ""

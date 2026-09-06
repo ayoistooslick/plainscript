@@ -1,0 +1,139 @@
+// PlainScript 1.0.36: a self-contained canvas 2D dodge mini-game.
+
+define a kind called "Enemy" with
+    x is 0
+    y is 0
+    size is 18
+    speed is 0
+done
+
+remember canvas as document.getElementById("game")
+remember ctx as canvas.getContext("2d")
+remember restartButton as document.getElementById("restart")
+
+remember keys as {}
+remember enemies as []
+remember widthValue as 640
+remember heightValue as 480
+remember playerSize as 24
+remember playerX as 308
+remember playerY as 420
+remember playerSpeed as 240
+remember scoreValue as 0
+remember lives as 3
+remember gameOver as false
+remember previousMs as -1
+remember spawnTimer as 0.5
+
+make resetEnemy(e)
+    e.x becomes 20 + Math.random() * 600
+    e.y becomes -30
+    e.speed becomes 60 + Math.random() * 120
+done
+
+make spawnEnemy()
+    remember e as new Enemy
+    resetEnemy(e)
+    enemies.push(e)
+done
+
+for index startCount from 0 to 4
+    spawnEnemy()
+done
+
+when document "keydown" happens as e
+    keys[e.key] becomes true
+done
+
+when document "keyup" happens as e
+    keys[e.key] becomes false
+done
+
+when restartButton "click" happens
+    scoreValue becomes 0
+    lives becomes 3
+    gameOver becomes false
+    playerX becomes 308
+    playerY becomes 420
+    previousMs becomes -1
+done
+
+every frame
+    remember nowMs as performance.now()
+    remember delta as 0
+    if previousMs is above 0
+        delta becomes (nowMs - previousMs) / 1000
+    done
+    previousMs becomes nowMs
+
+    if gameOver is false
+        if keys["ArrowLeft"] is true or keys["a"] is true
+            playerX becomes playerX - playerSpeed * delta
+        done
+        if keys["ArrowRight"] is true or keys["d"] is true
+            playerX becomes playerX + playerSpeed * delta
+        done
+        if keys["ArrowUp"] is true or keys["w"] is true
+            playerY becomes playerY - playerSpeed * delta
+        done
+        if keys["ArrowDown"] is true or keys["s"] is true
+            playerY becomes playerY + playerSpeed * delta
+        done
+        if playerX is less than 0
+            playerX becomes 0
+        done
+        if playerX is greater than widthValue - playerSize
+            playerX becomes widthValue - playerSize
+        done
+        if playerY is less than 0
+            playerY becomes 0
+        done
+        if playerY is greater than heightValue - playerSize
+            playerY becomes heightValue - playerSize
+        done
+
+        spawnTimer becomes spawnTimer - delta
+        if spawnTimer is less than 0
+            spawnEnemy()
+            spawnTimer becomes 1.1
+        done
+
+        for each e in enemies
+            e.y becomes e.y + e.speed * delta
+            if e.y is above heightValue
+                scoreValue becomes scoreValue + 1
+                resetEnemy(e)
+            done
+            if e.x is less than playerX + playerSize and e.x + e.size is greater than playerX and e.y is less than playerY + playerSize and e.y + e.size is greater than playerY
+                lives becomes lives - 1
+                resetEnemy(e)
+                if lives is 0
+                    gameOver becomes true
+                done
+            done
+        done
+    done
+
+    ctx.clearRect(0, 0, widthValue, heightValue)
+    ctx.fillStyle becomes "#0d1117"
+    ctx.fillRect(0, 0, widthValue, heightValue)
+    ctx.fillStyle becomes "#40c463"
+    ctx.fillRect(playerX, playerY, playerSize, playerSize)
+    ctx.strokeStyle becomes "#2ea043"
+    ctx.strokeRect(playerX, playerY, playerSize, playerSize)
+    ctx.fillStyle becomes "#ef4444"
+    for each e in enemies
+        ctx.fillRect(e.x, e.y, e.size, e.size)
+    done
+    ctx.fillStyle becomes "#e6edf3"
+    ctx.font becomes "18px sans-serif"
+    ctx.fillText("Score: " + scoreValue, 12, 28)
+    ctx.fillText("Lives: " + lives, 12, 52)
+    if gameOver is true
+        ctx.fillStyle becomes "#f6f8fa"
+        ctx.font becomes "34px sans-serif"
+        ctx.fillText("Game Over", 230, 208)
+        ctx.font becomes "18px sans-serif"
+        ctx.fillText("Press Restart to play again", 196, 244)
+    done
+done

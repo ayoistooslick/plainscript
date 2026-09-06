@@ -88,6 +88,164 @@ const BUILTIN_DECLARATIONS = {
     `  }`,
     `}`,
   ].join('\n'),
+  // v1.0.36 — DOM browser runtime (select/selectAll/parseHTML). Browser
+  // globals are guarded so the generated JS explains the problem when it is
+  // run under Node instead of failing with a ReferenceError midpoint.
+  dom: [
+    `function __select(sel) {`,
+    `  if (typeof document === 'undefined') throw new Error('select(...) needs a browser (document is not defined in Node).');`,
+    `  return document.querySelector(sel);`,
+    `}`,
+    `function __selectAll(sel) {`,
+    `  if (typeof document === 'undefined') throw new Error('selectAll(...) needs a browser (document is not defined in Node).');`,
+    `  return [...document.querySelectorAll(sel)];`,
+    `}`,
+    `function __parseHTML(html) {`,
+    `  if (typeof document === 'undefined') throw new Error('parseHTML(...) needs a browser (document is not defined in Node).');`,
+    `  const template = document.createElement('template');`,
+    `  template.innerHTML = String(html);`,
+    `  return template.content;`,
+    `}`,
+  ].join('\n'),
+  // v1.0.36 — input runtime: pointer coordinates, gamepads, dropped files.
+  input: [
+    `function __localPoint(e, canvas) {`,
+    `  if (typeof document === 'undefined') throw new Error('localPoint(...) needs a browser (document is not defined in Node).');`,
+    `  const rect = canvas.getBoundingClientRect();`,
+    `  return {`,
+    `    x: (e.clientX - rect.left) * (canvas.width / rect.width),`,
+    `    y: (e.clientY - rect.top) * (canvas.height / rect.height),`,
+    `  };`,
+    `}`,
+    `function __gamepads() {`,
+    `  if (typeof navigator === 'undefined' || typeof navigator.getGamepads !== 'function') throw new Error('gamepads() needs a browser with the Gamepad API (navigator.getGamepads).');`,
+    `  return navigator.getGamepads().filter(Boolean);`,
+    `}`,
+    `function __droppedFiles(event) {`,
+    `  return [...(event && event.dataTransfer ? event.dataTransfer.files : [])];`,
+    `}`,
+  ].join('\n'),
+  // v1.0.36 — asset-loading runtime (images, JSON, bytes, data URLs). All
+  // helpers return promises; the STDLIB entries await them.
+  assets: [
+    `function __loadImage(url) {`,
+    `  if (typeof Image === 'undefined') throw new Error('loadImage(...) needs a browser (global Image is not defined in Node).');`,
+    `  return new Promise((resolve, reject) => {`,
+    `    const img = new Image();`,
+    `    img.onload = () => resolve(img);`,
+    `    img.onerror = () => reject(new Error('Could not load image: ' + url));`,
+    `    img.src = String(url);`,
+    `  });`,
+    `}`,
+    `async function __fetchJson(url) {`,
+    `  if (typeof fetch === 'undefined') throw new Error('fetchJson(...) needs a browser or Node 18+ with global fetch.');`,
+    `  const response = await fetch(url);`,
+    `  const text = await response.text();`,
+    `  let data = null;`,
+    `  let parseError = null;`,
+    `  try { data = JSON.parse(text); } catch (e) { parseError = e.message; }`,
+    `  return { ok: response.ok, status: response.status, data, text, parseError };`,
+    `}`,
+    `async function __fetchBytes(url) {`,
+    `  if (typeof fetch === 'undefined') throw new Error('fetchBytes(...) needs a browser or Node 18+ with global fetch.');`,
+    `  const response = await fetch(url);`,
+    `  const buffer = await response.arrayBuffer();`,
+    `  return { ok: response.ok, status: response.status, data: new Uint8Array(buffer) };`,
+    `}`,
+    `function __readDataUrl(file) {`,
+    `  if (typeof FileReader === 'undefined') throw new Error('readDataUrl(...) needs a browser (FileReader is not defined in Node).');`,
+    `  return new Promise((resolve, reject) => {`,
+    `    const reader = new FileReader();`,
+    `    reader.onload = () => resolve(reader.result);`,
+    `    reader.onerror = () => reject(new Error('Could not read the file as a data URL.'));`,
+    `    reader.readAsDataURL(file);`,
+    `  });`,
+    `}`,
+  ].join('\n'),
+  // v1.0.36 — Web Audio runtime. The AudioContext is created once and shared
+  // (browsers cap the number), and resumed on demand because autoplay policies
+  // start it suspended.
+  audio: [
+    `let __plainAudioCtx = null;`,
+    `function __audioContext() {`,
+    `  if (typeof window === 'undefined' && typeof self === 'undefined') throw new Error('audioContext() / playTone(...) need a browser (Web Audio is not available in Node).');`,
+    `  if (!__plainAudioCtx) {`,
+    `    const Ctx = window.AudioContext || window.webkitAudioContext;`,
+    `    if (!Ctx) throw new Error('Web Audio is not supported in this browser.');`,
+    `    __plainAudioCtx = new Ctx();`,
+    `  }`,
+    `  if (__plainAudioCtx.state === 'suspended') __plainAudioCtx.resume();`,
+    `  return __plainAudioCtx;`,
+    `}`,
+    `function __audioTone(freq, seconds, opts) {`,
+    `  const ctx = __audioContext();`,
+    `  const o = opts || {};`,
+    `  const oscillator = ctx.createOscillator();`,
+    `  const gain = ctx.createGain();`,
+    `  const duration = seconds || 0.5;`,
+    `  oscillator.type = o.type || 'sine';`,
+    `  oscillator.frequency.value = freq;`,
+    `  gain.gain.value = o.gain || 0.2;`,
+    `  oscillator.connect(gain);`,
+    `  gain.connect(ctx.destination);`,
+    `  const t = ctx.currentTime;`,
+    `  if (o.when) oscillator.start(t + o.when); else oscillator.start(t);`,
+    `  gain.gain.setValueAtTime(o.gain || 0.2, t);`,
+    `  gain.gain.exponentialRampToValueAtTime(0.0001, t + duration);`,
+    `  oscillator.stop(t + duration);`,
+    `}`,
+    `function __loadAudio(url) {`,
+    `  if (typeof Audio === 'undefined') throw new Error('loadAudio(...) needs a browser (global Audio is not defined in Node).');`,
+    `  return new Promise((resolve, reject) => {`,
+    `    const audio = new Audio();`,
+    `    audio.oncanplaythrough = () => resolve(audio);`,
+    `    audio.onerror = () => reject(new Error('Could not load audio: ' + url));`,
+    `    audio.src = String(url);`,
+    `    audio.load();`,
+    `  });`,
+    `}`,
+  ].join('\n'),
+  // v1.0.36 — WebGL runtime: context selection plus the three compile/link/
+  // buffer helpers behind the gl* stdlib entries.
+  gl: [
+    `function __glContext(canvas) {`,
+    `  if (typeof document === 'undefined') throw new Error('webglContext(...) needs a browser (document is not defined in Node).');`,
+    `  const gl = canvas.getContext('webgl2') || canvas.getContext('webgl') || canvas.getContext('experimental-webgl');`,
+    `  if (!gl) throw new Error('WebGL is not supported in this browser.');`,
+    `  return gl;`,
+    `}`,
+    `function __glShader(gl, type, source) {`,
+    `  // Accept both the friendly names ("vertex"/"fragment") and the DOM`,
+    `  // constant names ("VERTEX_SHADER"/"FRAGMENT_SHADER").`,
+    `  const kind = type === 'vertex' || type === 'VERTEX_SHADER' ? gl.VERTEX_SHADER : gl.FRAGMENT_SHADER;`,
+    `  const shader = gl.createShader(kind);`,
+    `  gl.shaderSource(shader, source);`,
+    `  gl.compileShader(shader);`,
+    `  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {`,
+    `    const info = gl.getShaderInfoLog(shader);`,
+    `    gl.deleteShader(shader);`,
+    `    throw new Error('Shader compile error: ' + (info || 'unknown'));`,
+    `  }`,
+    `  return shader;`,
+    `}`,
+    `function __glProgram(gl, vertexShader, fragmentShader) {`,
+    `  const program = gl.createProgram();`,
+    `  gl.attachShader(program, vertexShader);`,
+    `  gl.attachShader(program, fragmentShader);`,
+    `  gl.linkProgram(program);`,
+    `  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {`,
+    `    const info = gl.getProgramInfoLog(program);`,
+    `    throw new Error('Program link error: ' + (info || 'unknown'));`,
+    `  }`,
+    `  return program;`,
+    `}`,
+    `function __glBuffer(gl, data) {`,
+    `  const buffer = gl.createBuffer();`,
+    `  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);`,
+    `  gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);`,
+    `  return buffer;`,
+    `}`,
+  ].join('\n'),
   // v1.0.1 — shared runtime helpers for reflection, binary-size, YAML subset
   // parsing/emitting, spread of timeouts, and set/map helpers. Injected lazily
   // when any feature that needs them is used.
@@ -2496,6 +2654,115 @@ const BUILTIN_DECLARATIONS = {
   blob: (args, context) => `new Blob(${args.map(a => generateExpr(a, context)).join(', ')})`,
   file: (args, context) => `new File(${args.map(a => generateExpr(a, context)).join(', ')})`,
   formData: (_args) => `new FormData()`,
+
+  // ── v1.0.36 — browser DOM (IOPL-native). All helpers guard their browser
+  // global, so the generated output throws a clear teaching error under Node.
+  select: (args, context) => {
+    ensureBuiltin(context, 'dom');
+    requireOneArg('select', args);
+    return `__select(${generateExpr(args[0], context)})`;
+  },
+  selectAll: (args, context) => {
+    ensureBuiltin(context, 'dom');
+    requireOneArg('selectAll', args);
+    return `__selectAll(${generateExpr(args[0], context)})`;
+  },
+  parseHTML: (args, context) => {
+    ensureBuiltin(context, 'dom');
+    requireOneArg('parseHTML', args);
+    return `__parseHTML(${generateExpr(args[0], context)})`;
+  },
+
+  // ── v1.0.36 — browser input (IOPL-native).
+  localPoint: (args, context) => {
+    ensureBuiltin(context, 'input');
+    requireArgs('localPoint', args, 2, 'localPoint(event, canvas)');
+    return `__localPoint(${args.map(a => generateExpr(a, context)).join(', ')})`;
+  },
+  gamepads: (_args, context) => {
+    ensureBuiltin(context, 'input');
+    return `__gamepads()`;
+  },
+  droppedFiles: (args, context) => {
+    ensureBuiltin(context, 'input');
+    requireOneArg('droppedFiles', args);
+    return `__droppedFiles(${generateExpr(args[0], context)})`;
+  },
+
+  // ── v1.0.36 — browser assets (IOPL-native). Each awaitable helper is
+  // awaited here, so the surrounding function/handler is marked async.
+  loadImage: (args, context) => {
+    ensureBuiltin(context, 'assets');
+    requireOneArg('loadImage', args);
+    markAsync(context);
+    return `(await __loadImage(${generateExpr(args[0], context)}))`;
+  },
+  loadAudio: (args, context) => {
+    ensureBuiltin(context, 'assets');
+    requireOneArg('loadAudio', args);
+    markAsync(context);
+    return `(await __loadAudio(${generateExpr(args[0], context)}))`;
+  },
+  fetchJson: (args, context) => {
+    ensureBuiltin(context, 'assets');
+    requireOneArg('fetchJson', args);
+    markAsync(context);
+    return `(await __fetchJson(${generateExpr(args[0], context)}))`;
+  },
+  fetchBytes: (args, context) => {
+    ensureBuiltin(context, 'assets');
+    requireOneArg('fetchBytes', args);
+    markAsync(context);
+    return `(await __fetchBytes(${generateExpr(args[0], context)}))`;
+  },
+  readDataUrl: (args, context) => {
+    ensureBuiltin(context, 'assets');
+    requireOneArg('readDataUrl', args);
+    markAsync(context);
+    return `(await __readDataUrl(${generateExpr(args[0], context)}))`;
+  },
+
+  // ── v1.0.36 — Web Audio (IOPL-native).
+  audioContext: (_args, context) => {
+    ensureBuiltin(context, 'audio');
+    return `__audioContext()`;
+  },
+  playTone: (args, context) => {
+    ensureBuiltin(context, 'audio');
+    requireArgs('playTone', args, 1, 'playTone(440)');
+    return `__audioTone(${args.map(a => generateExpr(a, context)).join(', ')})`;
+  },
+
+  // ── v1.0.36 — WebSocket send helper (works with any WebSocket-like object,
+  // browser or Node): strings go through verbatim, everything else is JSON.
+  webSocketSend: (args, context) => {
+    requireArgs('webSocketSend', args, 2, 'webSocketSend(socket, { type: "move", x: 10 })');
+    const ws = generateExpr(args[0], context);
+    const value = generateExpr(args[1], context);
+    return `${ws}.send(typeof (${value}) === 'string' ? (${value}) : JSON.stringify(${value}))`;
+  },
+
+  // ── v1.0.36 — WebGL (IOPL-native).
+  webglContext: (args, context) => {
+    ensureBuiltin(context, 'gl');
+    requireOneArg('webglContext', args);
+    return `__glContext(${generateExpr(args[0], context)})`;
+  },
+  glShader: (args, context) => {
+    ensureBuiltin(context, 'gl');
+    requireArgs('glShader', args, 3, 'glShader(gl, "vertex", "void main() {}")');
+    return `__glShader(${args.map(a => generateExpr(a, context)).join(', ')})`;
+  },
+  glProgram: (args, context) => {
+    ensureBuiltin(context, 'gl');
+    requireArgs('glProgram', args, 3, 'glProgram(gl, vertexShader, fragmentShader)');
+    return `__glProgram(${args.map(a => generateExpr(a, context)).join(', ')})`;
+  },
+  glBuffer: (args, context) => {
+    ensureBuiltin(context, 'gl');
+    requireArgs('glBuffer', args, 2, 'glBuffer(gl, new Float32Array([0, 0, 1, 0, 0, 1]))');
+    return `__glBuffer(${args.map(a => generateExpr(a, context)).join(', ')})`;
+  },
 };
 
 // Mark the enclosing program async when a call awaits at the top level, and
@@ -3810,6 +4077,39 @@ function generateStatement(node, indent = '', context = createGenerationContext(
       ].join('\n');
     }
 
+    // v1.0.36 — every frame … done: one requestAnimationFrame loop. The next
+    // frame is scheduled after the body so the body always runs once per
+    // frame; an awaiting body makes the callback async automatically.
+    case 'EveryFrameStatement': {
+      const prevInHandler = context.inHandler;
+      context.inHandler = true;
+      const block = generateBlock(node.body, indent + '    ', context);
+      context.inHandler = prevInHandler;
+      const handlerAsync = block.emitted ? 'async ' : '';
+      return [
+        `${indent}requestAnimationFrame(${handlerAsync}function __frame(__frameTime) {`,
+        block.out,
+        `${indent}  requestAnimationFrame(__frame);`,
+        `${indent}});`,
+      ].join('\n');
+    }
+
+    // v1.0.36 — after <n> <unit> … done: one-shot setTimeout. The delay is an
+    // expression scaled by the unit; an awaiting body makes the callback async.
+    case 'AfterStatement': {
+      const delay = generateExpr(node.delay, context);
+      const prevInHandler = context.inHandler;
+      context.inHandler = true;
+      const block = generateBlock(node.body, indent + '    ', context);
+      context.inHandler = prevInHandler;
+      const handlerAsync = block.emitted ? 'async ' : '';
+      return [
+        `${indent}setTimeout(${handlerAsync}() => {`,
+        block.out,
+        `${indent}}, ${delay} * ${node.unit});`,
+      ].join('\n');
+    }
+
     case 'ScheduleStatement': {
       ensureBuiltin(context, 'scheduler');
       const body = node.body.map(s => generateStatement(s, indent + '    ', context)).join('\n');
@@ -3929,6 +4229,19 @@ function generateStatement(node, indent = '', context = createGenerationContext(
       const event = typeof node.event === 'string' ? JSON.stringify(node.event) : generateExpr(node.event, context);
       const body = (node.body || []).map(s => generateStatement(s, indent + '  ', context)).join('\n');
       return `${indent}__emitter.on(${event}, (${node.paramName}) => {\n${body}\n${indent}});`;
+    }
+
+    // v1.0.36 — when <target> "<event>" happens [as <name>] … done: DOM event
+    // listener. The handler param defaults to "event"; an awaiting body makes
+    // the callback async automatically.
+    case 'WhenTargetedStatement': {
+      const prevInHandler = context.inHandler;
+      context.inHandler = true;
+      const block = generateBlock(node.body, indent + '  ', context);
+      context.inHandler = prevInHandler;
+      const handlerAsync = block.emitted ? 'async ' : '';
+      const param = node.paramName || 'event';
+      return `${indent}${generateExpr(node.target, context)}.addEventListener(${JSON.stringify(node.event)}, ${handlerAsync}function (${param}) {\n${block.out}\n${indent}});`;
     }
 
     case 'StreamStatement': {

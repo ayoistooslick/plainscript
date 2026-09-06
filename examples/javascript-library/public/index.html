@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PlainScript Interop</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #0d1117;
+      color: #e6edf3;
+      font-family: system-ui, "Segoe UI", sans-serif;
+    }
+    .note {
+      position: fixed;
+      bottom: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 90%;
+      max-width: 640px;
+      padding: 8px 14px;
+      border-radius: 10px;
+      background: rgba(13, 17, 23, 0.75);
+      font-size: 13px;
+      color: #8b949e;
+      text-align: center;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="note">
+    Fetching <code>config.json</code> from the server — serve the folder over HTTP
+    and the star count / color come from the file; otherwise the scene falls back
+    to the built-in defaults (check the console for the log lines).
+  </div>
+  <script src="interop.bundle.js"></script>
+</body>
+</html>

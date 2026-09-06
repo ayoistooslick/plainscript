@@ -1,4 +1,4 @@
-// PlainScript 1.0.35: variables, values, and output.
+// PlainScript 1.0.36: variables, values, and output.
 
 remember name as "Ada"
 remember visitCount as 3

@@ -1,4 +1,4 @@
-// PlainScript 1.0.35: JSON values and transformations.
+// PlainScript 1.0.36: JSON values and transformations.
 
 remember person as record with name "Ada" and role "engineer" done
 

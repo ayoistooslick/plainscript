@@ -1,6 +1,6 @@
 {
   "name": "plainscript-realtime-chat",
-  "version": "1.0.35",
+  "version": "1.0.36",
   "private": true,
   "type": "commonjs",
   "scripts": {
