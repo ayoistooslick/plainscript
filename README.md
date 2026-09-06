@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="https://github.com/ayoistooslick/plainscript/raw/main/docs/logo.jpg" alt="PlainScript logo" width="220" />
+<img src="https://raw.githubusercontent.com/ayoistooslick/plainscript/main/docs/logo-pln.jpg" alt="PlainScript logo" width="220" />
 
 # PlainScript
 
@@ -118,7 +118,7 @@ done
 </tr>
 </table>
 
-**Current version:** `v1.0.2` — the `plainscript` npm package, with a TypeScript-style production build (`plainscript build` → `dist/`, source names and structure preserved).
+**Current version:** `v1.0.36` — the `plainscript-lang` npm package, with a TypeScript-style production build (`plainscript build` → `dist/`, source names and structure preserved).
 
 ---
 
@@ -198,7 +198,7 @@ For projects that need custom output or source directories, add a `plainscript.c
     "build": "plainscript build",
     "prepare": "plainscript build"
   },
-  "devDependencies": { "plainscript-lang": "^1.0.2" }
+  "devDependencies": { "plainscript-lang": "^1.0.36" }
 }
 ```
 
