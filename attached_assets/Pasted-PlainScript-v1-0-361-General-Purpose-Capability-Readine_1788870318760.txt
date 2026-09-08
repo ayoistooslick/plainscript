@@ -1,0 +1,503 @@
+PlainScript v1.0.361 — General-Purpose Capability & Readiness Pass
+
+You are working on the PlainScript programming language/compiler repository.
+
+Critical repository state
+
+The current latest pushed/stable version is v1.0.36.
+
+Another coding agent, OpenCode, has been working on v1.0.37, but those changes have NOT been pushed yet.
+
+DO NOT:
+
+- pull, recreate, infer, cherry-pick, or implement OpenCode's unpushed v1.0.37 work
+- overwrite or modify work that is not present in the current repository state
+- attempt to merge the unfinished v1.0.37 work into this task
+- assume anything from v1.0.37 exists unless it is actually present in the checked-out repository
+
+Treat the current repository state as the source of truth.
+
+---
+
+Objective
+
+Prepare PlainScript for the next stage of its development as a serious general-purpose programming language.
+
+This is NOT a request to make PlainScript specifically support one particular application.
+
+Do NOT add features named after, hardcoded for, or tightly coupled to any specific project.
+
+Instead, evaluate whether PlainScript is sufficiently capable for programmers to build a broad range of serious software, including projects that may involve:
+
+- real-time systems
+- browser applications
+- games
+- computer-vision applications
+- AI-powered applications
+- data processing
+- networking
+- APIs and backend services
+- event-driven applications
+- automation
+- simulations
+- scientific/technical software
+- multimedia applications
+- developer tools
+- database-backed applications
+- distributed systems
+- applications using existing JavaScript/npm ecosystems
+
+A future football computer-vision/referee-assistance type project is one example of the class of applications PlainScript should be capable of supporting.
+
+It is NOT the specific target.
+
+The goal is general capability.
+
+---
+
+Phase 1 — Full capability audit
+
+First, inspect the entire compiler, runtime, standard library, CLI, tests, documentation, examples, templates, and existing interoperability system.
+
+Do not immediately start changing code.
+
+Determine what PlainScript can actually do today.
+
+Audit at minimum:
+
+Core language
+
+- variables
+- constants
+- expressions
+- functions
+- closures
+- control flow
+- loops
+- collections
+- objects/records
+- destructuring if supported
+- modules/imports
+- scope
+- error handling
+- return/break/continue semantics
+- operators
+- type-related behavior
+- string manipulation
+- numeric operations
+
+Runtime and execution
+
+- synchronous execution
+- asynchronous execution
+- promises
+- async/await semantics
+- concurrency
+- timers
+- event-driven execution
+- callbacks
+- error propagation
+- process lifecycle
+- cancellation where applicable
+
+JavaScript interoperability
+
+Because PlainScript compiles to JavaScript, verify that programmers can realistically use the existing JS ecosystem.
+
+Test:
+
+- importing npm packages
+- calling JavaScript functions
+- passing PlainScript values into JS
+- receiving JS values
+- callbacks
+- promises
+- events
+- objects
+- arrays
+- exceptions
+- browser APIs
+- Node.js APIs
+- module interoperability
+
+Do not create unnecessary proprietary replacements for functionality already available through JavaScript.
+
+Networking
+
+Evaluate practical support for:
+
+- HTTP requests
+- HTTP servers
+- WebSockets or equivalent realtime communication
+- headers
+- JSON
+- request/response handling
+- streaming where appropriate
+- connection/error handling
+
+Data and files
+
+Evaluate:
+
+- filesystem access
+- reading/writing files
+- JSON
+- binary data
+- buffers/typed arrays where relevant
+- environment variables
+- configuration
+- streams where relevant
+
+Browser capabilities
+
+Evaluate:
+
+- DOM manipulation
+- events
+- fetch
+- timers
+- canvas
+- animation/frame loops
+- Web APIs
+- browser module execution
+- WebGL/WebGPU interoperability where practical
+
+Graphics and multimedia
+
+PlainScript should be able to participate in serious applications that use existing JS/browser ecosystems.
+
+Evaluate interoperability with:
+
+- Canvas
+- WebGL/WebGPU
+- audio APIs
+- video APIs
+- image/data processing libraries
+- rendering libraries
+
+Do NOT build an entire graphics engine into PlainScript.
+
+AI and external services
+
+Evaluate whether PlainScript can reasonably integrate with:
+
+- HTTP AI APIs
+- streaming AI APIs
+- SDKs
+- model-serving services
+- external Python/JS services
+- local processes/services
+
+PlainScript does not need to implement neural-network frameworks itself.
+
+It needs to be capable of orchestrating and integrating serious systems.
+
+Databases
+
+Evaluate:
+
+- SQLite
+- PostgreSQL
+- other databases through existing JS/npm packages
+- async database operations
+- transactions
+- query results
+- connection lifecycle
+
+Again, prefer interoperability over reinventing entire database ecosystems.
+
+Processes and system integration
+
+Evaluate:
+
+- spawning processes where supported
+- communicating with processes
+- CLI execution
+- environment variables
+- exit codes
+- stdin/stdout/stderr
+- integration with external tools
+
+Package ecosystem
+
+Evaluate whether a PlainScript programmer can realistically install and use npm packages without fighting the compiler.
+
+---
+
+Phase 2 — Identify actual blockers
+
+After the audit, classify findings into:
+
+A. Already works
+
+No changes required.
+
+B. Works, but has poor ergonomics
+
+Improve only if the improvement is justified and does not destabilize the language.
+
+C. Missing but important
+
+Determine whether a language/runtime feature is genuinely necessary.
+
+D. Better handled through JavaScript/npm interoperability
+
+Do NOT add a new PlainScript feature just because JavaScript already provides a mature solution.
+
+E. Experimental/nonessential
+
+Do not implement merely because it sounds impressive.
+
+The objective is not feature count.
+
+The objective is real capability.
+
+---
+
+Phase 3 — General-purpose improvements
+
+Implement only changes that materially improve PlainScript's ability to build broad classes of software.
+
+Prioritize:
+
+1. correctness
+2. predictable semantics
+3. interoperability
+4. asynchronous/event-driven programming
+5. networking
+6. data handling
+7. runtime reliability
+8. developer ergonomics
+9. package ecosystem compatibility
+10. performance where relevant
+
+Avoid:
+
+- project-specific APIs
+- football-specific functionality
+- computer-vision-specific syntax
+- proprietary replacements for npm libraries
+- unnecessary language complexity
+- syntax additions that merely make examples look nicer
+
+PlainScript should remain recognizable as PlainScript.
+
+---
+
+Phase 4 — Prove capabilities with real examples
+
+Do not only write unit tests for isolated compiler features.
+
+Create or improve small representative examples covering different categories.
+
+For example:
+
+Networking
+
+A small HTTP server/client.
+
+Realtime
+
+A small WebSocket/event-driven example if supported.
+
+Browser
+
+A small interactive browser application.
+
+Graphics
+
+A small Canvas/WebGL example using existing ecosystem APIs.
+
+AI
+
+A small API integration.
+
+Database
+
+A small SQLite/PostgreSQL example.
+
+Async
+
+A program performing multiple asynchronous operations correctly.
+
+External ecosystem
+
+A program importing and using a real npm package.
+
+Data processing
+
+A program reading, transforming, and writing structured data.
+
+System integration
+
+A small CLI/process integration example where supported.
+
+The examples must use normal PlainScript rather than hidden compiler-specific tricks.
+
+---
+
+Phase 5 — Stress testing
+
+Expand the test suite where necessary.
+
+Pay particular attention to:
+
+- async/sync interaction
+- nested async operations
+- errors inside async callbacks
+- errors crossing JS/PlainScript boundaries
+- promise handling
+- callbacks
+- event listeners
+- timers
+- concurrent operations
+- module boundaries
+- npm package interop
+- browser/runtime differences
+- malformed input
+- invalid generated JavaScript
+- edge cases
+- backwards compatibility
+
+Existing working behavior must not be casually changed.
+
+Run the complete test suite.
+
+Also run all examples and templates.
+
+Do not accept "the new feature works" if existing functionality regresses.
+
+---
+
+Phase 6 — Decide whether v1.0.361 is actually necessary
+
+The version must be based on actual changes.
+
+If the audit shows that the current v1.0.36 is already capable enough and no meaningful language/runtime changes are necessary, do NOT manufacture changes simply to justify a version number.
+
+If meaningful fixes or improvements are required, prepare them as:
+
+PlainScript v1.0.361
+
+Note:
+
+"1.0.361" is intentional valid semver and means major=1, minor=0, patch=361. It is NOT intended to mean "1.0.36.1".
+
+---
+
+Phase 7 — Create FB-PROMPT.md
+
+Create a new file at:
+
+FB-PROMPT.md
+
+This file should be a comprehensive AI/developer instruction document for building future projects with PlainScript.
+
+The "FB" concept means this should function similarly to the existing game-oriented prompt/documentation, but it must be broader.
+
+It must NOT be written specifically for a football project.
+
+It should teach an AI coding agent or programmer:
+
+- what PlainScript is
+- how PlainScript syntax works
+- how the compiler/runtime works at a practical level
+- how to structure a real PlainScript project
+- how to use modules
+- how to handle async operations
+- how to use npm/JavaScript interoperability
+- how to use browser APIs
+- how to build backend applications
+- how to use HTTP/WebSockets
+- how to work with files/data
+- how to use databases
+- how to integrate external services
+- how to use AI APIs
+- how to work with graphics/browser APIs
+- how to structure larger applications
+- what PlainScript should handle itself
+- what should be delegated to JavaScript/npm/external services
+- common mistakes
+- compiler/runtime limitations
+- reliable patterns
+- testing practices
+- project organization
+- build/run/check workflows
+- examples of idiomatic PlainScript
+
+Most importantly:
+
+FB-PROMPT.md must describe what PlainScript actually supports after this work.
+
+Do not document imaginary features.
+
+Do not document planned features as if they already exist.
+
+Do not invent syntax.
+
+Every example must correspond to verified PlainScript behavior.
+
+---
+
+Documentation quality
+
+Update relevant documentation if the implementation changes existing behavior.
+
+Documentation should explain capabilities through practical examples rather than marketing language.
+
+Avoid claiming that PlainScript can "do everything."
+
+Instead demonstrate how PlainScript combines its own language features with the JavaScript ecosystem.
+
+---
+
+Engineering constraints
+
+- Preserve existing PlainScript design philosophy.
+- Keep the compiler deterministic and predictable.
+- Prefer minimal, composable additions.
+- Avoid breaking existing programs.
+- Avoid unnecessary dependencies.
+- Avoid introducing large frameworks into the compiler.
+- Do not create project-specific abstractions.
+- Do not modify unrelated functionality.
+- Do not create a package lockfile if the repository/project instructions prohibit one.
+- Respect all existing repository instructions.
+- Inspect existing architecture before changing it.
+- Do not blindly rewrite working compiler components.
+
+---
+
+Git/versioning constraints
+
+Remember:
+
+OpenCode's v1.0.37 changes are currently UNPUSHED.
+
+Your work must be based only on what is actually present in the repository.
+
+Do not attempt to reproduce or merge the unpushed v1.0.37 work.
+
+If you make changes, keep them logically isolated and clearly documented.
+
+At the end, report:
+
+1. What the audit found.
+2. What PlainScript could already do.
+3. What genuine gaps were discovered.
+4. What changes you made.
+5. Why each change was necessary.
+6. What you deliberately did NOT implement and why.
+7. Test results.
+8. Example results.
+9. Whether v1.0.361 is justified.
+10. What was added to FB-PROMPT.md.
+11. Any remaining limitations.
+
+The final result should leave PlainScript more generally capable, not merely more capable of building one specific project.
+
+The standard is:
+
+«A programmer should be able to look at PlainScript and reasonably choose it for a serious new project without immediately discovering that the language collapses the moment the project leaves a toy example.»
+
+Do the audit first. Then make only the changes justified by the evidence.

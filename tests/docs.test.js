@@ -16,6 +16,7 @@ const DOC_FILES = [
   'docs/PLAINSCRIPT-SPEC.md',
   'docs/CAPABILITY_GAP_AUDIT.md',
   'docs/GAME-PROMPT.md', // v1.0.36 — browser/game guide
+  'FB-PROMPT.md', // general-purpose capability guide
   'plainscript-vscode/README.md',
   'samples/README.md',
 ];

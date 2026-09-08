@@ -12,6 +12,7 @@ recover as err
     show message of err
 finally
     show "request complete"
+done
 
 retry 3 times every 2 seconds
     show "retrying"

@@ -53,6 +53,23 @@ done
   assert(out.includes('fallback used'), `expected recover on JSON error:\n${out}`);
 });
 
+test('finally runs after recover and preserves the cleanup block', () => {
+  const out = run(`
+remember cleanup as false
+try
+    throw "failure"
+recover as err
+    show "caught"
+finally
+    cleanup becomes true
+    show "cleaned"
+done
+show cleanup
+`);
+  assert(out.includes('caught') && out.includes('cleaned') && out.includes('true'),
+    `expected recover and finally output:\n${out}`);
+});
+
 test('retry: retries N times then succeeds', () => {
   const out = run(`
 remember attempts as 0

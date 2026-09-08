@@ -230,6 +230,7 @@ recover as error
     show message of error
 finally
     show "finished"
+done
 
 retry 3 times every 1 second
     show "retry"

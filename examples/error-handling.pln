@@ -5,3 +5,4 @@ recover as error
     show message of error
 finally
     show "finished"
+done

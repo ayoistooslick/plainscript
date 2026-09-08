@@ -2417,7 +2417,10 @@ function parseAsk() {
         const stmt = parseStatement();
         if (stmt) recoverBody.push(stmt);
       }
-      advance(); // consume "done" that closes recover body
+      // A recover body may be followed directly by another recover block or
+      // by finally. Only consume a real "done" terminator here; consuming
+      // "finally" would silently discard cleanup code.
+      if (peek().type === TOKEN.DONE) advance();
       catches.push({ param: paramName, errorType, body: recoverBody });
     }
     let finallyBody = null;

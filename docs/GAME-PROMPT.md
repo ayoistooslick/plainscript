@@ -629,6 +629,7 @@ recover as err
     show message of err
 finally
     show "done"
+done
 ```
 
 **Typed arrays / binary** — `remember buffer as new Uint8Array(64)` and index
