@@ -30,10 +30,11 @@ const PACKAGE_MAP = Object.freeze({
   uploads: 'multer',
   'wasm-sqlite': 'sql.js',
   // v2.1.1 — WhatsApp bots run on Baileys; QR codes render in the terminal
-  // through qrcode-terminal. Neither package ever appears in PlainScript source.
-  // The default Baileys is the maintained @qwerty-xcv fork (reliable pairing);
-  // users can override it per-block with `use baileys "<pkg>"`.
-  whatsapp: '@qwerty-xcv/baileys',
+  // through qrcode-terminal. These are optional application dependencies, not
+  // compiler dependencies. Pin the default adapter so `plainscript install`
+  // remains reproducible; users can override it per-block with
+  // `use baileys "<pkg>"`.
+  whatsapp: '@whiskeysockets/baileys@6.7.24',
   'wa-qrcode': 'qrcode-terminal',
   // v2.2.0 — MongoDB driver.
   mongodb: 'mongodb',
@@ -58,6 +59,13 @@ function splitPackageSpec(specifier) {
   const at = specifier.indexOf('@', 1);
   if (at === -1) return { name: specifier, spec: null };
   return { name: specifier.slice(0, at), spec: specifier.slice(at + 1) };
+}
+
+function isLocalPackageSpecifier(specifier) {
+  return specifier.startsWith('.') ||
+    specifier.startsWith('/') ||
+    specifier.startsWith('\\') ||
+    specifier.startsWith('file:');
 }
 
 function visit(node, onUse) {
@@ -151,7 +159,10 @@ function detectDependencies(source) {
     // so `use sqlite@7` still maps to better-sqlite3@7.
     const { name, spec } = splitPackageSpec(moduleName);
     const packageName = PACKAGE_MAP[name] || name;
-    if (!isBuiltinModule(packageName)) {
+    // A local adapter is installed by the application author, not npm's
+    // dependency detector. This also permits a project-local Baileys fork when
+    // the default package is unavailable behind a package firewall.
+    if (!isLocalPackageSpecifier(packageName) && !isBuiltinModule(packageName)) {
       dependencies.add(spec ? `${packageName}@${spec}` : packageName);
     }
   };
@@ -184,5 +195,6 @@ module.exports = {
   detectDependencies,
   isBuiltinModule,
   splitPackageSpec,
+  isLocalPackageSpecifier,
   PACKAGE_MAP,
 };

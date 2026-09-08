@@ -30,20 +30,17 @@
     "node": ">=18.0.0"
   },
   "devDependencies": {
-    "@whiskeysockets/baileys": "^7.0.0-rc14",
-    "better-sqlite3": "^13.0.3",
+    "better-sqlite3": "^11.10.0",
     "croner": "^10.0.1",
     "express": "^5.2.1",
     "multer": "^2.0.2",
     "nodemailer": "^9.0.5",
-    "qrcode-terminal": "^0.12.0",
-    "redis": "^6.2.1",
+    "redis": "^5.8.3",
     "sql.js": "^1.13.0",
     "ws": "^8.21.3"
   },
   "dependencies": {
-    "@qwerty-xcv/baileys": "^0.0.1",
-    "mongodb": "^7.6.0",
+    "mongodb": "^6.20.0",
     "tesseract.js": "^7.0.0",
     "three": "^0.185.1"
   }

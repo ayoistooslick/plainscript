@@ -312,7 +312,7 @@ accepts the following clauses:
 | Clause | Purpose |
 |--------|---------|
 | `auth "<folder>"` | Path where session credentials persist across restarts. |
-| `use baileys "<pkg>"` | Optional. Override the Baileys package (default: `@qwerty-xcv/baileys`). |
+| `use baileys "<pkg>"` | Optional. Override the Baileys package (default: `@whiskeysockets/baileys`). |
 | `login qr` | Authenticate by scanning a QR code in the terminal. |
 | `login pairing "<phone>"` | Authenticate by entering a phone number (digits only, no `+`). The argument may also be an expression such as `env("WHATSAPP_PHONE")`. |
 | `on message ... done` | Handler that fires for every incoming message. |
@@ -327,7 +327,7 @@ include `message.text`, `message.type`, `message.mtype`, `message.caption`,
 ```plainscript
 whatsapp bot
     auth "plain-script-whatsapp"
-    use baileys "@qwerty-xcv/baileys"
+    use baileys "@whiskeysockets/baileys"
     login pairing "2348012345678"
     on message
         if message.text is "/start"
@@ -383,7 +383,7 @@ documents, buttons, lists, and more. The following helpers are available:
 ```plainscript
 whatsapp bot
     auth "plain-script-whatsapp"
-    use baileys "@qwerty-xcv/baileys"
+    use baileys "@whiskeysockets/baileys"
     login pairing env("WHATSAPP_PHONE")
     on message
         log message

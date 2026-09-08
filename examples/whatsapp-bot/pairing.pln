@@ -4,7 +4,7 @@
 
 whatsapp bot
     auth "plain-script-whatsapp"
-    use baileys "@qwerty-xcv/baileys"
+    use baileys "@whiskeysockets/baileys"
     login pairing "2348012345678"
     on message
         log message

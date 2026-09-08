@@ -3566,8 +3566,8 @@ function parseAsk() {
       }
 
       // use baileys "<pkg>" — override the Baileys implementation package.
-      // Default is @qwerty-xcv/baileys. Accepts any require-able package name,
-      // so developers can pin a fork or the upstream @whiskeysockets/baileys.
+      // Default is @whiskeysockets/baileys. Accepts any require-able package
+      // name, so developers can pin a local adapter or another compatible fork.
       if (peek().type === TOKEN.USE && peekAt(1).value === 'baileys' && peekAt(2).type === TOKEN.STRING) {
         advance(); // use
         advance(); // baileys
@@ -3629,7 +3629,7 @@ function parseAsk() {
       }
 
       throw new Error(makeError(
-        'A "whatsapp bot" block may only contain an "auth", a "login", a "use baileys", and "on message" statements.\n\nExample:\n  whatsapp bot\n      auth "session"\n      use baileys "@qwerty-xcv/baileys"\n      login qr\n\n      on message\n          log message\n      done\n  done',
+        'A "whatsapp bot" block may only contain an "auth", a "login", a "use baileys", and "on message" statements.\n\nExample:\n  whatsapp bot\n      auth "session"\n      use baileys "@whiskeysockets/baileys"\n      login qr\n\n      on message\n          log message\n      done\n  done',
         peek()
       ));
     }

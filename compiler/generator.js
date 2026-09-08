@@ -641,7 +641,7 @@ const BUILTIN_DECLARATIONS = {
   whatsapp: [
     `const { __whatsappStart, __whatsappPair, __whatsappOnMessage, __whatsappReply, __whatsappSend, __whatsappDownload } = (() => {`,
     `  let sock = null;`,
-    `  let __waBaileysPkg = '@qwerty-xcv/baileys';`,
+    `  let __waBaileysPkg = '@whiskeysockets/baileys';`,
     `  const handlers = [];`,
     `  const __waSilentLogger = (() => {`,
     `    const noop = () => {};`,
@@ -751,7 +751,7 @@ const BUILTIN_DECLARATIONS = {
     `  }`,
     `  function __whatsappOnMessage(handler) { handlers.push(handler); }`,
     `  async function __whatsappStart(options) {`,
-    `    __waBaileysPkg = options.baileys || '@qwerty-xcv/baileys';`,
+    `    __waBaileysPkg = options.baileys || '@whiskeysockets/baileys';`,
     `    const baileys = require(__waBaileysPkg);`,
     `    const makeWASocket = baileys.default;`,
     `    const { useMultiFileAuthState, makeCacheableSignalKeyStore, DisconnectReason } = baileys;`,

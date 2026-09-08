@@ -127,7 +127,7 @@ done
 ```bash
 npx plainscript new myapp     # scaffolds src/app.pln and package.json
 cd myapp
-npm install                   # installs plainscript as a devDependency, plus runtime packages
+npm install                   # installs the compiler and runtime packages
 npm run build                 # compiles src/ -> dist/ (plainscript build)
 node dist/app.js              # or: npm start
 ```
@@ -140,6 +140,41 @@ npm install --save-dev plainscript-lang
 ```
 
 No global install is required. Everything runs through `npm` scripts and `npx`.
+
+### Supported Node.js and dependency policy
+
+The compiler and its checked-in dependency tree support **Node.js 18 or newer**.
+Use the lockfile for reproducible installs:
+
+```bash
+npm ci
+```
+
+The compiler package intentionally does not install the optional WhatsApp
+adapter. This keeps a normal `npm ci` independent of Baileys' native/GitHub
+transitives and lets projects that do not use WhatsApp install cleanly on the
+Node 18 floor. The SQLite, MongoDB, and Redis versions in `package.json` are
+the last compatible major lines for that floor.
+
+WhatsApp projects have a separate adapter requirement. `plainscript install`
+uses the pinned default `@whiskeysockets/baileys@6.7.24` (Node.js 20 or newer)
+and `qrcode-terminal`. If a package firewall or registry cannot provide that
+adapter, install a Baileys-compatible package or local fork yourself and select
+it in the bot block:
+
+```plainscript
+whatsapp bot
+    use baileys "./vendor/baileys"
+    auth "session"
+    login qr
+done
+```
+
+For a local adapter, install it from the project directory (for example,
+`npm install ./vendor/baileys`) and ensure it exposes the Baileys default
+socket export plus `useMultiFileAuthState`, `makeCacheableSignalKeyStore`, and
+`DisconnectReason`. Local adapter paths are not passed to `npm install` by
+`plainscript install`.
 
 ---
 

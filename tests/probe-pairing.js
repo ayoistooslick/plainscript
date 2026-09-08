@@ -1,5 +1,5 @@
 // Standalone pairing probe: tests a REAL WhatsApp pairing code request
-// against the qwerty fork of Baileys. Run with:
+// against the upstream Baileys adapter. Run with:
 //
 //   node tests/probe-pairing.js [PHONE]
 //
@@ -10,7 +10,7 @@
 const PHONE = process.argv[2] || '2349012834275';
 
 async function main() {
-  const baileys = require('@qwerty-xcv/baileys');
+  const baileys = require('@whiskeysockets/baileys');
   const makeWASocket = baileys.default;
   const { useMultiFileAuthState, makeCacheableSignalKeyStore } = baileys;
 

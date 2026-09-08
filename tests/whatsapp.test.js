@@ -305,7 +305,7 @@ test('cli: node compiler/cli.js check exits cleanly for both examples', () => {
 });
 
 test('dependencies: whatsapp bots map to Baileys and qrcode-terminal', () => {
-  assertIncludes(JSON.stringify(detectDependencies(QR_SOURCE)), '@qwerty-xcv/baileys');
+  assertIncludes(JSON.stringify(detectDependencies(QR_SOURCE)), '@whiskeysockets/baileys@6.7.24');
   assertIncludes(JSON.stringify(detectDependencies(QR_SOURCE)), 'qrcode-terminal');
 });
 
