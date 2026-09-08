@@ -70,7 +70,14 @@ function visit(node, onUse) {
     // Detect npm package dependencies imported via `bring ... from "pkg"` or `import ... from "pkg"`
     const isLocalFile = node.path.startsWith('.') || node.path.startsWith('/') || node.path.startsWith('\\') || node.path.startsWith('@/') || node.path.endsWith('.pln');
     if (!isLocalFile) {
-      onUse(node.path);
+      let isVendored = false;
+      try {
+        const { resolveVendorEntry } = require('./registry');
+        if (resolveVendorEntry(process.cwd(), node.path)) isVendored = true;
+      } catch (_) {}
+      if (!isVendored) {
+        onUse(node.path);
+      }
     }
   } else if (node.type === 'WebAppStatement') {
     // The `web app` shorthand creates an Express application.

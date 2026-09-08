@@ -29,6 +29,24 @@ const { format }   = require('./formatter');
 const { detectDependencies, PACKAGE_MAP, isBuiltinModule, splitPackageSpec } = require('./dependency-detector');
 
 const { VERSION } = require('./version');
+const { formatDiagnostic } = require('./diagnostics');
+const { startRepl, startJsonIpcRepl } = require('./repl');
+const { analyzeSemantics } = require('./passes/semantic');
+const { trackCommand, trackError, flush } = require('./telemetry');
+
+const cliStartTime = Date.now();
+let detectedCommand = 'repl';
+
+const origExit = process.exit;
+let isExiting = false;
+process.exit = function(code) {
+  if (isExiting) return origExit.call(process, code);
+  isExiting = true;
+  try {
+    trackCommand(detectedCommand || process.argv[2] || 'unknown', Date.now() - cliStartTime, code === 0 || code === undefined);
+  } catch {}
+  origExit.call(process, code);
+};
 
 // ── Terminal colours (disabled when stdout is not a TTY) ──────────────────────
 
@@ -55,24 +73,36 @@ ${clrBold(`PlainScript v${VERSION}`)} ${clrDim('· .pln compiles to readable Nod
 
 ${section('START')}
   plainscript new [name]        Scaffold a new project with a working app.pln
+  plainscript dev [file.pln]    Start live HMR dev server with instant hot-reload
+  plainscript repl              Start the interactive PlainScript REPL
   plainscript run <file.pln>    Install missing deps, compile, execute
   plainscript start             Build src/app.pln and run it from dist/
 
 ${section('BUILD & CHECK')}
   plainscript build             Compile every .pln under src/ into dist/
   plainscript build <file.pln>  Compile one file into dist/ (name preserved)
+                                --target=<node|esm|bun|edge|wasm>  Target runtime
+                                --standalone (-s)              Single executable binary
+                                --types (-t)                   TypeScript .d.ts declarations
+                                --sourcemap (-m)               Source maps
   plainscript check [target]  Validate imports + generate + JS output (no writes)
-                               target: a .pln file, a directory, or none = project scan
-                               --json  emits deterministic machine-readable output
+                                target: a .pln file, a directory, or none = project scan
+                                --json  emits deterministic machine-readable output
   plainscript fmt <file.pln>    Format a file in place
 
 ${section('PACKAGES')}
+  plainscript pack [dir]        Package pure .pln library into .plz archive
+  plainscript unpack <file.plz> Unpack .plz package bundle
   plainscript install           Install everything your source needs
   plainscript add <package>     Install a package into the project
   plainscript remove <package>  Uninstall a package from the project
   plainscript update            Update all installed packages
 
 ${section('TOOLS')}
+  plainscript fix <file.pln>    Self-heal syntax mistakes and unclosed blocks
+                                --dry-run  preview repairs without modifying files
+  plainscript benchmark         Benchmark LLM token efficiency vs TS & Python
+                                --json     emit machine-readable metrics
   plainscript doctor            Check the project environment
   plainscript version           Print the compiler version
   plainscript help              Print this text
@@ -362,6 +392,19 @@ function ensureDependencies(files, install = true) {
 // Compile a PlainScript program to JavaScript.
 //
 // Deterministic only: the lexer/parser/generator pipeline is the single
+function extractTargetArg() {
+  for (let i = 0; i < process.argv.length; i++) {
+    const arg = process.argv[i];
+    if (arg.startsWith('--target=')) {
+      return arg.split('=')[1].toLowerCase();
+    }
+    if (arg === '-T' || arg === '--target') {
+      return (process.argv[i + 1] || 'node').toLowerCase();
+    }
+  }
+  return null;
+}
+
 // authoritative compiler. Unsupported syntax produces a precise compiler
 // error — there is no second compilation path (v2.1.1).
 function compile(filePath, options = {}) {
@@ -370,7 +413,8 @@ function compile(filePath, options = {}) {
     console.error(`File not found: ${filePath}`);
     process.exit(1);
   }
-  const generationContext = createGenerationContext(options);
+  const target = options.target || extractTargetArg() || (readCompilerOptions() && readCompilerOptions().target) || 'node';
+  const generationContext = createGenerationContext({ ...options, target });
 
   let files;
   stage('Resolving imports', () => {
@@ -393,10 +437,13 @@ function compile(filePath, options = {}) {
     }).filter(s => s && s.trim()));
   let js = parts.join('\n');
   if (generationContext.needsAsync) {
-    js = wrapAsync(js);
-    if (generationContext.sourceMapBuilder) {
-      for (const m of generationContext.sourceMapBuilder.mappings) {
-        m.generatedLine += 1;
+    const isNativeAsync = generationContext.target === 'esm' || generationContext.target === 'bun';
+    if (!isNativeAsync) {
+      js = wrapAsync(js);
+      if (generationContext.sourceMapBuilder) {
+        for (const m of generationContext.sourceMapBuilder.mappings) {
+          m.generatedLine += 1;
+        }
       }
     }
   }
@@ -436,6 +483,20 @@ async function cmdRun(filePath, extraArgs = []) {
   if (!filePath) {
     console.error('Usage: plainscript run <file.pln>');
     process.exit(1);
+  }
+  const target = extractTargetArg() || 'node';
+  if (target === 'wasm') {
+    const { compileToWasm } = require('./wasm');
+    const srcText = fs.readFileSync(path.resolve(filePath), 'utf8');
+    const { exports, instantiate } = compileToWasm(srcText);
+    const instance = await instantiate();
+    console.log(`[WASM] Loaded module with exports: [${exports.join(', ')}]`);
+    if (instance.main) {
+      const res = instance.main();
+      console.log(`Result: ${res}`);
+    }
+    console.log('\nDone.');
+    return;
   }
   const isSourcemap = process.argv.includes('--sourcemap') || process.argv.includes('-m') || process.env.PLAINSCRIPT_SOURCEMAP === 'true';
   let js;
@@ -482,15 +543,27 @@ function buildOne(filePath, srcDir, outDir, options = {}) {
   if (rel.startsWith('..') || path.isAbsolute(rel)) rel = path.basename(absFile).replace(/\.pln$/, '.js');
   const outPath = path.join(path.resolve(outDir), rel);
 
+  const target = options.target || extractTargetArg() || (readCompilerOptions() && readCompilerOptions().target) || 'node';
+  if (target === 'wasm') {
+    const { compileToWasm } = require('./wasm');
+    const srcText = fs.readFileSync(absFile, 'utf8');
+    const { wasm, wat } = compileToWasm(srcText);
+    const wasmOutPath = outPath.replace(/\.js$/, '.wasm');
+    const watOutPath = outPath.replace(/\.js$/, '.wat');
+    fs.mkdirSync(path.dirname(wasmOutPath), { recursive: true });
+    fs.writeFileSync(wasmOutPath, wasm);
+    fs.writeFileSync(watOutPath, wat, 'utf8');
+    return path.relative(process.cwd(), wasmOutPath) || wasmOutPath;
+  }
   const isSourcemap = options.sourceMap || process.argv.includes('--sourcemap') || process.argv.includes('-m') || process.env.PLAINSCRIPT_SOURCEMAP === 'true';
 
   let code, mapObject;
   if (isSourcemap) {
-    const res = compile(absFile, { sourceMap: true, outputFile: path.basename(outPath) });
+    const res = compile(absFile, { target, sourceMap: true, outputFile: path.basename(outPath) });
     code = res.code + `\n//# sourceMappingURL=${path.basename(outPath)}.map\n`;
     mapObject = res.mapObject;
   } else {
-    code = compile(absFile);
+    code = compile(absFile, { target });
   }
 
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
@@ -498,6 +571,19 @@ function buildOne(filePath, srcDir, outDir, options = {}) {
   if (mapObject) {
     fs.writeFileSync(outPath + '.map', JSON.stringify(mapObject, null, 2), 'utf8');
   }
+
+  const isTypes = options.types || process.argv.includes('--types') || process.argv.includes('-t');
+  if (isTypes) {
+    try {
+      const { generateTypeDeclarations } = require('./passes/types');
+      const srcText = fs.readFileSync(absFile, 'utf8');
+      const ast = parse(tokenize(srcText));
+      const dts = generateTypeDeclarations(ast);
+      const dtsPath = outPath.replace(/\.js$/, '.d.ts');
+      fs.writeFileSync(dtsPath, dts, 'utf8');
+    } catch (_) {}
+  }
+
   return path.relative(process.cwd(), outPath) || outPath;
 }
 
@@ -519,8 +605,27 @@ async function cmdBuild(filePath) {
   const srcDir = resolveSrcDir(opts);
   const outDir = resolveOutDir(opts);
   const exclude = opts && opts.exclude;
+  const target = extractTargetArg() || (opts && opts.target) || 'node';
+
+  const isStandalone = process.argv.includes('--standalone') || process.argv.includes('-s');
+  if (isStandalone) {
+    const entry = filePath || findEntry(opts) || (fs.existsSync('src/app.pln') ? 'src/app.pln' : null);
+    if (!entry || !fs.existsSync(entry)) {
+      console.error(`Cannot build standalone binary: entry file "${entry || 'src/app.pln'}" not found.`);
+      process.exit(1);
+    }
+    console.log(`Packaging standalone executable for ${entry}...`);
+    const result = await buildStandaloneBinary(entry, compile, {
+      outDir,
+      target,
+      verbose: process.argv.includes('--verbose'),
+    });
+    console.log(`${clrGreen('✓')} Standalone executable created: ${result.binaryPath} (${(result.size / 1024).toFixed(1)} KB, engine: ${result.method})`);
+    return;
+  }
+
   if (filePath) {
-    const outPath = buildOne(filePath, srcDir, outDir);
+    const outPath = buildOne(filePath, srcDir, outDir, { target });
     console.log(`\nOutput written to ${outPath}`);
     return;
   }
@@ -534,7 +639,7 @@ async function cmdBuild(filePath) {
   try {
     built = sources.map((rel) => ({
       source: path.join(srcDir === '.' ? '' : srcDir, rel),
-      outPath: buildOne(path.join(path.resolve(srcDir), rel), srcDir, outDir),
+      outPath: buildOne(path.join(path.resolve(srcDir), rel), srcDir, outDir, { target }),
     }));
   } finally {
     QUIET_STAGES = false;
@@ -563,13 +668,31 @@ async function cmdStart(extraArgs = []) {
   });
 }
 
+async function cmdDev(target, extraArgs = []) {
+  const opts = readCompilerOptions();
+  let entryPath = target || findEntry(opts);
+  if (!entryPath || !fs.existsSync(entryPath)) {
+    console.error('No entry file found. Specify a file (e.g. "plainscript dev src/app.pln") or create "src/app.pln".');
+    process.exit(1);
+  }
+  const { startDevServer } = require('./dev');
+  startDevServer(entryPath);
+}
+
 function cmdNew(projectName) {
-  const name = projectName || 'my-plainscript-app';
+  const isLib = process.argv.includes('--lib');
+  const name = projectName || (isLib ? 'my-plainscript-lib' : 'my-plainscript-app');
   const dir  = path.resolve(name);
 
   if (fs.existsSync(dir)) {
     console.error(`Directory "${name}" already exists.`);
     process.exit(1);
+  }
+
+  if (isLib) {
+    initLibrary(dir, name);
+    console.log(`✓ Created PlainScript library "${name}" with pln.json`);
+    return;
   }
 
   fs.mkdirSync(dir);
@@ -670,6 +793,16 @@ function collectSourceAsts() {
 }
 
 function cmdInstall() {
+  const { restoreVendoredPackages } = require('./registry');
+  try {
+    const restored = restoreVendoredPackages(process.cwd());
+    if (restored && restored.length > 0) {
+      console.log(`${clrGreen('✓')} Restored ${restored.length} pure PlainScript package(s) into .plainscript/vendor/`);
+    }
+  } catch (e) {
+    console.error(`Warning: Could not restore pure PlainScript packages: ${e.message}`);
+  }
+
   console.log('Scanning source files...');
   const asts = collectSourceAsts();
 
@@ -746,6 +879,31 @@ function cmdAdd(packageName) {
     console.error('Usage: plainscript add <package>');
     process.exit(1);
   }
+
+  const { parsePackageSpec, vendorPackage } = require('./registry');
+  let specInfo;
+  try {
+    specInfo = parsePackageSpec(packageName);
+  } catch (e) {
+    console.error(e.message);
+    process.exit(1);
+  }
+
+  if (specInfo.type !== 'npm') {
+    console.log(`Resolving and vendoring pure PlainScript package ${packageName}...`);
+    try {
+      const res = vendorPackage(packageName, process.cwd(), { verbose: process.argv.includes('--verbose') });
+      console.log(`${clrGreen('✓')} Installed pure PlainScript package "${res.name}" v${res.version}`);
+      console.log(`  Location:  .plainscript/vendor/${res.name}/`);
+      console.log(`  Integrity: ${res.integrity}`);
+      console.log(`  Manifest:  pln.json & pln.lock updated`);
+      return;
+    } catch (e) {
+      console.error(`${clrRed('✗')} Failed to install "${packageName}": ${e.message}`);
+      process.exit(1);
+    }
+  }
+
   if (!isValidPackageName(packageName)) {
     console.error(`Invalid package name: "${packageName}".`);
     process.exit(1);
@@ -816,6 +974,17 @@ function validateSource(absPath) {
     // The compiler must never emit broken JavaScript. Parsing the output with
     // the V8 compiler catches generator regressions at check time.
     new vm.Script(js);
+
+    // Validate semantics and type safety across files
+    for (const { ast, absPath: f } of files) {
+      const sem = analyzeSemantics(ast);
+      if (!sem.ok && sem.errors.length > 0) {
+        const err = sem.errors[0];
+        const relF = path.relative(process.cwd(), f) || f;
+        const loc = err.line != null ? `Line ${err.line}, Column ${err.col}: ` : '';
+        throw new Error(`${relF} — ${loc}${err.message}`);
+      }
+    }
 
     // Collect unique npm dependencies across the file and its imports.
     const deps = [];
@@ -908,7 +1077,7 @@ function cmdCheck(target, json) {
       console.log(`${clrGreen('✓')} ${r.file} — ok${clrDim(` (${r.ms}ms)`)}`);
     } else {
       console.log(`${clrRed('✗')} ${r.file}`);
-      console.error(r.error);
+      console.error(formatDiagnostic(r.error, { filePath: r.file }));
     }
   }
 
@@ -963,13 +1132,55 @@ async function main() {
   if (verbose) { stage = stageVerbose;  VERBOSE = true; }
 
   // Filter flags out to get the positional arguments.
-  const positional = args.filter(a => !a.startsWith('--'));
+  const positional = [];
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (a.startsWith('-')) {
+      if (a === '-T' || a === '--target') {
+        i++; // skip option argument
+      }
+      continue;
+    }
+    positional.push(a);
+  }
   const [, , command, fileArg] = positional.length >= 2
     ? ['', '', positional[0], positional[1]]
     : ['', '', positional[0] || '', ''];
 
+  if (args.includes('--version') || args.includes('-v')) {
+    cmdVersion();
+    return;
+  }
+  if (args.includes('--help') || args.includes('-h')) {
+    cmdHelp();
+    return;
+  }
+
+  detectedCommand = command || 'repl';
+
   switch (command) {
+    case 'repl':
+      if (args.includes('--json-ipc')) {
+        startJsonIpcRepl();
+      } else {
+        const nativeBinCandidates = [
+          path.join(__dirname, '..', 'crates', 'pln-repl', 'target', 'release', process.platform === 'win32' ? 'pln-repl.exe' : 'pln-repl'),
+          path.join(__dirname, '..', 'bin', process.platform === 'win32' ? 'pln-repl.exe' : 'pln-repl'),
+        ];
+        const nativeBin = nativeBinCandidates.find(p => fs.existsSync(p));
+        if (nativeBin && !args.includes('--classic')) {
+          try {
+            execFileSync(nativeBin, [], { stdio: 'inherit' });
+            break;
+          } catch (_) {
+            // Fallback to classic REPL on exit or signal
+          }
+        }
+        startRepl();
+      }
+      break;
     case 'run':     await cmdRun(fileArg, positional.slice(2)); break;
+    case 'dev':     await cmdDev(fileArg, positional.slice(2)); break;
     case 'build':   await cmdBuild(fileArg);      break;
     case 'check':   cmdCheck(fileArg, json);    break;
     case 'fmt':     cmdFmt(fileArg);              break;
@@ -982,7 +1193,78 @@ async function main() {
     case 'update':  cmdUpdate();                  break;
     case 'version': cmdVersion();                 break;
     case 'help':    cmdHelp();                    break;
+    case 'pack': {
+      try {
+        const { packPackage } = require('./packager');
+        const pkg = packPackage(fileArg || '.', { verbose: process.argv.includes('--verbose') });
+        console.log(`${clrGreen('✓')} Packed package: ${pkg.packageName}`);
+        console.log(`  Version: ${pkg.manifest.version}`);
+        console.log(`  Files:   ${pkg.fileCount}`);
+        console.log(`  Size:    ${(pkg.size / 1024).toFixed(1)} KB`);
+        console.log(`  SHA-256: ${pkg.sha256}`);
+      } catch (e) {
+        console.error(`${clrRed('✗')} Package failed: ${e.message}`);
+        process.exit(1);
+      }
+      break;
+    }
+    case 'unpack': {
+      try {
+        if (!fileArg) {
+          console.error('Usage: plainscript unpack <archive.plz> [destination]');
+          process.exit(1);
+        }
+        const { unpackPackage } = require('./packager');
+        const dest = positional[2] || '.';
+        const res = unpackPackage(fileArg, dest);
+        console.log(`${clrGreen('✓')} Unpacked ${res.manifest.name} v${res.manifest.version} into ${res.targetDir}`);
+        for (const f of res.extractedFiles) {
+          console.log(`  + ${f}`);
+        }
+      } catch (e) {
+        console.error(`${clrRed('✗')} Unpack failed: ${e.message}`);
+        process.exit(1);
+      }
+      break;
+    }
+    case 'fix': {
+      if (!fileArg) {
+        console.error('Usage: plainscript fix <file.pln> [--dry-run]');
+        process.exit(1);
+      }
+      try {
+        const { fixFile } = require('./fixer');
+        const dryRun = args.includes('--dry-run');
+        const res = fixFile(fileArg, { dryRun });
+        if (!res.changed) {
+          console.log(`${clrGreen('✓')} ${fileArg} has no syntax issues.`);
+        } else {
+          console.log(`${clrGreen('✓')} ${dryRun ? '[dry-run] Would apply' : 'Applied'} ${res.fixes.length} fix(es) to ${fileArg}:`);
+          for (const f of res.fixes) {
+            console.log(`  + ${f}`);
+          }
+        }
+      } catch (e) {
+        console.error(`${clrRed('✗')} Fix failed: ${e.message}`);
+        process.exit(1);
+      }
+      break;
+    }
+    case 'benchmark': {
+      const { runBenchmarks, printReport } = require('../tools/benchmark-llm');
+      const data = runBenchmarks();
+      if (json) {
+        console.log(JSON.stringify(data, null, 2));
+      } else {
+        printReport(data);
+      }
+      break;
+    }
     default:
+      if (!command && process.stdin.isTTY && !process.env.CI) {
+        startRepl();
+        break;
+      }
       // Backwards-compatible: treat the first arg as a file to run directly
       if (command && command.endsWith('.pln')) {
         await cmdRun(command);
@@ -991,9 +1273,16 @@ async function main() {
         process.exit(1);
       }
   }
+  try {
+    trackCommand(detectedCommand, Date.now() - cliStartTime, true);
+  } catch {}
 }
 
 main().catch((err) => {
-  console.error(err.message);
+  try {
+    trackError(detectedCommand, err.code || err.name || 'CRASH', 0);
+    trackCommand(detectedCommand, Date.now() - cliStartTime, false);
+  } catch {}
+  console.error(formatDiagnostic(err));
   process.exit(1);
 });
