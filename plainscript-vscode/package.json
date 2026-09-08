@@ -2,20 +2,46 @@
     "name": "plainscript-language",
     "displayName": "PlainScript Language",
     "description": "Syntax highlighting and language support for the PlainScript programming language (.pln files)",
-    "version": "1.0.4-latest",
+    "version": "1.1.0",
     "publisher": "ayoistooslick",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/ayoistooslick/plainscript.git"
+    },
+    "homepage": "https://plainscript.org",
+    "bugs": {
+        "url": "https://github.com/ayoistooslick/plainscript/issues"
+    },
+    "keywords": [
+        "plainscript",
+        "pln",
+        "intent-oriented",
+        "programming-language",
+        "ai"
+    ],
+    "main": "./extension.js",
+    "activationEvents": [
+        "onLanguage:plainscript"
+    ],
     "engines": {
         "vscode": "^1.70.0"
     },
     "categories": [
-        "Programming Languages"
+        "Programming Languages",
+        "Linters",
+        "Snippets"
     ],
     "contributes": {
         "languages": [
             {
                 "id": "plainscript",
-                "aliases": ["PlainScript", "plainscript"],
-                "extensions": [".pln"],
+                "aliases": [
+                    "PlainScript",
+                    "plainscript"
+                ],
+                "extensions": [
+                    ".pln"
+                ],
                 "configuration": "./language-configuration.json",
                 "icon": {
                     "light": "./icons/plainscript-file.svg",
@@ -38,7 +64,7 @@
         ]
     },
     "scripts": {
-        "vscode:prepublish": "echo 'No build step required'"
+        "vscode:prepublish": "echo 'Prepublish complete'"
     },
     "license": "MIT"
 }
