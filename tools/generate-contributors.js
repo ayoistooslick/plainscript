@@ -1,0 +1,198 @@
+#!/usr/bin/env node
+// tools/generate-contributors.js
+// Automated contributor aggregation and CONTRIBUTORS.md generator.
+// Scans git commit history, groups authors, categorizes touched areas,
+// and formats an up-to-date CONTRIBUTORS.md markdown file.
+
+const fs = require('fs');
+const path = require('path');
+const { execSync } = require('child_process');
+
+const ROOT_DIR = path.resolve(__dirname, '..');
+const OUTPUT_FILE = path.join(ROOT_DIR, 'CONTRIBUTORS.md');
+const CONFIG_FILE = path.join(ROOT_DIR, '.github', 'contributors-meta.json');
+
+// Categorization heuristics based on changed file paths
+function categorizePath(filePath) {
+  if (/^docs\/|\.md$/i.test(filePath)) return 'Documentation';
+  if (/^tests\//i.test(filePath)) return 'Tests & Quality';
+  if (/^compiler\/(lexer|parser|generator)\.js/i.test(filePath)) return 'Core Grammar & Compiler';
+  if (/^compiler\/(cli|dev|repl|lsp|fixer|diagnostics)\.js/i.test(filePath)) return 'CLI & Developer Tooling';
+  if (/^compiler\/(standalone|packager|registry|wasm)\.js/i.test(filePath)) return 'Portability & Ecosystem';
+  if (/^packages\//i.test(filePath)) return 'Standard Packages';
+  if (/^plainscript-vscode\/|^editors\//i.test(filePath)) return 'IDE & Editor Extensions';
+  if (/^\.github\//i.test(filePath)) return 'CI/CD & Workflows';
+  if (/^tools\//i.test(filePath)) return 'Benchmarks & Tooling';
+  return 'General';
+}
+
+function getGitContributors() {
+  try {
+    // Delimiter: ###COMMIT###%an|%ae
+    const output = execSync('git log --format="###COMMIT###%an|%ae" --name-only', {
+      cwd: ROOT_DIR,
+      encoding: 'utf8',
+      maxBuffer: 10 * 1024 * 1024,
+    });
+
+    const authors = new Map();
+    let currentAuthor = null;
+
+    for (const rawLine of output.split('\n')) {
+      const line = rawLine.trim();
+      if (!line) continue;
+
+      if (line.startsWith('###COMMIT###')) {
+        const [name, email] = line.replace('###COMMIT###', '').split('|');
+        const key = (email || name || '').toLowerCase().trim();
+        if (!key || key.includes('github-actions') || key.includes('agent@replit.com') || key.includes('you@example.com')) {
+          currentAuthor = null;
+          continue;
+        }
+
+        if (!authors.has(key)) {
+          authors.set(key, {
+            name: name.trim(),
+            email: email.trim(),
+            commits: 0,
+            categories: new Set(),
+          });
+        }
+        currentAuthor = authors.get(key);
+        currentAuthor.commits++;
+      } else if (currentAuthor) {
+        currentAuthor.categories.add(categorizePath(line));
+      }
+    }
+
+    return Array.from(authors.values());
+  } catch (err) {
+    console.warn(`Warning: Could not read git log: ${err.message}`);
+    return [];
+  }
+}
+
+function loadMetadata() {
+  if (fs.existsSync(CONFIG_FILE)) {
+    try {
+      return JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
+    } catch (_) { }
+  }
+  return {
+    curated: [
+      {
+        name: 'Ayokunle',
+        github: 'ayoistooslick',
+        emails: ['davidayodele847@gmail.com'],
+        aliases: ['Ayodele Ayokunle David', 'ayoistoofiretogaf', 'ayoistooslick'],
+        role: 'Creator & Lead Maintainer',
+        contributions: 'Language creation, original architecture, compiler design, core grammar',
+      },
+      {
+        name: 'Pale Obscura',
+        github: 'palearchitect',
+        emails: ['thepalearchitect@gmail.com'],
+        aliases: ['Pale Obscura'],
+        role: 'Core Contributor',
+        contributions: 'Intent-oriented grammar adaptation, AI token benchmarks, multi-runtime targets (ESM/Wasm), LSP server, test suites, DX & dev server',
+      },
+      {
+        name: 'Documentation Contributor',
+        github: '',
+        emails: [],
+        aliases: [],
+        role: 'Documentation Specialist',
+        contributions: 'Documentation architecture, technical reference guides, API specifications, and tutorials',
+      },
+    ],
+  };
+}
+
+function matchesCurated(gitAuthor, curated) {
+  const authorName = (gitAuthor.name || '').toLowerCase().trim();
+  const authorEmail = (gitAuthor.email || '').toLowerCase().trim();
+
+  if (curated.name && curated.name.toLowerCase().trim() === authorName) return true;
+  if (curated.github && curated.github.toLowerCase().trim() === authorName) return true;
+
+  if (Array.isArray(curated.emails)) {
+    for (const e of curated.emails) {
+      if (e && e.toLowerCase().trim() === authorEmail) return true;
+    }
+  }
+
+  if (Array.isArray(curated.aliases)) {
+    for (const a of curated.aliases) {
+      const alias = a.toLowerCase().trim();
+      if (alias === authorName || alias === authorEmail) return true;
+    }
+  }
+
+  return false;
+}
+
+function generateMarkdown() {
+  const meta = loadMetadata();
+  const gitContributors = getGitContributors();
+
+  let md = `# PlainScript Contributors\n\n`;
+  md += `Thank you to everyone who has contributed their time, code, ideas, and feedback to the PlainScript language, compiler, and ecosystem.\n\n`;
+  md += `> This file is automatically generated and updated by \`tools/generate-contributors.js\` and GitHub Actions.\n\n`;
+  md += `---\n\n`;
+  md += `## Contributors Roll\n\n`;
+  md += `| Name / Handle | GitHub | Primary Contributions | Role |\n`;
+  md += `| :--- | :--- | :--- | :--- |\n`;
+
+  const accountedGitKeys = new Set();
+
+  // Curated contributors
+  for (const c of meta.curated) {
+    const ghLink = c.github ? `[@${c.github}](https://github.com/${c.github})` : '—';
+
+    // Find matching git contributions to enrich info if available
+    const matchedGit = gitContributors.filter(g => matchesCurated(g, c));
+    for (const g of matchedGit) {
+      accountedGitKeys.add(g.email.toLowerCase() || g.name.toLowerCase());
+    }
+
+    md += `| **${c.name}** | ${ghLink} | ${c.contributions} | **${c.role}** |\n`;
+  }
+
+  // Git-discovered contributors (auto-logged if not already listed)
+  for (const g of gitContributors) {
+    const key = (g.email || g.name || '').toLowerCase().trim();
+    if (accountedGitKeys.has(key)) continue;
+    accountedGitKeys.add(key);
+
+    const cats = Array.from(g.categories).filter(c => c !== 'General');
+    const desc = cats.length > 0 ? cats.join(', ') : 'Code & maintenance';
+    md += `| **${g.name}** | — | ${desc} (${g.commits} commit${g.commits === 1 ? '' : 's'}) | Contributor |\n`;
+  }
+
+  md += `\n---\n\n`;
+  md += `## How to Sign In as a Contributor\n\n`;
+  md += `We welcome contributions of all kinds—bug fixes, documentation, language design, performance benchmarks, and ecosystem packages.\n\n`;
+  md += `Contributors are **automatically detected and added to this roll upon merging into \`main\`**.\n\n`;
+  md += `To explicitly specify your preferred display name, GitHub handle, or role description:\n\n`;
+  md += `1. Add or edit your entry in [\`.github/contributors-meta.json\`](.github/contributors-meta.json):\n`;
+  md += `   \`\`\`json\n`;
+  md += `   {\n`;
+  md += `     "name": "Your Name",\n`;
+  md += `     "github": "yourhandle",\n`;
+  md += `     "role": "Documentation / Contributor",\n`;
+  md += `     "contributions": "Summary of your work"\n`;
+  md += `   }\n`;
+  md += `   \`\`\`\n`;
+  md += `2. Run \`node tools/generate-contributors.js\` (or let CI update it automatically).\n`;
+  md += `3. Submit a pull request.\n\n`;
+  md += `---\n\n`;
+  md += `## Recognition Policy\n\n`;
+  md += `- **All contributions count**: Code, documentation, benchmark datasets, bug reports, and syntax design discussions.\n`;
+  md += `- Please ensure your pull request adheres to the guidelines outlined in [CONTRIBUTION.md](CONTRIBUTION.md).\n`;
+
+  return md;
+}
+
+const content = generateMarkdown();
+fs.writeFileSync(OUTPUT_FILE, content, 'utf8');
+console.log(`✓ Updated CONTRIBUTORS.md successfully (${content.length} bytes).`);

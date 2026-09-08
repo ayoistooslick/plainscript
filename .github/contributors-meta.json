@@ -1,0 +1,38 @@
+{
+  "curated": [
+    {
+      "name": "Ayokunle",
+      "github": "ayoistooslick",
+      "emails": [
+        "davidayodele847@gmail.com"
+      ],
+      "aliases": [
+        "Ayodele Ayokunle David",
+        "ayoistoofiretogaf",
+        "ayoistooslick"
+      ],
+      "role": "Creator & Lead Maintainer",
+      "contributions": "Language creation, original architecture, compiler design, core grammar"
+    },
+    {
+      "name": "Pale Obscura",
+      "github": "palearchitect",
+      "emails": [
+        "thepalearchitect@gmail.com"
+      ],
+      "aliases": [
+        "Pale Obscura"
+      ],
+      "role": "Core Contributor",
+      "contributions": "Intent-oriented grammar adaptation, AI token benchmarks, multi-runtime targets (ESM/Wasm), LSP server, test suites, DX & dev server"
+    },
+    {
+      "name": "Documentation Contributor",
+      "github": "",
+      "emails": [],
+      "aliases": [],
+      "role": "Documentation Specialist",
+      "contributions": "Documentation architecture, technical reference guides, API specifications, and tutorials"
+    }
+  ]
+}

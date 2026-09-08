@@ -222,4 +222,4 @@ Questions
 
 If you're unsure whether a change belongs in the project, open an issue and describe what you are trying to accomplish before investing heavily in an implementation.
 
-Thanks for helping make **`plainscript`** better.
+Thanks for helping make **`plainscript`** better. See [CONTRIBUTORS.md](CONTRIBUTORS.md) for the list of project contributors.

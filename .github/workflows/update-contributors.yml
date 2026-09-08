@@ -1,0 +1,47 @@
+name: Update Contributors Roll
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/contributors-meta.json'
+      - 'tools/generate-contributors.js'
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-contributors:
+    if: github.event_name != 'pull_request' || github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository with full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Generate Contributors Roll
+        run: node tools/generate-contributors.js
+
+      - name: Commit and push changes if updated
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if [ -n "$(git status --porcelain CONTRIBUTORS.md)" ]; then
+            git add CONTRIBUTORS.md
+            git commit -m "docs: update CONTRIBUTORS.md [skip ci]"
+            git push origin main
+          else
+            echo "No changes detected in CONTRIBUTORS.md."
+          fi

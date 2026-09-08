@@ -1,0 +1,28 @@
+---
+description: PlainScript language rules and syntax patterns
+globs: ["*.pln", "**/*.pln", "pln.json"]
+---
+
+# PlainScript Language Rules & Coding Guidelines
+
+You are writing and maintaining code in PlainScript (`.pln`), an Intent-Oriented Programming Language.
+
+## Critical Invariants
+1. **Never use `=` for assignment or comparison**:
+   - Declare: `remember name as "Value"` or `let count is 0`
+   - Reassign: `count becomes count + 1`
+   - Compare: `if count is 10` or `if count equals 10`
+2. **Every block closes with `done`**:
+   - `make ... done`
+   - `if ... done`
+   - `for each ... done`
+   - `while ... done`
+   - `route ... done`
+   - `test ... done`
+3. **Return values with `give`**:
+   - `give result` (never use `return`)
+4. **Output with `show`**:
+   - `show "Message"` (never use `console.log` or `print`)
+5. **Always validate with the compiler**:
+   - Run `plainscript check`
+   - Run `plainscript fix <file.pln>` if syntax mistakes are detected

@@ -27,3 +27,32 @@ output.txt
 # Agent memory and local dev config
 .agents/memory/MEMORY.md
 .replit
+.claude/
+
+# Local roadmap / task tracker (never commit)
+TASKS.md
+tasks.md
+
+# AI Datasets (never commit large generated corpus files)
+dataset/
+*.jsonl
+
+# Extension and package binaries
+*.vsix
+*.tgz
+release-artifacts/
+
+# Rust and native build artifacts
+target/
+crates/**/target/
+
+# Package registry cache
+.pln_modules/
+.plainscript/vendor/
+
+# Local Drip Feed Commit System (never commit)
+scripts/
+tools/drip-commit.*
+.drip-feed/
+drip-feed.json
+drip-commit.json

@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="PlainScript 1.0.3-beta language reference and examples">
-  <title>PlainScript 1.0.3-beta</title>
+  <meta name="description" content="PlainScript 1.0.4 language reference and examples">
+  <title>PlainScript 1.0.4</title>
   <link rel="stylesheet" href="website/style.css">
 </head>
 <body>
@@ -13,7 +13,7 @@
       <a class="nav-logo" href="#">
         <img src="logo.jpg" alt="" class="nav-logo-image">
         <span>PlainScript</span>
-        <span class="logo-ver">1.0.3-beta</span>
+        <span class="logo-ver">1.0.4</span>
       </a>
       <nav class="nav-links" aria-label="Primary navigation">
         <a href="#quickstart">Quick start</a>
@@ -27,7 +27,7 @@
   <main>
     <section class="hero">
       <div class="container hero-content">
-        <p class="hero-badge">1.0.3-beta: intent-oriented Node.js programming</p>
+        <p class="hero-badge">1.0.4: intent-oriented programming</p>
         <h1 class="hero-title">Code that reads like plain English.</h1>
         <p class="hero-lead">Describe what you want. PlainScript compiles it to readable JavaScript while keeping the language small, direct, and checkable.</p>
         <div class="hero-actions">
@@ -50,10 +50,10 @@ done</code></pre>
           <article class="info-card"><span class="card-number">02</span><h3>Check</h3><p>Run <code>plainscript check file.pln</code> to validate imports and generated JavaScript.</p></article>
           <article class="info-card"><span class="card-number">03</span><h3>Build</h3><p>Run <code>plainscript build</code> to emit standalone files in <code>dist/</code>.</p></article>
         </div>
-        <pre class="code-window"><code>npx plainscript new hello
+        <pre class="code-window"><code>npx plainscript-lang new hello
 cd hello
-npx plainscript check
-npx plainscript build
+npx plainscript-lang check
+npx plainscript-lang build
 npm start</code></pre>
       </div>
     </section>
@@ -64,12 +64,14 @@ npm start</code></pre>
         <h2 class="section-title">A focused grammar for real programs.</h2>
         <div class="feature-grid">
           <article class="feature-card"><h3>Variables</h3><p><code>remember name as "Ada"</code> and readable assignment with <code>becomes</code>.</p></article>
-          <article class="feature-card"><h3>Conditions</h3><p>Use <code>is at least</code>, <code>contains</code>, <code>between</code>, and logical operators.</p></article>
+          <article class="feature-card"><h3>Conditions</h3><p>Use <code>is at least</code>, <code>is equal to</code>, <code>contains</code>, and <code>is in list</code>.</p></article>
           <article class="feature-card"><h3>Functions</h3><p>Define functions with <code>make</code>, return with <code>give</code>, and close with <code>done</code>.</p></article>
-          <article class="feature-card"><h3>Records</h3><p>Model data with record kinds and readable constructors.</p></article>
+          <article class="feature-card"><h3>Loops</h3><p>Repeat loops: <code>repeat 5 times</code>, <code>repeat with item in list</code>, and <code>repeat while</code>.</p></article>
+          <article class="feature-card"><h3>Records</h3><p>Model data with record kinds, field defaults, and readable constructors.</p></article>
           <article class="feature-card"><h3>Web apps</h3><p>Declare routes, JSON responses, sessions, cookies, uploads, and auth.</p></article>
           <article class="feature-card"><h3>Data and async</h3><p>Use SQLite, HTTP, files, schedules, concurrency, and WebSockets.</p></article>
-          <article class="feature-card"><h3>AI providers</h3><p>Call Groq and other OpenAI-compatible providers with environment-backed keys.</p></article>
+          <article class="feature-card"><h3>Native & Wasm</h3><p>Target Node.js, ES Modules, standalone executables, and WebAssembly.</p></article>
+          <article class="feature-card"><h3>AI integration</h3><p>High token efficiency (50% reduction) with OpenAI-compatible completion APIs.</p></article>
         </div>
       </div>
     </section>
@@ -79,7 +81,7 @@ npm start</code></pre>
         <p class="section-tag">Capabilities</p>
         <h2 class="section-title">The compiler covers the full path.</h2>
         <div class="capability-list">
-          <span>JSON</span><span>SQLite and SQL</span><span>HTTP client</span><span>Auth and sessions</span><span>Files</span><span>Packages</span><span>Async</span><span>Errors</span><span>Concurrency</span><span>WebSockets</span><span>Cache</span><span>Bots</span><span>OCR</span><span>Tests</span><span>Modules</span>
+          <span>JSON</span><span>SQLite and SQL</span><span>HTTP client</span><span>Auth and sessions</span><span>Files</span><span>Packages</span><span>Async</span><span>Errors</span><span>Concurrency</span><span>WebSockets</span><span>Cache</span><span>Bots</span><span>OCR</span><span>Tests</span><span>Modules</span><span>Wasm</span><span>LSP Server</span><span>Dev Server</span><span>TypeScript .d.ts</span>
         </div>
       </div>
     </section>
@@ -88,7 +90,7 @@ npm start</code></pre>
       <div class="container">
         <p class="section-tag">Feature library</p>
         <h2 class="section-title">Current, checked examples.</h2>
-        <p class="section-lead">These snippets use the grammar accepted by PlainScript 1.0.3-beta.</p>
+        <p class="section-lead">These snippets use the grammar accepted by PlainScript 1.0.4.</p>
         <div class="library-toolbar">
           <label class="sr-only" for="lib-search">Search examples</label>
           <input id="lib-search" class="lib-search-input" type="search" placeholder="Search examples">
@@ -108,7 +110,7 @@ npm start</code></pre>
   </main>
 
   <footer class="site-footer">
-    <div class="container footer-bottom"><span>PlainScript</span><span>1.0.3-beta</span></div>
+    <div class="container footer-bottom"><span>PlainScript</span><span>1.0.4</span></div>
   </footer>
   <script src="website/script.js"></script>
 </body>
