@@ -6,13 +6,25 @@ const path = require('path');
 const { tokenize } = require('./lexer');
 const { parse }    = require('./parser');
 const { generate, createGenerationContext, wrapAsync } = require('./generator');
+const { resolveVendorEntry } = require('./registry');
 
-function isLocalImportPath(p) {
+function isLocalImportPath(p, dir = process.cwd()) {
   if (!p) return false;
-  return p.startsWith('.') || p.startsWith('/') || p.startsWith('\\') || p.startsWith('@/') || p.endsWith('.pln');
+  if (p.startsWith('.') || p.startsWith('/') || p.startsWith('\\') || p.startsWith('@/') || p.endsWith('.pln')) {
+    return true;
+  }
+  try {
+    if (resolveVendorEntry(dir, p)) return true;
+  } catch (_) {}
+  return false;
 }
 
 function resolveImportPath(dir, importPath) {
+  try {
+    const vendored = resolveVendorEntry(dir, importPath);
+    if (vendored) return vendored;
+  } catch (_) {}
+
   let base;
   if (importPath.startsWith('@/')) {
     const srcDir = fs.existsSync(path.resolve(process.cwd(), 'src'))
@@ -46,12 +58,12 @@ function resolveImportPath(dir, importPath) {
 }
 
 // Returns the local file import and re-export paths declared at the top level of an AST.
-function getImports(ast) {
+function getImports(ast, dir = process.cwd()) {
   const paths = [];
   for (const node of ast.body) {
-    if (node.type === 'ImportStatement' && node.path && isLocalImportPath(node.path)) {
+    if (node.type === 'ImportStatement' && node.path && isLocalImportPath(node.path, dir)) {
       paths.push(node.path);
-    } else if (node.type === 'ExportStatement' && node.fromPath && isLocalImportPath(node.fromPath)) {
+    } else if (node.type === 'ExportStatement' && node.fromPath && isLocalImportPath(node.fromPath, dir)) {
       paths.push(node.fromPath);
     }
   }
@@ -103,8 +115,8 @@ function resolveDependencies(entryPath) {
 
     // Recurse into each import before processing this file (DFS)
     const newStack = [...stack, absPath];
-    for (const importPath of getImports(ast)) {
-      const dir         = path.dirname(absPath);
+    const dir = path.dirname(absPath);
+    for (const importPath of getImports(ast, dir)) {
       const resolvedAbs = resolveImportPath(dir, importPath);
       visit(resolvedAbs, newStack);
     }
@@ -154,4 +166,4 @@ function bundle(entryPath, options = {}) {
   return js;
 }
 
-module.exports = { bundle, resolveDependencies };
+module.exports = { bundle, resolveDependencies, resolveImportPath, isLocalImportPath };
