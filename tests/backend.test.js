@@ -561,6 +561,50 @@ done
   assert(JSON.stringify(received), '["welcome","echo-me"]');
 });
 
+testAsync('websocket: send to targets a specific connection', async () => {
+  const ws = require('ws');
+  const servers = [];
+  const wrappedWs = {
+    WebSocket: ws.WebSocket,
+    WebSocketServer: class extends ws.WebSocketServer {
+      constructor(options) {
+        super(options);
+        servers.push(this);
+      }
+    },
+  };
+  const js = compileProgram(`websocket server on 0
+when socket connects
+done
+when socket sends message
+send to socket "echo: " + message
+done
+when socket disconnects
+done
+done
+`);
+  new Function('require', js)((name) => {
+    if (name === 'ws') return wrappedWs;
+    throw new Error('unexpected require ' + name);
+  });
+
+  await sleep(150);
+  const server = servers[servers.length - 1];
+  if (!server) throw new Error('websocket server did not open');
+  const port = server.address().port;
+
+  const client = new ws.WebSocket(`ws://127.0.0.1:${port}`);
+  const received = [];
+  client.on('open', () => client.send('hello'));
+  client.on('message', (raw) => {
+    received.push(raw.toString());
+    client.close();
+  });
+  await waitFor(() => received.length >= 1, 3000);
+  server.close();
+  assert(JSON.stringify(received), '["echo: hello"]');
+});
+
 test('websocket: broadcast consumes a string payload and targets the server', () => {
   const js = compileProgram(`websocket server on 8080
 when socket connects

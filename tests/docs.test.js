@@ -15,6 +15,7 @@ const DOC_FILES = [
   'knowledge.md',
   'docs/PLAINSCRIPT-SPEC.md',
   'docs/CAPABILITY_GAP_AUDIT.md',
+  'docs/GAME-PROMPT.md', // v1.0.36 — browser/game guide
   'plainscript-vscode/README.md',
   'samples/README.md',
 ];
@@ -58,7 +59,7 @@ test('all fenced PlainScript documentation blocks compile', () => {
   console.log(`        checked ${count} fenced blocks`);
 });
 
-test('all eight real-world templates compile and old starters are gone', () => {
+test('all fourteen real-world templates compile and old starters are gone', () => {
   const root = path.join(__dirname, '..', 'templates');
   const old = ['idverify', 'oauth'];
   for (const name of old) {
@@ -70,7 +71,7 @@ test('all eight real-world templates compile and old starters are gone', () => {
     .filter(name => name !== 'README.md')
     .filter(name => fs.existsSync(path.join(root, name, 'src', 'app.pln')))
     .sort();
-  if (entries.length !== 8) throw new Error(`expected 8 templates, found ${entries.length}`);
+  if (entries.length !== 14) throw new Error(`expected 14 templates, found ${entries.length}`);
   for (const name of entries) {
     compile(
       fs.readFileSync(path.join(root, name, 'src', 'app.pln'), 'utf8'),

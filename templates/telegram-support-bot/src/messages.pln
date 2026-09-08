@@ -1,0 +1,13 @@
+make supportHours()
+    give "Support is available Monday to Friday, 09:00 to 17:00 UTC."
+done
+
+make supportPricing()
+    give "Plans start at $10 per month."
+done
+
+make supportContact()
+    give "Please send your email and a support specialist will reply."
+done
+
+export supportHours and supportPricing and supportContact

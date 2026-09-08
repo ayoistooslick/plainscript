@@ -1,4 +1,4 @@
-// PlainScript 1.0.3-beta: hardcoded Telegram support bot.
+bring supportHours and supportPricing and supportContact from "./messages.pln"
 
 bot env("TELEGRAM_BOT_TOKEN")
 
@@ -7,15 +7,15 @@ when someone sends "/start"
 done
 
 when someone sends "/hours"
-    reply "Support is available Monday to Friday, 09:00 to 17:00 UTC."
+    reply supportHours()
 done
 
 when someone sends "/pricing"
-    reply "Plans start at $10 per month. Ask /contact for a person."
+    reply supportPricing() + " Ask /contact for a person."
 done
 
 when someone sends "/contact"
-    reply "Please send your email and a support specialist will reply."
+    reply supportContact()
 done
 
 when someone sends matching "/echo (.+)"
@@ -31,15 +31,15 @@ when someone sends "/menu"
 done
 
 when someone clicks "hours"
-    reply "Support is available Monday to Friday, 09:00 to 17:00 UTC."
+    reply supportHours()
 done
 
 when someone clicks "pricing"
-    reply "Plans start at $10 per month."
+    reply supportPricing()
 done
 
 when someone clicks "contact"
-    reply "Please send your email and a support specialist will reply."
+    reply supportContact()
 done
 
 start telegram bot

@@ -1,4 +1,4 @@
-// PlainScript 1.0.3-beta: JSON REST route.
+// PlainScript 1.0.36: JSON REST route.
 web app
 route get "/api/status"
     reply json

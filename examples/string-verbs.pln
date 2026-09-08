@@ -1,0 +1,16 @@
+// PlainScript 1.0.36: natural string verbs — transform a variable in place.
+
+make capitalize(title)
+    lowercase title
+    split title by " "
+    uppercase first letter of each word in title
+    join title by " "
+    give title
+done
+
+remember headline as "hello world from plainscript"
+show capitalize(headline)
+
+remember label as "  just a label  "
+trim label
+show label

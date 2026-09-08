@@ -1,11 +1,11 @@
-// PlainScript 1.0.3-beta: authenticated webhook receiver.
+bring persistEvent from "./events.pln"
 
 web app
 require api key from env("WEBHOOK_KEY")
 
 route post "/webhooks/events"
     remember event as body()
-    writeFile("last-webhook.json", jsonEncode(event))
+    persistEvent(event)
     show "Webhook accepted"
     status 202
     reply json

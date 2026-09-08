@@ -1,4 +1,4 @@
-// PlainScript 1.0.3-beta: fetch an upstream API from a route.
+// PlainScript 1.0.36: fetch an upstream API from a route.
 web app
 route get "/proxy"
     remember upstream as get "https://example.com/data" timeout 5000

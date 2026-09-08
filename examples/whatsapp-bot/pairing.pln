@@ -1,16 +1,38 @@
-// PlainScript 1.0.3-beta: WhatsApp pairing login.
+// PlainScript 1.0.36: WhatsApp pairing login.
+// Showcases `use baileys`, message.type branching, media downloads,
+// and button/list reply handling.
 
 whatsapp bot
     auth "plain-script-whatsapp"
+    use baileys "@qwerty-xcv/baileys"
     login pairing "2348012345678"
     on message
         log message
+        // Text commands.
         if message.text is "/start"
             reply "Welcome!"
         done
         if message.text is "/help"
             reply `Available commands:
 /start /help`
+        done
+        // Save any incoming image to disk.
+        if message.type is "image"
+            download "media/photo.jpg"
+            reply "Got your image, saved it to media/photo.jpg"
+        done
+        // Same for documents.
+        if message.type is "document"
+            download "media/file.bin"
+            reply "Got your document, saved it to media/file.bin"
+        done
+        // Button taps carry a buttonId we can reply with.
+        if message.type is "button"
+            reply "You chose: " + message.buttonId
+        done
+        // List replies carry the selected list item.
+        if message.type is "list"
+            reply "You picked: " + message.buttonId
         done
     done
 done

@@ -1,0 +1,11 @@
+make monthlyChart()
+    remember labels as ["Jan", "Feb", "Mar", "Apr"]
+    remember signups as [12, 18, 27, 35]
+    give barChart("Monthly signups", labels, signups, {
+        width: 720,
+        height: 420,
+        accent: "#40c463"
+    })
+done
+
+export monthlyChart

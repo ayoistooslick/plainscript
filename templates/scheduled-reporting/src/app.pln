@@ -1,15 +1,9 @@
-// PlainScript 1.0.3-beta: scheduled report with a status endpoint.
+bring createReport from "./reports.pln"
 
 remember latest as "No report has run yet"
 
-make createReport()
-    latest becomes `report created at ${date()}`
-    writeFile("latest-report.txt", latest)
-    give latest
-done
-
 schedule "0 * * * *"
-    createReport()
+    latest becomes createReport(latest)
 done
 
 web app

@@ -1,6 +1,6 @@
 {
   "name": "idverify",
-  "version": "1.0.4-latest",
+  "version": "1.0.36",
   "private": true,
   "type": "commonjs",
   "description": "A real-world ID-verification SDK authored in PlainScript.",

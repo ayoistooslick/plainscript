@@ -1,0 +1,10 @@
+make broadcastMsg(msg, connections)
+    remember payload as jsonEncode(msg)
+    for each connection in connections
+        if connection.userId is not "" and connection.userId is not msg.sender
+            __wsSend(connection.socket, payload)
+        done
+    done
+done
+
+export broadcastMsg

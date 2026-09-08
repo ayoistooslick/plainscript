@@ -1,0 +1,5 @@
+make welcomeMessage()
+    give "welcome to the chat"
+done
+
+export welcomeMessage

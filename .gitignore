@@ -27,3 +27,4 @@ output.txt
 # Agent memory and local dev config
 .agents/memory/MEMORY.md
 .replit
+.aider*

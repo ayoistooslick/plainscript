@@ -1,4 +1,4 @@
-// PlainScript 1.0.3-beta: hardcoded and Groq-backed Telegram replies.
+bring answerQuestion from "./ai.pln"
 
 bot env("TELEGRAM_BOT_TOKEN")
 
@@ -15,9 +15,7 @@ when someone sends "/status"
 done
 
 when someone sends matching "/ask (.+)"
-    remember answer as chatWith("groq", "llama-3.3-70b-versatile", message, {
-        temperature: 0.2
-    })
+    remember answer as answerQuestion(message)
     reply answer
 done
 

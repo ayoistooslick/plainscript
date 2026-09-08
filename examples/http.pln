@@ -1,4 +1,4 @@
-// PlainScript 1.0.3-beta: HTTP client requests.
+// PlainScript 1.0.36: HTTP client requests.
 
 remember response as get "https://example.com/api/items" timeout 5000
 if response.ok is true

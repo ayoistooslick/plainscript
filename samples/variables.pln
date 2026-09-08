@@ -1,4 +1,4 @@
-// PlainScript 1.0.3-beta: declarations and assignment.
+// PlainScript 1.0.36: declarations and assignment.
 remember count as 1
 count becomes count + 1
 show count

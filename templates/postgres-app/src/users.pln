@@ -1,0 +1,7 @@
+make normalizeName(value)
+    trim value
+    lowercase value
+    give value
+done
+
+export normalizeName

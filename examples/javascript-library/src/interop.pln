@@ -1,0 +1,53 @@
+// PlainScript 1.0.36: drop into an npm library via import, callbacks, and fetch.
+
+bring THREE from "three"
+
+remember scene as new THREE.Scene()
+remember camera as new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 1000)
+remember renderer as new THREE.WebGLRenderer()
+renderer.setSize(window.innerWidth, window.innerHeight)
+camera.position.z becomes 9
+document.body.append(renderer.domElement)
+
+make fitWindow()
+    camera.aspect becomes window.innerWidth / window.innerHeight
+    camera.updateProjectionMatrix()
+    renderer.setSize(window.innerWidth, window.innerHeight)
+done
+
+window.addEventListener("resize", fitWindow)
+
+remember starCount as 150
+remember starColor as 0x40c463
+
+try
+    remember cfg as fetchJson("config.json")
+    if cfg.ok is true
+        starCount becomes cfg.data.stars
+        starColor becomes cfg.data.color
+    otherwise
+        show "Config request returned status " + cfg.status
+    done
+recover as err
+    show message of err
+    show "Falling back to the built-in starfield."
+done
+
+remember stars as []
+for index n from 0 to starCount
+    remember shape as new THREE.SphereGeometry(0.05, 6, 6)
+    remember starMaterial as new THREE.MeshBasicMaterial({ color: starColor })
+    remember star as new THREE.Mesh(shape, starMaterial)
+    star.position.x becomes (Math.random() - 0.5) * 18
+    star.position.y becomes (Math.random() - 0.5) * 10
+    star.position.z becomes (Math.random() - 0.5) * 10
+    scene.add(star)
+    stars.push(star)
+done
+
+show "Starfield ready with " + starCount + " stars"
+
+every frame
+    scene.rotation.y becomes scene.rotation.y + 0.002
+    renderer.render(scene, camera)
+done

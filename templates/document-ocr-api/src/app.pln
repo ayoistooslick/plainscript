@@ -1,4 +1,4 @@
-// PlainScript 1.0.3-beta: upload and OCR API.
+bring scanDocument from "./ocr.pln"
 
 web app
 accept uploads limit "8 MB" allow list with "image/png", "image/jpeg" folder "uploads"
@@ -12,7 +12,7 @@ route post "/documents/scan"
         done
     otherwise
         remember document as upload("document")
-        ocr path of document as text
+        remember text as scanDocument(document)
         reply json
             text is text
         done

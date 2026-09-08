@@ -1,4 +1,4 @@
-// PlainScript 1.0.3-beta: WebSocket server.
+// PlainScript 1.0.36: WebSocket server.
 websocket server on 8080
     when socket connects
         send socket "connected"
