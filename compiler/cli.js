@@ -4,6 +4,7 @@
  // Usage:
  //   plainscript run    <file.pln>   install missing dependencies, compile and execute
  //   plainscript build  [file.pln]   compile src/ (or one file) to dist/, names preserved
+ //   plainscript build  <file.pln> -o <out.js>  compile one file to a chosen output path
  //   plainscript check  [target]   fully validate source(s): imports + generate + JS syntax
  //                                 (target: a .pln file, a directory, or none to scan the project)
  //   plainscript fmt    <file.pln>   format a PlainScript file in-place
@@ -82,6 +83,7 @@ ${section('BUILD & CHECK')}
   plainscript build             Compile every .pln under src/ into dist/
   plainscript build <file.pln>  Compile one file into dist/ (name preserved)
                                 --target=<node|esm|bun|edge|wasm>  Target runtime
+                                -o <out.js>                    Compile one file to an explicit path
                                 --standalone (-s)              Single executable binary
                                 --types (-t)                   TypeScript .d.ts declarations
                                 --sourcemap (-m)               Source maps
@@ -587,6 +589,38 @@ function buildOne(filePath, srcDir, outDir, options = {}) {
   return path.relative(process.cwd(), outPath) || outPath;
 }
 
+// `plainscript build <file.pln> -o <out.js>` — compile one entry to an explicit
+// output path (same compilation pipeline as buildOne, including source maps
+// when requested). Valuable for browser payloads such as the v1.0.36
+// requestAnimationFrame / addEventListener helpers, which are meant to run as
+// a single script tag.
+function writeOneFile(filePath, outputFile) {
+  const absFile = path.resolve(filePath);
+  if (!fs.existsSync(absFile)) {
+    console.error(`File not found: ${filePath}`);
+    process.exit(1);
+  }
+  const outPath = path.resolve(outputFile);
+
+  const isSourcemap = process.argv.includes('--sourcemap') || process.argv.includes('-m') || process.env.PLAINSCRIPT_SOURCEMAP === 'true';
+
+  let code, mapObject;
+  if (isSourcemap) {
+    const res = compile(absFile, { sourceMap: true, outputFile: path.basename(outPath) });
+    code = res.code + `\n//# sourceMappingURL=${path.basename(outPath)}.map\n`;
+    mapObject = res.mapObject;
+  } else {
+    code = compile(absFile);
+  }
+
+  fs.mkdirSync(path.dirname(outPath), { recursive: true });
+  fs.writeFileSync(outPath, code, 'utf8');
+  if (mapObject) {
+    fs.writeFileSync(outPath + '.map', JSON.stringify(mapObject, null, 2), 'utf8');
+  }
+  return path.relative(process.cwd(), outPath) || outPath;
+}
+
 // `plainscript build` — TypeScript-style production build:
 //
 //   Zero config (default):
@@ -600,7 +634,9 @@ function buildOne(filePath, srcDir, outDir, options = {}) {
 //
 // With an explicit file argument only that entry is compiled; without one,
 // every .pln under the discovered source root builds to the output directory.
-async function cmdBuild(filePath) {
+// The optional -o/--output <path> flag (single-file builds only) redirects the
+// output to an explicit file instead of the dist layout.
+async function cmdBuild(filePath, outputPath) {
   const opts = readCompilerOptions();
   const srcDir = resolveSrcDir(opts);
   const outDir = resolveOutDir(opts);
@@ -625,9 +661,15 @@ async function cmdBuild(filePath) {
   }
 
   if (filePath) {
-    const outPath = buildOne(filePath, srcDir, outDir, { target });
+    const outPath = outputPath
+      ? writeOneFile(filePath, outputPath)
+      : buildOne(filePath, srcDir, outDir, { target });
     console.log(`\nOutput written to ${outPath}`);
     return;
+  }
+  if (outputPath) {
+    console.error('Usage: plainscript build <file.pln> -o <output.js>\n\n-o/--output needs a single .pln file to compile.');
+    process.exit(1);
   }
   const sources = discoverSources(srcDir, outDir, exclude);
   if (sources.length === 0) {
@@ -711,7 +753,7 @@ done
 route get "/api/status"
     reply json
         status is "ok"
-        version is "1.0.4-latest"
+        version is "1.0.36"
     done
 done
 
@@ -1181,7 +1223,28 @@ async function main() {
       break;
     case 'run':     await cmdRun(fileArg, positional.slice(2)); break;
     case 'dev':     await cmdDev(fileArg, positional.slice(2)); break;
-    case 'build':   await cmdBuild(fileArg);      break;
+    case 'build': {
+      // v1.0.36 — optional -o/--output <path>. "-o" is a single-dash flag, so
+      // it survives the "--filtered" positional list; pull it out here before
+      // building the positional file argument for cmdBuild.
+      let outputPath = null;
+      const positionalOnly = [];
+      for (let i = 0; i < args.length; i++) {
+        const a = args[i];
+        if (a === '-o' || a === '--output') {
+          if (i + 1 < args.length && !args[i + 1].startsWith('-')) {
+            outputPath = args[++i];
+          } else {
+            console.error('Usage: plainscript build <file.pln> -o <output.js>');
+            process.exit(1);
+          }
+        } else if (!a.startsWith('-')) {
+          positionalOnly.push(a);
+        }
+      }
+      await cmdBuild(positionalOnly[1] || '', outputPath);
+      break;
+    }
     case 'check':   cmdCheck(fileArg, json);    break;
     case 'fmt':     cmdFmt(fileArg);              break;
     case 'new':     cmdNew(fileArg);              break;

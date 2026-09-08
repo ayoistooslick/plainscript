@@ -52,6 +52,7 @@ const TOKEN = {
   RESPOND:     'RESPOND',     // alias for reply
   SEND_BACK:   'SEND_BACK',   // alias for reply
   JSON_KW:     'JSON_KW',
+  FILE_KW:     'FILE_KW',      // for "reply file" and "serve file"
   SERVE:       'SERVE',
   SERVE_STATIC: 'SERVE_STATIC', // alias for serve folder
   SERVE_PUBLIC: 'SERVE_PUBLIC', // alias for serve folder
@@ -212,6 +213,7 @@ const KEYWORDS = {
   respond:   TOKEN.RESPOND,
   send_back: TOKEN.SEND_BACK,
   json:      TOKEN.JSON_KW,
+  file:      TOKEN.FILE_KW,
   serve:     TOKEN.SERVE,
   serve_static: TOKEN.SERVE_STATIC,
   serve_public: TOKEN.SERVE_PUBLIC,
@@ -414,6 +416,18 @@ function tokenize(source) {
       i++; // skip closing backtick
       tokens.push({ type: TOKEN.TEMPLATE_STRING, value: content, line: tokenLine, col: tokenCol });
       continue;
+    }
+
+    // Hex number literal (0x... → decimal; supports colors like 0xRRGGBB)
+    if (source[i] === '0' && (source[i + 1] === 'x' || source[i + 1] === 'X')) {
+      let hex = '';
+      let j = i + 2;
+      while (j < source.length && /[0-9a-fA-F]/.test(source[j])) hex += source[j++];
+      if (hex) {
+        tokens.push({ type: TOKEN.NUMBER, value: Number.parseInt(hex, 16), line: tokenLine, col: tokenCol });
+        i = j;
+        continue;
+      }
     }
 
     // Number literal (may include decimal point or BigInt suffix 'n')

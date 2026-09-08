@@ -1,0 +1,10 @@
+{
+  "name": "plainscript-messaging-app",
+  "version": "1.0.36",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "build": "plainscript build src/app.pln -o dist/app.js",
+    "start": "node dist/app.js"
+  }
+}

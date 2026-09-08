@@ -1,4 +1,4 @@
-// PlainScript 1.0.3-beta: file and path operations.
+// PlainScript 1.0.36: file and path operations.
 
 remember report as readFile("README.md")
 show length(report)

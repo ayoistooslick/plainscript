@@ -1,12 +1,28 @@
-// PlainScript 1.0.3-beta: WhatsApp QR login.
+// PlainScript 1.0.36: WhatsApp QR login.
+// Showcases `use baileys`, message.type branching, media downloads,
+// and button handling.
 
 whatsapp bot
     auth "plain-script-whatsapp"
+    use baileys "@qwerty-xcv/baileys"
     login qr
     on message
         log message
         if message.text is "/start"
             reply "Welcome"
+        done
+        // Save incoming images automatically.
+        if message.type is "image"
+            download "media/photo.jpg"
+            reply "Saved your photo!"
+        done
+        if message.type is "document"
+            download "media/file.bin"
+            reply "Saved your document!"
+        done
+        // Button replies include the tapped button's id.
+        if message.type is "button"
+            reply "You chose: " + message.buttonId
         done
     done
 done

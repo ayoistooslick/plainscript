@@ -1,4 +1,4 @@
-// PlainScript 1.0.3-beta: parallel operations and timeouts.
+// PlainScript 1.0.36: parallel operations and timeouts.
 
 make firstJob()
     wait for sleep(10)

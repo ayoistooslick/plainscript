@@ -1,0 +1,33 @@
+bring monthlyChart from "./chart.pln"
+
+makeFolder("public")
+remember chart as monthlyChart()
+saveImage("public/monthly-signups.svg", chart)
+
+web app
+
+route get "/health"
+    reply "ok"
+done
+
+route get "/chart.svg"
+    reply file "public/monthly-signups.svg"
+done
+
+bot env("TELEGRAM_BOT_TOKEN")
+
+when someone sends "/start"
+    reply "Welcome. Use /chart to receive the latest signup visualization."
+done
+
+when someone sends "/chart"
+    if env("PUBLIC_BASE_URL") is empty
+        reply "Set PUBLIC_BASE_URL so Telegram can access the chart."
+    otherwise
+        sendPhoto(chatId, env("PUBLIC_BASE_URL") + "/chart.svg", "Monthly signups")
+        reply "Here is the latest signup chart."
+    done
+done
+
+start 3000
+start telegram bot

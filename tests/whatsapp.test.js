@@ -103,6 +103,8 @@ async function runWhatsAppProgram(js, initialState = {}) {
     saveCredsCalls: 0,     // creds.update → saveCreds persistence calls
     pairingRequests: [],   // requestPairingCode(phone) numbers
     sentMessages: [],      // sendMessage(chat, { text })
+    downloads: [],         // downloadMediaMessage invocations
+    filesWritten: [],      // media files saved via the download statement
     qrRendered: [],        // qrcode-terminal.generate(qr, options)
     logs: [],
     errors: [],
@@ -128,6 +130,7 @@ async function runWhatsAppProgram(js, initialState = {}) {
       recorder.pairingRequests.push(phone);
       return 'ABCD1234';
     },
+    updateMediaMessage: async (msg) => ({ content: msg }),
   };
 
   const baileysStub = {
@@ -141,6 +144,7 @@ async function runWhatsAppProgram(js, initialState = {}) {
     },
     fetchLatestBaileysVersion: async () => ({ version: [6, 7, 18] }),
     makeCacheableSignalKeyStore: (keys) => { recorder.keyStoreWraps.push({ keys }); return keys; },
+    downloadMediaMessage: async (msg, type, mime, opts) => { recorder.downloads.push({ msg: msg.key.id, type }); return Buffer.from('FAKEMEDIA'); },
     DisconnectReason: {
       loggedOut: 401, connectionClosed: 428, connectionLost: 409,
       timedOut: 408, restartedRequired: 515,
@@ -159,6 +163,24 @@ async function runWhatsAppProgram(js, initialState = {}) {
       close: () => {},
     }),
   };
+  const tmpRoot = (() => {
+    const os = require('os');
+    const pathmod = require('path');
+    const dir = pathmod.join(os.tmpdir(), 'ps-wa-test-' + process.pid);
+    require('fs').mkdirSync(dir, { recursive: true });
+    return dir;
+  })();
+  const sandboxFs = {
+    mkdirSync: (dir) => { require('fs').mkdirSync(dir, { recursive: true }); },
+    writeFileSync: (dest, buffer) => {
+      recorder.writeDest = dest;
+      recorder.sandboxTmpRoot = tmpRoot;
+      const resolved = dest.startsWith('/') ? dest : require('path').join(tmpRoot, dest);
+      require('fs').mkdirSync(require('path').dirname(resolved), { recursive: true });
+      require('fs').writeFileSync(resolved, buffer);
+      recorder.filesWritten.push(resolved);
+    },
+  };
 
   const sandboxConsole = {
     log: (...args) => {
@@ -169,12 +191,14 @@ async function runWhatsAppProgram(js, initialState = {}) {
           : args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' '),
       );
     },
-    error: (...args) => recorder.errors.push(args.map(String).join(' ')),
+    error: (...args) => recorder.errors.push(args.map(a => (a instanceof Error ? a.stack : String(a))).join('\n')),
   };
   const stubRequire = (name) => {
-    if (name === '@whiskeysockets/baileys') return baileysStub;
+    if (name === '@qwerty-xcv/baileys' || name === '@whiskeysockets/baileys') return baileysStub;
     if (name === 'qrcode-terminal') return qrcodeStub;
     if (name === 'readline') return readlineStub;
+    if (name === 'fs') return sandboxFs;
+    if (name === 'path') return require('path');
     throw new Error('Unexpected require in test: ' + name);
   };
 
@@ -237,6 +261,30 @@ const QR_SOURCE = [
   'done',
 ].join('\n');
 
+const RICH_SOURCE = [
+  'whatsapp bot',
+  '    auth "session"',
+  '    login qr',
+  '',
+  '    on message',
+  '        log message',
+  '',
+  '        if message.type is "image"',
+  '            download "downloads/bot-media.jpg"',
+  '            reply "saved image"',
+  '        done',
+  '',
+  '        if message.type is "button"',
+  '            reply "button pressed"',
+  '        done',
+  '',
+  '        if message.type is "list"',
+  '            reply "list chosen"',
+  '        done',
+  '    done',
+  'done',
+].join('\n');
+
 // ── 1. Compiler / check ─────────────────────────────────────────────────────
 
 test('check: the finalized pairing example passes plainscript check', () => {
@@ -257,7 +305,7 @@ test('cli: node compiler/cli.js check exits cleanly for both examples', () => {
 });
 
 test('dependencies: whatsapp bots map to Baileys and qrcode-terminal', () => {
-  assertIncludes(JSON.stringify(detectDependencies(QR_SOURCE)), '@whiskeysockets/baileys');
+  assertIncludes(JSON.stringify(detectDependencies(QR_SOURCE)), '@qwerty-xcv/baileys');
   assertIncludes(JSON.stringify(detectDependencies(QR_SOURCE)), 'qrcode-terminal');
 });
 
@@ -310,11 +358,11 @@ test('parser: separators and a leading plus are normalized away', () => {
   }
 });
 
-test('parser: defaults are deterministic — no auth/login means default folder and QR', () => {
+test('parser: no login means null login (handlers-only mode for hybrid bots)', () => {
   const ast = parse(tokenize('whatsapp bot\n    on message\n        log message\n    done\ndone'));
   const bot = ast.body[0];
   if (bot.authFolder !== 'plainscript-whatsapp-auth') throw new Error('bad default auth folder');
-  if (bot.login.mode !== 'qr') throw new Error('bad default login mode');
+  if (bot.login !== null) throw new Error('expected null login when no login line present');
 });
 
 test('compile errors: unknown statements inside whatsapp bot are teaching errors', () => {
@@ -411,18 +459,19 @@ testAsync('runtime: the socket uses the proven pairing-safe settings', async () 
   const rec = await runWhatsAppProgram(compileProgram(PAIRING_SOURCE));
   const config = rec.socketConfigs[0];
   if (!config) throw new Error('makeWASocket was never called');
-  if (JSON.stringify(config.browser) !== JSON.stringify(['Ubuntu', 'Edge', '20.0.04'])) {
+  if (JSON.stringify(config.browser) !== JSON.stringify(['Mac Os', 'chrome', '121.0.6167.159'])) {
     throw new Error(`browser mismatch: ${JSON.stringify(config.browser)}`);
   }
-  if (JSON.stringify(config.version) !== JSON.stringify([6, 7, 18])) {
-    throw new Error(`fetched Baileys version not passed through: ${JSON.stringify(config.version)}`);
+  if (JSON.stringify(config.version) !== JSON.stringify([2, 2413, 1])) {
+    throw new Error(`fixed Baileys version not applied: ${JSON.stringify(config.version)}`);
   }
   for (const [key, expected] of [
     ['syncFullHistory', false],
     ['markOnlineOnConnect', false],
     ['defaultQueryTimeoutMs', 60000],
-    ['keepAliveIntervalMs', 30000],
+    ['keepAliveIntervalMs', 50000],
     ['printQRInTerminal', false],
+    ['generateHighQualityLinkPreview', true],
   ]) {
     if (config[key] !== expected) throw new Error(`${key} should be ${expected}, got ${config[key]}`);
   }
@@ -588,6 +637,55 @@ testAsync('normalization: wrapped and captioned messages expose their text', asy
   if (!texts.includes('photo caption')) throw new Error('image caption not extracted');
 });
 
+testAsync('rich record: image messages expose type, mtype, caption and download media', async () => {
+  const rec = await runWhatsAppProgram(compileProgram(RICH_SOURCE));
+  rec.events['messages.upsert']({
+    type: 'notify',
+    messages: [mockMessage('', { message: { imageMessage: { caption: 'holiday snap', url: 'http://x/y.jpg' } } })],
+  });
+  try {
+    await waitFor(() => rec.logs.some(l => l.includes('holiday snap')));
+    await waitFor(() => rec.downloads.length > 0 && rec.filesWritten.length > 0);
+    await waitFor(() => rec.sentMessages.some(m => m.text === 'saved image'));
+  } catch (e) {
+    throw new Error(e.message + ' | errors=' + JSON.stringify(rec.errors) + ' | logs=' + JSON.stringify(rec.logs) + ' | downloads=' + JSON.stringify(rec.downloads) + ' | files=' + JSON.stringify(rec.filesWritten) + ' | writeDest=' + JSON.stringify(rec.writeDest) + ' | tmpRoot=' + JSON.stringify(rec.sandboxTmpRoot) + ' | sent=' + JSON.stringify(rec.sentMessages));
+  }
+  const printed = JSON.parse(rec.logs.find(l => l.includes('holiday snap')));
+  if (printed.type !== 'image') throw new Error(`type should be image, got ${printed.type}`);
+  if (printed.mtype !== 'imageMessage') throw new Error(`mtype should be imageMessage, got ${printed.mtype}`);
+  if (printed.caption !== 'holiday snap') throw new Error(`caption wrong: ${printed.caption}`);
+  if (printed.buttonId !== null) throw new Error(`buttonId should be null for images, got ${printed.buttonId}`);
+  if (rec.downloads[0].type !== 'buffer') throw new Error('downloadMediaMessage not called as buffer');
+  if (rec.filesWritten.length !== 1) throw new Error('media was not saved to a file; files=' + JSON.stringify(rec.filesWritten));
+  if (!rec.sentMessages.some(m => m.text === 'saved image')) throw new Error('image branch did not reply');
+});
+
+testAsync('rich record: button replies carry the selected id', async () => {
+  const rec = await runWhatsAppProgram(compileProgram(RICH_SOURCE));
+  rec.events['messages.upsert']({
+    type: 'notify',
+    messages: [mockMessage('', { message: { buttonsResponseMessage: { selectedButtonId: 'yes', selectedDisplayText: 'Yes' } } })],
+  });
+  await waitFor(() => rec.sentMessages.length > 0);
+  const printed = JSON.parse(rec.logs.find(l => l.includes('yes')));
+  if (printed.type !== 'button') throw new Error(`type should be button, got ${printed.type}`);
+  if (printed.buttonId !== 'yes') throw new Error(`buttonId wrong: ${printed.buttonId}`);
+  if (!rec.sentMessages.some(m => m.text === 'button pressed')) throw new Error('button branch did not reply');
+});
+
+testAsync('rich record: list replies carry the selected row id', async () => {
+  const rec = await runWhatsAppProgram(compileProgram(RICH_SOURCE));
+  rec.events['messages.upsert']({
+    type: 'notify',
+    messages: [mockMessage('', { message: { listResponseMessage: { singleSelectReply: { selectedRowId: 'opt2', selectedRowTitle: 'Option 2' } } } })],
+  });
+  await waitFor(() => rec.sentMessages.length > 0);
+  const printed = JSON.parse(rec.logs.find(l => l.includes('opt2')));
+  if (printed.type !== 'list') throw new Error(`type should be list, got ${printed.type}`);
+  if (printed.buttonId !== 'opt2') throw new Error(`row id wrong: ${printed.buttonId}`);
+  if (!rec.sentMessages.some(m => m.text === 'list chosen')) throw new Error('list branch did not reply');
+});
+
 testAsync('reply failure teaches instead of crashing the process', async () => {
   const rec = await runWhatsAppProgram(compileProgram(PAIRING_SOURCE));
   rec.sock.sendMessage = async () => { throw new Error('socket gone'); };
@@ -595,8 +693,7 @@ testAsync('reply failure teaches instead of crashing the process', async () => {
     type: 'notify',
     messages: [mockMessage('/start')],
   });
-  await sleep(50);
-  // The process survives: no exception escaped the runtime's error boundary.
+  await sleep(50);  // The process survives: no exception escaped the runtime's error boundary.
 });
 
 testAsync('acceptance: the compiled example files boot against real-shaped events', async () => {

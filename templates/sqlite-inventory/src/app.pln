@@ -1,4 +1,4 @@
-// PlainScript 1.0.3-beta: SQLite-backed inventory API.
+bring normalizeProductName from "./products.pln"
 
 database "inventory.db" using "wasm"
 
@@ -22,9 +22,10 @@ route get "/products"
 done
 
 route post "/products"
+    remember name as normalizeProductName(body("name"))
     insert
         INSERT INTO products (name, quantity)
-        VALUES ({body("name")}, {body("quantity")})
+        VALUES ({name}, {body("quantity")})
     done
     status 201
     reply json

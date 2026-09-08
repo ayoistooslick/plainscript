@@ -13,6 +13,8 @@ const KNOWN_PACKAGES = {
   chalk:   `const chalk = require('chalk');`,
   // v2.1.0 — PostgreSQL driver behind the friendly "postgres" name.
   postgres: `const { Pool } = require('pg');`,
+  // v2.2.0 — MongoDB driver.
+  mongodb: `const { MongoClient } = require('mongodb');`,
 };
 
 // PlainScript module names whose npm package name differs from the PlainScript name.
@@ -84,6 +86,164 @@ const BUILTIN_DECLARATIONS = {
     `  } finally {`,
     `    await worker.terminate();`,
     `  }`,
+    `}`,
+  ].join('\n'),
+  // v1.0.36 — DOM browser runtime (select/selectAll/parseHTML). Browser
+  // globals are guarded so the generated JS explains the problem when it is
+  // run under Node instead of failing with a ReferenceError midpoint.
+  dom: [
+    `function __select(sel) {`,
+    `  if (typeof document === 'undefined') throw new Error('select(...) needs a browser (document is not defined in Node).');`,
+    `  return document.querySelector(sel);`,
+    `}`,
+    `function __selectAll(sel) {`,
+    `  if (typeof document === 'undefined') throw new Error('selectAll(...) needs a browser (document is not defined in Node).');`,
+    `  return [...document.querySelectorAll(sel)];`,
+    `}`,
+    `function __parseHTML(html) {`,
+    `  if (typeof document === 'undefined') throw new Error('parseHTML(...) needs a browser (document is not defined in Node).');`,
+    `  const template = document.createElement('template');`,
+    `  template.innerHTML = String(html);`,
+    `  return template.content;`,
+    `}`,
+  ].join('\n'),
+  // v1.0.36 — input runtime: pointer coordinates, gamepads, dropped files.
+  input: [
+    `function __localPoint(e, canvas) {`,
+    `  if (typeof document === 'undefined') throw new Error('localPoint(...) needs a browser (document is not defined in Node).');`,
+    `  const rect = canvas.getBoundingClientRect();`,
+    `  return {`,
+    `    x: (e.clientX - rect.left) * (canvas.width / rect.width),`,
+    `    y: (e.clientY - rect.top) * (canvas.height / rect.height),`,
+    `  };`,
+    `}`,
+    `function __gamepads() {`,
+    `  if (typeof navigator === 'undefined' || typeof navigator.getGamepads !== 'function') throw new Error('gamepads() needs a browser with the Gamepad API (navigator.getGamepads).');`,
+    `  return navigator.getGamepads().filter(Boolean);`,
+    `}`,
+    `function __droppedFiles(event) {`,
+    `  return [...(event && event.dataTransfer ? event.dataTransfer.files : [])];`,
+    `}`,
+  ].join('\n'),
+  // v1.0.36 — asset-loading runtime (images, JSON, bytes, data URLs). All
+  // helpers return promises; the STDLIB entries await them.
+  assets: [
+    `function __loadImage(url) {`,
+    `  if (typeof Image === 'undefined') throw new Error('loadImage(...) needs a browser (global Image is not defined in Node).');`,
+    `  return new Promise((resolve, reject) => {`,
+    `    const img = new Image();`,
+    `    img.onload = () => resolve(img);`,
+    `    img.onerror = () => reject(new Error('Could not load image: ' + url));`,
+    `    img.src = String(url);`,
+    `  });`,
+    `}`,
+    `async function __fetchJson(url) {`,
+    `  if (typeof fetch === 'undefined') throw new Error('fetchJson(...) needs a browser or Node 18+ with global fetch.');`,
+    `  const response = await fetch(url);`,
+    `  const text = await response.text();`,
+    `  let data = null;`,
+    `  let parseError = null;`,
+    `  try { data = JSON.parse(text); } catch (e) { parseError = e.message; }`,
+    `  return { ok: response.ok, status: response.status, data, text, parseError };`,
+    `}`,
+    `async function __fetchBytes(url) {`,
+    `  if (typeof fetch === 'undefined') throw new Error('fetchBytes(...) needs a browser or Node 18+ with global fetch.');`,
+    `  const response = await fetch(url);`,
+    `  const buffer = await response.arrayBuffer();`,
+    `  return { ok: response.ok, status: response.status, data: new Uint8Array(buffer) };`,
+    `}`,
+    `function __readDataUrl(file) {`,
+    `  if (typeof FileReader === 'undefined') throw new Error('readDataUrl(...) needs a browser (FileReader is not defined in Node).');`,
+    `  return new Promise((resolve, reject) => {`,
+    `    const reader = new FileReader();`,
+    `    reader.onload = () => resolve(reader.result);`,
+    `    reader.onerror = () => reject(new Error('Could not read the file as a data URL.'));`,
+    `    reader.readAsDataURL(file);`,
+    `  });`,
+    `}`,
+  ].join('\n'),
+  // v1.0.36 — Web Audio runtime. The AudioContext is created once and shared
+  // (browsers cap the number), and resumed on demand because autoplay policies
+  // start it suspended.
+  audio: [
+    `let __plainAudioCtx = null;`,
+    `function __audioContext() {`,
+    `  if (typeof window === 'undefined' && typeof self === 'undefined') throw new Error('audioContext() / playTone(...) need a browser (Web Audio is not available in Node).');`,
+    `  if (!__plainAudioCtx) {`,
+    `    const Ctx = window.AudioContext || window.webkitAudioContext;`,
+    `    if (!Ctx) throw new Error('Web Audio is not supported in this browser.');`,
+    `    __plainAudioCtx = new Ctx();`,
+    `  }`,
+    `  if (__plainAudioCtx.state === 'suspended') __plainAudioCtx.resume();`,
+    `  return __plainAudioCtx;`,
+    `}`,
+    `function __audioTone(freq, seconds, opts) {`,
+    `  const ctx = __audioContext();`,
+    `  const o = opts || {};`,
+    `  const oscillator = ctx.createOscillator();`,
+    `  const gain = ctx.createGain();`,
+    `  const duration = seconds || 0.5;`,
+    `  oscillator.type = o.type || 'sine';`,
+    `  oscillator.frequency.value = freq;`,
+    `  gain.gain.value = o.gain || 0.2;`,
+    `  oscillator.connect(gain);`,
+    `  gain.connect(ctx.destination);`,
+    `  const t = ctx.currentTime;`,
+    `  if (o.when) oscillator.start(t + o.when); else oscillator.start(t);`,
+    `  gain.gain.setValueAtTime(o.gain || 0.2, t);`,
+    `  gain.gain.exponentialRampToValueAtTime(0.0001, t + duration);`,
+    `  oscillator.stop(t + duration);`,
+    `}`,
+    `function __loadAudio(url) {`,
+    `  if (typeof Audio === 'undefined') throw new Error('loadAudio(...) needs a browser (global Audio is not defined in Node).');`,
+    `  return new Promise((resolve, reject) => {`,
+    `    const audio = new Audio();`,
+    `    audio.oncanplaythrough = () => resolve(audio);`,
+    `    audio.onerror = () => reject(new Error('Could not load audio: ' + url));`,
+    `    audio.src = String(url);`,
+    `    audio.load();`,
+    `  });`,
+    `}`,
+  ].join('\n'),
+  // v1.0.36 — WebGL runtime: context selection plus the three compile/link/
+  // buffer helpers behind the gl* stdlib entries.
+  gl: [
+    `function __glContext(canvas) {`,
+    `  if (typeof document === 'undefined') throw new Error('webglContext(...) needs a browser (document is not defined in Node).');`,
+    `  const gl = canvas.getContext('webgl2') || canvas.getContext('webgl') || canvas.getContext('experimental-webgl');`,
+    `  if (!gl) throw new Error('WebGL is not supported in this browser.');`,
+    `  return gl;`,
+    `}`,
+    `function __glShader(gl, type, source) {`,
+    `  // Accept both the friendly names ("vertex"/"fragment") and the DOM`,
+    `  // constant names ("VERTEX_SHADER"/"FRAGMENT_SHADER").`,
+    `  const kind = type === 'vertex' || type === 'VERTEX_SHADER' ? gl.VERTEX_SHADER : gl.FRAGMENT_SHADER;`,
+    `  const shader = gl.createShader(kind);`,
+    `  gl.shaderSource(shader, source);`,
+    `  gl.compileShader(shader);`,
+    `  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {`,
+    `    const info = gl.getShaderInfoLog(shader);`,
+    `    gl.deleteShader(shader);`,
+    `    throw new Error('Shader compile error: ' + (info || 'unknown'));`,
+    `  }`,
+    `  return shader;`,
+    `}`,
+    `function __glProgram(gl, vertexShader, fragmentShader) {`,
+    `  const program = gl.createProgram();`,
+    `  gl.attachShader(program, vertexShader);`,
+    `  gl.attachShader(program, fragmentShader);`,
+    `  gl.linkProgram(program);`,
+    `  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {`,
+    `    const info = gl.getProgramInfoLog(program);`,
+    `    throw new Error('Program link error: ' + (info || 'unknown'));`,
+    `  }`,
+    `  return program;`,
+    `}`,
+    `function __glBuffer(gl, data) {`,
+    `  const buffer = gl.createBuffer();`,
+    `  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);`,
+    `  gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);`,
+    `  return buffer;`,
     `}`,
   ].join('\n'),
   // v1.0.1 — shared runtime helpers for reflection, binary-size, YAML subset
@@ -217,6 +377,98 @@ const BUILTIN_DECLARATIONS = {
     `    const timer = setTimeout(() => reject(new Error('Timed out after ' + timeout + 'ms.')), timeout);`,
     `    Promise.resolve(promise).then(v => { clearTimeout(timer); resolve(v); }, e => { clearTimeout(timer); reject(e); });`,
     `  });`,
+    `}`,
+  ].join('\n'),
+  // v1.0.35 — dependency-free SVG images and visualizations.
+  // The image value is an SVG string, so it can be saved, embedded, or returned
+  // from a web route without a native graphics dependency.
+  visualization: [
+    `const __vizFs = require('fs');`,
+    `const __vizPath = require('path');`,
+    `function __svgEscape(value) {`,
+    `  return String(value == null ? '' : value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');`,
+    `}`,
+    `function __vizOptions(options) {`,
+    `  return Object.assign({ width: 720, height: 420, background: '#071b10', foreground: '#e6f1e7', grid: '#284734', accent: '#40c463', muted: '#8da99a' }, options || {});`,
+    `}`,
+    `function __svgImage(width, height, content, options) {`,
+    `  const opt = __vizOptions(options);`,
+    `  const w = Number(width) || opt.width;`,
+    `  const h = Number(height) || opt.height;`,
+    `  return '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '" role="img">' +`,
+    `    '<rect width="100%" height="100%" fill="' + __svgEscape(opt.background) + '"/>' + String(content == null ? '' : content) + '</svg>';`,
+    `}`,
+    `function __vizText(x, y, value, size, fill, anchor, weight) {`,
+    `  return '<text x="' + x + '" y="' + y + '" fill="' + __svgEscape(fill) + '" font-family="Arial, sans-serif" font-size="' + size + '" text-anchor="' + (anchor || 'start') + '" font-weight="' + (weight || 400) + '">' + __svgEscape(value) + '</text>';`,
+    `}`,
+    `function __barChart(title, labels, values, options) {`,
+    `  const opt = __vizOptions(options);`,
+    `  const names = Array.isArray(labels) ? labels : [];`,
+    `  const nums = (Array.isArray(values) ? values : []).map(value => Number(value) || 0);`,
+    `  const count = Math.max(names.length, nums.length, 1);`,
+    `  const width = Number(opt.width) || 720;`,
+    `  const height = Number(opt.height) || 420;`,
+    `  const left = 62; const right = 24; const top = title ? 68 : 28; const bottom = 58;`,
+    `  const plotWidth = Math.max(1, width - left - right);`,
+    `  const plotHeight = Math.max(1, height - top - bottom);`,
+    `  const max = Math.max(1, ...nums.map(value => Math.max(0, value)));`,
+    `  const barWidth = plotWidth / count * 0.68;`,
+    `  const gap = plotWidth / count;`,
+    `  let body = '';`,
+    `  if (title) body += __vizText(width / 2, 34, title, 20, opt.foreground, 'middle', 700);`,
+    `  for (let tick = 0; tick <= 4; tick++) {`,
+    `    const value = max * tick / 4; const y = top + plotHeight - value / max * plotHeight;`,
+    `    body += '<line x1="' + left + '" y1="' + y + '" x2="' + (width - right) + '" y2="' + y + '" stroke="' + __svgEscape(opt.grid) + '" stroke-width="1"/>';`,
+    `    body += __vizText(left - 10, y + 4, Math.round(value), 11, opt.muted, 'end', 400);`,
+    `  }`,
+    `  for (let index = 0; index < count; index++) {`,
+    `    const value = Math.max(0, nums[index] || 0); const barHeight = value / max * plotHeight;`,
+    `    const x = left + index * gap + (gap - barWidth) / 2; const y = top + plotHeight - barHeight;`,
+    `    body += '<rect x="' + x + '" y="' + y + '" width="' + barWidth + '" height="' + barHeight + '" rx="5" fill="' + __svgEscape(opt.accent) + '"/>';`,
+    `    body += __vizText(left + index * gap + gap / 2, height - 24, names[index] == null ? '' : names[index], 12, opt.muted, 'middle', 400);`,
+    `  }`,
+    `  return __svgImage(width, height, body, opt);`,
+    `}`,
+    `function __lineChart(title, labels, values, options) {`,
+    `  const opt = __vizOptions(options);`,
+    `  const names = Array.isArray(labels) ? labels : [];`,
+    `  const nums = (Array.isArray(values) ? values : []).map(value => Number(value) || 0);`,
+    `  const count = Math.max(names.length, nums.length, 2);`,
+    `  const width = Number(opt.width) || 720;`,
+    `  const height = Number(opt.height) || 420;`,
+    `  const left = 62; const right = 24; const top = title ? 68 : 28; const bottom = 58;`,
+    `  const plotWidth = Math.max(1, width - left - right);`,
+    `  const plotHeight = Math.max(1, height - top - bottom);`,
+    `  const max = Math.max(1, ...nums.map(value => Math.max(0, value)));`,
+    `  let body = '';`,
+    `  if (title) body += __vizText(width / 2, 34, title, 20, opt.foreground, 'middle', 700);`,
+    `  for (let tick = 0; tick <= 4; tick++) {`,
+    `    const value = max * tick / 4; const y = top + plotHeight - value / max * plotHeight;`,
+    `    body += '<line x1="' + left + '" y1="' + y + '" x2="' + (width - right) + '" y2="' + y + '" stroke="' + __svgEscape(opt.grid) + '" stroke-width="1"/>';`,
+    `    body += __vizText(left - 10, y + 4, Math.round(value), 11, opt.muted, 'end', 400);`,
+    `  }`,
+    `  const points = nums.map((value, index) => {`,
+    `    const x = left + (count === 1 ? plotWidth / 2 : index * plotWidth / (count - 1));`,
+    `    const y = top + plotHeight - Math.max(0, value) / max * plotHeight;`,
+    `    return { x, y, label: names[index] == null ? '' : names[index] };`,
+    `  });`,
+    `  if (points.length) {`,
+    `    body += '<polyline fill="none" stroke="' + __svgEscape(opt.accent) + '" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" points="' + points.map(point => point.x + ',' + point.y).join(' ') + '"/>';`,
+    `    for (const point of points) {`,
+    `      body += '<circle cx="' + point.x + '" cy="' + point.y + '" r="5" fill="' + __svgEscape(opt.accent) + '"/>';`,
+    `      body += __vizText(point.x, height - 24, point.label, 12, opt.muted, 'middle', 400);`,
+    `    }`,
+    `  }`,
+    `  return __svgImage(width, height, body, opt);`,
+    `}`,
+    `function __saveImage(file, image) {`,
+    `  const target = String(file);`,
+    `  __vizFs.mkdirSync(__vizPath.dirname(target), { recursive: true });`,
+    `  __vizFs.writeFileSync(target, String(image == null ? '' : image), 'utf8');`,
+    `  return target;`,
+    `}`,
+    `function __imageDataUri(image) {`,
+    `  return 'data:image/svg+xml;base64,' + Buffer.from(String(image == null ? '' : image), 'utf8').toString('base64');`,
     `}`,
   ].join('\n'),
   // v1.0.1 — process execution (child processes).
@@ -387,8 +639,9 @@ const BUILTIN_DECLARATIONS = {
   // lifecycle and messages.upsert normalization. PlainScript programs only ever
   // see __whatsappStart/__whatsappOnMessage/__whatsappReply.
   whatsapp: [
-    `const { __whatsappStart, __whatsappOnMessage, __whatsappReply } = (() => {`,
+    `const { __whatsappStart, __whatsappPair, __whatsappOnMessage, __whatsappReply, __whatsappSend, __whatsappDownload } = (() => {`,
     `  let sock = null;`,
+    `  let __waBaileysPkg = '@qwerty-xcv/baileys';`,
     `  const handlers = [];`,
     `  const __waSilentLogger = (() => {`,
     `    const noop = () => {};`,
@@ -413,21 +666,95 @@ const BUILTIN_DECLARATIONS = {
     `  }`,
     `  function __waExtractText(content) {`,
     `    if (!content) return '';`,
-    `    return String(` +
-      `(content.conversation || (content.extendedTextMessage || {}).text || ` +
-      `(content.imageMessage || {}).caption || (content.videoMessage || {}).caption || ` +
-      `(content.documentMessage || {}).caption) || '');`,
+    `    const c = content;`,
+    `    if (c.conversation != null) return String(c.conversation);`,
+    `    if (c.extendedTextMessage && c.extendedTextMessage.text != null) return String(c.extendedTextMessage.text);`,
+    `    if (c.imageMessage && c.imageMessage.caption != null) return String(c.imageMessage.caption);`,
+    `    if (c.videoMessage && c.videoMessage.caption != null) return String(c.videoMessage.caption);`,
+    `    if (c.documentMessage && c.documentMessage.caption != null) return String(c.documentMessage.caption);`,
+    `    if (c.audioMessage && c.audioMessage.caption != null) return String(c.audioMessage.caption);`,
+    `    if (c.stickerMessage && c.stickerMessage.caption != null) return String(c.stickerMessage.caption);`,
+    `    if (c.buttonsResponseMessage && c.buttonsResponseMessage.selectedButtonId != null) return String(c.buttonsResponseMessage.selectedButtonId);`,
+    `    if (c.listResponseMessage && c.listResponseMessage.singleSelectReply && c.listResponseMessage.singleSelectReply.selectedRowId != null) return String(c.listResponseMessage.singleSelectReply.selectedRowId);`,
+    `    if (c.templateButtonReplyMessage && c.templateButtonReplyMessage.selectedId != null) return String(c.templateButtonReplyMessage.selectedId);`,
+    `    if (c.reactionMessage && c.reactionMessage.text != null) return String(c.reactionMessage.text);`,
+    `    if (c.contactMessage && c.contactMessage.displayName != null) return String(c.contactMessage.displayName);`,
+    `    if (c.contactsArrayMessage && c.contactsArrayMessage.contacts) return c.contactsArrayMessage.contacts.map(x => x.displayName || '').join(', ');`,
+    `    if (c.locationMessage) return String(c.locationMessage.degreesLatitude) + ',' + String(c.locationMessage.degreesLongitude);`,
+    `    if (c.groupInviteMessage) return String(c.groupInviteMessage.groupJid || '');`,
+    `    if (c.pollCreationMessage && c.pollCreationMessage.name != null) return String(c.pollCreationMessage.name);`,
+    `    return '';`,
     `  }`,
-    `  async function __whatsappReply(chat, value) {`,
+    `  function __waMessageType(content) {`,
+    `    if (!content) return 'unknown';`,
+    `    const c = content;`,
+    `    if (c.conversation != null || c.extendedTextMessage) return 'text';`,
+    `    if (c.imageMessage) return 'image';`,
+    `    if (c.videoMessage) return 'video';`,
+    `    if (c.audioMessage) return 'audio';`,
+    `    if (c.documentMessage) return 'document';`,
+    `    if (c.stickerMessage) return 'sticker';`,
+    `    if (c.buttonsResponseMessage) return 'button';`,
+    `    if (c.listResponseMessage) return 'list';`,
+    `    if (c.templateButtonReplyMessage) return 'template-button';`,
+    `    if (c.interactiveResponseMessage) return 'interactive';`,
+    `    if (c.reactionMessage) return 'reaction';`,
+    `    if (c.contactMessage) return 'contact';`,
+    `    if (c.contactsArrayMessage) return 'contacts';`,
+    `    if (c.locationMessage) return 'location';`,
+    `    if (c.liveLocationMessage) return 'live-location';`,
+    `    if (c.pollCreationMessage) return 'poll';`,
+    `    if (c.pollUpdateMessage) return 'poll-update';`,
+    `    if (c.groupInviteMessage) return 'group-invite';`,
+    `    if (c.protocolMessage) return 'protocol';`,
+    `    if (c.buttonsMessage) return 'buttons';`,
+    `    if (c.templateMessage) return 'template';`,
+    `    if (c.interactiveMessage) return 'interactive';`,
+    `    return 'other';`,
+    `  }`,
+    `  function __waButtonId(content) {`,
+    `    if (!content) return null;`,
+    `    const c = content;`,
+    `    if (c.buttonsResponseMessage && c.buttonsResponseMessage.selectedButtonId != null) return c.buttonsResponseMessage.selectedButtonId;`,
+    `    if (c.listResponseMessage && c.listResponseMessage.singleSelectReply) return c.listResponseMessage.singleSelectReply.selectedRowId || null;`,
+    `    if (c.templateButtonReplyMessage && c.templateButtonReplyMessage.selectedId != null) return c.templateButtonReplyMessage.selectedId;`,
+    `    if (c.interactiveResponseMessage && c.interactiveResponseMessage.nativeFlowResponseMessage) {`,
+    `      try { return JSON.parse(c.interactiveResponseMessage.nativeFlowResponseMessage.paramsJson).id || null; } catch (_) { return null; }`,
+    `    }`,
+    `    return null;`,
+    `  }`,
+    `  async function __waDownload(message, dest) {`,
+    `    if (!sock) throw new Error('WhatsApp: the bot is not connected.');`,
+    `    const { downloadMediaMessage } = require(__waBaileysPkg);`,
+    `    const raw = message && message.raw ? message.raw : message;`,
+    `    const buffer = await downloadMediaMessage(raw, 'buffer', {}, { logger: __waSilentLogger, reuploadRequest: sock.updateMediaMessage });`,
+    `    if (!dest) return buffer;`,
+    `    const fs = require('fs'), path = require('path');`,
+    `    const dir = path.dirname(path.resolve(dest));`,
+    `    if (dir && dir !== '.') fs.mkdirSync(dir, { recursive: true });`,
+    `    fs.writeFileSync(dest, buffer);`,
+    `    return dest;`,
+    `  }`,
+    `  async function __whatsappDownload(message, dest) {`,
+    `    if (!message) throw new Error('WhatsApp: there is no message to download.');`,
+    `    await __waDownload(message, dest);`,
+    `    console.log('WhatsApp: saved media to ' + dest);`,
+    `  }`,
+    `  async function __whatsappReply(chat, value, extra) {`,
     `    if (!sock) throw new Error('WhatsApp: cannot reply because the bot is not connected yet.');`,
     `    const text = typeof value === 'string' ? value : JSON.stringify(value);`,
-    `    return sock.sendMessage(chat, { text });`,
+    `    return sock.sendMessage(chat, Object.assign({ text }, extra || {}));`,
+    `  }`,
+    `  async function __whatsappSend(chat, value) {`,
+    `    if (!sock) throw new Error('WhatsApp: cannot send because the bot is not connected yet.');`,
+    `    return sock.sendMessage(chat, typeof value === 'string' ? { text: value } : value);`,
     `  }`,
     `  function __whatsappOnMessage(handler) { handlers.push(handler); }`,
     `  async function __whatsappStart(options) {`,
-    `    const baileys = require('@whiskeysockets/baileys');`,
+    `    __waBaileysPkg = options.baileys || '@qwerty-xcv/baileys';`,
+    `    const baileys = require(__waBaileysPkg);`,
     `    const makeWASocket = baileys.default;`,
-    `    const { useMultiFileAuthState, fetchLatestBaileysVersion, makeCacheableSignalKeyStore, DisconnectReason } = baileys;`,
+    `    const { useMultiFileAuthState, makeCacheableSignalKeyStore, DisconnectReason } = baileys;`,
     `    const folder = options.folder || 'plainscript-whatsapp-auth';`,
     `    const mode = options.login && options.login.mode === 'pairing' ? 'pairing' : 'qr';`,
     `    const pairingPhone = mode === 'pairing' ? __waNormalizePhone(options.login.phone) : null;`,
@@ -439,35 +766,45 @@ const BUILTIN_DECLARATIONS = {
     // Auth/session persistence: useMultiFileAuthState stores credentials in
     // the folder from `auth "<name>"`; saveCreds writes every update back.
     `        const { state, saveCreds } = await useMultiFileAuthState(folder);`,
-    `        let version;`,
-    `        try { version = (await fetchLatestBaileysVersion()).version; } catch (_) {}`,
-    // Proven socket settings: these exact options are required for pairing
-    // codes to survive WhatsApp's handshake without a 428 connection close.
+    // v2.14 — adopt the proven pairing-safe socket settings used by the
+    // reference Dual-Crasher build on the qwerty fork: a fixed Baileys protocol
+    // version and the exact browser fingerprint that survives WhatsApp's
+    // handshake without a 428 connection close.
     `        sock = makeWASocket({`,
-    `          ...(version ? { version } : {}),`,
-    `          browser: ['Ubuntu', 'Edge', '20.0.04'],`,
+    `          version: [2, 2413, 1],`,
+    `          browser: ['Mac Os', 'chrome', '121.0.6167.159'],`,
     `          printQRInTerminal: false,`,
     `          syncFullHistory: false,`,
     `          markOnlineOnConnect: false,`,
+    `          generateHighQualityLinkPreview: true,`,
     `          defaultQueryTimeoutMs: 60000,`,
-    `          keepAliveIntervalMs: 30000,`,
+    `          keepAliveIntervalMs: 50000,`,
     `          logger: __waSilentLogger,`,
     `          auth: { creds: state.creds, keys: makeCacheableSignalKeyStore(state.keys, __waSilentLogger) },`,
     `        });`,
     `        sock.ev.on('creds.update', saveCreds);`,
     // Pairing codes are requested two seconds after socket creation — asking
-    // earlier aborts the link attempt. PlainScript calls requestPairingCode(phone)
-    // with no custom suffix; the number was validated at compile time.
+    // earlier aborts the link attempt. PlainScript retries a few times (spam)
+    // so a dropped request never blocks linking. The number was validated at
+    // compile time; no custom suffix is applied.
     `        if (mode === 'pairing' && !state.creds.registered) {`,
-    `          setTimeout(() => {`,
-    `            if (!sock) return;`,
-    `            sock.requestPairingCode(pairingPhone).then((rawCode) => {`,
-    `              const pretty = String(rawCode || '').replace(/[^A-Za-z0-9]/g, '').replace(/(.{4})(?=.)/g, '$1-');`,
-    `              console.log('WhatsApp pairing code: ' + pretty);`,
-    `              console.log('Enter it on your phone: WhatsApp > Settings > Linked devices > Link a device > Link with phone number instead.');`,
-    `            }).catch((error) => {`,
-    `              console.error('WhatsApp pairing code failed: ' + error.message);`,
-    `            });`,
+    `          let attempts = 0;`,
+    `          const requestCode = async () => {`,
+    `            if (!sock || attempts >= 4) return;`,
+    `            attempts += 1;`,
+    `            try {`,
+    `              sock.requestPairingCode(pairingPhone).then((rawCode) => {`,
+    `                const pretty = String(rawCode || '').replace(/[^A-Za-z0-9]/g, '').replace(/(.{4})(?=.)/g, '$1-');`,
+    `                console.log('WhatsApp pairing code: ' + pretty);`,
+    `                console.log('Enter it on your phone: WhatsApp > Settings > Linked devices > Link a device > Link with phone number instead.');`,
+    `              }).catch((error) => {`,
+    `                console.error('WhatsApp pairing code failed: ' + error.message);`,
+    `              });`,
+    `            } catch (_) {}`,
+    `          };`,
+    `          setTimeout(async () => {`,
+    `            await requestCode();`,
+    `            setTimeout(requestCode, 4000);`,
     `          }, 2000);`,
     `        }`,
     // Connection lifecycle: the QR code while linking, a friendly note on
@@ -512,16 +849,23 @@ const BUILTIN_DECLARATIONS = {
     `              if (key.fromMe) continue;`,
     `              const chat = key.remoteJid;`,
     `              if (!chat || chat === 'status@broadcast') continue;`,
+    `              const content = __waUnwrap(msg.message);`,
     `              const message = {`,
-    `                text: __waExtractText(__waUnwrap(msg.message)),`,
+    `                text: __waExtractText(content),`,
+    `                type: __waMessageType(content),`,
+    `                mtype: content ? (Object.keys(content)[0] || 'unknown') : 'unknown',`,
+    `                caption: (content && (content.imageMessage || content.videoMessage || content.documentMessage || content.audioMessage || {}).caption) || null,`,
+    `                buttonId: __waButtonId(content),`,
     `                chat,`,
     `                sender: key.participant || chat,`,
     `                name: msg.pushName || null,`,
     `                id: key.id || null,`,
     `                time: Number(msg.messageTimestamp) > 0 ? Number(msg.messageTimestamp) * 1000 : Date.now(),`,
     `                isGroup: chat.endsWith('@g.us'),`,
+    `                raw: msg,`,
+    `                download: (dest) => __waDownload(msg, dest),`,
     `              };`,
-    `              const ctx = { chat, message, reply: (value) => __whatsappReply(chat, value) };`,
+    `              const ctx = { chat, message, reply: (value, extra) => __whatsappReply(chat, value, extra), send: (to, value) => __whatsappSend(to || chat, value) };`,
     `              for (const handler of handlers) {`,
     `                await handler(ctx);`,
     `              }`,
@@ -536,7 +880,107 @@ const BUILTIN_DECLARATIONS = {
     `    };`,
     `    await connect();`,
     `  }`,
-    `  return { __whatsappStart, __whatsappOnMessage, __whatsappReply };`,
+    `  async function __whatsappPair(phone, onCode, onOpen) {`,
+    `    const digits = __waNormalizePhone(phone);`,
+    `    const baileys = require(__waBaileysPkg);`,
+    `    const makeWASocket = baileys.default;`,
+    `    const { useMultiFileAuthState, makeCacheableSignalKeyStore } = baileys;`,
+    `    const { state, saveCreds } = await useMultiFileAuthState('whatsapp-session');`,
+    `    let pairSock = makeWASocket({`,
+    `      version: [2, 2413, 1],`,
+    `      browser: ['Mac Os', 'chrome', '121.0.6167.159'],`,
+    `      printQRInTerminal: false,`,
+    `      syncFullHistory: false,`,
+    `      markOnlineOnConnect: false,`,
+    `      generateHighQualityLinkPreview: true,`,
+    `      defaultQueryTimeoutMs: 60000,`,
+    `      keepAliveIntervalMs: 50000,`,
+    `      logger: __waSilentLogger,`,
+    `      auth: { creds: state.creds, keys: makeCacheableSignalKeyStore(state.keys, __waSilentLogger) },`,
+    `    });`,
+    `    pairSock.ev.on('creds.update', saveCreds);`,
+    `    pairSock.ev.on('messages.upsert', async (upsert) => {`,
+    `      try {`,
+    `        if (!upsert || upsert.type !== 'notify') return;`,
+    `        for (const msg of upsert.messages || []) {`,
+    `          const key = msg.key || {};`,
+    `          if (key.fromMe) continue;`,
+    `          const chat = key.remoteJid;`,
+    `          if (!chat || chat === 'status@broadcast') continue;`,
+    `          const content = __waUnwrap(msg.message);`,
+    `          const message = {`,
+    `            text: __waExtractText(content),`,
+    `            type: __waMessageType(content),`,
+    `            mtype: content ? (Object.keys(content)[0] || 'unknown') : 'unknown',`,
+    `            caption: (content && (content.imageMessage || content.videoMessage || content.documentMessage || content.audioMessage || {}).caption) || null,`,
+    `            buttonId: __waButtonId(content),`,
+    `            chat,`,
+    `            sender: key.participant || chat,`,
+    `            name: msg.pushName || null,`,
+    `            id: key.id || null,`,
+    `            time: Number(msg.messageTimestamp) > 0 ? Number(msg.messageTimestamp) * 1000 : Date.now(),`,
+    `            isGroup: chat.endsWith('@g.us'),`,
+    `            raw: msg,`,
+    `            download: (dest) => __waDownload(msg, dest),`,
+    `          };`,
+    `          const ctx = { chat, message, reply: (value, extra) => __whatsappReply(chat, value, extra), send: (to, value) => __whatsappSend(to || chat, value) };`,
+    `          for (const handler of handlers) {`,
+    `            await handler(ctx);`,
+    `          }`,
+    `        }`,
+    `      } catch (error) {`,
+    `        console.error(error);`,
+    `      }`,
+    `    });`,
+    `    if (onCode) {`,
+    `      await new Promise((resolve) => {`,
+    `        let attempts = 0;`,
+    `        const requestCode = async () => {`,
+    `          if (!pairSock || attempts >= 4) { resolve(); return; }`,
+    `          attempts += 1;`,
+    `          try {`,
+    `            pairSock.requestPairingCode(digits).then((rawCode) => {`,
+    `              const pretty = String(rawCode || '').replace(/[^A-Za-z0-9]/g, '').replace(/(.{4})(?=.)/g, '$1-');`,
+    `              console.log('WhatsApp pairing code: ' + pretty);`,
+    `              onCode(pretty);`,
+    `              resolve();`,
+    `            }).catch((error) => {`,
+    `              console.error('WhatsApp pairing code failed: ' + error.message);`,
+    `              resolve();`,
+    `            });`,
+    `          } catch (_) { resolve(); }`,
+    `        };`,
+    `        setTimeout(async () => {`,
+    `          await requestCode();`,
+    `          setTimeout(requestCode, 4000);`,
+    `        }, 2000);`,
+    `      });`,
+    `    } else {`,
+    `      await new Promise((resolve) => {`,
+    `        let attempts = 0;`,
+    `        const requestCode = async () => {`,
+    `          if (!pairSock || attempts >= 4) { resolve(); return; }`,
+    `          attempts += 1;`,
+    `          try {`,
+    `            pairSock.requestPairingCode(digits).then((rawCode) => {`,
+    `              const pretty = String(rawCode || '').replace(/[^A-Za-z0-9]/g, '').replace(/(.{4})(?=.)/g, '$1-');`,
+    `              console.log('WhatsApp pairing code: ' + pretty);`,
+    `              resolve();`,
+    `            }).catch((error) => {`,
+    `              console.error('WhatsApp pairing code failed: ' + error.message);`,
+    `              resolve();`,
+    `            });`,
+    `          } catch (_) { resolve(); }`,
+    `        };`,
+    `        setTimeout(async () => {`,
+    `          await requestCode();`,
+    `          setTimeout(requestCode, 4000);`,
+    `        }, 2000);`,
+    `      });`,
+    `    }`,
+    `    return digits;`,
+    `  }`,
+    `  return { __whatsappStart, __whatsappPair, __whatsappOnMessage, __whatsappReply, __whatsappSend, __whatsappDownload };`,
     `})();`,
   ].join('\n'),
   // v2.1.1 — HTTP client runtime on the global fetch API (Node.js 18+).
@@ -990,7 +1434,91 @@ const BUILTIN_DECLARATIONS = {
     `  };`,
     `}`,
   ].join('\n'),
-  // v1.2 — Telegram runtime. Polling-based: no webhook endpoint needed.
+  // v2.2.0 -- MongoDB runtime. Connects to MongoDB and provides a
+  // collection-oriented surface compatible with the existing SQL statement
+  // forms (query, insert, update, delete, execute, transaction).
+  mongodb: [
+    `let __mongoClient = null;`,
+    `let __mongoDb = null;`,
+    `function __mongoCollection(name) {`,
+    `  if (!__mongoDb) throw new Error('MongoDB: not connected. Use "database <uri> using "mongo" [db <name>]" first.');`,
+    `  return __mongoDb.collection(name);`,
+    `}`,
+    `async function __mongoOpen(uri, dbName) {`,
+    `  if (__mongoClient) return __mongoDb;`,
+    `  const { MongoClient } = require('mongodb');`,
+    `  __mongoClient = new MongoClient(uri);`,
+    `  await __mongoClient.connect();`,
+    `  __mongoDb = __mongoClient.db(dbName || undefined);`,
+    `  __mongoDb.__query = async function(sql, params) {`,
+    `    const m = String(sql).match(/^\\s*SELECT\\s+(.+?)\\s+FROM\\s+(\\w+)(?:\\s+WHERE\\s+(.+))?\\s*$/i);`,
+    `    if (!m) throw new Error('MongoDB query: use SELECT fields FROM collection [WHERE condition]');`,
+    `    const [, fields, collection, where] = m;`,
+    `    const coll = __mongoCollection(collection);`,
+    `    let filter = {};`,
+    `    if (where) {`,
+    `      const parts = where.split('=').map(s => s.trim());`,
+    `      if (parts.length === 2) filter[parts[0]] = params[0];`,
+    `    }`,
+    `    const projection = fields.trim() === '*' ? {} : Object.fromEntries(fields.split(',').map(f => [f.trim(), 1]));`,
+    `    return coll.find(filter).project(projection).toArray();`,
+    `  };`,
+    `  __mongoDb.__write = async function(sql, params) {`,
+    `    const m = String(sql).match(/^\\s*INSERT\\s+INTO\\s+(\\w+)\\s*\\(([^)]+)\\)\\s*VALUES\\s*\\(([^)]+)\\)/i);`,
+    `    if (!m) throw new Error('MongoDB insert: use INSERT INTO collection (fields) VALUES (?, ...)');`,
+    `    const [, collection, fieldsStr, valuesStr] = m;`,
+    `    const fields = fieldsStr.split(',').map(f => f.trim());`,
+    `    const values = params;`,
+    `    const doc = {}; fields.forEach((f, i) => doc[f] = values[i]);`,
+    `    const coll = __mongoCollection(collection);`,
+    `    const result = await coll.insertOne(doc);`,
+    `    return { insertedId: result.insertedId, acknowledged: result.acknowledged };`,
+    `  };`,
+    `  __mongoDb.__update = async function(sql, params) {`,
+    `    if (!__mongoDb) throw new Error('MongoDB: not connected');`,
+    `    const m = String(sql).match(/^\\s*UPDATE\\s+(\\w+)\\s+SET\\s+(.+?)(?:\\s+WHERE\\s+(.+))?\\s*$/i);`,
+    `    if (!m) throw new Error('MongoDB update: use UPDATE collection SET field = ? WHERE field = ?');`,
+    `    const [, collection, setClause, whereClause] = m;`,
+    `    const coll = __mongoCollection(collection);`,
+    `    const filter = {};`,
+    `    if (whereClause) {`,
+    `      const wm = whereClause.match(/(\\w+)\\s*=\\s*\\?/);`,
+    `      if (wm) filter[wm[1]] = params[1] !== undefined ? params[1] : params[0];`,
+    `    }`,
+    `    const updateDoc = {};`,
+    `    const sm = setClause.match(/(\\w+)\\s*=\\s*\\?/);`,
+    `    if (sm) updateDoc[sm[1]] = params[0];`,
+    `    const result = await coll.updateMany(filter, { $set: updateDoc });`,
+    `    return { rowCount: result.modifiedCount };`,
+    `  };`,
+    `  __mongoDb.__delete = async function(sql, params) {`,
+    `    if (!__mongoDb) throw new Error('MongoDB: not connected');`,
+    `    const m = String(sql).match(/^\\s*DELETE\\s+FROM\\s+(\\w+)(?:\\s+WHERE\\s+(.+))?\\s*$/i);`,
+    `    if (!m) throw new Error('MongoDB delete: use DELETE FROM collection WHERE field = ?');`,
+    `    const [, collection, whereClause] = m;`,
+    `    const coll = __mongoCollection(collection);`,
+    `    const filter = {};`,
+    `    if (whereClause) {`,
+    `      const wm = whereClause.match(/(\\w+)\\s*=\\s*\\?/);`,
+    `      if (wm) filter[wm[1]] = params[0];`,
+    `    }`,
+    `    const result = await coll.deleteMany(filter);`,
+    `    return { rowCount: result.deletedCount };`,
+    `  };`,
+    `  __mongoDb.__execute = async function(sql, params) {`,
+    `    throw new Error('MongoDB execute: use query/insert/update/delete instead');`,
+    `  };`,
+    `  return __mongoDb;`,
+    `}`,
+    `async function __mongoClose() {`,
+    `  if (__mongoClient) {`,
+    `    await __mongoClient.close();`,
+    `    __mongoClient = null;`,
+    `    __mongoDb = null;`,
+    `  }`,
+    `}`,
+  ].join('\n'),
+  // v1.2 -- Telegram runtime. Polling-based: no webhook endpoint needed.
   // Exposes `Telegram` (the raw API client) plus a `createTelegramBot(token)`
   // factory that registers handlers and polls getUpdates in a loop. `BOT` is
   // assigned by `bot "<token>"`. The token also falls back to the
@@ -1140,6 +1668,27 @@ const BUILTIN_DECLARATIONS = {
   print:      (args, context) => `console.log(${args.map(arg => generateExpr(arg, context)).join(', ')})`,
   readFile:   (args, context) => `fs.readFileSync(${generateExpr(args[0], context)}, 'utf8')`,
   writeFile:  (args, context) => `fs.writeFileSync(${generateExpr(args[0], context)}, ${generateExpr(args[1], context)}, 'utf8')`,
+  // v2.4.0 — dependency-free SVG image and visualization helpers.
+  svgImage: (args, context) => {
+    ensureBuiltin(context, 'visualization');
+    return `__svgImage(${args.map(arg => generateExpr(arg, context)).join(', ')})`;
+  },
+  barChart: (args, context) => {
+    ensureBuiltin(context, 'visualization');
+    return `__barChart(${args.map(arg => generateExpr(arg, context)).join(', ')})`;
+  },
+  lineChart: (args, context) => {
+    ensureBuiltin(context, 'visualization');
+    return `__lineChart(${args.map(arg => generateExpr(arg, context)).join(', ')})`;
+  },
+  saveImage: (args, context) => {
+    ensureBuiltin(context, 'visualization');
+    return `__saveImage(${args.map(arg => generateExpr(arg, context)).join(', ')})`;
+  },
+  imageDataUri: (args, context) => {
+    ensureBuiltin(context, 'visualization');
+    return `__imageDataUri(${args.map(arg => generateExpr(arg, context)).join(', ')})`;
+  },
   fileExists: (args, context) => `fs.existsSync(${generateExpr(args[0], context)})`,
   read:       (args, context) => `fs.readFileSync(${generateExpr(args[0], context)}, 'utf8')`,
   sleep:      (args, context) => `Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ${generateExpr(args[0], context)})`,
@@ -2105,6 +2654,115 @@ const BUILTIN_DECLARATIONS = {
   blob: (args, context) => `new Blob(${args.map(a => generateExpr(a, context)).join(', ')})`,
   file: (args, context) => `new File(${args.map(a => generateExpr(a, context)).join(', ')})`,
   formData: (_args) => `new FormData()`,
+
+  // ── v1.0.36 — browser DOM (IOPL-native). All helpers guard their browser
+  // global, so the generated output throws a clear teaching error under Node.
+  select: (args, context) => {
+    ensureBuiltin(context, 'dom');
+    requireOneArg('select', args);
+    return `__select(${generateExpr(args[0], context)})`;
+  },
+  selectAll: (args, context) => {
+    ensureBuiltin(context, 'dom');
+    requireOneArg('selectAll', args);
+    return `__selectAll(${generateExpr(args[0], context)})`;
+  },
+  parseHTML: (args, context) => {
+    ensureBuiltin(context, 'dom');
+    requireOneArg('parseHTML', args);
+    return `__parseHTML(${generateExpr(args[0], context)})`;
+  },
+
+  // ── v1.0.36 — browser input (IOPL-native).
+  localPoint: (args, context) => {
+    ensureBuiltin(context, 'input');
+    requireArgs('localPoint', args, 2, 'localPoint(event, canvas)');
+    return `__localPoint(${args.map(a => generateExpr(a, context)).join(', ')})`;
+  },
+  gamepads: (_args, context) => {
+    ensureBuiltin(context, 'input');
+    return `__gamepads()`;
+  },
+  droppedFiles: (args, context) => {
+    ensureBuiltin(context, 'input');
+    requireOneArg('droppedFiles', args);
+    return `__droppedFiles(${generateExpr(args[0], context)})`;
+  },
+
+  // ── v1.0.36 — browser assets (IOPL-native). Each awaitable helper is
+  // awaited here, so the surrounding function/handler is marked async.
+  loadImage: (args, context) => {
+    ensureBuiltin(context, 'assets');
+    requireOneArg('loadImage', args);
+    markAsync(context);
+    return `(await __loadImage(${generateExpr(args[0], context)}))`;
+  },
+  loadAudio: (args, context) => {
+    ensureBuiltin(context, 'assets');
+    requireOneArg('loadAudio', args);
+    markAsync(context);
+    return `(await __loadAudio(${generateExpr(args[0], context)}))`;
+  },
+  fetchJson: (args, context) => {
+    ensureBuiltin(context, 'assets');
+    requireOneArg('fetchJson', args);
+    markAsync(context);
+    return `(await __fetchJson(${generateExpr(args[0], context)}))`;
+  },
+  fetchBytes: (args, context) => {
+    ensureBuiltin(context, 'assets');
+    requireOneArg('fetchBytes', args);
+    markAsync(context);
+    return `(await __fetchBytes(${generateExpr(args[0], context)}))`;
+  },
+  readDataUrl: (args, context) => {
+    ensureBuiltin(context, 'assets');
+    requireOneArg('readDataUrl', args);
+    markAsync(context);
+    return `(await __readDataUrl(${generateExpr(args[0], context)}))`;
+  },
+
+  // ── v1.0.36 — Web Audio (IOPL-native).
+  audioContext: (_args, context) => {
+    ensureBuiltin(context, 'audio');
+    return `__audioContext()`;
+  },
+  playTone: (args, context) => {
+    ensureBuiltin(context, 'audio');
+    requireArgs('playTone', args, 1, 'playTone(440)');
+    return `__audioTone(${args.map(a => generateExpr(a, context)).join(', ')})`;
+  },
+
+  // ── v1.0.36 — WebSocket send helper (works with any WebSocket-like object,
+  // browser or Node): strings go through verbatim, everything else is JSON.
+  webSocketSend: (args, context) => {
+    requireArgs('webSocketSend', args, 2, 'webSocketSend(socket, { type: "move", x: 10 })');
+    const ws = generateExpr(args[0], context);
+    const value = generateExpr(args[1], context);
+    return `${ws}.send(typeof (${value}) === 'string' ? (${value}) : JSON.stringify(${value}))`;
+  },
+
+  // ── v1.0.36 — WebGL (IOPL-native).
+  webglContext: (args, context) => {
+    ensureBuiltin(context, 'gl');
+    requireOneArg('webglContext', args);
+    return `__glContext(${generateExpr(args[0], context)})`;
+  },
+  glShader: (args, context) => {
+    ensureBuiltin(context, 'gl');
+    requireArgs('glShader', args, 3, 'glShader(gl, "vertex", "void main() {}")');
+    return `__glShader(${args.map(a => generateExpr(a, context)).join(', ')})`;
+  },
+  glProgram: (args, context) => {
+    ensureBuiltin(context, 'gl');
+    requireArgs('glProgram', args, 3, 'glProgram(gl, vertexShader, fragmentShader)');
+    return `__glProgram(${args.map(a => generateExpr(a, context)).join(', ')})`;
+  },
+  glBuffer: (args, context) => {
+    ensureBuiltin(context, 'gl');
+    requireArgs('glBuffer', args, 2, 'glBuffer(gl, new Float32Array([0, 0, 1, 0, 0, 1]))');
+    return `__glBuffer(${args.map(a => generateExpr(a, context)).join(', ')})`;
+  },
 };
 
 // Mark the enclosing program async when a call awaits at the top level, and
@@ -2224,9 +2882,15 @@ function emitSqlCall(kind, sql, params, indent, context) {
     markAsync(context);
     return kind === 'query' ? `(await ${call}).rows` : `await ${call}`;
   }
+  if (_sqlDriver === 'mongo') {
+    markAsync(context);
+    return `await ${_sqlClientVar}.__${kind}(\`${sql}\`, [${args}])`;
+  }
   switch (kind) {
     case 'query':   return `db.prepare(\`${sql}\`).all(${args})`;
     case 'write':   return `db.prepare(\`${sql}\`).run(${args})`;
+    case 'update':  return `db.prepare(\`${sql}\`).run(${args})`;
+    case 'delete':  return `db.prepare(\`${sql}\`).run(${args})`;
     case 'execute': return `db.exec(\`${sql}\`)`;
     default: throw new Error(`Unknown SQL kind "${kind}".`);
   }
@@ -2958,6 +3622,13 @@ function generateStatement(node, indent = '', context = createGenerationContext(
       }
       return `${indent}res.send(${generateExpr(node.value, context)});`;
 
+    case 'ReplyFileStatement':
+      if (!_inRoute) {
+        throw new Error('"reply file" can only be used inside a route handler.\n\nExample:\n  route get "/"\n    reply file "public/index.html"\n  done');
+      }
+      // Use path.resolve to handle relative paths correctly
+      return `${indent}res.sendFile(require('path').resolve(${JSON.stringify(node.filePath)}));`;
+
     case 'ReplyJsonStatement': {
       const props = node.properties
         .map(p => `${JSON.stringify(p.key)}: ${generateExpr(p.value, context)}`)
@@ -3246,13 +3917,30 @@ function generateStatement(node, indent = '', context = createGenerationContext(
       ].filter(Boolean).map(line => line.startsWith('const ') ? `${indent}${line}` : line).join('\n');
     }
 
+    // v2.2.0 — mongo "<connection>" [db "<name>"]: MongoDB client bound to "db".
+    // Uses the mongodb driver; subsequent query/insert/update/delete/execute
+    // statements compile to MongoDB collection operations.
+    case 'MongoStatement': {
+      _sqlDriver = 'mongo';
+      _sqlClientVar = 'db';
+      markAsync(context);
+      ensureBuiltin(context, 'mongodb');
+      const dbArg = node.dbName ? `, ${generateExpr(node.dbName, context)}` : '';
+      return [
+        emitRequire(context, 'mongodb'),
+        `${indent}const db = await __mongoOpen(${generateExpr(node.connection, context)}${dbArg});`,
+      ].filter(Boolean).map(line => line.startsWith('const ') ? `${indent}${line}` : line).join('\n');
+    }
+
     case 'QueryStatement':
       return `${indent}${emitSqlCall('query', node.sql, node.params, indent, context)};`;
 
     case 'InsertStatement':
-    case 'UpdateStatement':
-    case 'DeleteStatement':
       return `${indent}${emitSqlCall('write', node.sql, node.params, indent, context)};`;
+    case 'UpdateStatement':
+      return `${indent}${emitSqlCall('update', node.sql, node.params, indent, context)};`;
+    case 'DeleteStatement':
+      return `${indent}${emitSqlCall('delete', node.sql, node.params, indent, context)};`;
 
     case 'ExecuteStatement':
       return `${indent}${emitSqlCall('execute', node.sql, node.params, indent, context)};`;
@@ -3260,7 +3948,10 @@ function generateStatement(node, indent = '', context = createGenerationContext(
     // v2.1.0 — remember <name> as query|insert|update|delete … done
     case 'RememberSqlStatement': {
       const kind = node.kind === 'query' ? 'query'
-        : node.kind === 'execute' ? 'execute' : 'write';
+        : node.kind === 'execute' ? 'execute'
+        : node.kind === 'update' ? 'update'
+        : node.kind === 'delete' ? 'delete'
+        : 'write';
       return `${indent}let ${node.name} = ${emitSqlCall(kind, node.sql, node.params, indent, context)};`;
     }
 
@@ -3332,31 +4023,54 @@ function generateStatement(node, indent = '', context = createGenerationContext(
 
     // whatsapp bot … done — starts the Baileys runtime with the declared
     // auth folder and login mode, then registers every "on message" handler.
+    // When no login line is present (login is null), only registers handlers
+    // without auto-starting — used by hybrid bots that pair on-demand.
     case 'WhatsAppBotStatement': {
       ensureBuiltin(context, 'whatsapp');
       markAsync(context);
-      // v2.1.2 — the pairing phone may be a compile-time literal or any
-      // PlainScript expression (e.g. a variable filled by `ask`). Runtime values
-      // are normalized/validated by __waNormalizePhone at startup.
-      let loginArg;
-      if (node.login.mode === 'pairing') {
-        loginArg = node.login.phoneExpr != null
-          ? `{ mode: 'pairing', phone: (${generateExpr(node.login.phoneExpr, context)}) }`
-          : `{ mode: 'pairing', phone: ${JSON.stringify(node.login.phone)} }`;
-      } else {
-        loginArg = `{ mode: 'qr' }`;
+      const lines = [];
+      if (node.login) {
+        // v2.1.2 — the pairing phone may be a compile-time literal or any
+        // PlainScript expression (e.g. a variable filled by `ask`). Runtime values
+        // are normalized/validated by __waNormalizePhone at startup.
+        let loginArg;
+        if (node.login.mode === 'pairing') {
+          loginArg = node.login.phoneExpr != null
+            ? `{ mode: 'pairing', phone: (${generateExpr(node.login.phoneExpr, context)}) }`
+            : `{ mode: 'pairing', phone: ${JSON.stringify(node.login.phone)} }`;
+        } else {
+          loginArg = `{ mode: 'qr' }`;
+        }
+        lines.push(
+          `${indent}await __whatsappStart({`,
+          `${indent}  folder: ${JSON.stringify(node.authFolder)},`,
+          `${indent}  login: ${loginArg},`,
+          ...(node.baileysModule ? [`${indent}  baileys: ${JSON.stringify(node.baileysModule)},`] : []),
+          `${indent}});`,
+        );
       }
-      const lines = [
-        `${indent}await __whatsappStart({`,
-        `${indent}  folder: ${JSON.stringify(node.authFolder)},`,
-        `${indent}  login: ${loginArg},`,
-        `${indent}});`,
-      ];
       for (const handlerNode of node.handlers) {
         const generated = generateStatement(handlerNode, indent, context);
         if (generated) lines.push(generated);
       }
       return lines.join('\n');
+    }
+
+    // pair whatsapp "<phone>" — on-demand WhatsApp pairing session.
+    // When _inTelegram is true, relays the pairing code and connection status
+    // to the Telegram chat via ctx.chatId.
+    case 'WhatsAppPairStatement': {
+      ensureBuiltin(context, 'whatsapp');
+      markAsync(context);
+      const phoneArg = node.phone.type === 'StringLiteral'
+        ? JSON.stringify(node.phone.value)
+        : generateExpr(node.phone, context);
+      if (_inTelegram) {
+        return [
+          `${indent}await __whatsappPair(${phoneArg}, (code) => Telegram.sendMessage(ctx.chatId, "WhatsApp pairing code: " + code), () => Telegram.sendMessage(ctx.chatId, "WhatsApp connected."));`,
+        ].join('\n');
+      }
+      return `${indent}await __whatsappPair(${phoneArg}, null, null);`;
     }
 
     // on message … done — registers the handler that receives each incoming
@@ -3383,6 +4097,16 @@ function generateStatement(node, indent = '', context = createGenerationContext(
       }
       ensureBuiltin(context, 'whatsapp');
       return `${indent}console.log(__waCtx.message);`;
+
+    // v2.14 — download "<path>" — saves the current message's media to a file.
+    // Handler-only by design: outside "on message" there is no message media.
+    case 'WhatsAppDownloadStatement':
+      if (!_inWhatsApp) {
+        throw new Error('"download" can only be used inside an "on message" block to save the current message\'s media.\n\nExample:\n  whatsapp bot\n      on message\n          if message.type is "image"\n              download "media/photo.jpg"\n              reply "Saved your photo!"\n          done\n      done\n  done');
+      }
+      ensureBuiltin(context, 'whatsapp');
+      markAsync(context);
+      return `${indent}await __whatsappDownload(__waCtx.message, ${JSON.stringify(node.filePath)});`;
 
     // v2.1.0 — mail, cache, scheduling, background jobs, websocket
 
@@ -3452,6 +4176,39 @@ function generateStatement(node, indent = '', context = createGenerationContext(
       ].join('\n');
     }
 
+    // v1.0.36 — every frame … done: one requestAnimationFrame loop. The next
+    // frame is scheduled after the body so the body always runs once per
+    // frame; an awaiting body makes the callback async automatically.
+    case 'EveryFrameStatement': {
+      const prevInHandler = context.inHandler;
+      context.inHandler = true;
+      const block = generateBlock(node.body, indent + '    ', context);
+      context.inHandler = prevInHandler;
+      const handlerAsync = block.emitted ? 'async ' : '';
+      return [
+        `${indent}requestAnimationFrame(${handlerAsync}function __frame(__frameTime) {`,
+        block.out,
+        `${indent}  requestAnimationFrame(__frame);`,
+        `${indent}});`,
+      ].join('\n');
+    }
+
+    // v1.0.36 — after <n> <unit> … done: one-shot setTimeout. The delay is an
+    // expression scaled by the unit; an awaiting body makes the callback async.
+    case 'AfterStatement': {
+      const delay = generateExpr(node.delay, context);
+      const prevInHandler = context.inHandler;
+      context.inHandler = true;
+      const block = generateBlock(node.body, indent + '    ', context);
+      context.inHandler = prevInHandler;
+      const handlerAsync = block.emitted ? 'async ' : '';
+      return [
+        `${indent}setTimeout(${handlerAsync}() => {`,
+        block.out,
+        `${indent}}, ${delay} * ${node.unit});`,
+      ].join('\n');
+    }
+
     case 'ScheduleStatement': {
       ensureBuiltin(context, 'scheduler');
       const body = node.body.map(s => generateStatement(s, indent + '    ', context)).join('\n');
@@ -3473,6 +4230,20 @@ function generateStatement(node, indent = '', context = createGenerationContext(
         `${indent}});`,
       ].join('\n');
 
+    case 'StringTransformStatement': {
+      const method = { lowercase: 'toLowerCase', uppercase: 'toUpperCase', trim: 'trim' }[node.kind];
+      return `${indent}${node.target} = String(${node.target}).${method}();`;
+    }
+
+    case 'CapitalizeWordsStatement':
+      return `${indent}${node.target} = (${node.target}).map(w => String(w).charAt(0).toUpperCase() + String(w).slice(1));`;
+
+    case 'SplitStatement':
+      return `${indent}${node.target} = String(${node.target}).split(${generateExpr(node.separator, context)});`;
+
+    case 'JoinStatement':
+      return `${indent}(${node.target}) = (${node.target}).join(${generateExpr(node.separator, context)});`;
+
     case 'WebSocketServerStatement': {
       ensureBuiltin(context, 'websocket');
       const handler = (name, params, body) => {
@@ -3492,6 +4263,10 @@ function generateStatement(node, indent = '', context = createGenerationContext(
     case 'SendSocketStatement':
       ensureBuiltin(context, 'websocket');
       return `${indent}__wsSend(socket, ${generateExpr(node.value, context)});`;
+
+    case 'SendToStatement':
+      ensureBuiltin(context, 'websocket');
+      return `${indent}__wsSend(${generateExpr(node.connection, context)}, ${generateExpr(node.value, context)});`;
 
     case 'BroadcastStatement':
       ensureBuiltin(context, 'websocket');
@@ -3553,6 +4328,19 @@ function generateStatement(node, indent = '', context = createGenerationContext(
       const event = typeof node.event === 'string' ? JSON.stringify(node.event) : generateExpr(node.event, context);
       const body = (node.body || []).map(s => generateStatement(s, indent + '  ', context)).join('\n');
       return `${indent}__emitter.on(${event}, (${node.paramName}) => {\n${body}\n${indent}});`;
+    }
+
+    // v1.0.36 — when <target> "<event>" happens [as <name>] … done: DOM event
+    // listener. The handler param defaults to "event"; an awaiting body makes
+    // the callback async automatically.
+    case 'WhenTargetedStatement': {
+      const prevInHandler = context.inHandler;
+      context.inHandler = true;
+      const block = generateBlock(node.body, indent + '  ', context);
+      context.inHandler = prevInHandler;
+      const handlerAsync = block.emitted ? 'async ' : '';
+      const param = node.paramName || 'event';
+      return `${indent}${generateExpr(node.target, context)}.addEventListener(${JSON.stringify(node.event)}, ${handlerAsync}function (${param}) {\n${block.out}\n${indent}});`;
     }
 
     case 'StreamStatement': {

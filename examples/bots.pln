@@ -1,4 +1,4 @@
-// PlainScript 1.0.3-beta: Telegram bot handlers.
+// PlainScript 1.0.36: Telegram bot handlers.
 
 bot env("TELEGRAM_BOT_TOKEN")
 

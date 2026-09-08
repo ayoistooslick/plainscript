@@ -1,0 +1,54 @@
+bring whatsappWelcome and telegramMenu and pairInstructions from "./messages.pln"
+
+bot env("TELEGRAM_BOT_TOKEN")
+
+whatsapp bot
+    auth "whatsapp-session"
+
+    on message
+        log message
+
+        if message.text is ".ping"
+            reply "pong"
+        done
+
+        if message.text is ".start"
+            reply whatsappWelcome()
+        done
+        if message.text is "/start"
+            reply whatsappWelcome()
+        done
+
+        if message.type is "image"
+            download "downloads/whatsapp-photo.jpg"
+            reply "Got your picture. We saved it for the team."
+        done
+
+        if message.type is "button"
+            reply "You chose: " + message.buttonId
+        done
+
+        if message.type is "document"
+            download "downloads/whatsapp-document"
+            reply "We received your document."
+        done
+    done
+done
+
+when someone sends "/start"
+    reply pairInstructions()
+done
+
+when someone sends "/menu"
+    reply telegramMenu()
+done
+
+when someone sends "/ping"
+    reply "pong"
+done
+
+when someone sends matching "/pair (.+)"
+    pair whatsapp matches[1]
+done
+
+start telegram bot

@@ -1,0 +1,13 @@
+make whatsappWelcome()
+    give "Welcome to the WhatsApp hybrid bot."
+done
+
+make telegramMenu()
+    give "/pair <phone> — connect WhatsApp\n/ping — test bot\n/start — welcome message"
+done
+
+make pairInstructions()
+    give "Welcome! Use /pair <phone> to connect WhatsApp, or /menu for options."
+done
+
+export whatsappWelcome and telegramMenu and pairInstructions

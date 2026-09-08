@@ -1,4 +1,4 @@
-// PlainScript 1.0.3-beta: validated JSON REST API.
+bring missingTitle and newTicket from "./tickets.pln"
 
 web app
 remember tickets as []
@@ -17,7 +17,7 @@ route get "/tickets"
 done
 
 route post "/tickets"
-    remember missing as validate("title", body())
+    remember missing as missingTitle(body())
     if length(missing) is greater than 0
         status 400
         reply json
@@ -25,7 +25,7 @@ route post "/tickets"
             missing is missing
         done
     otherwise
-        remember ticket as { title: body("title"), state: "open" }
+        remember ticket as newTicket(body("title"))
         tickets becomes tickets plus [ticket]
         status 201
         reply json

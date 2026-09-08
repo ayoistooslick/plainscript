@@ -1,4 +1,4 @@
-// PlainScript 1.0.3-beta: protected API with sessions.
+bring issueToken from "./auth.pln"
 
 web app
 enable sessions env("SESSION_SECRET")
@@ -12,7 +12,7 @@ route get "/api/me"
 done
 
 route post "/api/token"
-    remember token as createToken(body("user"), env("SESSION_SECRET"))
+    remember token as issueToken(body("user"), env("SESSION_SECRET"))
     reply json
         token is token
     done

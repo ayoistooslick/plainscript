@@ -28,6 +28,7 @@ output.txt
 .agents/memory/MEMORY.md
 .replit
 .claude/
+.aider*
 
 # Local roadmap / task tracker (never commit)
 TASKS.md

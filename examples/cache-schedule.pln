@@ -1,4 +1,4 @@
-// PlainScript 1.0.3-beta: cache values and scheduled work.
+// PlainScript 1.0.36: cache values and scheduled work.
 
 cache "redis://localhost:6379"
 

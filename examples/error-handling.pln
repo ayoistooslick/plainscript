@@ -1,4 +1,4 @@
-// PlainScript 1.0.3-beta: recovery and cleanup.
+// PlainScript 1.0.36: recovery and cleanup.
 try
     show "work"
 recover as error

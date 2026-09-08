@@ -1,0 +1,12 @@
+// Create a dependency-free SVG visualization.
+remember months as ["Jan", "Feb", "Mar", "Apr"]
+remember signups as [12, 18, 27, 35]
+
+remember chart as barChart("Monthly signups", months, signups, {
+    width: 720,
+    height: 420,
+    accent: "#40c463"
+})
+
+saveImage("dist/monthly-signups.svg", chart)
+show "Saved dist/monthly-signups.svg"

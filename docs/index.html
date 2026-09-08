@@ -3,19 +3,32 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="PlainScript 1.0.4 language reference and examples">
-  <title>PlainScript 1.0.4</title>
+  <meta name="description" content="PlainScript 1.1.0 language reference and examples">
+  <meta name="theme-color" content="#070c16">
+  <title>PlainScript 1.1.0</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500&family=Public+Sans:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="website/style.css">
 </head>
 <body>
-  <header class="site-nav">
+  <div class="bg-scrim" aria-hidden="true"></div>
+  <canvas id="bg-canvas" aria-hidden="true"></canvas>
+
+  <header class="site-nav" id="site-nav">
     <div class="container nav-inner">
       <a class="nav-logo" href="#">
-        <img src="logo.jpg" alt="" class="nav-logo-image">
+        <img class="nav-logo-image" src="logo-pln.jpg" alt="">
         <span>PlainScript</span>
-        <span class="logo-ver">1.0.4</span>
+        <span class="logo-ver">1.1.0</span>
       </a>
-      <nav class="nav-links" aria-label="Primary navigation">
+      <button class="nav-toggle" id="nav-toggle" aria-label="Toggle navigation" aria-expanded="false" aria-controls="nav-links">
+        <span class="nav-toggle-bar"></span>
+        <span class="nav-toggle-bar"></span>
+        <span class="nav-toggle-bar"></span>
+      </button>
+      <nav class="nav-links" id="nav-links" aria-label="Primary navigation">
         <a href="#quickstart">Quick start</a>
         <a href="#language">Language</a>
         <a href="#capabilities">Capabilities</a>
@@ -27,30 +40,37 @@
   <main>
     <section class="hero">
       <div class="container hero-content">
-        <p class="hero-badge">1.0.4: intent-oriented programming</p>
-        <h1 class="hero-title">Code that reads like plain English.</h1>
-        <p class="hero-lead">Describe what you want. PlainScript compiles it to readable JavaScript while keeping the language small, direct, and checkable.</p>
-        <div class="hero-actions">
-          <a class="button button-primary" href="#quickstart">Start building</a>
-          <a class="button button-secondary" href="#library">Browse examples</a>
-        </div>
-        <pre class="code-window"><code>remember name as "Ada"
+        <div class="hero-grid">
+          <div class="hero-headline-block">
+            <p class="hero-badge" data-reveal>1.1.0: an intent-oriented language for node.js & wasm</p>
+            <h1 class="hero-title"><span class="kw">remember</span> the sentence <span class="kw">as</span> the program.<br><span class="kw">show</span> the result <span class="kw">when</span> the meaning is clear.</h1>
+            <p class="hero-lead">Write what you want in plain words. PlainScript checks it, then turns it into readable JavaScript and WebAssembly — no boilerplate, no hidden steps, with 50% fewer AI tokens.</p>
+            <div class="hero-actions">
+              <span class="hero-install-label">install</span>
+              <a class="button" href="#quickstart">npx plainscript-lang new hello</a>
+            </div>
+          </div>
+          <div class="hero-panel">
+            <p class="hero-panel-label">terminal</p>
+            <pre class="code-window"><code>remember name as "Ada"
 if name contains "A"
     show `Hello, ${name}!`
 done</code></pre>
+          </div>
+        </div>
       </div>
     </section>
 
     <section id="quickstart" class="section">
       <div class="container">
-        <p class="section-tag">Quick start</p>
-        <h2 class="section-title">Check first, then build.</h2>
+        <p class="section-tag" data-reveal>Quick start</p>
+        <h2 class="section-title" data-reveal>A simple three-step workflow.</h2>
         <div class="three-column">
-          <article class="info-card"><span class="card-number">01</span><h3>Write</h3><p>Create a <code>.pln</code> file with readable declarations and blocks.</p></article>
-          <article class="info-card"><span class="card-number">02</span><h3>Check</h3><p>Run <code>plainscript check file.pln</code> to validate imports and generated JavaScript.</p></article>
-          <article class="info-card"><span class="card-number">03</span><h3>Build</h3><p>Run <code>plainscript build</code> to emit standalone files in <code>dist/</code>.</p></article>
+          <article class="info-card" data-reveal><span class="card-number">01</span><h3>Write</h3><p>Create a <code>.pln</code> file with readable code blocks.</p></article>
+          <article class="info-card" data-reveal><span class="card-number">02</span><h3>Check</h3><p>Run <code>plainscript check file.pln</code> to catch mistakes.</p></article>
+          <article class="info-card" data-reveal><span class="card-number">03</span><h3>Build</h3><p>Run <code>plainscript build</code> to get your files in <code>dist/</code>.</p></article>
         </div>
-        <pre class="code-window"><code>npx plainscript-lang new hello
+        <pre class="code-window" data-reveal><code>npx plainscript-lang new hello
 cd hello
 npx plainscript-lang check
 npx plainscript-lang build
@@ -60,38 +80,40 @@ npm start</code></pre>
 
     <section id="language" class="section section--alt">
       <div class="container">
-        <p class="section-tag">Language</p>
-        <h2 class="section-title">A focused grammar for real programs.</h2>
+        <p class="section-tag" data-reveal>Language</p>
+        <h2 class="section-title" data-reveal>A small set of words you already know.</h2>
         <div class="feature-grid">
-          <article class="feature-card"><h3>Variables</h3><p><code>remember name as "Ada"</code> and readable assignment with <code>becomes</code>.</p></article>
-          <article class="feature-card"><h3>Conditions</h3><p>Use <code>is at least</code>, <code>is equal to</code>, <code>contains</code>, and <code>is in list</code>.</p></article>
-          <article class="feature-card"><h3>Functions</h3><p>Define functions with <code>make</code>, return with <code>give</code>, and close with <code>done</code>.</p></article>
-          <article class="feature-card"><h3>Loops</h3><p>Repeat loops: <code>repeat 5 times</code>, <code>repeat with item in list</code>, and <code>repeat while</code>.</p></article>
-          <article class="feature-card"><h3>Records</h3><p>Model data with record kinds, field defaults, and readable constructors.</p></article>
-          <article class="feature-card"><h3>Web apps</h3><p>Declare routes, JSON responses, sessions, cookies, uploads, and auth.</p></article>
-          <article class="feature-card"><h3>Data and async</h3><p>Use SQLite, HTTP, files, schedules, concurrency, and WebSockets.</p></article>
-          <article class="feature-card"><h3>Native & Wasm</h3><p>Target Node.js, ES Modules, standalone executables, and WebAssembly.</p></article>
-          <article class="feature-card"><h3>AI integration</h3><p>High token efficiency (50% reduction) with OpenAI-compatible completion APIs.</p></article>
+          <article class="feature-card" data-reveal><h3>Variables</h3><p>Store values with <code>remember name as "Ada"</code> and change them with <code>becomes</code>.</p></article>
+          <article class="feature-card" data-reveal><h3>Conditions</h3><p>Compare things with <code>is at least</code>, <code>is equal to</code>, <code>contains</code>, <code>is in list</code>, and <code>between</code>.</p></article>
+          <article class="feature-card" data-reveal><h3>Functions</h3><p>Create functions with <code>make</code>, return with <code>give</code>, and close with <code>done</code>.</p></article>
+          <article class="feature-card" data-reveal><h3>Loops</h3><p>Repeat loops: <code>repeat 5 times</code>, <code>repeat with item in list</code>, and <code>repeat while</code>.</p></article>
+          <article class="feature-card" data-reveal><h3>Records</h3><p>Model your data with record kinds and easy constructors.</p></article>
+          <article class="feature-card" data-reveal><h3>Modules</h3><p>Import code with <code>bring ... from</code>, <code>@/</code> aliases, and re-exports.</p></article>
+          <article class="feature-card" data-reveal><h3>Compound Types</h3><p>Use dictionaries, sets, and tuples with unpacking.</p></article>
+          <article class="feature-card" data-reveal><h3>Web apps</h3><p>Set up routes, JSON responses, sessions, cookies, uploads, and auth.</p></article>
+          <article class="feature-card" data-reveal><h3>Data and async</h3><p>Work with SQLite, HTTP, files, schedules, concurrency, and WebSockets.</p></article>
+          <article class="feature-card" data-reveal><h3>Native & Wasm</h3><p>Target Node.js, ES Modules, standalone executables, and WebAssembly.</p></article>
+          <article class="feature-card" data-reveal><h3>AI integration</h3><p>High token efficiency (50% reduction) with OpenAI-compatible completion APIs.</p></article>
         </div>
       </div>
     </section>
 
     <section id="capabilities" class="section">
       <div class="container">
-        <p class="section-tag">Capabilities</p>
-        <h2 class="section-title">The compiler covers the full path.</h2>
-        <div class="capability-list">
-          <span>JSON</span><span>SQLite and SQL</span><span>HTTP client</span><span>Auth and sessions</span><span>Files</span><span>Packages</span><span>Async</span><span>Errors</span><span>Concurrency</span><span>WebSockets</span><span>Cache</span><span>Bots</span><span>OCR</span><span>Tests</span><span>Modules</span><span>Wasm</span><span>LSP Server</span><span>Dev Server</span><span>TypeScript .d.ts</span>
+        <p class="section-tag" data-reveal>Capabilities</p>
+        <h2 class="section-title" data-reveal>Everything you need is built in.</h2>
+        <div class="capability-list" data-reveal>
+          <span>JSON</span><span>SQLite and SQL</span><span>HTTP client</span><span>Auth and sessions</span><span>Files</span><span>Packages</span><span>Async</span><span>Errors</span><span>Concurrency</span><span>WebSockets</span><span>Cache</span><span>Bots</span><span>OCR</span><span>Tests</span><span>Modules</span><span>Source Maps</span><span>Compound Types</span><span>Wasm</span><span>LSP Server</span><span>Dev Server</span><span>TypeScript .d.ts</span>
         </div>
       </div>
     </section>
 
     <section id="library" class="section section--alt">
       <div class="container">
-        <p class="section-tag">Feature library</p>
-        <h2 class="section-title">Current, checked examples.</h2>
-        <p class="section-lead">These snippets use the grammar accepted by PlainScript 1.0.4.</p>
-        <div class="library-toolbar">
+        <p class="section-tag" data-reveal>Feature library</p>
+        <h2 class="section-title" data-reveal>Examples you can try today.</h2>
+        <p class="section-lead">These snippets use the PlainScript 1.1.0 grammar.</p>
+        <div class="library-toolbar" data-reveal>
           <label class="sr-only" for="lib-search">Search examples</label>
           <input id="lib-search" class="lib-search-input" type="search" placeholder="Search examples">
           <div id="lib-filters" class="lib-filters" aria-label="Filter examples"></div>
@@ -103,15 +125,28 @@ npm start</code></pre>
 
     <section class="section">
       <div class="container split">
-        <div><p class="section-tag">Reference</p><h2 class="section-title">Use the compiler as the authority.</h2></div>
-        <div><p>Read the <a href="PLAINSCRIPT-SPEC.md">language specification</a> and the <a href="../knowledge.md">AI coding specification</a>. The repository's <code>examples/</code> directory is the executable reference set.</p><p>Validate a file with <code>node compiler/cli.js check path/to/file.pln</code>.</p></div>
+        <div data-reveal><p class="section-tag">Reference</p><h2 class="section-title">The compiler is the source of truth.</h2></div>
+        <div data-reveal>
+          <p>Read the language specification and the <a href="https://github.com/ayoistooslick/plainscript/blob/main/knowledge.md" target="_blank" rel="noopener noreferrer">AI coding specification</a>. The repository's <code>examples/</code> directory has runnable examples.</p>
+          <div class="reference-actions" aria-label="PlainScript resources">
+            <a class="button button-reference" href="https://www.npmjs.com/package/plainscript-lang" target="_blank" rel="noopener noreferrer">NPM package</a>
+            <a class="button button-reference" href="https://github.com/ayoistooslick/plainscript" target="_blank" rel="noopener noreferrer">GitHub repo</a>
+            <a class="button button-reference" href="https://github.com/ayoistooslick/plainscript/blob/main/docs/PLAINSCRIPT-SPEC.md" target="_blank" rel="noopener noreferrer">Language specification</a>
+            <a class="button button-reference" href="https://ayoistooslick.github.io/plainscript/" target="_blank" rel="noopener noreferrer">Documentation website</a>
+          </div>
+          <p>Validate a file with <code>node compiler/cli.js check path/to/file.pln</code>.</p>
+        </div>
       </div>
     </section>
   </main>
 
   <footer class="site-footer">
-    <div class="container footer-bottom"><span>PlainScript</span><span>1.0.4</span></div>
+    <div class="container footer-bottom"><span>PlainScript</span><span>1.1.0</span></div>
   </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"></script>
   <script src="website/script.js"></script>
 </body>
 </html>

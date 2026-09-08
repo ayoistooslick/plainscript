@@ -1,4 +1,0 @@
-modules = ["nodejs-24"]
-
-[nix]
-channel = "stable-25_05"

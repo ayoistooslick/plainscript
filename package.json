@@ -6,7 +6,7 @@
     "type": "git",
     "url": "https://github.com/ayoistooslick/plainscript.git"
   },
-  "homepage": "https://plainscript.org",
+  "homepage": "https://ayoistooslick.github.io/plainscript/",
   "bugs": {
     "url": "https://github.com/ayoistooslick/plainscript/issues"
   },
@@ -15,7 +15,7 @@
     "plainscript": "./compiler/cli.js"
   },
   "scripts": {
-    "test": "node tests/compiler.test.js && node tests/build.test.js && node tests/telegram.test.js && node tests/ocr.test.js && node tests/nesting.test.js && node tests/backend.test.js && node tests/runtime.test.js && node tests/portability.test.js && node tests/ai.test.js && node tests/acceptance.test.js && node tests/whatsapp.test.js && node tests/audit.test.js && node tests/sourcemap.test.js && node tests/modules.test.js && node tests/datastructures.test.js && node tests/docs.test.js && node tests/dx.test.js && node tests/lsp.test.js && node tests/types.test.js && node tests/repeat.test.js && node tests/dataset.test.js && node tests/inference.test.js && node tests/dev.test.js && node tests/registry.test.js && node tests/wasm.test.js && node tests/telemetry.test.js && node tests/packages.test.js && node tests/compat/language.test.js && node tests/compat/node.test.js && node tests/compat/binary.test.js && node tests/compat/errors.test.js && node tests/compat/async.test.js && node tests/compat/modules.test.js && node tests/compat/npm.test.js && node tests/compat/web.test.js && node tests/compat/real-world.test.js",
+    "test": "node tests/compiler.test.js && node tests/build.test.js && node tests/telegram.test.js && node tests/ocr.test.js && node tests/nesting.test.js && node tests/backend.test.js && node tests/runtime.test.js && node tests/browser.test.js && node tests/portability.test.js && node tests/ai.test.js && node tests/acceptance.test.js && node tests/whatsapp.test.js && node tests/audit.test.js && node tests/sourcemap.test.js && node tests/modules.test.js && node tests/datastructures.test.js && node tests/docs.test.js && node tests/dx.test.js && node tests/lsp.test.js && node tests/types.test.js && node tests/repeat.test.js && node tests/dataset.test.js && node tests/inference.test.js && node tests/dev.test.js && node tests/registry.test.js && node tests/wasm.test.js && node tests/telemetry.test.js && node tests/packages.test.js && node tests/compat/browser-interop.test.js && node tests/compat/language.test.js && node tests/compat/node.test.js && node tests/compat/binary.test.js && node tests/compat/errors.test.js && node tests/compat/async.test.js && node tests/compat/modules.test.js && node tests/compat/npm.test.js && node tests/compat/web.test.js && node tests/compat/real-world.test.js",
     "build:browser": "node tools/build-browser.js",
     "package:vscode": "cd plainscript-vscode && npx -y @vscode/vsce package --no-git-tag-version"
   },
@@ -54,6 +54,9 @@
     "ws": "^8.21.3"
   },
   "dependencies": {
-    "tesseract.js": "^7.0.0"
+    "@qwerty-xcv/baileys": "^0.0.1",
+    "mongodb": "^7.6.0",
+    "tesseract.js": "^7.0.0",
+    "three": "^0.185.1"
   }
 }

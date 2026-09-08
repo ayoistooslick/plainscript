@@ -41,8 +41,10 @@ const NUMBER_WORDS = {
 const HTTP_METHODS = ['get', 'post', 'put', 'patch', 'delete'];
 
 // Time units accepted by the "every <n> <unit>" statement, in milliseconds
-// (used by the generator to build the interval directly).
+// (used by the generator to build the interval directly). "every 16
+// milliseconds" powers requestAnimationFrame-style loops.
 const TIME_UNITS = {
+  millisecond: 1, milliseconds: 1,
   second: 1000, seconds: 1000,
   minute: 60 * 1000, minutes: 60 * 1000,
   hour: 60 * 60 * 1000, hours: 60 * 60 * 1000,
@@ -490,6 +492,13 @@ function parse(tokens) {
         peekAt(2).type === TOKEN.IDENTIFIER && TIME_UNITS[peekAt(2).value]) {
       return parseEvery();
     }
+    // v1.0.36 — every frame … done: requestAnimationFrame loop. "every" lexes
+    // as TOKEN.EACH; guard on the following "frame" identifier ("for every
+    // item in list" is intercepted by TOKEN.FOR above).
+    if (token.type === TOKEN.EACH && peekAt(1).type === TOKEN.IDENTIFIER &&
+        peekAt(1).value === 'frame') {
+      return parseEveryFrame();
+    }
     if (token.type === TOKEN.WHILE)       return parseWhile();
     if (token.type === TOKEN.USE)         return parseUse();
     if (token.type === TOKEN.IMPORT || token.type === TOKEN.INCLUDE || token.type === TOKEN.LOAD ||
@@ -566,6 +575,54 @@ function parse(tokens) {
 
     // Statements starting with an identifier: call, becomes, index/member becomes
     if (token.type === TOKEN.IDENTIFIER) {
+      // v2.5 — natural string and collection verbs that transform a variable
+      // in place: "lowercase title", "uppercase first letter of each word in title",
+      // "split title by \" \"", "join title by \" \"", "trim title".
+      const TRANSFORM_VERB = token.value === 'lowercase' || token.value === 'uppercase' ||
+        token.value === 'trim' || token.value === 'split' || token.value === 'join';
+      if (TRANSFORM_VERB && peekAt(1).type === TOKEN.IDENTIFIER) {
+        // "uppercase first letter of each word in <target>"
+        if (token.value === 'uppercase' &&
+            peekAt(1).value === 'first' && peekAt(2).value === 'letter' &&
+            peekAt(3).value === 'of' && peekAt(4).type === TOKEN.EACH && peekAt(4).value === 'each' &&
+            peekAt(5).value === 'word') {
+          for (let t = 0; t < 6; t++) advance(); // uppercase first letter of each word
+          const connector = peek();
+          if (connector.type !== TOKEN.IN && !(connector.type === TOKEN.IDENTIFIER && connector.value === 'in')) {
+            throw new Error(makeError(
+              'Expected "in <name>" after "uppercase first letter of each word".\n\nExample:\n  uppercase first letter of each word in title',
+              connector
+            ));
+          }
+          advance(); // in
+          const target = peek();
+          if (target.type !== TOKEN.IDENTIFIER) {
+            throw new Error(makeError('Expected a variable name after "in".', target));
+          }
+          advance();
+          return { type: 'CapitalizeWordsStatement', target: target.value };
+        }
+
+        // "lowercase title" / "uppercase title" / "trim title"
+        if (token.value === 'lowercase' || token.value === 'uppercase' || token.value === 'trim') {
+          const kind = token.value;
+          advance(); // verb
+          const target = advance().value;
+          return { type: 'StringTransformStatement', kind, target };
+        }
+
+        // "split title by <sep>" / "join list by <sep>"
+        if ((token.value === 'split' || token.value === 'join') &&
+            peekAt(2).type === TOKEN.IDENTIFIER && peekAt(2).value === 'by') {
+          const kind = token.value;
+          advance(); // verb
+          const target = advance().value;
+          advance(); // by
+          const separator = parseExpression();
+          return { type: kind === 'split' ? 'SplitStatement' : 'JoinStatement', target, separator };
+        }
+      }
+
       // switch ... against ... done
       if (token.value === 'switch' && (peekAt(1).type === TOKEN.IDENTIFIER || tokenStartsValue(peekAt(1)))) {
         return parseSwitchStatement();
@@ -585,9 +642,12 @@ function parse(tokens) {
         return { type: 'ReturnStatement', value };
       }
 
-      // new expression: new ClassName(args)
+      // new expression: new ClassName(args). "new" is not a keyword, so
+      // parsePrimary intercepts it anywhere an expression appears; routing the
+      // statement-start form through parsePrimary keeps member chains after the
+      // constructor intact (new THREE.Scene().add(...)).
       if (token.value === 'new' && peekAt(1).type !== TOKEN.BECOMES && peekAt(1).type !== TOKEN.LPAREN) {
-        return { type: 'ExpressionStatement', expression: parseNewExpression() };
+        return { type: 'ExpressionStatement', expression: parsePrimary() };
       }
 
       // v1.2 — bot "<token>" / bot <expr>: creates the polling Telegram bot.
@@ -627,6 +687,15 @@ function parse(tokens) {
           peekAt(1).type === TOKEN.STRING || peekAt(1).type === TOKEN.IDENTIFIER ||
           peekAt(1).type === TOKEN.LPAREN || peekAt(1).type === TOKEN.TEMPLATE_STRING)) {
         return parsePostgres();
+      }
+
+      // v2.2.0 — mongo "<connection-string>" [db "<name>"]: binds the MongoDB client.
+      // Contextual: a variable named "mongo" or "mongodb" keeps its meaning unless
+      // a connection string follows on the same line.
+      if ((token.value === 'mongo' || token.value === 'mongodb') && (
+          peekAt(1).type === TOKEN.STRING || peekAt(1).type === TOKEN.IDENTIFIER ||
+          peekAt(1).type === TOKEN.LPAREN || peekAt(1).type === TOKEN.TEMPLATE_STRING)) {
+        return parseMongo();
       }
 
       // v2.1.0 — cache "<redis-url>" / cache env("REDIS_URL"): connects the
@@ -675,6 +744,22 @@ function parse(tokens) {
         return parseEvery();
       }
 
+      // v1.0.36 — every frame … done: requestAnimationFrame loop. Identifier
+      // mirror of the EACH dispatch above.
+      if (token.value === 'every' && peekAt(1).type === TOKEN.IDENTIFIER &&
+          peekAt(1).value === 'frame') {
+        return parseEveryFrame();
+      }
+
+      // v1.0.36 — after <n> <unit>s … done: one-shot delayed execution.
+      // Contextual like "retry": "after becomes 5" and after(...) keep their
+      // ordinary meanings.
+      if (token.value === 'after' &&
+          tokenStartsValue(peekAt(1)) &&
+          peekAt(2).type === TOKEN.IDENTIFIER && TIME_UNITS[peekAt(2).value]) {
+        return parseAfter();
+      }
+
       // v2.1.0 — schedule "<cron>" … done: run work on a cron schedule.
       if (token.value === 'schedule' && peekAt(1).type === TOKEN.STRING) {
         advance(); // schedule
@@ -718,6 +803,23 @@ function parse(tokens) {
         return parseWhatsAppBot();
       }
 
+      // v2.1.1 — pair whatsapp "<phone>": starts an on-demand WhatsApp pairing
+      // session for the given phone number. Used by hybrid bots where a
+      // Telegram command triggers a WhatsApp pairing flow.
+      // Accepts a string literal (validated at compile time) or any expression
+      // (e.g. a variable filled by regex matches[1]).
+      if (token.value === 'pair' &&
+          peekAt(1).type === TOKEN.IDENTIFIER && peekAt(1).value === 'whatsapp') {
+        advance(); // pair
+        advance(); // whatsapp
+        if (peek().type === TOKEN.STRING) {
+          const phone = advance().value;
+          return { type: 'WhatsAppPairStatement', phone: { type: 'StringLiteral', value: phone } };
+        }
+        const phoneExpr = parseExpression();
+        return { type: 'WhatsAppPairStatement', phone: phoneExpr };
+      }
+
       // v2.1.1 — log message: prints the normalized message record inside an
       // "on message" handler. Generation rejects it everywhere else with a
       // teaching error.
@@ -728,11 +830,30 @@ function parse(tokens) {
         return { type: 'WhatsAppLogStatement' };
       }
 
+      // v2.14 — download "<path>": saves the current message's media (image,
+      // video, audio, document, sticker, …) to a file, inside an "on message"
+      // handler. Generation rejects it everywhere else with a teaching error.
+      if (token.value === 'download' && peekAt(1).type === TOKEN.STRING) {
+        advance(); // download
+        const filePath = advance().value;
+        return { type: 'WhatsAppDownloadStatement', filePath };
+      }
+
       // v2.1.0 — broadcast <expr>: sends to every connected socket.
       if (token.value === 'broadcast') {
         advance(); // broadcast
         const value = parseExpression();
         return { type: 'BroadcastStatement', value };
+      }
+
+      // v2.2.0 — send to <connection> <message>: send to a specific stored connection.
+      if (token.value === 'send' &&
+          (peekAt(1).type === TOKEN.TO || (peekAt(1).type === TOKEN.IDENTIFIER && peekAt(1).value === 'to'))) {
+        advance(); // send
+        advance(); // to
+        const connection = parseExpression();
+        const value = parseExpression();
+        return { type: 'SendToStatement', connection, value };
       }
 
       // v2.1.0 — send socket <expr>: replies to one connected socket.
@@ -1430,9 +1551,9 @@ function parseAsk() {
         return pattern;
       }
       // Regular parameter
-      // Contextual keywords (back/reply/respond/send back/file/total) are valid
+      // Contextual keywords (back/reply/respond/send back/file) are valid
       // identifier names when used as a parameter, mirroring `remember`.
-      const PARAM_KEYWORDS = new Set([TOKEN.BACK, TOKEN.TOTAL, TOKEN.REPLY, TOKEN.RESPOND, TOKEN.SEND_BACK, TOKEN.FILE_KW]);
+      const PARAM_KEYWORDS = new Set([TOKEN.BACK, TOKEN.REPLY, TOKEN.RESPOND, TOKEN.SEND_BACK, TOKEN.FILE_KW]);
       let name;
       if (PARAM_KEYWORDS.has(peek().type)) {
         name = advance().value;
@@ -1909,6 +2030,31 @@ function parseAsk() {
       (nextToken.type === TOKEN.IDENTIFIER && (nextToken.value === 'nothing' || nextToken.value === 'socket'));
 
     if (!isEventWhen) {
+      // v1.0.36 — when <target> "<event>" happens [as <name>] … done binds a
+      // DOM event listener: when button "click" happens => addEventListener.
+      // Detection probes the target expression and commits only when a string
+      // followed by "happens" is next; otherwise the tokens are replayed and
+      // the block parses as the English-like if-condition "when <condition>".
+      const savedPos = pos;
+      try {
+        const target = parseExpression();
+        if (peek().type === TOKEN.STRING && peekAt(1).type === TOKEN.HAPPENS) {
+          const eventStr = advance().value;
+          advance(); // happens
+          let paramName = null;
+          if (peek().type === TOKEN.AS) {
+            advance(); // as
+            paramName = consume(TOKEN.IDENTIFIER,
+              'Expected a parameter name after "as".\n\nExample:\n  when button "click" happens as event').value;
+          }
+          const body = parseBody('"when happens" block');
+          return { type: 'WhenTargetedStatement', target, event: eventStr, paramName, body };
+        }
+      } catch (_e) {
+        // Not a targeted "when" — replay and fall through to the condition form.
+      }
+      pos = savedPos;
+
       const condition = parseCondition();
       // Optional "then" keyword
       if (peek().type === TOKEN.THEN) {
@@ -2082,6 +2228,7 @@ function parseAsk() {
 
 // reply <expr>  /  respond <expr>  /  send back <expr>
 // reply json\n  <key> is <val>\n...\ndone
+// reply file "<path>"
   function parseReply() {
     const isRespond = peek().type === TOKEN.RESPOND;
     const isSendBack = peek().type === TOKEN.SEND_BACK;
@@ -2109,6 +2256,12 @@ function parseAsk() {
       }
       advance(); // consume DONE
       return { type: 'ReplyJsonStatement', properties };
+    }
+    if (peek().type === TOKEN.FILE_KW) {
+      advance(); // consume file
+      const filePath = consume(TOKEN.STRING,
+        'Expected a file path string after "reply file".\n\nExample:\n  route get "/"\n    reply file "public/index.html"\n  done').value;
+      return { type: 'ReplyFileStatement', filePath };
     }
     const value = parseExpression();
 
@@ -2308,6 +2461,19 @@ function parseAsk() {
     advance(); // postgres
     const connection = parseExpression();
     return { type: 'PostgresStatement', connection };
+  }
+
+  // v2.2.0 — mongo "<connection-string>" [db "<name>"]: binds the MongoDB client.
+  // Usage: mongo "mongodb://localhost:27017" db "mydb"
+  function parseMongo() {
+    const token = advance(); // mongo or mongodb
+    const connection = parseExpression();
+    let dbName = null;
+    if (peek().type === TOKEN.IDENTIFIER && peek().value === 'db') {
+      advance(); // db
+      dbName = parseExpression();
+    }
+    return { type: 'MongoStatement', connection, dbName };
   }
 
   // query/insert/update/delete/execute SQL_BODY DONE
@@ -2968,7 +3134,18 @@ function parseAsk() {
 
     const item = tryParseItemExpression();
     if (item) return item;
-    let node = parseAtom();
+    // v1.0.36 — `new` works anywhere an expression is parsed (assignment
+    // targets, call arguments, member chains). "new" is not a keyword, so this
+    // identifier must be intercepted here; parseAtom would read it as a plain
+    // Identifier and turn "new THREE.Scene()" into "new.THREE.Scene()".
+    let node;
+    if (peek().type === TOKEN.IDENTIFIER && peek().value === 'new' &&
+        peekAt(1).type !== TOKEN.BECOMES && peekAt(1).type !== TOKEN.LPAREN) {
+      advance(); // new
+      node = parseNewExpressionCore();
+    } else {
+      node = parseAtom();
+    }
     while (true) {
       if (peek().type === TOKEN.LBRACKET) {
         advance();
@@ -3175,7 +3352,7 @@ function parseAsk() {
     }
 
     // Keywords that can also be used as identifiers in expression context
-    const IDENTIFIER_KEYWORDS = new Set([TOKEN.BACK, TOKEN.TOTAL, TOKEN.REPLY, TOKEN.RESPOND, TOKEN.SEND_BACK, TOKEN.FILE_KW]);
+    const IDENTIFIER_KEYWORDS = new Set([TOKEN.BACK, TOKEN.REPLY, TOKEN.RESPOND, TOKEN.SEND_BACK, TOKEN.FILE_KW]);
     if (token.type === TOKEN.IDENTIFIER || IDENTIFIER_KEYWORDS.has(token.type)) {
       if (peekAt(1).type === TOKEN.USES || peekAt(1).type === TOKEN.FILLS) {
         const callee = { type: 'Identifier', name: token.value };
@@ -3424,13 +3601,43 @@ function parseAsk() {
     }
     if (unitToken.type !== TOKEN.IDENTIFIER || !TIME_UNITS[unitToken.value]) {
       throw new Error(makeError(
-        'Expected a time unit after the number in "every".\n\nUnits: seconds, minutes, hours, days\n\nExample:\n  every 5 minutes',
+        'Expected a time unit after the number in "every".\n\nUnits: milliseconds, seconds, minutes, hours, days\n\nExample:\n  every 5 minutes',
         unitToken
       ));
     }
     const unit = TIME_UNITS[advance().value];
     const body = parseBody('"every" block');
     return { type: 'EveryStatement', count, unit, body };
+  }
+
+  // v1.0.36 — every frame … done: a requestAnimationFrame loop whose body runs
+  // once per animation frame. The next frame is scheduled after the body so it
+  // always runs (t is the frame timestamp, like the DOM's rAF callback).
+  function parseEveryFrame() {
+    advance(); // every/each
+    advance(); // frame
+    const body = parseBody('"every frame" block');
+    return { type: 'EveryFrameStatement', body };
+  }
+
+  // v1.0.36 — after <n> <unit>s … done: run work once after a delay.
+  //   after 5 seconds
+  //       show "butter!"  ...  done
+  // The delay is a number expression ("after count seconds"); the unit is
+  // consumed from TIME_UNITS so the generator can fold <n>*<unit> directly.
+  function parseAfter() {
+    advance(); // after
+    const delay = parseExpression();
+    const unitToken = peek();
+    if (unitToken.type !== TOKEN.IDENTIFIER || !TIME_UNITS[unitToken.value]) {
+      throw new Error(makeError(
+        'Expected a time unit after the delay in "after".\n\nUnits: milliseconds, seconds, minutes, hours, days\n\nExample:\n  after 5 seconds\n    show "later"\n  done',
+        unitToken
+      ));
+    }
+    const unit = TIME_UNITS[advance().value];
+    const body = parseBody('"after" block');
+    return { type: 'AfterStatement', delay, unit, body };
   }
 
   // v2.1.0 — websocket server on <port> … done
@@ -3509,6 +3716,7 @@ function parseAsk() {
 
     let authFolder = null;
     let login = null;
+    let baileysModule = null;
     const handlers = [];
 
     while (peek().type !== TOKEN.DONE) {
@@ -3517,6 +3725,16 @@ function parseAsk() {
           'Expected keyword "done" to close the "whatsapp bot" block before end of file.',
           peek()
         ));
+      }
+
+      // use baileys "<pkg>" — override the Baileys implementation package.
+      // Default is @qwerty-xcv/baileys. Accepts any require-able package name,
+      // so developers can pin a fork or the upstream @whiskeysockets/baileys.
+      if (peek().type === TOKEN.USE && peekAt(1).value === 'baileys' && peekAt(2).type === TOKEN.STRING) {
+        advance(); // use
+        advance(); // baileys
+        baileysModule = advance().value;
+        continue;
       }
 
       // auth "<folder>" — where WhatsApp session credentials persist.
@@ -3573,7 +3791,7 @@ function parseAsk() {
       }
 
       throw new Error(makeError(
-        'A "whatsapp bot" block may only contain an "auth", a "login", and "on message" statements.\n\nExample:\n  whatsapp bot\n      auth "session"\n      login qr\n\n      on message\n          log message\n      done\n  done',
+        'A "whatsapp bot" block may only contain an "auth", a "login", a "use baileys", and "on message" statements.\n\nExample:\n  whatsapp bot\n      auth "session"\n      use baileys "@qwerty-xcv/baileys"\n      login qr\n\n      on message\n          log message\n      done\n  done',
         peek()
       ));
     }
@@ -3582,8 +3800,9 @@ function parseAsk() {
     return {
       type: 'WhatsAppBotStatement',
       authFolder: authFolder || 'plainscript-whatsapp-auth',
-      login: login || { mode: 'qr' },
+      login: login,
       handlers,
+      baileysModule,
     };
   }
 
@@ -3957,17 +4176,55 @@ function parseAsk() {
     return { type: 'ClassDeclaration', name, superClass, body };
   }
 
-  // new ClassName(args)
-  function parseNewExpression() {
-    advance(); // new
-    const callee = parsePrimary();
+  // new ClassName(args) — the constructor-call forms:
+  //   new Foo                  → new Foo()
+  //   new Foo(1, 2)            → new Foo(1, 2)
+  //   new window.Thing(1, 2)   → new window.Thing(1, 2)
+  //   new Foo().bar            → new Foo().bar      (postfix continues in parsePrimary)
+  // Called with the "new" word already consumed. The callee is parsed as a
+  // plain identifier plus a member chain so "new THREE.Scene(75)" binds the
+  // argument list to the constructor — not to a member call.
+  function parseNewExpressionCore() {
+    const callee = parseNewCallee();
+    let args = [];
     if (peek().type === TOKEN.LPAREN) {
       advance(); // (
-      const { separator, args } = parseArgList();
+      const { separator, args: parsedArgs } = parseArgList();
       consume(TOKEN.RPAREN, 'Expected ")" to close the constructor call.');
-      return { type: 'NewExpression', callee, args };
+      if (separator) {
+        throw new Error(makeError(
+          'Constructor calls cannot use "to"/"from" arguments.\n\nExample:\n  new THREE.PerspectiveCamera(75, 1.5, 0.1, 1000)',
+          peek()
+        ));
+      }
+      args = parsedArgs;
     }
-    return { type: 'NewExpression', callee, args: [] };
+    return { type: 'NewExpression', callee, args };
+  }
+
+  // The constructor name after "new": an identifier with an optional member
+  // chain. Deliberately narrower than parsePrimary — a call paren following
+  // the callee belongs to the constructor, so it is never consumed here.
+  function parseNewCallee() {
+    const token = peek();
+    if (token.type !== TOKEN.IDENTIFIER || token.value === 'new') {
+      throw new Error(makeError(
+        'Expected a class name after "new".\n\nExample:\n  remember scene as new THREE.Scene()',
+        token
+      ));
+    }
+    advance();
+    let node = { type: 'Identifier', name: token.value };
+    while (peek().type === TOKEN.DOT) {
+      advance();
+      const propToken = peek();
+      if (propToken.type === TOKEN.EOF || !/^[A-Za-z_$]/.test(propToken.value)) {
+        throw new Error(makeError('Expected a property name after "." in the constructor.', propToken));
+      }
+      advance();
+      node = { type: 'MemberExpression', object: node, property: propToken.value };
+    }
+    return node;
   }
 
   // ── Program ────────────────────────────────────────────────────────────────

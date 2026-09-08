@@ -1,0 +1,34 @@
+// PlainScript 1.0.36: a WebGL 3D scene using the global THREE object.
+
+remember scene as new THREE.Scene()
+remember camera as new THREE.PerspectiveCamera(75, 640 / 480, 0.1, 1000)
+remember renderer as new THREE.WebGLRenderer()
+renderer.setSize(640, 480)
+camera.position.z becomes 5
+
+remember geometry as new THREE.BoxGeometry(1, 1, 1)
+remember material as new THREE.MeshStandardMaterial({ color: 0x40c463 })
+remember cube as new THREE.Mesh(geometry, material)
+scene.add(cube)
+
+remember ambient as new THREE.AmbientLight(0xffffff)
+remember sun as new THREE.DirectionalLight(0xffffff, 1)
+sun.position.set(3, 5, 4)
+scene.add(ambient)
+scene.add(sun)
+
+document.body.append(renderer.domElement)
+
+make fitWindow()
+    camera.aspect becomes window.innerWidth / window.innerHeight
+    camera.updateProjectionMatrix()
+    renderer.setSize(window.innerWidth, window.innerHeight)
+done
+
+window.addEventListener("resize", fitWindow)
+
+every frame
+    cube.rotation.y becomes cube.rotation.y + 0.01
+    cube.rotation.x becomes cube.rotation.x + 0.005
+    renderer.render(scene, camera)
+done

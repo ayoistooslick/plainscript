@@ -620,6 +620,43 @@ test('lowercase() compiles to toLowerCase()', () => {
   if (!js.includes('.toLowerCase()')) throw new Error('missing toLowerCase');
 });
 
+// ── v2.5 — natural string/collection verbs ──────────────────────────────
+
+test('lowercase statement transforms a variable in place', () => {
+  const js = compile('remember x as "HELLO"\nlowercase x');
+  if (!js.includes('x = String(x).toLowerCase();')) throw new Error('missing lowercase transform');
+});
+
+test('uppercase statement transforms a variable in place', () => {
+  const js = compile('remember x as "hello"\nuppercase x');
+  if (!js.includes('x = String(x).toUpperCase();')) throw new Error('missing uppercase transform');
+});
+
+test('trim statement transforms a variable in place', () => {
+  const js = compile('remember x as "  hi "\ntrim x');
+  if (!js.includes('x = String(x).trim();')) throw new Error('missing trim transform');
+});
+
+test('split statement transforms a string into a list', () => {
+  const js = compile('remember x as "a b c"\nsplit x by " "');
+  if (!js.includes('x = String(x).split(" ");')) throw new Error('missing split transform');
+});
+
+test('join statement transforms a list into a string', () => {
+  const js = compile('split x by ","\nremember x as list with "a", "b"\njoin x by ","');
+  if (!js.includes('(x) = (x).join(",");')) throw new Error('missing join transform');
+});
+
+test('uppercase first letter of each word transforms each word', () => {
+  const js = compile('split title by " "\nuppercase first letter of each word in title');
+  if (!js.includes('charAt(0).toUpperCase()')) throw new Error('missing capitalize transform');
+});
+
+test('toString-like verbs do not break function calls', () => {
+  const js = compile('split(a, ",")');
+  if (!js.includes('.split(",")')) throw new Error('split() call must still work');
+});
+
 test('random() compiles to Math.random()', () => {
   const js = compile('show random()');
   if (!js.includes('Math.random()')) throw new Error('missing Math.random');

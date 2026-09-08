@@ -1,2 +1,0 @@
-- [Canonical syntax workflow](canonical-syntax.md) — compiler grammar is authoritative; keep examples and user-facing references checkable against it.
-- [Provider-neutral AI](provider-neutral-ai.md) — AI integrations use OpenAI-compatible endpoints with environment-backed provider presets.

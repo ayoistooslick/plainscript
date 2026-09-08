@@ -1,0 +1,34 @@
+// PlainScript 1.0.36: a DOM-first clicker with a run log.
+
+remember scoreEl as document.querySelector("#score")
+remember historyEl as document.querySelector("#history")
+remember clickButton as document.querySelector("#click-button")
+remember logButton as document.querySelector("#log-button")
+
+remember entryCount as 0
+
+show "PlainScript clicker dashboard ready"
+
+when clickButton "click" happens
+    remember current as parseInt(scoreEl.textContent)
+    remember updated as current + 10
+    scoreEl.innerHTML becomes String(updated)
+    if updated is at least 50
+        clickButton.classList.add("level-up")
+    done
+done
+
+when logButton "click" happens
+    entryCount becomes entryCount + 1
+    remember item as document.createElement("li")
+    item.textContent becomes "Entry " + entryCount + " (score " + scoreEl.textContent + ")"
+    historyEl.appendChild(item)
+done
+
+when document "keydown" happens as e
+    if e.key is "r" or e.key is "R"
+        scoreEl.textContent becomes "0"
+        clickButton.classList.remove("level-up")
+        historyEl.innerHTML becomes ""
+    done
+done

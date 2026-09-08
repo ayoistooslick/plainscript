@@ -1,0 +1,34 @@
+{
+  "name": "@plainscript/aizen-chat",
+  "version": "1.0.0",
+  "description": "An AI chatbot template with the Aizen Sosuke (Bleach) persona, storing chat history in MongoDB. Authored in PlainScript.",
+  "main": "dist/app.js",
+  "type": "commonjs",
+  "scripts": {
+    "build": "plainscript build",
+    "prepare": "plainscript build",
+    "start": "plainscript run src/app.pln",
+    "dev": "plainscript run src/app.pln"
+  },
+  "files": [
+    "dist",
+    "public"
+  ],
+  "keywords": [
+    "plainscript",
+    "ai",
+    "chatbot",
+    "aizen",
+    "bleach",
+    "mongodb",
+    "template"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "plainscript-lang": "^1.0.35"
+  },
+  "dependencies": {
+    "mongodb": "^7.6.0"
+  }
+}
