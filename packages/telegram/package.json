@@ -1,0 +1,8 @@
+{
+  "name": "@plainscript/telegram",
+  "version": "1.0.0",
+  "description": "Modular Telegram Bot integration for PlainScript (.pln)",
+  "main": "index.js",
+  "keywords": ["plainscript", "telegram", "bot"],
+  "license": "MIT"
+}

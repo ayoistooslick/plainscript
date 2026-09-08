@@ -1,0 +1,8 @@
+{
+  "name": "@plainscript/vision",
+  "version": "1.0.0",
+  "description": "Modular Vision and OCR package for PlainScript (.pln)",
+  "main": "index.js",
+  "keywords": ["plainscript", "vision", "ocr"],
+  "license": "MIT"
+}
