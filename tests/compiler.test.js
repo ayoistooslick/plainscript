@@ -1,4 +1,4 @@
-﻿// Tests for the PlainScript compiler
+// Tests for the PlainScript compiler
 
 const fs   = require('fs');
 const path = require('path');

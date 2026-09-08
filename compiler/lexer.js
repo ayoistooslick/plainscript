@@ -33,6 +33,9 @@ const TOKEN = {
   EVERY:       'EVERY',       // alias: "for every item in list"
   IN:          'IN',
   WHILE:       'WHILE',
+  REPEAT:      'REPEAT',      // v2.5 — Natural intent repeat loop: repeat 5 times, repeat with x in list, repeat while, repeat until
+  UNTIL:       'UNTIL',       // v2.5 — Natural intent repeat until <condition>
+  LOG_KW:      'LOG_KW',      // alias for show: "log 'hello'"
   USE:         'USE',
   IMPORT:      'IMPORT',
   INCLUDE:     'INCLUDE',     // alias for import: "include "./file.pln""
@@ -283,6 +286,10 @@ const KEYWORDS = {
   choosing:     TOKEN.CHOOSING,
   uses:         TOKEN.USES,
   fills:        TOKEN.FILLS,
+  // v2.5 — Natural language intent keywords
+  repeat:       TOKEN.REPEAT,
+  until:        TOKEN.UNTIL,
+  log:          TOKEN.LOG_KW,
 };
 
 // Keywords that introduce raw SQL blocks (content up to "done" is collected verbatim).

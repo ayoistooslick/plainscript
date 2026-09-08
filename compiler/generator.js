@@ -2233,6 +2233,7 @@ function emitSqlCall(kind, sql, params, indent, context) {
 }
 
 function createGenerationContext(options = {}) {
+  const target = (options.target || process.env.PLAINSCRIPT_TARGET || 'node').toLowerCase();
   const sourceMap = options.sourceMap || false;
   const sourceFile = options.sourceFile || 'source.pln';
   const sourceContent = options.sourceContent || null;
@@ -2241,6 +2242,7 @@ function createGenerationContext(options = {}) {
     builder.addSource(sourceFile, sourceContent);
   }
   return {
+    target,
     requires: new Set(),
     pendingPrelude: [],
     needsAsync: false, // true when top-level code emits await (js blocks / ask)
@@ -2274,6 +2276,41 @@ function emitRequire(context, moduleName, alias) {
   // the bare name only — the range is the installer's business (plain install).
   const { name: bareName } = splitPackageSpec(moduleName);
   const npmName = npmPackageName(bareName);
+  const target = context.target || 'node';
+  const isEsm = target === 'esm' || target === 'bun' || target === 'edge';
+
+  if (isEsm) {
+    if (target === 'bun' && bareName === 'sqlite') {
+      const key = 'bun:sqlite\0' + (alias || 'Database');
+      if (context.requires.has(key)) return '';
+      context.requires.add(key);
+      return alias ? `import { Database as ${alias} } from 'bun:sqlite';` : `import { Database } from 'bun:sqlite';`;
+    }
+    if (alias) {
+      if (!isValidIdentifier(alias)) {
+        throw new Error(
+          `use ${npmName} as ${alias}: "${alias}" is not a valid JavaScript variable name.`
+        );
+      }
+      const key = `${npmName}\0${alias}`;
+      if (context.requires.has(key)) return '';
+      context.requires.add(key);
+      return `import ${alias} from '${npmName}';`;
+    }
+    if (context.requires.has(npmName)) return '';
+    context.requires.add(npmName);
+    if (bareName === 'postgres') {
+      return `import pg from 'pg';\nconst { Pool } = pg;`;
+    }
+    if (KNOWN_PACKAGES[bareName]) {
+      if (bareName === 'sqlite') return `import Database from 'better-sqlite3';`;
+      return `import ${bareName} from '${npmName}';`;
+    }
+    if (isValidIdentifier(bareName)) {
+      return `import ${bareName} from '${npmName}';`;
+    }
+    return `import '${npmName}';`;
+  }
 
   if (alias) {
     if (!isValidIdentifier(alias)) {
@@ -2312,7 +2349,16 @@ function emitRequire(context, moduleName, alias) {
 function ensureBuiltin(context, moduleName) {
   if (context.requires.has(moduleName)) return;
   context.requires.add(moduleName);
-  const declaration = BUILTIN_DECLARATIONS[moduleName];
+  const target = context.target || 'node';
+  const isEsm = target === 'esm' || target === 'bun' || target === 'edge';
+  let declaration = BUILTIN_DECLARATIONS[moduleName];
+  if (isEsm) {
+    if (moduleName === 'fs') declaration = `import fs from 'node:fs';`;
+    else if (moduleName === 'path') declaration = `import path from 'node:path';`;
+    else if (moduleName === 'crypto') {
+      declaration = target === 'edge' ? `` : `import crypto from 'node:crypto';`;
+    }
+  }
   if (declaration && !context.pendingPrelude.includes(declaration)) {
     context.pendingPrelude.push(declaration);
   }
@@ -2396,7 +2442,12 @@ function generate(ast, contextOrOptions = createGenerationContext(), options = {
   // When the author uses explicit `export <name>`, they control the module
   // surface; skip the automatic function export so it does not clobber it.
   if (exported.length > 0 && !hasExplicitExport) {
-    lines.push(`if (typeof module !== 'undefined') { module.exports = { ${exported.join(', ')} }; }`);
+    const isEsm = context.target === 'esm' || context.target === 'bun' || context.target === 'edge';
+    if (isEsm) {
+      lines.push(`export { ${exported.join(', ')} };`);
+    } else {
+      lines.push(`if (typeof module !== 'undefined') { module.exports = { ${exported.join(', ')} }; }`);
+    }
   }
 
   // v1.0.1 — native test runner. When any "test ... done" block exists, emit
@@ -2465,6 +2516,12 @@ function generateCondition(cond, context) {
       return `${expr} >= ${generateExpr(cond.low, context)} && ${expr} <= ${generateExpr(cond.high, context)}`;
     }
 
+    case 'InCondition':
+      return `(${generateExpr(cond.right, context)}).includes(${generateExpr(cond.left, context)})`;
+
+    case 'NotInCondition':
+      return `!(${generateExpr(cond.right, context)}).includes(${generateExpr(cond.left, context)})`;
+
     case 'StringCondition':
       return `(${generateExpr(cond.left, context)}).${cond.method}(${generateExpr(cond.right, context)})`;
 
@@ -2499,7 +2556,7 @@ function generateStatement(node, indent = '', context = createGenerationContext(
       return `${indent}console.log(${generateExpr(node.value, context)});`;
 
     case 'GiveStatement':
-      return `${indent}return ${generateExpr(node.value, context)};`;
+      return `${indent}return${node.value ? ' ' + generateExpr(node.value, context) : ''};`;
 
     case 'BecomeStatement': {
       // Handle destructuring: [a, b] = arr / {x, y} = obj
@@ -2595,13 +2652,25 @@ function generateStatement(node, indent = '', context = createGenerationContext(
 
     // Enterprise & Intent-Oriented Exporting
     case 'ExportStatement': {
+      const isEsm = context.target === 'esm' || context.target === 'bun' || context.target === 'edge';
       if (node.exportAll && node.fromPath) {
+        if (isEsm) {
+          const modPath = node.fromPath.endsWith('.pln') ? node.fromPath.replace(/\.pln$/, '.js') : node.fromPath;
+          return `${indent}export * from ${JSON.stringify(modPath)};`;
+        }
         return `${indent}Object.assign(module.exports, require(${JSON.stringify(node.fromPath)}));`;
       }
       const names = node.names || (node.name ? [node.name] : []);
       if (node.fromPath) {
+        if (isEsm) {
+          const modPath = node.fromPath.endsWith('.pln') ? node.fromPath.replace(/\.pln$/, '.js') : node.fromPath;
+          return `${indent}export { ${names.join(', ')} } from ${JSON.stringify(modPath)};`;
+        }
         const exports = names.map(n => `module.exports.${n} = require(${JSON.stringify(node.fromPath)}).${n};`);
         return exports.map(e => `${indent}${e}`).join('\n');
+      }
+      if (isEsm) {
+        return `${indent}export { ${names.join(', ')} };`;
       }
       const exports = names.map(n => `module.exports.${n} = ${n};`);
       return exports.map(e => `${indent}${e}`).join('\n');
@@ -2636,7 +2705,28 @@ function generateStatement(node, indent = '', context = createGenerationContext(
     // Enterprise & Intent-Oriented Importing
     case 'ImportStatement': {
       if (!node.path) return '';
-      const isLocalFile = node.path.startsWith('.') || node.path.startsWith('/') || node.path.startsWith('\\') || node.path.startsWith('@/') || node.path.endsWith('.pln');
+      const isEsm = context.target === 'esm' || context.target === 'bun' || context.target === 'edge';
+      let isVendored = false;
+      try {
+        const { resolveVendorEntry } = require('./registry');
+        if (resolveVendorEntry(process.cwd(), node.path)) isVendored = true;
+      } catch (_) {}
+      const isLocalFile = isVendored || node.path.startsWith('.') || node.path.startsWith('/') || node.path.startsWith('\\') || node.path.startsWith('@/') || node.path.endsWith('.pln');
+      const importPath = isLocalFile && node.path.endsWith('.pln') ? node.path.replace(/\.pln$/, '.js') : node.path;
+
+      if (isEsm) {
+        if (node.namespace) {
+          return `${indent}import * as ${node.namespace} from ${JSON.stringify(importPath)};`;
+        }
+        if (node.defaultImport) {
+          return `${indent}import ${node.defaultImport} from ${JSON.stringify(importPath)};`;
+        }
+        if (node.names && node.names.length > 0) {
+          return `${indent}import { ${node.names.join(', ')} } from ${JSON.stringify(importPath)};`;
+        }
+        return `${indent}import ${JSON.stringify(importPath)};`;
+      }
+
       if (!isLocalFile) {
         // Third-party npm package import
         if (node.namespace) {
@@ -2728,6 +2818,15 @@ function generateStatement(node, indent = '', context = createGenerationContext(
         out += ` else {\n${alternate}\n${indent}}`;
       }
       return out;
+    }
+
+    case 'RepeatTimesStatement': {
+      context.loopDepth++;
+      const body = node.body.map(s => generateStatement(s, indent + '  ', context)).join('\n');
+      context.loopDepth--;
+      const count = generateExpr(node.count, context);
+      const idxVar = `__repeat_i_${context.loopDepth + 1}`;
+      return `${indent}for (let ${idxVar} = 0; ${idxVar} < ${count}; ${idxVar}++) {\n${body}\n${indent}}`;
     }
 
     case 'ForEachStatement': {
@@ -3678,6 +3777,11 @@ function generateExpr(node, context = createGenerationContext()) {
 
     case 'LengthExpression':
       return `${generateExpr(node.object, context)}.length`;
+
+    case 'CountOfExpression': {
+      const obj = generateExpr(node.object, context);
+      return `((${obj} && ${obj}.count !== undefined) ? ${obj}.count : ((${obj} && ${obj}.length !== undefined) ? ${obj}.length : ((${obj} && ${obj}.size !== undefined) ? ${obj}.size : 0)))`;
+    }
 
     // v1.1 — Property access
     case 'OfExpression': {
