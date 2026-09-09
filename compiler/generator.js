@@ -3129,6 +3129,12 @@ function generateCondition(cond, context) {
       return `${expr} >= ${generateExpr(cond.low, context)} && ${expr} <= ${generateExpr(cond.high, context)}`;
     }
 
+    case 'InCondition':
+      return `(${generateExpr(cond.right, context)}).includes(${generateExpr(cond.left, context)})`;
+
+    case 'NotInCondition':
+      return `!(${generateExpr(cond.right, context)}).includes(${generateExpr(cond.left, context)})`;
+
     case 'StringCondition':
       return `(${generateExpr(cond.left, context)}).${cond.method}(${generateExpr(cond.right, context)})`;
 
@@ -3163,7 +3169,7 @@ function generateStatement(node, indent = '', context = createGenerationContext(
       return `${indent}console.log(${generateExpr(node.value, context)});`;
 
     case 'GiveStatement':
-      return `${indent}return ${generateExpr(node.value, context)};`;
+      return `${indent}return${node.value ? ' ' + generateExpr(node.value, context) : ''};`;
 
     case 'BecomeStatement': {
       // Handle destructuring: [a, b] = arr / {x, y} = obj
@@ -3392,6 +3398,15 @@ function generateStatement(node, indent = '', context = createGenerationContext(
         out += ` else {\n${alternate}\n${indent}}`;
       }
       return out;
+    }
+
+    case 'RepeatTimesStatement': {
+      context.loopDepth++;
+      const body = node.body.map(s => generateStatement(s, indent + '  ', context)).join('\n');
+      context.loopDepth--;
+      const count = generateExpr(node.count, context);
+      const idxVar = `__repeat_i_${context.loopDepth + 1}`;
+      return `${indent}for (let ${idxVar} = 0; ${idxVar} < ${count}; ${idxVar}++) {\n${body}\n${indent}}`;
     }
 
     case 'ForEachStatement': {
@@ -4466,6 +4481,11 @@ function generateExpr(node, context = createGenerationContext()) {
 
     case 'LengthExpression':
       return `${generateExpr(node.object, context)}.length`;
+
+    case 'CountOfExpression': {
+      const obj = generateExpr(node.object, context);
+      return `((${obj} && ${obj}.count !== undefined) ? ${obj}.count : ((${obj} && ${obj}.length !== undefined) ? ${obj}.length : ((${obj} && ${obj}.size !== undefined) ? ${obj}.size : 0)))`;
+    }
 
     // v1.1 — Property access
     case 'OfExpression': {

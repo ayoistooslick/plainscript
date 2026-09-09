@@ -4,8 +4,8 @@ const { TOKEN } = require('./lexer');
 
 // Statement-starting PlainScript keywords, used for "did you mean?" suggestions.
 const STATEMENT_KEYWORDS = [
-  'remember', 'show', 'if', 'make', 'give',
-  'for', 'while', 'use', 'import', 'when', 'listen', 'reply', 'serve',
+  'remember', 'show', 'display', 'log', 'if', 'make', 'give',
+  'for', 'while', 'repeat', 'until', 'use', 'import', 'when', 'listen', 'reply', 'serve',
   'web', 'route', 'start', 'database', 'query', 'insert', 'update', 'delete', 'execute',
   'ask', 'javascript', 'bot', 'ocr', 'try', 'recover', 'retry',
   'gather', 'filter', 'total', 'match', 'emit', 'stream', 'run',
@@ -107,6 +107,7 @@ function makeError(message, token) {
 
 function parse(tokens) {
   let pos = 0;
+  let _inRepeatCount = false;
 
   function peek()         { return tokens[pos]; }
   function peekAt(offset) { return tokens[pos + offset] || { type: TOKEN.EOF }; }
@@ -242,6 +243,20 @@ function parse(tokens) {
     }
 
     // ── Non-"is" operators ──────────────────────────────────────────────────
+    // "in" / "not in" condition (e.g. if item in list)
+    if (peek().type === TOKEN.IN || (peek().type === TOKEN.IDENTIFIER && peek().value === 'in')) {
+      advance();
+      const right = parseExpression();
+      return { type: 'InCondition', left, right };
+    }
+
+    if (peek().type === TOKEN.NOT && (peekAt(1).type === TOKEN.IN || (peekAt(1).type === TOKEN.IDENTIFIER && peekAt(1).value === 'in'))) {
+      advance(); // not
+      advance(); // in
+      const right = parseExpression();
+      return { type: 'NotInCondition', left, right };
+    }
+
     if (peek().type === TOKEN.CONTAINS) {
       advance();
       const right = parseExpression();
@@ -277,12 +292,34 @@ function parse(tokens) {
       isToken
     ));
 
-    // is not empty / is not <expr>
+    // is in <list>
+    if (peek().type === TOKEN.IN || (peek().type === TOKEN.IDENTIFIER && peek().value === 'in')) {
+      advance();
+      const right = parseExpression();
+      return { type: 'InCondition', left, right };
+    }
+
+    // is not empty / is not in <expr> / is not equal to <expr> / is not <expr>
     if (peek().type === TOKEN.NOT) {
       advance();
+      // is not in <list>
+      if (peek().type === TOKEN.IN || (peek().type === TOKEN.IDENTIFIER && peek().value === 'in')) {
+        advance();
+        const right = parseExpression();
+        return { type: 'NotInCondition', left, right };
+      }
       if (peek().type === TOKEN.EMPTY) {
         advance();
         return { type: 'UnaryCondition', left, op: 'isNotEmpty' };
+      }
+      // is not equal [to] <expr>
+      if (peek().type === TOKEN.IDENTIFIER && peek().value === 'equal') {
+        advance();
+        if (peek().type === TOKEN.TO || (peek().type === TOKEN.IDENTIFIER && peek().value === 'to')) {
+          advance();
+        }
+        const right = parseExpression();
+        return { type: 'BinaryCondition', left, op: '!==', right };
       }
       const right = parseExpression();
       return { type: 'BinaryCondition', left, op: '!==', right };
@@ -292,6 +329,25 @@ function parse(tokens) {
     if (peek().type === TOKEN.EMPTY) {
       advance();
       return { type: 'UnaryCondition', left, op: 'isEmpty' };
+    }
+
+    // is equal to <expr> / is equal <expr>
+    if (peek().type === TOKEN.IDENTIFIER && peek().value === 'equal') {
+      advance();
+      if (peek().type === TOKEN.TO || (peek().type === TOKEN.IDENTIFIER && peek().value === 'to')) {
+        advance();
+      }
+      const right = parseExpression();
+      return { type: 'BinaryCondition', left, op: '===', right };
+    }
+
+    // is more than <expr>
+    if (peek().type === TOKEN.IDENTIFIER && peek().value === 'more' &&
+        (peekAt(1).type === TOKEN.THAN || (peekAt(1).type === TOKEN.IDENTIFIER && peekAt(1).value === 'than'))) {
+      advance(); // more
+      advance(); // than
+      const right = parseExpression();
+      return { type: 'BinaryCondition', left, op: '>', right };
     }
 
     // is above  (alias: >)
@@ -324,18 +380,36 @@ function parse(tokens) {
       throw new Error(makeError('Expected "least" or "most" after "at". Use: is at least / is at most', peek()));
     }
 
-    // is greater than
+    // is greater than [or equal to]
     if (peek().type === TOKEN.GREATER) {
       advance();
       consume(TOKEN.THAN, 'Expected "than" after "greater". Use: is greater than');
+      if (peek().type === TOKEN.OR && peekAt(1).type === TOKEN.IDENTIFIER && peekAt(1).value === 'equal') {
+        advance(); // or
+        advance(); // equal
+        if (peek().type === TOKEN.TO || (peek().type === TOKEN.IDENTIFIER && peek().value === 'to')) {
+          advance(); // to
+        }
+        const right = parseExpression();
+        return { type: 'BinaryCondition', left, op: '>=', right };
+      }
       const right = parseExpression();
       return { type: 'BinaryCondition', left, op: '>', right };
     }
 
-    // is less than
+    // is less than [or equal to]
     if (peek().type === TOKEN.LESS) {
       advance();
       consume(TOKEN.THAN, 'Expected "than" after "less". Use: is less than');
+      if (peek().type === TOKEN.OR && peekAt(1).type === TOKEN.IDENTIFIER && peekAt(1).value === 'equal') {
+        advance(); // or
+        advance(); // equal
+        if (peek().type === TOKEN.TO || (peek().type === TOKEN.IDENTIFIER && peek().value === 'to')) {
+          advance(); // to
+        }
+        const right = parseExpression();
+        return { type: 'BinaryCondition', left, op: '<=', right };
+      }
       const right = parseExpression();
       return { type: 'BinaryCondition', left, op: '<', right };
     }
@@ -385,6 +459,17 @@ function parse(tokens) {
     if (token.type === TOKEN.SHOW)        return parseShow();
     if (token.type === TOKEN.PRINT)       return parseShow();  // alias for show
     if (token.type === TOKEN.DISPLAY)     return parseShow();  // alias for show
+    // log <expr> / log message (WhatsApp)
+    if (token.type === TOKEN.LOG_KW || (token.type === TOKEN.IDENTIFIER && token.value === 'log')) {
+      if (peekAt(1).type === TOKEN.IDENTIFIER && peekAt(1).value === 'message') {
+        advance(); // log
+        advance(); // message
+        return { type: 'WhatsAppLogStatement' };
+      }
+      if (token.type === TOKEN.LOG_KW || (peekAt(1).type !== TOKEN.DOT && peekAt(1).type !== TOKEN.LPAREN && peekAt(1).type !== TOKEN.BECOMES)) {
+        return parseShow();
+      }
+    }
     if (token.type === TOKEN.IF)          return parseIf();
     if (token.type === TOKEN.MAKE)        return parseMake();
     if (token.type === TOKEN.DEFINE)      return parseMake();  // alias for make
@@ -396,6 +481,10 @@ function parse(tokens) {
     // body; the generator marks the enclosing `make ... done` as a function*.
     if (token.type === TOKEN.YIELD)       return parseYield();
     if (token.type === TOKEN.FOR)         return parseForEach();
+    // Natural intent repeat loops (counted, repeat with, repeat while, repeat until)
+    if (token.type === TOKEN.REPEAT || (token.type === TOKEN.IDENTIFIER && token.value === 'repeat')) {
+      return parseRepeat();
+    }
     // v2.1.0 — every <n> <unit>s … done: interval scheduling. "every" also
     // lexes as TOKEN.EACH (the "for every" alias), so only the number+unit
     // form is intercepted; "for every item in list" keeps its meaning.
@@ -1130,10 +1219,13 @@ function parseAsk() {
   function parseShow() {
     const isPrint = peek().type === TOKEN.PRINT;
     const isDisplay = peek().type === TOKEN.DISPLAY;
+    const isLog = peek().type === TOKEN.LOG_KW || (peek().type === TOKEN.IDENTIFIER && peek().value === 'log');
     if (isPrint) {
       consume(TOKEN.PRINT);
     } else if (isDisplay) {
       consume(TOKEN.DISPLAY);
+    } else if (isLog) {
+      advance();
     } else {
       consume(TOKEN.SHOW);
     }
@@ -1511,9 +1603,10 @@ function parseAsk() {
   }
 
   function parseGive() {
-    const isReturn = peek().type === TOKEN.RETURN;
-    const isGiveBack = peek().type === TOKEN.GIVE_BACK;
-    const isGive = peek().type === TOKEN.GIVE;
+    const kwToken = peek();
+    const isReturn = kwToken.type === TOKEN.RETURN;
+    const isGiveBack = kwToken.type === TOKEN.GIVE_BACK;
+    const isGive = kwToken.type === TOKEN.GIVE;
     if (isReturn) {
       consume(TOKEN.RETURN);
     } else if (isGiveBack) {
@@ -1524,7 +1617,14 @@ function parseAsk() {
     } else {
       consume(TOKEN.GIVE);
     }
-    const value = parseExpression();
+    let value = null;
+    const next = peek();
+    if (next.type !== TOKEN.DONE && next.type !== TOKEN.TOGETHER && next.type !== TOKEN.OTHERWISE &&
+        next.type !== TOKEN.ELSE && next.type !== TOKEN.END && next.type !== TOKEN.EOF) {
+      value = parseExpression();
+    } else if (!isReturn) {
+      throw new Error(makeError('Expected a value after "give".\n\nExample:\n  give a + b', kwToken));
+    }
     return { type: 'GiveStatement', value };
   }
 
@@ -1692,6 +1792,54 @@ function parseAsk() {
     const condition = parseCondition();
     const body      = parseBody('"while" loop');
     return { type: 'WhileStatement', condition, body };
+  }
+
+  // Natural intent repeat loops:
+  //   repeat N times ... done
+  //   repeat with <item> in <collection> ... done
+  //   repeat while <condition> ... done
+  //   repeat until <condition> ... done
+  function parseRepeat() {
+    advance(); // consume repeat
+    // Form 1: repeat with <item> in <collection> ... done
+    if ((peek().type === TOKEN.WITH || (peek().type === TOKEN.IDENTIFIER && peek().value === 'with')) &&
+        peekAt(1).type === TOKEN.IDENTIFIER) {
+      advance(); // with
+      const item = consume(TOKEN.IDENTIFIER, 'Expected an item name after "repeat with".\n\nExample:\n  repeat with item in items\n    show item\n  done').value;
+      consume(TOKEN.IN, `Expected "in" after "${item}".\n\nExample:\n  repeat with item in items`);
+      const collection = parseExpression();
+      const body = parseBody('"repeat with" loop');
+      return { type: 'ForEachStatement', item, collection, body };
+    }
+    // Form 2: repeat while <condition> ... done
+    if (peek().type === TOKEN.WHILE || (peek().type === TOKEN.IDENTIFIER && peek().value === 'while')) {
+      advance(); // while
+      const condition = parseCondition();
+      const body = parseBody('"repeat while" loop');
+      return { type: 'WhileStatement', condition, body };
+    }
+    // Form 3: repeat until <condition> ... done
+    if (peek().type === TOKEN.UNTIL || (peek().type === TOKEN.IDENTIFIER && peek().value === 'until')) {
+      advance(); // until
+      const condition = parseCondition();
+      const body = parseBody('"repeat until" loop');
+      return { type: 'WhileStatement', condition: { type: 'LogicalCondition', op: 'not', operand: condition }, body };
+    }
+    // Form 4: repeat <count> times ... done
+    _inRepeatCount = true;
+    let count;
+    try {
+      count = parseExpression();
+    } finally {
+      _inRepeatCount = false;
+    }
+    if (peek().type === TOKEN.TIMES_WORD || (peek().type === TOKEN.IDENTIFIER && peek().value === 'times')) {
+      advance(); // times
+    } else {
+      throw new Error(makeError('Expected "times" after count in "repeat" loop.\n\nExample:\n  repeat 5 times\n    show "hello"\n  done', peek()));
+    }
+    const body = parseBody('"repeat" loop');
+    return { type: 'RepeatTimesStatement', count, body };
   }
 
   // Enterprise & Intent-Oriented Module Importing & Exporting
@@ -2819,7 +2967,7 @@ function parseAsk() {
       peek().type === TOKEN.STAR ||
       peek().type === TOKEN.SLASH ||
       peek().type === TOKEN.PERCENT ||
-      peek().type === TOKEN.TIMES_WORD ||
+      (!_inRepeatCount && peek().type === TOKEN.TIMES_WORD) ||
       peek().type === TOKEN.DIVIDED_BY_WORD
     ) {
       const opToken = advance();
@@ -2978,6 +3126,15 @@ function parseAsk() {
       return { type: 'SpreadExpression', collection };
     }
 
+    // `count of <collection>` returns collection count/length
+    if (peek().type === TOKEN.IDENTIFIER && peek().value === 'count' &&
+        peekAt(1).type === TOKEN.IDENTIFIER && peekAt(1).value === 'of') {
+      advance(); // count
+      advance(); // of
+      const collection = parsePrimary();
+      return { type: 'CountOfExpression', object: collection };
+    }
+
     const item = tryParseItemExpression();
     if (item) return item;
     // v1.0.36 — `new` works anywhere an expression is parsed (assignment
@@ -3089,6 +3246,14 @@ function parseAsk() {
     // v2.4 — skip "different from" which is a comparison, not an item expression
     if (second.value === 'different' && third.value === 'from') return null;
 
+    // Natural intent style: "first of <collection>" / "last of <collection>"
+    if ((first.value === 'first' || first.value === 'last') && second.value === 'of') {
+      advance(); // first / last
+      advance(); // of
+      const collection = parsePrimary();
+      return { type: first.value === 'first' ? 'FirstItem' : 'LastItem', collection };
+    }
+
     // "first from players" / "last from players" — missing noun
     if ((first.value === 'first' || first.value === 'last') && second.value === 'from') {
       throw new Error(makeError(
@@ -3097,12 +3262,12 @@ function parseAsk() {
       ));
     }
 
-    if (third.value !== 'from') return null;
+    if (third.value !== 'from' && third.value !== 'of') return null;
 
     if (first.value === 'first') {
       advance(); // first
-      advance(); // noun
-      advance(); // from
+      advance(); // noun (e.g. item, player)
+      advance(); // from / of
       const collection = parsePrimary();
       return { type: 'FirstItem', collection };
     }
@@ -3110,7 +3275,7 @@ function parseAsk() {
     if (first.value === 'last') {
       advance(); // last
       advance(); // noun
-      advance(); // from
+      advance(); // from / of
       const collection = parsePrimary();
       return { type: 'LastItem', collection };
     }
