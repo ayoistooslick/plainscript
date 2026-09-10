@@ -1,6 +1,6 @@
-// tests/browser-stubs.js — ZERO-dependency browser-emulation stubs.
+// tests/browser-stubs.js  -  ZERO-dependency browser-emulation stubs.
 //
-// Purpose: v1.0.36 adds browser-targeted PlainScript features (DOM events,
+// Purpose: v1.0.361 adds browser-targeted PlainScript features (DOM events,
 // canvas 2D, WebGL, requestAnimationFrame loops, animation/timers, input,
 // audio, asset loading, WebSocket, localStorage). The generated JS is asserted
 // by running it through tests/runtime.test.js's new Function mechanism: the
@@ -10,7 +10,7 @@
 // makeBrowserEnv() builds a matching environment and env.run(js) re-threads the
 // same stubs in, so tests assert on env.logs and env.recorder.
 //
-// Every env is freshly built per makeBrowserEnv() call — there is NO shared
+// Every env is freshly built per makeBrowserEnv() call  -  there is NO shared
 // mutable module state, so sequenced/parallel tests never pollute each other.
 //
 // Usage:
@@ -454,7 +454,7 @@ function makeGLContext(recorder, canvas, kind) {
   });
 }
 
-// Anything else getContext() is asked for (bitmaprenderer, etc.) — recorded.
+// Anything else getContext() is asked for (bitmaprenderer, etc.)  -  recorded.
 function makeInertContext(recorder, type, el) {
   const record = (fn, args) => recorder.gl.push({ fn, args: [...args] });
   return new Proxy({ el, kind: type }, {

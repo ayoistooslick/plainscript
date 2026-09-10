@@ -67,7 +67,7 @@ function resolveDependencies(entryPath) {
   const order   = [];         // final compile order
 
   function visit(absPath, stack) {
-    // Already fully processed — skip (handles duplicate imports)
+    // Already fully processed  -  skip (handles duplicate imports)
     if (visited.has(absPath)) return;
 
     // File is in the current DFS stack → circular dependency
@@ -90,7 +90,7 @@ function resolveDependencies(entryPath) {
 
     // Parse the file to discover its own imports.
     // Annotate any tokenise/parse error with the filename so callers see
-    // "file.pln — Line N, Column N: …" rather than a bare positional message.
+    // "file.pln  -  Line N, Column N: …" rather than a bare positional message.
     const source = fs.readFileSync(absPath, 'utf8');
     let tokens, ast;
     try {
@@ -98,7 +98,7 @@ function resolveDependencies(entryPath) {
       ast    = parse(tokens);
     } catch (err) {
       const relPath = path.relative(process.cwd(), absPath) || path.basename(absPath);
-      throw new Error(`${relPath} — ${err.message}`);
+      throw new Error(`${relPath}  -  ${err.message}`);
     }
 
     // Recurse into each import before processing this file (DFS)
@@ -109,7 +109,7 @@ function resolveDependencies(entryPath) {
       visit(resolvedAbs, newStack);
     }
 
-    // All dependencies are done — add this file to the order
+    // All dependencies are done  -  add this file to the order
     visited.add(absPath);
     order.push({ absPath, ast });
   }

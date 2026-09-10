@@ -1,4 +1,4 @@
-// PlainScript 1.0.36: upload route.
+// PlainScript 1.0.361: upload route.
 web app
 accept uploads limit "5 MB" allow list with "image/png" folder "uploads"
 route post "/upload"

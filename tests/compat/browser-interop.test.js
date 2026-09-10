@@ -1,10 +1,10 @@
-// Browser-interop compatibility guard for PlainScript v1.0.36.
+// Browser-interop compatibility guard for PlainScript v1.0.361.
 //
 // Dogfoods the browser/game canon in docs/GAME-PROMPT.md: every fenced
 // PlainScript block must compile, and the canonical snippet keeps the emitted
 // JS shapes documented in section 16 (addEventListener, self-scheduling rAF,
 // scaled setTimeout, async IIFE for promise builtins). Pure compile-time string
-// checks — deterministic and fast, no network or timers.
+// checks  -  deterministic and fast, no network or timers.
 
 const fs = require('fs');
 const path = require('path');

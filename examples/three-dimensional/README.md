@@ -2,7 +2,7 @@
 
 The canonical PlainScript path to 3D: the page loads **three.js from a CDN**
 before the compiled script, so `src/scene.pln` just references the global
-`THREE` object directly. The build is 100% dependency-free — the emitted file
+`THREE` object directly. The build is 100% dependency-free  -  the emitted file
 contains no `require(...)` and needs no bundler, it only needs `THREE` to exist
 in the page.
 
@@ -11,7 +11,7 @@ What the script exercises:
 - `remember scene as new THREE.Scene()`, `new THREE.PerspectiveCamera(...)`,
   `new THREE.WebGLRenderer()` and `renderer.setSize(...)`.
 - `new THREE.BoxGeometry(...)`, `new THREE.MeshStandardMaterial({ color: 0x40c463 })`
-  and `new THREE.Mesh(geo, mat)` — v1.0.36 hex literals (`0xRRGGBB`) keep the
+  and `new THREE.Mesh(geo, mat)`  -  v1.0.361 hex literals (`0xRRGGBB`) keep the
   palette legible; the lights use `0xffffff`.
 - A light rig with `new THREE.AmbientLight(...)` + `new THREE.DirectionalLight(...)`.
 - `document.body.append(renderer.domElement)` mounts the WebGL canvas.

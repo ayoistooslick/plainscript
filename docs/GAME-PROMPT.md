@@ -1,4 +1,4 @@
-# PlainScript Game Development Prompt Guide (v1.0.36)
+# PlainScript Game Development Prompt Guide (v1.0.361)
 
 The standing instruction sheet for AI agents asked to build games and
 interactive browser apps in PlainScript.
@@ -11,25 +11,25 @@ the compiler actually implements.
 
 - **Work in PlainScript.** Write `.pln`, compile it, ship the generated JS. Do
   not hand-rewrite the logic in JavaScript.
-- **Rule Zero — trust the compiler, nothing else.** Before you claim anything
+- **Rule Zero  -  trust the compiler, nothing else.** Before you claim anything
   works, run `node compiler/cli.js check <file.pln>` (or `plainscript check`).
   If it does not compile, it does not work.
-- **You may import and CALL any JavaScript library** — canvas, Web Audio,
+- **You may import and CALL any JavaScript library**  -  canvas, Web Audio,
   three.js, matter.js, npm packages, browser globals. `new Type(args)`, member
   chains, property assignment, promises, and callbacks all work.
 - **Never rewrite PlainScript project logic in JavaScript** just because the
   underlying API is JS. A library is *called* from PlainScript; game logic
   stays in `.pln`. JS is the guest library, not the host language.
 
-Every PlainScript block you show a user must compile — check it first.
+Every PlainScript block you show a user must compile  -  check it first.
 
 ---
 
 ## 1. Philosophy: intent-first, never rewrite in JavaScript (cardinal rule)
 
 PlainScript is intent-oriented: you describe *what* the game should do and the
-compiler generates JavaScript. One hard rule — **game logic lives in
-PlainScript**. v1.0.36 reaches into any JS API from `.pln`, which makes
+compiler generates JavaScript. One hard rule  -  **game logic lives in
+PlainScript**. v1.0.361 reaches into any JS API from `.pln`, which makes
 dropping to JS tempting; do not. Every browser capability below stays
 reachable without leaving PlainScript.
 
@@ -58,13 +58,13 @@ my-game/
 web app that serves the page; `public/index.html` is a dumb shell owning the
 canvas and script tag; `public/game.js` is build output, never hand-edited;
 `src/*.pln` helpers are pulled in with `bring name from "./helpers.pln"`.
-Keep server and client logic in separate files — different runtimes.
+Keep server and client logic in separate files  -  different runtimes.
 
 ---
 
 ## 3. Browser target / how a game is served
 
-A game is static files. `server.pln` — `serve folder "public"` exposes every
+A game is static files. `server.pln`  -  `serve folder "public"` exposes every
 file under `public/` at `/`, and `reply file` sends the HTML shell for the
 root path:
 
@@ -94,14 +94,14 @@ node compiler/cli.js build src/game.pln -o public/game.js
 ```
 
 **Package-free JS is browser-`<script>`-safe.** Without an npm import the
-generated code has no `require()` — it is an async IIFE with a guarded
+generated code has no `require()`  -  it is an async IIFE with a guarded
 `module.exports` tail, so it loads as a plain script.
 
 **When you need an npm library in the browser:**
 
 1. **CDN global (preferred, stays package-free).** Load the library in
    `index.html` *before* `game.js`; it becomes a browser global that
-   PlainScript calls directly — no `use`, no bundler:
+   PlainScript calls directly  -  no `use`, no bundler:
 
    ```html
    <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
@@ -118,7 +118,7 @@ generated code has no `require()` — it is an async IIFE with a guarded
 
 ### 4.1 Canvas 2D
 
-Default for 2D games — get the element, its 2D context, draw each frame:
+Default for 2D games  -  get the element, its 2D context, draw each frame:
 
 ```plainscript
 remember canvas as document.getElementById("game")
@@ -136,8 +136,8 @@ done
 requestAnimationFrame(step)
 ```
 
-Canvas state is property interop — `fillStyle becomes ...`, `strokeStyle
-becomes ...`, `font becomes ...` — then a draw call. Colors like `"#0d1117"`
+Canvas state is property interop  -  `fillStyle becomes ...`, `strokeStyle
+becomes ...`, `font becomes ...`  -  then a draw call. Colors like `"#0d1117"`
 are just strings. Match the canvas backing size to its display size so nothing
 drifts on resize:
 
@@ -180,7 +180,7 @@ remember prog as glProgram(gl, vs, fs)
 remember buf as glBuffer(gl, [0.0, 0.0, 1.0, 0.0, 0.0, 1.0])
 ```
 
-Per-frame render — keep setup out of the loop:
+Per-frame render  -  keep setup out of the loop:
 
 ```plainscript
 make renderTriangle()
@@ -196,7 +196,7 @@ done
 
 ### 4.3 WebGPU
 
-No special syntax — plain member-chain interop like WebGL, guarded, with the
+No special syntax  -  plain member-chain interop like WebGL, guarded, with the
 promise verbs for async parts. Do not over-promise; support depends on the
 browser/GPU:
 
@@ -237,8 +237,8 @@ done
 requestAnimationFrame(loop)
 ```
 
-v1.0.36 adds hex literals (`0xRRGGBB`): numeric colors use `0xffffff` instead
-of magic decimals, and a `"#ffffff"` string works too — THREE accepts all
+v1.0.361 adds hex literals (`0xRRGGBB`): numeric colors use `0xffffff` instead
+of magic decimals, and a `"#ffffff"` string works too  -  THREE accepts all
 three.
 
 ---
@@ -266,7 +266,7 @@ make step(dt)
 done
 ```
 
-- Never mutate world state inside an event handler — set a flag, let the loop
+- Never mutate world state inside an event handler  -  set a flag, let the loop
   consume it.
 - `when <target> "<event>" happens` → `target.addEventListener(event, ...)`
   with the parameter named via `as name` (default `event`).
@@ -293,7 +293,7 @@ when window "wheel" happens as e
 done
 ```
 
-Touch reuses pointer events (`"touchmove"`) — call `e.preventDefault()` when
+Touch reuses pointer events (`"touchmove"`)  -  call `e.preventDefault()` when
 you own the gesture; `"wheel"` gives `e.deltaY` for zoom; `gamepads()` returns
 connected pads to read inside the loop; drag-and-drop files arrive via
 `droppedFiles(event)` in a `drop` handler.
@@ -304,9 +304,9 @@ connected pads to read inside the loop; drag-and-drop files arrive via
 
 The browser runs a single-threaded event loop; the only good loop is
 `requestAnimationFrame` (rAF). A `while true` or long synchronous loop blocks
-rendering, input, and audio — the page freezes. Never write one.
+rendering, input, and audio  -  the page freezes. Never write one.
 
-rAF passes a millisecond timestamp — difference, normalize to seconds, and
+rAF passes a millisecond timestamp  -  difference, normalize to seconds, and
 movement is frame-rate independent:
 
 ```plainscript
@@ -324,14 +324,14 @@ requestAnimationFrame(loop)
 
 Cap `dt` (skip the step after a long stall) so a background-tab resume does not
 jump the sim forward by seconds. For loops that do not need delta time, the
-short form is `every frame ... done` (still rAF under the hood — see the
+short form is `every frame ... done` (still rAF under the hood  -  see the
 Appendix); use rAF + `dt` when movement must be time-based.
 
 ---
 
 ## 7. Asset loading
 
-Built-in loaders return promises and **auto-await** — no `await` written:
+Built-in loaders return promises and **auto-await**  -  no `await` written:
 
 ```plainscript
 remember bg as loadImage("img/background.png")
@@ -341,16 +341,16 @@ remember manifest as fetchJson("assets/manifest.json")
 
 - `loadImage(url)` → an `Image` ready for `ctx.drawImage(img, x, y)`.
 - `loadAudio(url)` → an `Audio` element; call `sound.play()`.
-- `fetchJson(url)` → `{ok, status, data, text, parseError}` — never throws on a
+- `fetchJson(url)` → `{ok, status, data, text, parseError}`  -  never throws on a
   bad status; check `ok`.
 - `fetchBytes(url)` → `{ok, status, data: Uint8Array}` for binary payloads.
 - `readDataUrl(file)` → a `data:` URL string for a `File` (from
-  `droppedFiles(event)` or a file input) — feed it straight to `loadImage`.
+  `droppedFiles(event)` or a file input)  -  feed it straight to `loadImage`.
 
 For an `Image` you own, use `new Image()` and `spriteSheet.src becomes "img.png"`.
 
 Start the scene **after** assets are ready, or the first frame draws a blank
-flash — gate scene start on a loaded flag. Sprite atlases are one image plus a
+flash  -  gate scene start on a loaded flag. Sprite atlases are one image plus a
 `fetchJson` manifest of `{x, y, w, h}` frames, drawn with
 `drawImage(sheet, sx, sy, sw, sh, dx, dy, dw, dh)`.
 
@@ -366,7 +366,7 @@ remember sfx as loadAudio("boing.mp3")
 
 `audioContext()` lazily creates a singleton `AudioContext` (with a
 `webkitAudioContext` fallback); `playTone(freq, seconds, options)` plays a tone
-on it. **Browsers require a user gesture to start audio** — the context stays
+on it. **Browsers require a user gesture to start audio**  -  the context stays
 `"suspended"` until a click/keypress/touch, so resume it from the first one:
 
 ```plainscript
@@ -376,7 +376,7 @@ done
 document.addEventListener("click", resumeAudio)
 ```
 
-The #1 "audio does not work" bug in browser games — always wire the resume.
+The #1 "audio does not work" bug in browser games  -  always wire the resume.
 
 ---
 
@@ -415,7 +415,7 @@ one predictable place per frame.
 
 ## 10. Collision and physics
 
-Two workhorse tests. AABB — exact enough for rectangles and tiles:
+Two workhorse tests. AABB  -  exact enough for rectangles and tiles:
 
 ```plainscript
 if enemy.x is at least player.x - 26 and enemy.x is at most player.x + 26 and enemy.y is at least player.y - 26 and enemy.y is at most player.y + 26
@@ -423,7 +423,7 @@ if enemy.x is at least player.x - 26 and enemy.x is at most player.x + 26 and en
 done
 ```
 
-Circle distance — compare squared distance against squared radius to skip a
+Circle distance  -  compare squared distance against squared radius to skip a
 `Math.sqrt` per pair:
 
 ```plainscript
@@ -436,8 +436,8 @@ done
 ```
 
 With many entities, do a broad phase first (bounding boxes, tile-grid buckets)
-and run the precise test only on candidates. When you need real physics —
-impulses, joints, continuous collision — delegate to a physics library. That is
+and run the precise test only on candidates. When you need real physics  - 
+impulses, joints, continuous collision  -  delegate to a physics library. That is
 interop, not surrender:
 
 ```plainscript
@@ -465,7 +465,7 @@ library computes physics.
 ## 11. UI overlay via DOM
 
 Canvas = the world; DOM = the chrome. Score, lives, menus, and buttons live in
-HTML and update by property assignment — `innerHTML becomes`,
+HTML and update by property assignment  -  `innerHTML becomes`,
 `textContent becomes`, `classList.add`. Do not build UI in canvas when a div
 will do:
 
@@ -529,7 +529,7 @@ compact tick/snapshot; clients render and correct.
 
 ## 13. Persistence
 
-`localStorage` is direct interop — strings only. Wrap state in JSON:
+`localStorage` is direct interop  -  strings only. Wrap state in JSON:
 
 ```plainscript
 remember rawSave as localStorage.getItem("plainscript-save")
@@ -540,7 +540,7 @@ done
 localStorage.setItem("plainscript-save", jsonEncode(state))
 ```
 
-Save on meaningful changes or `beforeunload`, not every frame —
+Save on meaningful changes or `beforeunload`, not every frame  - 
 `localStorage` is synchronous and small (~5MB). For structured or large data,
 wrap IndexedDB behind promises via the `idb` npm library (`use idb`).
 
@@ -551,9 +551,9 @@ wrap IndexedDB behind promises via the `idb` npm library (`use idb`).
 - **One rAF loop, one `step(dt)`.** No scattered timers drawing or simulating
   independently.
 - **No allocations in the loop.** Reuse typed arrays and mutating math
-  (gl-matrix `mat4.rotateX(mat, mat, 0.5)`) — never fresh arrays per frame.
+  (gl-matrix `mat4.rotateX(mat, mat, 0.5)`)  -  never fresh arrays per frame.
 - **Cap dt** so a background-tab resume cannot run the sim forward for seconds.
-- **Canvas sizing discipline.** Match backing size to display size — oversized
+- **Canvas sizing discipline.** Match backing size to display size  -  oversized
   canvases are the #1 silent frame-rate killer.
 - **Reuse sprites and draw calls**; redraw only what changed.
 - **No synchronous work in the loop.** No storage writes, no fetch, no heavy
@@ -584,14 +584,14 @@ bring axios from "axios"
 bring geometry from "./helpers.pln"
 ```
 
-**Call member chains** — no special syntax:
+**Call member chains**  -  no special syntax:
 
 ```plainscript
 crypto.createHash("sha256").update("abc").digest("hex")
 mesh.scale.set(2, 2, 2)
 ```
 
-**Construct with `new Type(args)`** — statement start, `remember`, arguments,
+**Construct with `new Type(args)`**  -  statement start, `remember`, arguments,
 member chains, or bare without parens:
 
 ```plainscript
@@ -613,9 +613,9 @@ window.addEventListener("resize", fitWindow)
 button.onclick becomes fitWindow
 ```
 
-**Promises** — browser builtins (`loadImage`, `fetchJson`, `loadAudio`)
+**Promises**  -  browser builtins (`loadImage`, `fetchJson`, `loadAudio`)
 auto-await. Raw interop uses `await` / `wait for`; errors use the repository's
-`try/recover` idiom — never `.then`:
+`try/recover` idiom  -  never `.then`:
 
 ```plainscript
 remember response as await fetch("/api/state")
@@ -632,7 +632,7 @@ finally
 done
 ```
 
-**Typed arrays / binary** — `remember buffer as new Uint8Array(64)` and index
+**Typed arrays / binary**  -  `remember buffer as new Uint8Array(64)` and index
 with `buffer[0] becomes 255`.
 
 **Arrays, objects, JSON:**
@@ -646,7 +646,7 @@ remember config as jsonDecode(rawJson)
 ```
 
 Rules: no `=>`, `.then`, `let/const`, braces, or semicolons in `.pln`. A
-library is *called* from PlainScript — symbol, flow, and state stay in
+library is *called* from PlainScript  -  symbol, flow, and state stay in
 PlainScript. Need a stateful callback? Define a `make` function that reads the
 shared state you already have.
 
@@ -687,7 +687,7 @@ Debug by checking `game.js` for that shape (`addEventListener`,
 | Variable named for a keyword/builtin | Rename (`start`, `now`, `get`, `set`, `reply`, `from`, `as`, `of`, `in`, `json`, `bytes`, `update`, `status` are taken) |
 | Writing `is most` for `<=` | Use `is at most` (`is most` is not a comparison) |
 | Storing colors as opaque decimals (`4244579`) | Hex literal `0x40c463` is supported (or a `"#40c463"` string) |
-| `make update` / `make get` as function names | Rename — those are keywords |
+| `make update` / `make get` as function names | Rename  -  those are keywords |
 | Bare `keys["ArrowLeft"]` in `if` | Compare: `if keys["ArrowLeft"] is true` |
 | Audio with no user gesture | `ctx.resume()` from a click/keydown handler |
 | Drawing before assets load | Gate scene start on a loaded flag |
@@ -834,7 +834,7 @@ requestAnimationFrame(loop)
 For games up to a few hundred lines, one `.pln` file is correct: one `state`
 record owned by the loop, one rAF loop (`every frame` or the dt form) that
 steps then draws, one input set (a `keys{}` map plus one pointer handler), and
-plain DOM updates for the HUD. File count should track surface area — a small
+plain DOM updates for the HUD. File count should track surface area  -  a small
 game in five files is as wrong as a big game in one.
 
 ### 19.2 Large games
@@ -851,15 +851,15 @@ remember firstWave as spawnEnemy(320, 40)
 
 A proven structure:
 
-- **Entity factories** — `define a kind` plus a `make spawnThing()` returning a
+- **Entity factories**  -  `define a kind` plus a `make spawnThing()` returning a
   new instance; one file per entity family.
-- **Systems as `make` functions** — one system (movement, collision, rendering,
+- **Systems as `make` functions**  -  one system (movement, collision, rendering,
   scoring) per function, run in order by the loop.
-- **Scene/state table** — a state record or switch with explicit `attract`,
+- **Scene/state table**  -  a state record or switch with explicit `attract`,
   `play`, and `gameover` states.
-- **Asset manifest** — one `assets` record of URLs loaded at boot; scenes look
+- **Asset manifest**  -  one `assets` record of URLs loaded at boot; scenes look
   up paths instead of hardcoding.
-- **A server when networking** — own `server.pln` with `websocket server`,
+- **A server when networking**  -  own `server.pln` with `websocket server`,
   authority checks, and snapshot broadcasts; the client is a pure renderer +
   input reporter.
 
@@ -888,7 +888,7 @@ APIs stay libraries you call.
 
 ## Appendix A: Canonical snippets quick reference
 
-Every line below is verified canonical form — copy it exactly:
+Every line below is verified canonical form  -  copy it exactly:
 
 ```plainscript
 remember canvas as document.getElementById("game")
@@ -910,7 +910,7 @@ remember bg as loadImage("img.png")
 
 Runnable, maintained reference implementations live in:
 
-- `examples/canvas-game` — canvas 2D dodge game (keys map + `every frame` + delta time + kinds + restart).
-- `examples/browser-interactive` — DOM-first interactive app (`when ... happens`, `classList`, innerHTML/textContent).
-- `examples/three-dimensional` — WebGL 3D scene via the global `THREE` object.
-- `examples/javascript-library` — an npm library (`bring THREE from "three"`), callbacks, and `fetchJson`.
+- `examples/canvas-game`  -  canvas 2D dodge game (keys map + `every frame` + delta time + kinds + restart).
+- `examples/browser-interactive`  -  DOM-first interactive app (`when ... happens`, `classList`, innerHTML/textContent).
+- `examples/three-dimensional`  -  WebGL 3D scene via the global `THREE` object.
+- `examples/javascript-library`  -  an npm library (`bring THREE from "three"`), callbacks, and `fetchJson`.

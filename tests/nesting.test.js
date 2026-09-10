@@ -1,16 +1,16 @@
-// Tests for PlainScript — "any statement works at any nesting level".
+// Tests for PlainScript  -  "any statement works at any nesting level".
 //
 // Historically the compiler decided whether a route handler / listener / user
 // function had to be `async` from a hand-maintained registry of "async
 // keywords". A new async keyword (like `ocr`) would silently stop working the
 // moment it moved out of the top level (where the whole program is wrapped in
 // an async IIFE). The generator now derives async-ness from actual generation
-// output (generateBlock + emitAwaited)/(markAsync), so every runtime keyword —
-// old or brand-new — is guaranteed to work inside any route, function, or nested
+// output (generateBlock + emitAwaited)/(markAsync), so every runtime keyword  - 
+// old or brand-new  -  is guaranteed to work inside any route, function, or nested
 // block, not just at the top level.
 //
 // This file locks that guarantee in with a regression test per async construct:
-// inside a route, inside a function, and deeply nested — plus tests that
+// inside a route, inside a function, and deeply nested  -  plus tests that
 // non-async constructs stay synchronous and that asyncness never leaks between
 // sibling functions.
 //

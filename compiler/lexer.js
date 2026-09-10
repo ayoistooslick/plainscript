@@ -41,7 +41,7 @@ const TOKEN = {
   IMPORT:      'IMPORT',
   INCLUDE:     'INCLUDE',     // alias for import: "include "./file.pln""
   LOAD:        'LOAD',        // alias for import: "load "./file.pln""
-  // v0.3 — Express runtime
+  // v0.3  -  Express runtime
   WHEN:        'WHEN',
   SOMEONE:     'SOMEONE',
   VISITS:      'VISITS',
@@ -58,7 +58,7 @@ const TOKEN = {
   SERVE_STATIC: 'SERVE_STATIC', // alias for serve folder
   SERVE_PUBLIC: 'SERVE_PUBLIC', // alias for serve folder
   FOLDER:      'FOLDER',
-  // v0.6 — Extended comparisons
+  // v0.6  -  Extended comparisons
   ABOVE:       'ABOVE',
   BELOW:       'BELOW',
   AT:          'AT',
@@ -74,14 +74,14 @@ const TOKEN = {
   WITH:        'WITH',
   BETWEEN:     'BETWEEN',
   AND:         'AND',
-  OR:          'OR',          // v2.1.1 — logical or in conditions
-  INSTANCEOF:  'INSTANCEOF',  // v1.0.2 — instanceof condition
-  // v0.6 — Express DX
+  OR:          'OR',          // v2.1.1  -  logical or in conditions
+  INSTANCEOF:  'INSTANCEOF',  // v1.0.2  -  instanceof condition
+  // v0.6  -  Express DX
   WEB:         'WEB',
   ROUTE_KW:    'ROUTE_KW',
   START_KW:    'START_KW',
   RUN_ON:      'RUN_ON',      // alias for start: "run on port 3000"
-  // v0.6 — SQLite DX
+  // v0.6  -  SQLite DX
   DATABASE_KW: 'DATABASE_KW',
   CONNECT_DB:  'CONNECT_DB',  // alias for database: "connect database "app.db""
   USE_DATABASE: 'USE_DATABASE', // alias for database: "use database "app.db""
@@ -93,7 +93,7 @@ const TOKEN = {
   SQL_BODY:    'SQL_BODY',    // raw SQL collected between a block keyword and "done"
   ASK:           'ASK',           // interactive input: ask name / ask "prompt" as name
   PROMPT:        'PROMPT',        // alias for ask: 'prompt "name?" as name'
-  OCR_KW:        'OCR_KW',        // v2.0.1 — ocr "<image>" as <name> [using "<lang>"]
+  OCR_KW:        'OCR_KW',        // v2.0.1  -  ocr "<image>" as <name> [using "<lang>"]
   PACKAGE:       'PACKAGE',       // bare npm package name after "use" (may contain -, _, ., /, @)
   GATHER:       'GATHER',       // gather each item in list giving expr (functional map)
   FILTER_KW:    'FILTER_KW',    // filter each item in list when condition (functional filter)
@@ -106,10 +106,10 @@ const TOKEN = {
   EMIT:         'EMIT',         // emit "event.name" with data (event emitter)
   HAPPENS:      'HAPPENS',      // when "event.name" happens as data (event listener)
   CATCHES:      'CATCHES',      // recover when err catches "TypeError" (typed error recovery)
-  // v1.0.1 — generators. "yield" is a JavaScript reserved word, so it becomes a
+  // v1.0.1  -  generators. "yield" is a JavaScript reserved word, so it becomes a
   // real keyword token (a variable named `yield` is illegal in JS anyway).
   YIELD:        'YIELD',
-  // v2.3 — English-like syntax keywords
+  // v2.3  -  English-like syntax keywords
   TO:           'TO',           // "to add a and b together" function syntax
   TOGETHER:     'TOGETHER',     // function block terminator alternative
   BE:           'BE',           // "let x be 5" alternative to "let x is 5"
@@ -121,26 +121,26 @@ const TOKEN = {
   LIST_WITH:    'LIST_WITH',    // "list with 1, 2, 3" alternative to "[1, 2, 3]"
   RECORD_WITH:  'RECORD_WITH',  // "record with name 'Alice'" alternative to object literal
   // Punctuation
-  LBRACE:      'LBRACE',   // { — inline object literal (v1.2)
+  LBRACE:      'LBRACE',   // {  -  inline object literal (v1.2)
   RBRACE:      'RBRACE',   // }
-  COLON:       'COLON',    // : — inline object property separator (v1.2)
-  ARROW:       'ARROW',    // -> — Telegram inline keyboard button (v1.2)
+  COLON:       'COLON',    // :  -  inline object property separator (v1.2)
+  ARROW:       'ARROW',    // ->  -  Telegram inline keyboard button (v1.2)
   LPAREN:      'LPAREN',
   RPAREN:      'RPAREN',
   LBRACKET:    'LBRACKET',
   RBRACKET:    'RBRACKET',
   COMMA:       'COMMA',
   DOT:         'DOT',
-  OPTIONAL_CHAIN: 'OPTIONAL_CHAIN', // ?. — optional chaining
-  NULLISH_COALESCE: 'NULLISH_COALESCE', // ?? — nullish coalescing
-  POWER:       'POWER',    // ** — exponentiation
+  OPTIONAL_CHAIN: 'OPTIONAL_CHAIN', // ?.  -  optional chaining
+  NULLISH_COALESCE: 'NULLISH_COALESCE', // ??  -  nullish coalescing
+  POWER:       'POWER',    // **  -  exponentiation
   PLUS:        'PLUS',
-  MINUS:       'MINUS',    // v2.1.1 — subtraction / unary minus
-  STAR:        'STAR',     // v2.1.1 — multiplication
-  SLASH:       'SLASH',    // v2.1.1 — division
-  PERCENT:     'PERCENT',  // v2.1.1 — remainder (modulo)
-  SPREAD:      'SPREAD',   // ... — spread operator
-  REST:        'REST',     // ... — rest parameter
+  MINUS:       'MINUS',    // v2.1.1  -  subtraction / unary minus
+  STAR:        'STAR',     // v2.1.1  -  multiplication
+  SLASH:       'SLASH',    // v2.1.1  -  division
+  PERCENT:     'PERCENT',  // v2.1.1  -  remainder (modulo)
+  SPREAD:      'SPREAD',   // ...  -  spread operator
+  REST:        'REST',     // ...  -  rest parameter
   LOGICAL_OR_ASSIGN: 'LOGICAL_OR_ASSIGN',     // ||=
   LOGICAL_AND_ASSIGN: 'LOGICAL_AND_ASSIGN',   // &&=
   NULLISH_ASSIGN: 'NULLISH_ASSIGN',           // ??=
@@ -149,16 +149,16 @@ const TOKEN = {
   IDENTIFIER:  'IDENTIFIER',
   STRING:      'STRING',
   NUMBER:      'NUMBER',
-  TRUE_KW:     'TRUE_KW',   // v2.1.1 — boolean literal true
-  FALSE_KW:    'FALSE_KW',  // v2.1.1 — boolean literal false
-  NULL_KW:     'NULL_KW',   // v2.1.1 — null literal
-  UNDEFINED_KW: 'UNDEFINED_KW', // v2.2.0 — undefined literal
+  TRUE_KW:     'TRUE_KW',   // v2.1.1  -  boolean literal true
+  FALSE_KW:    'FALSE_KW',  // v2.1.1  -  boolean literal false
+  NULL_KW:     'NULL_KW',   // v2.1.1  -  null literal
+  UNDEFINED_KW: 'UNDEFINED_KW', // v2.2.0  -  undefined literal
   BIGINT:      'BIGINT',   // BigInt literal (e.g., 42n)
   TEMPLATE_STRING: 'TEMPLATE_STRING', // backtick-delimited string with interpolation
   SYMBOL_KW:   'SYMBOL_KW', // symbol keyword
   DEBUGGER_KW: 'DEBUGGER_KW', // debugger keyword
   IMPORT_META: 'IMPORT_META', // import.meta
-  // v2.4 — Near-English intent-oriented syntax (single-word keywords)
+  // v2.4  -  Near-English intent-oriented syntax (single-word keywords)
   RAISES:        'RAISES',        // "raise expr" throw alternative
   CHOOSING:      'CHOOSING',      // "choosing cond then a otherwise b" ternary
   USES:          'USES',          // "x uses a, b together" function call
@@ -221,7 +221,7 @@ const KEYWORDS = {
   serve_static: TOKEN.SERVE_STATIC,
   serve_public: TOKEN.SERVE_PUBLIC,
   folder:    TOKEN.FOLDER,
-  // v0.6 — comparisons
+  // v0.6  -  comparisons
   above:     TOKEN.ABOVE,
   below:     TOKEN.BELOW,
   at:        TOKEN.AT,
@@ -239,25 +239,25 @@ const KEYWORDS = {
   instanceof: TOKEN.INSTANCEOF,
   now:       TOKEN.NOW,
   back:      TOKEN.BACK,
-  // v2.1.1 — literal keywords. These were previously plain identifiers that
+  // v2.1.1  -  literal keywords. These were previously plain identifiers that
   // passed through to generated JavaScript; making them explicit tokens gives
   // them first-class AST nodes and deterministic diagnostics.
   true:      TOKEN.TRUE_KW,
   false:     TOKEN.FALSE_KW,
   null:      TOKEN.NULL_KW,
   undefined: TOKEN.UNDEFINED_KW,
-  // v0.6 — Express DX
+  // v0.6  -  Express DX
   web:       TOKEN.WEB,
   route:     TOKEN.ROUTE_KW,
   start:     TOKEN.START_KW,
   run_on:    TOKEN.RUN_ON,
-  // v0.6 — SQLite DX
+  // v0.6  -  SQLite DX
   database:  TOKEN.DATABASE_KW,
   connect_db: TOKEN.CONNECT_DB,
   use_database: TOKEN.USE_DATABASE,
   ask:        TOKEN.ASK,
   prompt:     TOKEN.PROMPT,
-  // v2.0.1 — OCR capability
+  // v2.0.1  -  OCR capability
   ocr:        TOKEN.OCR_KW,
   // IOPL-native features
   gather:     TOKEN.GATHER,
@@ -274,7 +274,7 @@ const KEYWORDS = {
   yield:      TOKEN.YIELD,
   symbol:     TOKEN.SYMBOL_KW,
   debugger:   TOKEN.DEBUGGER_KW,
-  // v2.3 — English-like syntax keywords
+  // v2.3  -  English-like syntax keywords
   to:         TOKEN.TO,
   together:   TOKEN.TOGETHER,
   be:         TOKEN.BE,
@@ -285,7 +285,7 @@ const KEYWORDS = {
   divided_by: TOKEN.DIVIDED_BY_WORD,
   list_with:  TOKEN.LIST_WITH,
   record_with: TOKEN.RECORD_WITH,
-  // v2.4 — Near-English intent-oriented syntax (single-word keywords)
+  // v2.4  -  Near-English intent-oriented syntax (single-word keywords)
   raise:        TOKEN.RAISES,
   raises:       TOKEN.RAISES,
   choosing:     TOKEN.CHOOSING,
@@ -308,7 +308,7 @@ const SQL_BLOCK_WORDS = {
 
 // Decode one escape sequence inside a double-quoted string, starting at
 // source[index] (the backslash). Returns [decodedText, charsConsumed].
-// Supported: \n \t \r \0 \\ \" \' — any other escaped character is kept as
+// Supported: \n \t \r \0 \\ \" \'  -  any other escaped character is kept as
 // itself (JavaScript-style leniency), so "\q" means "q".
 function decodeEscape(source, index) {
   const next = source[index + 1];
@@ -355,7 +355,7 @@ function tokenize(source) {
         pendingUse = false;
         continue;
       }
-      pendingUse = false; // not a package start — tokenize normally
+      pendingUse = false; // not a package start  -  tokenize normally
     }
 
     // String literal. Normal escapes are decoded here (\n, \t, \r, \\, \",
@@ -390,7 +390,7 @@ function tokenize(source) {
     }
 
     // Backtick string (template literal): preserves whitespace and supports
-    // interpolation. Scanning is escape-aware — a backslash escapes the next
+    // interpolation. Scanning is escape-aware  -  a backslash escapes the next
     // character verbatim (\` does not close the string, \\ stays a backslash,
     // \$ guards ${ from interpolating) while ordinary characters, real
     // newlines and ${expr} pass through untouched for the generator to emit.
@@ -488,7 +488,7 @@ function tokenize(source) {
           tokens.push({ type: TOKEN.SQL_BODY,  value: sql.trimEnd(), line: tokenLine, col: tokenCol });
           tokens.push({ type: TOKEN.DONE,       value: 'done',         line, col: col() });
         }
-        // else: stays on same line — parsed normally by the parser as kwType + next tokens
+        // else: stays on same line  -  parsed normally by the parser as kwType + next tokens
         continue;
       }
 
@@ -516,7 +516,7 @@ function tokenize(source) {
     if (source[i] === '.') { tokens.push({ type: TOKEN.DOT,      value: '.', line: tokenLine, col: tokenCol }); i++; continue; }
     if (source[i] === '+' && source[i + 1] === '+' && source[i + 2] === '=') { tokens.push({ type: TOKEN.PLUS_ASSIGN, value: '++=', line: tokenLine, col: tokenCol }); i += 3; continue; }
     if (source[i] === '+') { tokens.push({ type: TOKEN.PLUS,     value: '+', line: tokenLine, col: tokenCol }); i++; continue; }
-    // v2.1.1 — arithmetic. "->" is matched first so it never becomes MINUS.
+    // v2.1.1  -  arithmetic. "->" is matched first so it never becomes MINUS.
     if (source[i] === '-' && source[i + 1] === '>') { tokens.push({ type: TOKEN.ARROW,  value: '->', line: tokenLine, col: tokenCol }); i += 2; continue; }
     if (source[i] === '-') { tokens.push({ type: TOKEN.MINUS,    value: '-', line: tokenLine, col: tokenCol }); i++; continue; }
     if (source[i] === '*' && source[i + 1] === '*') { tokens.push({ type: TOKEN.POWER, value: '**', line: tokenLine, col: tokenCol }); i += 2; continue; }

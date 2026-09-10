@@ -1,4 +1,4 @@
-// PlainScript 1.0.36: upload and OCR verification service.
+// PlainScript 1.0.361: upload and OCR verification service.
 
 web app
 accept uploads limit "5 MB" allow list with "image/png", "image/jpeg" folder "uploads"

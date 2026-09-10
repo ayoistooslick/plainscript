@@ -524,7 +524,7 @@ if pressed["ArrowLeft"] is true
 done
 ```
 
-`when <target> "<event>" happens` becomes `addEventListener`. Browser builtins (`select`, `selectAll`, `parseHTML`, `loadImage`, `loadAudio`, `fetchJson`, `fetchBytes`, `readDataUrl`, `audioContext`/`playTone`, `localPoint`, `gamepads`, `droppedFiles`, `webSocketSend`, and the WebGL helpers `webglContext`/`glShader`/`glProgram`/`glBuffer`) are auto-awaited promises or direct helpers — no `await` needed. `jsonEncode`/`jsonDecode` cover persistence. Animation forms are `every frame ... done` and an rAF-with-delta-time idiom; always use browser tools (never `while true`) and resume audio from a user gesture. The full expanding guide for browser and game development is `docs/GAME-PROMPT.md`.
+`when <target> "<event>" happens` becomes `addEventListener`. Browser builtins (`select`, `selectAll`, `parseHTML`, `loadImage`, `loadAudio`, `fetchJson`, `fetchBytes`, `readDataUrl`, `audioContext`/`playTone`, `localPoint`, `gamepads`, `droppedFiles`, `webSocketSend`, and the WebGL helpers `webglContext`/`glShader`/`glProgram`/`glBuffer`) are auto-awaited promises or direct helpers  -  no `await` needed. `jsonEncode`/`jsonDecode` cover persistence. Animation forms are `every frame ... done` and an rAF-with-delta-time idiom; always use browser tools (never `while true`) and resume audio from a user gesture. The full expanding guide for browser and game development is `docs/GAME-PROMPT.md`.
 
 ---
 

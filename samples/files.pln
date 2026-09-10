@@ -1,4 +1,4 @@
-// PlainScript 1.0.36: file helpers.
+// PlainScript 1.0.361: file helpers.
 writeFile("sample-output.txt", "PlainScript")
 remember contents as readFile("sample-output.txt")
 show contents

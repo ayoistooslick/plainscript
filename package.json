@@ -1,7 +1,7 @@
 {
   "name": "plainscript-lang",
   "version": "1.0.361",
-  "description": "PlainScript — an Intent-Oriented Programming Language. When even a simple sentence can be code.",
+  "description": "PlainScript  -  an Intent-Oriented Programming Language. When even a simple sentence can be code.",
   "main": "compiler/cli.js",
   "bin": {
     "plainscript": "./compiler/cli.js"

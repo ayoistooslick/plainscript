@@ -322,7 +322,7 @@ test('void compiles as an operand-expression', () => {
   if (run(src, 'v') !== undefined) throw new Error('void runtime failed');
 });
 
-// NOTE: separate JS-style `delete` is intentionally absent — `delete` is the
+// NOTE: separate JS-style `delete` is intentionally absent  -  `delete` is the
 // HTTP verb keyword (e.g. `delete http://...`), so the remove() helper and
 // object reassignment cover property removal instead.
 

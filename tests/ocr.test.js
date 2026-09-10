@@ -1,4 +1,4 @@
-// Tests for PlainScript v2.0.1 — OCR statements (tesseract.js backing).
+// Tests for PlainScript v2.0.1  -  OCR statements (tesseract.js backing).
 //
 // Run with: node tests/ocr.test.js
 

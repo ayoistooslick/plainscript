@@ -3,7 +3,7 @@ make whatsappWelcome()
 done
 
 make telegramMenu()
-    give "/pair <phone> — connect WhatsApp\n/ping — test bot\n/start — welcome message"
+    give "/pair <phone>  -  connect WhatsApp\n/ping  -  test bot\n/start  -  welcome message"
 done
 
 make pairInstructions()

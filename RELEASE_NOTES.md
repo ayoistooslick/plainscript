@@ -1,4 +1,4 @@
-# PlainScript v0.1.7 — Release Notes
+# PlainScript v0.1.7  -  Release Notes
 
 **Release date:** 2026
 
@@ -27,7 +27,7 @@ editor tooling ship together.
   `src/messi.pln` → `dist/messi.js`, nested folders included.
 - Imports are bundled into each output, so every file in `dist/` runs
   standalone under Node.
-- Deterministic output: rebuilds are byte-identical — safe to commit,
+- Deterministic output: rebuilds are byte-identical  -  safe to commit,
   diff, and cache.
 
 - `plainscript build` discovers all `.pln` files under `src/` and compiles each to
@@ -39,7 +39,7 @@ editor tooling ship together.
 
 - A project is a normal npm package: point `main` at the built entry and
   publish. Consumers `require()` the generated `dist/` output like any
-  Node package — no custom registry, no custom format.
+  Node package  -  no custom registry, no custom format.
 - The `prepare` script hooks straight into the compiler:
   `"prepare": "plainscript build"`.
 
@@ -59,7 +59,7 @@ editor tooling ship together.
 
 ## Backend capabilities
 
-Everything below is compiled by the same deterministic compiler — no rules
+Everything below is compiled by the same deterministic compiler  -  no rules
 engine, no AI, no hidden codegen:
 
 - Web apps and routing with groups, CORS, params, and custom 404s.

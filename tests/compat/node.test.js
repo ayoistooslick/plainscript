@@ -1,4 +1,4 @@
-// PlainScript — Node built-in interop capability suite.
+// PlainScript  -  Node built-in interop capability suite.
 //
 // Verifies `use fs`, `use path`, `use crypto` and method/member calls
 // (receiver.method(args), receiver.property) by running snippets against real

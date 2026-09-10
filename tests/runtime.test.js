@@ -1,4 +1,4 @@
-﻿// Tests for PlainScript v2.1.1 — one deterministic compiler, no Complex
+﻿// Tests for PlainScript v2.1.1  -  one deterministic compiler, no Complex
 // Compilation:
 //   language: booleans/null, arithmetic, and/or/not, try/recover,
 //             wait for, retry, HTTP client expressions

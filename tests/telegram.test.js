@@ -1,4 +1,4 @@
-﻿// Tests for PlainScript v1.2 — Telegram statements, inline objects, and the
+﻿// Tests for PlainScript v1.2  -  Telegram statements, inline objects, and the
 // statement-level JavaScript block.
 //
 // Run with: node tests/telegram.test.js
@@ -60,8 +60,8 @@ function compileProgram(source) {
 
 // Execute generated Telegram JavaScript against a stubbed Telegram API.
 //
-// The stub serves two queued getUpdates batches — a "/menu" command, then a
-// callback query on "about" — and records every other API call. Once the
+// The stub serves two queued getUpdates batches  -  a "/menu" command, then a
+// callback query on "about"  -  and records every other API call. Once the
 // queue is empty it parks the poll loop (a never-resolved promise does not
 // hold the event loop open), so the program settles deterministically.
 function runTelegramProgram(js) {
@@ -334,7 +334,7 @@ testAsync('runtime: rendered inline button carries callback_data and executes it
   }
 
   // 2. Pressing the button (callback_query update) must execute the PlainScript
-  //    "when someone clicks" handler — proven by its reply reaching Telegram.
+  //    "when someone clicks" handler  -  proven by its reply reaching Telegram.
   await waitFor(calls, (c) => c.some(m => m.method === 'sendMessage' && m.body.text === 'You clicked about!'));
   const click = calls.find(m => m.method === 'sendMessage' && m.body.text === 'You clicked about!');
   if (!click) throw new Error('clicking the rendered button did not execute the PlainScript callback');

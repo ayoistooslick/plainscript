@@ -1,10 +1,10 @@
-﻿// Tests for PlainScript v2.1.1 — WhatsApp bots and general string escapes.
+﻿// Tests for PlainScript v2.1.1  -  WhatsApp bots and general string escapes.
 //
 //   language: multiline backtick strings, escape sequences (\n \t \\ \")
 //   bots:     whatsapp bot … done with auth, login qr, login pairing,
 //             on message, log message, message.text, reply
 //   runtime:  Baileys socket startup, auth persistence, QR + pairing flows,
-//             connection lifecycle/reconnect, self-message filtering — all
+//             connection lifecycle/reconnect, self-message filtering  -  all
 //             against a stubbed @whiskeysockets/baileys so the suite is
 //             deterministic and network-free.
 //
@@ -491,7 +491,7 @@ testAsync('runtime: auth/session persists through the declared folder and saveCr
 
 testAsync('pairing flow: a fresh session requests a code 2s after socket creation', async () => {
   const rec = await runWhatsAppProgram(compileProgram(PAIRING_SOURCE));
-  // The code is requested by a timer scheduled at socket-creation time — no
+  // The code is requested by a timer scheduled at socket-creation time  -  no
   // QR event or any other trigger may be involved.
   const pairTimer = rec.timers.find(([fn, delay]) => delay === 2000);
   if (!pairTimer) throw new Error(`expected a 2000ms pairing timer, got ${JSON.stringify(rec.timers.map(t => t[1]))}`);
@@ -711,7 +711,7 @@ testAsync('acceptance: the compiled example files boot against real-shaped event
   if (!JSON.parse(recQr.logs[0]).text) throw new Error('qr example logging broken');
 });
 
-// ── v2.1.2 — ask (general console input) + login pairing with a value ───────
+// ── v2.1.2  -  ask (general console input) + login pairing with a value ───────
 
 const ASK_PAIRING_SOURCE = [
   'ask "WhatsApp number: " as phone',

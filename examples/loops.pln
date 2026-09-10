@@ -1,4 +1,4 @@
-// PlainScript 1.0.36: collection and numeric loops.
+// PlainScript 1.0.361: collection and numeric loops.
 
 remember colors as list with "red", "green", "blue"
 

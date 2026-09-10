@@ -1,10 +1,10 @@
-﻿// Tests for PlainScript — zero-config production build model.
+﻿// Tests for PlainScript  -  zero-config production build model.
 //
 //   build:    plainscript build writes dist/<name>.js preserving source names and
 //             structure relative to the source root (TypeScript-style)
 //   src:      automatic src/ discovery; src/ falls back to project root
 //   run:      execution happens from a scratch directory outside the
-//             project — execution never writes output files into it
+//             project  -  execution never writes output files into it
 //   packages: multi-file projects and npm-package-style projects build to a
 //             normal Node-consumable dist/
 //

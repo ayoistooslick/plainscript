@@ -287,7 +287,7 @@ function ensurePackageJson(cwd = process.cwd()) {
   }, null, 2) + '\n', 'utf8');
 }
 
-// v2.1.1 — verify that a freshly installed package actually LOADS on this
+// v2.1.1  -  verify that a freshly installed package actually LOADS on this
 // machine. "better-sqlite3 present in node_modules" does not imply usable:
 // its native binding may be missing for this platform or Node ABI (the
 // Termux failure mode). The check runs in a child process so a hard crash
@@ -321,7 +321,7 @@ function installPackages(packages, cwd = process.cwd()) {
         stdio: 'ignore',
       });
       dependencyCache.set(`${cwd}\0${bareName}`, true);
-      // v2.1.1 — "downloaded" and "usable" are different facts. Report both.
+      // v2.1.1  -  "downloaded" and "usable" are different facts. Report both.
       if (verifyPackageUsable(bareName, cwd)) {
         console.log(`${clrGreen('✓')} ${pkg} installed`);
       } else {
@@ -332,7 +332,7 @@ function installPackages(packages, cwd = process.cwd()) {
         );
       }
     } catch (_) {
-      // v2.1.1 — better-sqlite3 is optional at install time: programs opened
+      // v2.1.1  -  better-sqlite3 is optional at install time: programs opened
       // through the portable engine chain fall back to sql.js, so a native
       // build failure must not abort setup.
       if (bareName === 'better-sqlite3') {
@@ -366,7 +366,7 @@ function ensureDependencies(files, install = true) {
 //
 // Deterministic only: the lexer/parser/generator pipeline is the single
 // authoritative compiler. Unsupported syntax produces a precise compiler
-// error — there is no second compilation path (v2.1.1).
+// error  -  there is no second compilation path (v2.1.1).
 function compile(filePath, options = {}) {
   const absPath = path.resolve(filePath);
   if (!fs.existsSync(absPath)) {
@@ -421,7 +421,7 @@ function compile(filePath, options = {}) {
 // file in the OS temp dir could never see the project's node_modules. Passing
 // every node_modules directory between the entry file and the filesystem root
 // through NODE_PATH gives the child the exact same resolution the old
-// project-local temp file had — without ever writing into the project.
+// project-local temp file had  -  without ever writing into the project.
 function nodeModulesSearchPaths(entryDir) {
   const paths = [];
   let dir = path.resolve(entryDir);
@@ -504,9 +504,9 @@ function buildOne(filePath, srcDir, outDir, options = {}) {
   return path.relative(process.cwd(), outPath) || outPath;
 }
 
-// `plainscript build <file.pln> -o <out.js>` — compile one entry to an explicit
+// `plainscript build <file.pln> -o <out.js>`  -  compile one entry to an explicit
 // output path (same compilation pipeline as buildOne, including source maps
-// when requested). Valuable for browser payloads such as the v1.0.36
+// when requested). Valuable for browser payloads such as the v1.0.361
 // requestAnimationFrame / addEventListener helpers, which are meant to run as
 // a single script tag.
 function writeOneFile(filePath, outputFile) {
@@ -536,7 +536,7 @@ function writeOneFile(filePath, outputFile) {
   return path.relative(process.cwd(), outPath) || outPath;
 }
 
-// `plainscript build` — TypeScript-style production build:
+// `plainscript build`  -  TypeScript-style production build:
 //
 //   Zero config (default):
 //     messi.pln        → dist/messi.js       (project-root sources)
@@ -619,7 +619,7 @@ function cmdNew(projectName) {
   fs.mkdirSync(path.join(dir, 'public'));
   fs.mkdirSync(path.join(dir, 'src'));
 
-  // src/app.pln — starter web app
+  // src/app.pln  -  starter web app
   fs.writeFileSync(path.join(dir, 'src', 'app.pln'), `web app
 
 serve folder "public"
@@ -631,14 +631,14 @@ done
 route get "/api/status"
     reply json
         status is "ok"
-        version is "1.0.36"
+        version is "1.0.361"
     done
 done
 
 start 3000
 `);
 
-  // package.json — plain Node semantics; PlainScript itself is a devDependency and
+  // package.json  -  plain Node semantics; PlainScript itself is a devDependency and
   // deployment only needs the generated dist/ output.
   fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({
     name,
@@ -746,7 +746,7 @@ function cmdInstall() {
 function cmdDoctor() {
   console.log('PlainScript doctor\n');
   const check = (label, ok, detail = '') => {
-    const suffix = detail ? ` — ${detail}` : '';
+    const suffix = detail ? `  -  ${detail}` : '';
     console.log(`${ok ? clrGreen('✓') : clrRed('✗')} ${label}${suffix}`);
   };
   check('Node.js', Boolean(process.version));
@@ -843,14 +843,14 @@ function cmdUpdate() {
 // Check syntax of a PlainScript file without generating JavaScript or executing.
 // Full validation of a single .pln entry: resolve imports, parse+generate every
 // file in dependency order, and verify the emitted JavaScript is syntactically
-// valid — all without writing anything to disk. Returns a deterministic
+// valid  -  all without writing anything to disk. Returns a deterministic
 // result record; `deps` are the npm packages the sources require.
 function validateSource(absPath) {
   const rel = path.relative(process.cwd(), absPath) || absPath;
   const t0 = Date.now();
   try {
     // resolveDependencies parses each file too, so a parse error anywhere in
-    // the import graph surfaces here with a "file.pln — Line:Col" prefix.
+    // the import graph surfaces here with a "file.pln  -  Line:Col" prefix.
     const files = resolveDependencies(absPath);
     const context = createGenerationContext();
     let js = files.map(({ ast }) => generate(ast, context)).filter(s => s.trim()).join('\n');
@@ -948,7 +948,7 @@ function cmdCheck(target, json) {
 
   for (const r of results) {
     if (r.ok) {
-      console.log(`${clrGreen('✓')} ${r.file} — ok${clrDim(` (${r.ms}ms)`)}`);
+      console.log(`${clrGreen('✓')} ${r.file}  -  ok${clrDim(` (${r.ms}ms)`)}`);
     } else {
       console.log(`${clrRed('✗')} ${r.file}`);
       console.error(r.error);
@@ -978,7 +978,7 @@ function cmdFmt(filePath) {
   const source    = fs.readFileSync(absPath, 'utf8');
   const formatted = format(source);
   if (source === formatted) {
-    console.log(`${clrDim('–')} ${filePath} — already formatted.`);
+    console.log(`${clrDim('–')} ${filePath}  -  already formatted.`);
   } else {
     fs.writeFileSync(absPath, formatted, 'utf8');
     console.log(`${clrGreen('✓')} Formatted ${filePath}`);
@@ -998,7 +998,7 @@ function cmdHelp() {
 async function main() {
   const args = process.argv.slice(2);
 
-  // Global flags — recognized anywhere in the argument list.
+  // Global flags  -  recognized anywhere in the argument list.
   const quiet   = args.includes('--quiet');
   const verbose = args.includes('--verbose');
   const json    = args.includes('--json');
@@ -1014,7 +1014,7 @@ async function main() {
   switch (command) {
     case 'run':     await cmdRun(fileArg, positional.slice(2)); break;
     case 'build': {
-      // v1.0.36 — optional -o/--output <path>. "-o" is a single-dash flag, so
+      // v1.0.361  -  optional -o/--output <path>. "-o" is a single-dash flag, so
       // it survives the "--filtered" positional list; pull it out here before
       // building the positional file argument for cmdBuild.
       let outputPath = null;

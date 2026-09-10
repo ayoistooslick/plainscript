@@ -83,7 +83,7 @@ test('returns an empty list for a project without use statements', () => {
 });
 
 test('detects better-sqlite3 from database shorthand', () => {
-  // v2.1.1 — the portable engine chain installs both engines: native first,
+  // v2.1.1  -  the portable engine chain installs both engines: native first,
   // WebAssembly fallback second.
   assert(JSON.stringify(detectDependencies('database "app.db"')),
     '["better-sqlite3","sql.js"]');
@@ -620,7 +620,7 @@ test('lowercase() compiles to toLowerCase()', () => {
   if (!js.includes('.toLowerCase()')) throw new Error('missing toLowerCase');
 });
 
-// ── v2.5 — natural string/collection verbs ──────────────────────────────
+// ── v2.5  -  natural string/collection verbs ──────────────────────────────
 
 test('lowercase statement transforms a variable in place', () => {
   const js = compile('remember x as "HELLO"\nlowercase x');
@@ -1765,7 +1765,7 @@ test('"query" SQL_BODY contains the SQL text', () => {
 });
 
 test('"database" compiles to the portable engine chain', () => {
-  // v2.1.1 — opening a database awaits __dbOpen, which probes better-sqlite3
+  // v2.1.1  -  opening a database awaits __dbOpen, which probes better-sqlite3
   // and falls back to sql.js when the native binding is unusable.
   const js = compile('database "app.db"');
   if (!js.includes('await __dbOpen("app.db", null)')) throw new Error('missing await __dbOpen');

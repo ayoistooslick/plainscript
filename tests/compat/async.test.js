@@ -1,7 +1,7 @@
-// PlainScript — async capability suite.
+// PlainScript  -  async capability suite.
 //
-// Verifies async combinators — all of, any of, settled of, withTimeout, and
-// run background — by RUNNING snippets and checking runtime behaviour (each
+// Verifies async combinators  -  all of, any of, settled of, withTimeout, and
+// run background  -  by RUNNING snippets and checking runtime behaviour (each
 // result resolves in order).
 
 const { test, assert, run } = require('./_util');

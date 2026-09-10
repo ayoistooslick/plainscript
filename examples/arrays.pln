@@ -1,4 +1,4 @@
-// PlainScript 1.0.36: array literals and indexing.
+// PlainScript 1.0.361: array literals and indexing.
 remember values as [1, 2, 3]
 show values[0]
 show length(values)

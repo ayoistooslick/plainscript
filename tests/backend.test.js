@@ -1,4 +1,4 @@
-﻿// Tests for PlainScript v2.1.0 — deterministic backend capabilities:
+﻿// Tests for PlainScript v2.1.0  -  deterministic backend capabilities:
 //   HTTP routing (methods, groups, accessors, status, CORS, validation)
 //   filesystem operations, text / number / collection helpers,
 //   databases (SQLite live, PostgreSQL shape, transactions),
@@ -393,7 +393,7 @@ for each row in adults
 show row.name
 done
 `);
-  // v2.1.1 — opening a database is async (native probe with wasm fallback),
+  // v2.1.1  -  opening a database is async (native probe with wasm fallback),
   // so the generated program runs inside the async wrapper.
   const logs = await runGeneratedAsync(js);
   assert(JSON.stringify(logs), JSON.stringify(['bo', 'cy']));

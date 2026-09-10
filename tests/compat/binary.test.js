@@ -1,4 +1,4 @@
-// PlainScript — binary/bytes capability suite.
+// PlainScript  -  binary/bytes capability suite.
 //
 // Verifies the stdlib byte helpers: textToBytes, bytesToText, base64Encode,
 // base64Decode and sha256, by RUNNING snippets and checking deterministic output.

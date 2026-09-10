@@ -5,8 +5,8 @@
 // filesystem metadata/walk/path, and the native test DSL.
 //
 // Two kinds of assertions:
-//   * static — compiled JavaScript contains the expected output pattern, and
-//   * runtime — the compiled program is executed with node and its stdout,
+//   * static  -  compiled JavaScript contains the expected output pattern, and
+//   * runtime  -  the compiled program is executed with node and its stdout,
 //     exit code are verified against reality.
 
 const fs   = require('fs');

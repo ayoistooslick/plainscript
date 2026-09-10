@@ -11,9 +11,9 @@ const KNOWN_PACKAGES = {
   path:    `const path = require('path');`,
   axios:   `const axios = require('axios');`,
   chalk:   `const chalk = require('chalk');`,
-  // v2.1.0 — PostgreSQL driver behind the friendly "postgres" name.
+  // v2.1.0  -  PostgreSQL driver behind the friendly "postgres" name.
   postgres: `const { Pool } = require('pg');`,
-  // v2.2.0 — MongoDB driver.
+  // v2.2.0  -  MongoDB driver.
   mongodb: `const { MongoClient } = require('mongodb');`,
 };
 
@@ -22,7 +22,7 @@ const KNOWN_PACKAGES = {
 const NPM_NAME = {
   sqlite: 'better-sqlite3',
   postgres: 'pg',
-  // v2.1.1 — portable WebAssembly SQLite engine used by the "database"
+  // v2.1.1  -  portable WebAssembly SQLite engine used by the "database"
   // statement as an automatic fallback (or explicit choice) when
   // better-sqlite3's native binding is unavailable.
   'wasm-sqlite': 'sql.js',
@@ -42,7 +42,7 @@ const BUILTIN_DECLARATIONS = {
   fs: `const fs = require('fs');`,
   path: `const path = require('path');`,
   crypto: `const crypto = require('crypto');`,
-  // v1.0.1 — env-file runtime. Applies KEY=VALUE pairs from a .env file to
+  // v1.0.1  -  env-file runtime. Applies KEY=VALUE pairs from a .env file to
   // process.env. Blank lines and `#` comment lines are skipped.
   dotenv: [
     `function __loadEnvFile(path) {`,
@@ -61,7 +61,7 @@ const BUILTIN_DECLARATIONS = {
     `  }`,
     `}`,
   ].join('\n'),
-  // v1.1.1 — ask runtime (RFC-0011 §14)
+  // v1.1.1  -  ask runtime (RFC-0011 §14)
   ask: [
     `const readline = require('readline');`,
     `async function __ask(prompt = '') {`,
@@ -73,7 +73,7 @@ const BUILTIN_DECLARATIONS = {
     `  }`,
     `}`,
   ].join('\n'),
-  // v2.0.1 — OCR runtime (tesseract.js). Extracts text from an image file.
+  // v2.0.1  -  OCR runtime (tesseract.js). Extracts text from an image file.
   // The worker is created per call and always terminated, so repeated ocr
   // statements do not leak workers.
   ocr: [
@@ -88,7 +88,7 @@ const BUILTIN_DECLARATIONS = {
     `  }`,
     `}`,
   ].join('\n'),
-  // v1.0.36 — DOM browser runtime (select/selectAll/parseHTML). Browser
+  // v1.0.361  -  DOM browser runtime (select/selectAll/parseHTML). Browser
   // globals are guarded so the generated JS explains the problem when it is
   // run under Node instead of failing with a ReferenceError midpoint.
   dom: [
@@ -107,7 +107,7 @@ const BUILTIN_DECLARATIONS = {
     `  return template.content;`,
     `}`,
   ].join('\n'),
-  // v1.0.36 — input runtime: pointer coordinates, gamepads, dropped files.
+  // v1.0.361  -  input runtime: pointer coordinates, gamepads, dropped files.
   input: [
     `function __localPoint(e, canvas) {`,
     `  if (typeof document === 'undefined') throw new Error('localPoint(...) needs a browser (document is not defined in Node).');`,
@@ -125,7 +125,7 @@ const BUILTIN_DECLARATIONS = {
     `  return [...(event && event.dataTransfer ? event.dataTransfer.files : [])];`,
     `}`,
   ].join('\n'),
-  // v1.0.36 — asset-loading runtime (images, JSON, bytes, data URLs). All
+  // v1.0.361  -  asset-loading runtime (images, JSON, bytes, data URLs). All
   // helpers return promises; the STDLIB entries await them.
   assets: [
     `function __loadImage(url) {`,
@@ -162,7 +162,7 @@ const BUILTIN_DECLARATIONS = {
     `  });`,
     `}`,
   ].join('\n'),
-  // v1.0.36 — Web Audio runtime. The AudioContext is created once and shared
+  // v1.0.361  -  Web Audio runtime. The AudioContext is created once and shared
   // (browsers cap the number), and resumed on demand because autoplay policies
   // start it suspended.
   audio: [
@@ -205,7 +205,7 @@ const BUILTIN_DECLARATIONS = {
     `  });`,
     `}`,
   ].join('\n'),
-  // v1.0.36 — WebGL runtime: context selection plus the three compile/link/
+  // v1.0.361  -  WebGL runtime: context selection plus the three compile/link/
   // buffer helpers behind the gl* stdlib entries.
   gl: [
     `function __glContext(canvas) {`,
@@ -246,7 +246,7 @@ const BUILTIN_DECLARATIONS = {
     `  return buffer;`,
     `}`,
   ].join('\n'),
-  // v1.0.1 — shared runtime helpers for reflection, binary-size, YAML subset
+  // v1.0.1  -  shared runtime helpers for reflection, binary-size, YAML subset
   // parsing/emitting, spread of timeouts, and set/map helpers. Injected lazily
   // when any feature that needs them is used.
   core: [
@@ -379,7 +379,7 @@ const BUILTIN_DECLARATIONS = {
     `  });`,
     `}`,
   ].join('\n'),
-  // v1.0.35 — dependency-free SVG images and visualizations.
+  // v1.0.35  -  dependency-free SVG images and visualizations.
   // The image value is an SVG string, so it can be saved, embedded, or returned
   // from a web route without a native graphics dependency.
   visualization: [
@@ -471,7 +471,7 @@ const BUILTIN_DECLARATIONS = {
     `  return 'data:image/svg+xml;base64,' + Buffer.from(String(image == null ? '' : image), 'utf8').toString('base64');`,
     `}`,
   ].join('\n'),
-  // v1.0.1 — process execution (child processes).
+  // v1.0.1  -  process execution (child processes).
   process: [
     `const { execFile } = require('child_process');`,
     `function __runCommand(command, args) {`,
@@ -482,11 +482,11 @@ const BUILTIN_DECLARATIONS = {
     `  });`,
     `}`,
   ].join('\n'),
-  // v1.0.1 — Map helpers.
+  // v1.0.1  -  Map helpers.
   mapset: [
     `function __mapSet(map, key, value) { map.set(key, value); return map; }`,
   ].join('\n'),
-  // v2.2.0 — collection primitives (flatten / pick / omit / groupBy).
+  // v2.2.0  -  collection primitives (flatten / pick / omit / groupBy).
   coll: [
     `function __flatten(list) {`,
     `  const out = [];`,
@@ -529,7 +529,7 @@ const BUILTIN_DECLARATIONS = {
     `  return { items: slice, count: total, page, pages, perPage, hasNext: page < pages, hasPrev: page > 1 };`,
     `}`,
   ].join('\n'),
-  // v1.0.1 — dynamic module loader.
+  // v1.0.1  -  dynamic module loader.
   loadmodule: [
     `function __loadModule(spec) {`,
     `  const path = require('path');`,
@@ -538,7 +538,7 @@ const BUILTIN_DECLARATIONS = {
     `  catch (e) { if (spec[0] !== '.') return require(spec); throw e; }`,
     `}`,
   ].join('\n'),
-  // v1.0.1 — recursive directory walker (returns full paths, files first).
+  // v1.0.1  -  recursive directory walker (returns full paths, files first).
   walk: [
     `function __walkFolder(dir) {`,
     `  const fs = require('fs');`,
@@ -556,7 +556,7 @@ const BUILTIN_DECLARATIONS = {
     `  return out;`,
     `}`,
   ].join('\n'),
-  // v2.1.0 — request validation runtime. Returns the names of required
+  // v2.1.0  -  request validation runtime. Returns the names of required
   // fields whose value is missing (undefined/null/empty string) in data.
   validation: [
     `function __validate(data, fields) {`,
@@ -566,7 +566,7 @@ const BUILTIN_DECLARATIONS = {
     `  });`,
     `}`,
   ].join('\n'),
-  // v2.1.0 — email runtime (nodemailer). One transport per program; sending
+  // v2.1.0  -  email runtime (nodemailer). One transport per program; sending
   // fails with a teaching error when no transport was configured.
   mailer: [
     `const nodemailer = require('nodemailer');`,
@@ -577,12 +577,12 @@ const BUILTIN_DECLARATIONS = {
     `  return __mailTransport.sendMail(options);`,
     `}`,
   ].join('\n'),
-  // v2.1.0 — cron scheduling runtime (croner). Zero dependencies, validates
+  // v2.1.0  -  cron scheduling runtime (croner). Zero dependencies, validates
   // expressions at registration time.
   scheduler: [
     `const cron = require('croner');`,
   ].join('\n'),
-  // v2.1.0 — WebSocket runtime (ws). Standalone server bound to its own port.
+  // v2.1.0  -  WebSocket runtime (ws). Standalone server bound to its own port.
   websocket: [
     `const { WebSocketServer } = require('ws');`,
     `function __wsServerCreate(port, handlers) {`,
@@ -606,7 +606,7 @@ const BUILTIN_DECLARATIONS = {
     `  }`,
     `}`,
   ].join('\n'),
-  // v2.1.0 — cache runtime (Redis via the redis package). The client is
+  // v2.1.0  -  cache runtime (Redis via the redis package). The client is
   // created by the "cache" statement; accessors fail with a teaching error
   // when no cache was configured.
   cache: [
@@ -633,7 +633,7 @@ const BUILTIN_DECLARATIONS = {
     `  return __memCache.delete(key) ? 1 : 0;`,
     `}`,
   ].join('\n'),
-  // v2.1.1 — WhatsApp runtime (@whiskeysockets/baileys behind the
+  // v2.1.1  -  WhatsApp runtime (@whiskeysockets/baileys behind the
   // "whatsapp bot" block). Everything Baileys-shaped stays in here: socket
   // creation, auth-state files, QR rendering, pairing codes, connection
   // lifecycle and messages.upsert normalization. PlainScript programs only ever
@@ -766,7 +766,7 @@ const BUILTIN_DECLARATIONS = {
     // Auth/session persistence: useMultiFileAuthState stores credentials in
     // the folder from `auth "<name>"`; saveCreds writes every update back.
     `        const { state, saveCreds } = await useMultiFileAuthState(folder);`,
-    // v2.14 — adopt the proven pairing-safe socket settings used by the
+    // v2.14  -  adopt the proven pairing-safe socket settings used by the
     // reference Dual-Crasher build on the qwerty fork: a fixed Baileys protocol
     // version and the exact browser fingerprint that survives WhatsApp's
     // handshake without a 428 connection close.
@@ -783,7 +783,7 @@ const BUILTIN_DECLARATIONS = {
     `          auth: { creds: state.creds, keys: makeCacheableSignalKeyStore(state.keys, __waSilentLogger) },`,
     `        });`,
     `        sock.ev.on('creds.update', saveCreds);`,
-    // Pairing codes are requested two seconds after socket creation — asking
+    // Pairing codes are requested two seconds after socket creation  -  asking
     // earlier aborts the link attempt. PlainScript retries a few times (spam)
     // so a dropped request never blocks linking. The number was validated at
     // compile time; no custom suffix is applied.
@@ -983,7 +983,7 @@ const BUILTIN_DECLARATIONS = {
     `  return { __whatsappStart, __whatsappPair, __whatsappOnMessage, __whatsappReply, __whatsappSend, __whatsappDownload };`,
     `})();`,
   ].join('\n'),
-  // v2.1.1 — HTTP client runtime on the global fetch API (Node.js 18+).
+  // v2.1.1  -  HTTP client runtime on the global fetch API (Node.js 18+).
   // Every response becomes a PlainScript-friendly record: { ok, status, headers,
   // data }, where data holds parsed JSON when the content type says JSON.
   http: [
@@ -1020,7 +1020,7 @@ const BUILTIN_DECLARATIONS = {
     `  return { ok: response.ok, status: response.status, headers: Object.fromEntries(response.headers.entries()), data };`,
     `}`,
   ].join('\n'),
-  // v2.2.0 — provider-neutral AI runtime. `chat` and `embedText` speak
+  // v2.2.0  -  provider-neutral AI runtime. `chat` and `embedText` speak
   // OpenAI-compatible APIs, including Groq, OpenRouter, Together, Fireworks,
   // and DeepSeek. A custom `base` and `key` can be supplied per call.
   ai: [
@@ -1080,7 +1080,7 @@ const BUILTIN_DECLARATIONS = {
     `  return dot / (Math.sqrt(na) * Math.sqrt(nb));`,
     `}`,
   ].join('\n'),
-  // v2.1.1 — file upload runtime (multer behind "accept uploads"). Files are
+  // v2.1.1  -  file upload runtime (multer behind "accept uploads"). Files are
   // held in memory by default or written to disk when a folder is given.
   // Normalised records expose: name, type, size, data (buffer) and path.
   uploads: [
@@ -1124,7 +1124,7 @@ const BUILTIN_DECLARATIONS = {
     `  return (req.files || []).filter((f) => f.fieldname === field).map(__normalizeUpload);`,
     `}`,
   ].join('\n'),
-  // v2.1.1 — cookie helpers shared by the cookie() accessor and the session
+  // v2.1.1  -  cookie helpers shared by the cookie() accessor and the session
   // runtime.
   cookies: [
     `function __parseCookies(header) {`,
@@ -1145,7 +1145,7 @@ const BUILTIN_DECLARATIONS = {
     `  return value === undefined ? null : value;`,
     `}`,
   ].join('\n'),
-  // v2.1.1 — session runtime. Cookie-signed session ids backed by an
+  // v2.1.1  -  session runtime. Cookie-signed session ids backed by an
   // in-memory store (sessions reset when the server restarts).
   sessions: [
     `const __sessionStore = new Map();`,
@@ -1188,7 +1188,7 @@ const BUILTIN_DECLARATIONS = {
     `  response.setHeader('Set-Cookie', 'plainscript.sid=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0');`,
     `}`,
   ].join('\n'),
-  // v2.1.1 — authentication runtime: scrypt password hashing and signed
+  // v2.1.1  -  authentication runtime: scrypt password hashing and signed
   // tokens (HS256 format), both zero-dependency.
   auth: [
     `const __authCrypto = require('crypto');`,
@@ -1233,7 +1233,7 @@ const BUILTIN_DECLARATIONS = {
     `  }`,
     `}`,
   ].join('\n'),
-  // v2.1.1 — Google sign-in (OAuth 2.0 authorization code flow). Registers
+  // v2.1.1  -  Google sign-in (OAuth 2.0 authorization code flow). Registers
   // two endpoints: /auth/google (redirect) and the configured callback URL
   // (token exchange + profile fetch), then redirects to the landing page.
   oauth: [
@@ -1288,7 +1288,7 @@ const BUILTIN_DECLARATIONS = {
     `  });`,
     `}`,
   ].join('\n'),
-  // v2.1.1 — per-IP request rate limiting with an in-memory sliding window.
+  // v2.1.1  -  per-IP request rate limiting with an in-memory sliding window.
   ratelimit: [
     `function __rateLimit(options) {`,
     `  const hits = new Map();`,
@@ -1313,13 +1313,13 @@ const BUILTIN_DECLARATIONS = {
     `  };`,
     `}`,
   ].join('\n'),
-  // v2.1.1 — pause helper for "retry N times every N seconds".
+  // v2.1.1  -  pause helper for "retry N times every N seconds".
   retry: [
     `const __retrySleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));`,
   ].join('\n'),
-  // IOPL-native — event emitter runtime.
+  // IOPL-native  -  event emitter runtime.
   __emitter: 'const __emitter = new (require("events").EventEmitter)();',
-  // IOPL-native — line-by-line file streaming runtime.
+  // IOPL-native  -  line-by-line file streaming runtime.
   __streamFile: [
     `async function __streamFile(path, fn) {`,
     `  const fs = require('fs');`,
@@ -1327,7 +1327,7 @@ const BUILTIN_DECLARATIONS = {
     `  for await (const line of rl) await fn(line);`,
     `}`,
   ].join('\n'),
-  // v2.1.1 — SQLite runtime with a portable engine chain. Default order:
+  // v2.1.1  -  SQLite runtime with a portable engine chain. Default order:
   // better-sqlite3 (native binding) first, sql.js (WebAssembly) as fallback.
   // Both engines are wrapped in the same tiny synchronous surface that PlainScript
   // generates (prepare().all()/.run(), exec(), transaction()), so compiled
@@ -1545,7 +1545,7 @@ const BUILTIN_DECLARATIONS = {
     `      inline_keyboard: [rows.map(([text, data]) => ({ text, callback_data: data }))],`,
     `    },`,
     `  });`,
-    // v2.0.1 — createTelegramBot is defined inside this module so its handler
+    // v2.0.1  -  createTelegramBot is defined inside this module so its handler
     // registry (`handlers`) and API transport (`call`, `sleep`) are in scope.
     // Defining it outside made every BOT.onCommand/onPattern/onCallback call
     // throw "ReferenceError: handlers is not defined", so no rendered inline
@@ -1664,11 +1664,11 @@ const BUILTIN_DECLARATIONS = {
     symbolSpecies:       (_args) => `Symbol.species`,
     // Runtime constructors
     sqlite:    (args, context)  => `new Database(${args.map(arg => generateExpr(arg, context)).join(', ')})`,
-  // v0.6 — runtime standard library
+  // v0.6  -  runtime standard library
   print:      (args, context) => `console.log(${args.map(arg => generateExpr(arg, context)).join(', ')})`,
   readFile:   (args, context) => `fs.readFileSync(${generateExpr(args[0], context)}, 'utf8')`,
   writeFile:  (args, context) => `fs.writeFileSync(${generateExpr(args[0], context)}, ${generateExpr(args[1], context)}, 'utf8')`,
-  // v2.4.0 — dependency-free SVG image and visualization helpers.
+  // v2.4.0  -  dependency-free SVG image and visualization helpers.
   svgImage: (args, context) => {
     ensureBuiltin(context, 'visualization');
     return `__svgImage(${args.map(arg => generateExpr(arg, context)).join(', ')})`;
@@ -1699,7 +1699,7 @@ const BUILTIN_DECLARATIONS = {
   env:        (args, context) => `process.env[${generateExpr(args[0], context)}]`,
   exit:       (args, context) => `process.exit(${args.length ? generateExpr(args[0], context) : '0'})`,
   uuid:       (_args, context) => `crypto.randomUUID()`,
-  // v1.2 — Telegram runtime helpers
+  // v1.2  -  Telegram runtime helpers
   bot:         (args, context) => {
     ensureBuiltin(context, 'telegram');
     markAsync(context);
@@ -1741,7 +1741,7 @@ const BUILTIN_DECLARATIONS = {
     const params = args.length > 1 ? generateExpr(args[1], context) : '{}';
     return `await Telegram.call(${method}, ${params})`;
   },
-  // v2.1.0 — HTTP request accessors. Only meaningful inside a route handler,
+  // v2.1.0  -  HTTP request accessors. Only meaningful inside a route handler,
   // where Express provides req/res.
   param:   (args, context) => routeAccessor('param',   'params',   args, context),
   query:   (args, context) => routeAccessor('query',   'query',    args, context),
@@ -1758,13 +1758,13 @@ const BUILTIN_DECLARATIONS = {
     if (!args || args.length === 0) return base;
     return `${base}[${generateExpr(args[0], context)}]`;
   },
-  // v2.1.0 — request validation. Returns the list of missing required fields.
+  // v2.1.0  -  request validation. Returns the list of missing required fields.
   validate: (args, context) => {
     ensureBuiltin(context, 'validation');
     return `__validate(${args.map(arg => generateExpr(arg, context)).join(', ')})`;
   },
 
-  // ── v2.1.0 — filesystem helpers (sync, matching readFile/writeFile style)
+  // ── v2.1.0  -  filesystem helpers (sync, matching readFile/writeFile style)
 
   copyFile:   (args, context) => { ensureBuiltin(context, 'fs'); return `fs.copyFileSync(${args.map(a => generateExpr(a, context)).join(', ')})`; },
   moveFile:   (args, context) => { ensureBuiltin(context, 'fs'); return `fs.renameSync(${args.map(a => generateExpr(a, context)).join(', ')})`; },
@@ -1782,7 +1782,7 @@ const BUILTIN_DECLARATIONS = {
     return `fs.writeFileSync(${generateExpr(args[0], context)}, ${generateExpr(args[1], context)})`;
   },
 
-  // ── v2.1.0 — text, number and collection helpers
+  // ── v2.1.0  -  text, number and collection helpers
 
   trim:     (args, context) => `String(${generateExpr(args[0], context)}).trim()`,
   replace:  (args, context) => {
@@ -1813,7 +1813,7 @@ const BUILTIN_DECLARATIONS = {
   hasKey:   (args, context) => `Object.prototype.hasOwnProperty.call(${generateExpr(args[0], context)}, ${generateExpr(args[1], context)})`,
   merge:    (args, context) => `{ ...${generateExpr(args[0], context)}, ...${generateExpr(args[1], context)} }`,
 
-  // ── v2.2.0 — collection & string primitives (IOPL-native, dependency-free).
+  // ── v2.2.0  -  collection & string primitives (IOPL-native, dependency-free).
   // A numeric range [start..end], stepping by 1 (or `step` when given).
   range: (args, context) => {
     const start = generateExpr(args[0], context);
@@ -1862,7 +1862,7 @@ const BUILTIN_DECLARATIONS = {
   padStart: (args, context) => `String(${generateExpr(args[0], context)}).padStart(${generateExpr(args[1], context)}, String(${args.length > 2 ? generateExpr(args[2], context) : '" "'}))`,
   padEnd: (args, context) => `String(${generateExpr(args[0], context)}).padEnd(${generateExpr(args[1], context)}, String(${args.length > 2 ? generateExpr(args[2], context) : '" "'}))`,
 
-  // ── v2.3.0 — Proxy and Reflect (IOPL-native).
+  // ── v2.3.0  -  Proxy and Reflect (IOPL-native).
   // Proxy creation: proxy(target, handler)
   proxy: (args, context) => `new Proxy(${args.map(a => generateExpr(a, context)).join(', ')})`,
   // Proxy revocable: proxyRevocable(target, handler) -> { proxy, revoke }
@@ -1882,8 +1882,8 @@ const BUILTIN_DECLARATIONS = {
   reflectSet:       (args, context) => `Reflect.set(${args.map(a => generateExpr(a, context)).join(', ')})`,
   reflectSetPrototypeOf: (args, context) => `Reflect.setPrototypeOf(${args.map(a => generateExpr(a, context)).join(', ')})`,
 
-  // ── v1.0.1 — nullable / regex / date helpers (IOPL-native).
-  // first non-null, non-undefined argument — IOPL null-coalescing.
+  // ── v1.0.1  -  nullable / regex / date helpers (IOPL-native).
+  // first non-null, non-undefined argument  -  IOPL null-coalescing.
   coalesce: (args, context) =>
     `(() => { const __vals = [${args.map(a => generateExpr(a, context)).join(', ')}]; for (const __v of __vals) if (__v !== null && __v !== undefined) return __v; return undefined; })()`,
   // regex-aware replace (replace() is literal-only).
@@ -1899,7 +1899,7 @@ const BUILTIN_DECLARATIONS = {
     return `__formatDate(${value}, ${pattern})`;
   },
 
-  // ── v1.0.2 — Native Date/DateTime/Regex support (IOPL-native, no JS gateway needed).
+  // ── v1.0.2  -  Native Date/DateTime/Regex support (IOPL-native, no JS gateway needed).
   // Create a new Date object. With no args: now. With 1 arg: parse ISO string or timestamp.
   // With multiple args: year, month (1-12), day, hour, min, sec, ms.
   newDate: (args, context) => {
@@ -2037,7 +2037,7 @@ const BUILTIN_DECLARATIONS = {
     return `${text}.split(new RegExp(${pattern}, ${flags}))`;
   },
 
-  // ── v2.1.0 — cache (Redis) accessors. All async.
+  // ── v2.1.0  -  cache (Redis) accessors. All async.
 
   cacheGet: (args, context) => {
     ensureBuiltin(context, 'cache');
@@ -2060,14 +2060,14 @@ const BUILTIN_DECLARATIONS = {
     return `await __cacheDelete(String(${generateExpr(args[0], context)}))`;
   },
 
-  // v2.1.0 — email sending helper (statement form uses this too).
+  // v2.1.0  -  email sending helper (statement form uses this too).
   sendMail: (args, context) => {
     ensureBuiltin(context, 'mailer');
     markAsync(context);
     return `__mailSend(${args.map(arg => generateExpr(arg, context)).join(', ')})`;
   },
 
-  // ── v2.1.1 — uploads, cookies, passwords and tokens
+  // ── v2.1.1  -  uploads, cookies, passwords and tokens
 
   // upload("field") / uploads("field") read files registered by
   // "accept uploads". Single file → record or null; plural → array.
@@ -2110,7 +2110,7 @@ const BUILTIN_DECLARATIONS = {
     return `readToken(${args.map(arg => generateExpr(arg, context)).join(', ')})`;
   },
 
-  // ── v1.0.1 — capability-gap stdlib (reflection, binary, concurrency, ...) ──
+  // ── v1.0.1  -  capability-gap stdlib (reflection, binary, concurrency, ...) ──
 
   // Reflection
   typeOf: (args, context) => { ensureBuiltin(context, 'core'); return `__typeOf(${generateExpr(args[0], context)})`; },
@@ -2141,7 +2141,7 @@ const BUILTIN_DECLARATIONS = {
     return `crypto.createHash('md5').update(String(${generateExpr(args[0], context)})).digest('hex')`;
   },
 
-  // Serialization — minimal dependency-free YAML subset (see __yamlParse).
+  // Serialization  -  minimal dependency-free YAML subset (see __yamlParse).
   yamlDecode: (args, context) => { ensureBuiltin(context, 'core'); return `__yamlParse(${generateExpr(args[0], context)})`; },
   yamlEncode: (args, context) => { ensureBuiltin(context, 'core'); return `__yamlStringify(${generateExpr(args[0], context)})`; },
 
@@ -2171,7 +2171,7 @@ const BUILTIN_DECLARATIONS = {
   // Generators / iterables
   spread: (args, context) => `[...${generateExpr(args[0], context)}]`,
 
-  // v1.0.1 — dynamic module loading (the runtime companion to `import "./x.pt"`).
+  // v1.0.1  -  dynamic module loading (the runtime companion to `import "./x.pt"`).
   // Resolves relative to the bundler's CWD so `loadModule("./m")` behaves like
   // `require.resolve` from the program root.
   loadModule: (args, context) => {
@@ -2179,7 +2179,7 @@ const BUILTIN_DECLARATIONS = {
     return `__loadModule(${generateExpr(args[0], context)})`;
   },
 
-  // ── v2.2.0 — AI/ML. `chat`/`embedText` call an OpenAI-compatible endpoint
+  // ── v2.2.0  -  AI/ML. `chat`/`embedText` call an OpenAI-compatible endpoint
   // (key from OPENAI_API_KEY, base from OPENAI_BASE_URL); `similarity` runs
   // offline cosine similarity over any two equal-length numeric vectors.
   chat: (args, context) => {
@@ -2280,7 +2280,7 @@ const BUILTIN_DECLARATIONS = {
     return `fs.appendFileSync(${generateExpr(args[0], context)}, ${generateExpr(args[1], context)} + '\\n', 'utf8')`;
   },
 
-  // ── v1.0.2 — Extended Math functions (IOPL-native).
+  // ── v1.0.2  -  Extended Math functions (IOPL-native).
   abs: (args, context) => `Math.abs(${generateExpr(args[0], context)})`,
   min: (args, context) => `Math.min(${args.map(a => generateExpr(a, context)).join(', ')})`,
   max: (args, context) => `Math.max(${args.map(a => generateExpr(a, context)).join(', ')})`,
@@ -2320,7 +2320,7 @@ const BUILTIN_DECLARATIONS = {
   hypot: (args, context) => `Math.hypot(${args.map(a => generateExpr(a, context)).join(', ')})`,
   cbrt: (args, context) => `Math.cbrt(${generateExpr(args[0], context)})`,
 
-  // ── v1.0.2 — Extended String functions (IOPL-native).
+  // ── v1.0.2  -  Extended String functions (IOPL-native).
   trim: (args, context) => `String(${generateExpr(args[0], context)}).trim()`,
   trimStart: (args, context) => `String(${generateExpr(args[0], context)}).trimStart()`,
   trimEnd: (args, context) => `String(${generateExpr(args[0], context)}).trimEnd()`,
@@ -2352,7 +2352,7 @@ const BUILTIN_DECLARATIONS = {
   toString: (args, context) => `String(${generateExpr(args[0], context)}).toString()`,
   stringValueOf: (args, context) => `String(${generateExpr(args[0], context)}).valueOf()`,
 
-  // ── v1.0.2 — Extended Array/Collection functions (IOPL-native).
+  // ── v1.0.2  -  Extended Array/Collection functions (IOPL-native).
   push: (args, context) => `(${generateExpr(args[0], context)}).push(${args.slice(1).map(a => generateExpr(a, context)).join(', ')})`,
   pop: (args, context) => `(${generateExpr(args[0], context)}).pop()`,
   shift: (args, context) => `(${generateExpr(args[0], context)}).shift()`,
@@ -2395,7 +2395,7 @@ const BUILTIN_DECLARATIONS = {
   values: (args, context) => `Object.values(${generateExpr(args[0], context)})`,
   entries: (args, context) => `Object.entries(${generateExpr(args[0], context)})`,
 
-  // ── v1.0.2 — Extended Object functions (IOPL-native).
+  // ── v1.0.2  -  Extended Object functions (IOPL-native).
   assign: (args, context) => `Object.assign(${args.map(a => generateExpr(a, context)).join(', ')})`,
   create: (args, context) => `Object.create(${generateExpr(args[0], context)}${args.length > 1 ? ', ' + generateExpr(args[1], context) : ''})`,
   defineProperty: (args, context) => `Object.defineProperty(${args.map(a => generateExpr(a, context)).join(', ')})`,
@@ -2415,7 +2415,7 @@ const BUILTIN_DECLARATIONS = {
   seal: (args, context) => `Object.seal(${generateExpr(args[0], context)})`,
   hasOwn: (args, context) => `Object.hasOwn(${generateExpr(args[0], context)}, ${generateExpr(args[1], context)})`,
 
-  // ── v1.0.2 — Promise/Async utilities (IOPL-native).
+  // ── v1.0.2  -  Promise/Async utilities (IOPL-native).
   Promise: {
     resolve: (args, context) => `Promise.resolve(${generateExpr(args[0], context)})`,
     reject: (args, context) => `Promise.reject(${generateExpr(args[0], context)})`,
@@ -2449,11 +2449,11 @@ const BUILTIN_DECLARATIONS = {
     return `Promise.race([${generateExpr(args[0], context)}, new Promise((_, r) => setTimeout(() => r(new Error('Timed out')), ${ms}))])`;
   },
 
-  // ── v1.0.2 — JSON utilities (IOPL-native).
+  // ── v1.0.2  -  JSON utilities (IOPL-native).
   jsonParse: (args, context) => `JSON.parse(${generateExpr(args[0], context)})`,
   stringify: (args, context) => `JSON.stringify(${generateExpr(args[0], context)}${args.length > 1 ? ', ' + generateExpr(args[1], context) : ''}${args.length > 2 ? ', ' + generateExpr(args[2], context) : ''})`,
 
-  // ── v1.0.2 — Type checking utilities (IOPL-native).
+  // ── v1.0.2  -  Type checking utilities (IOPL-native).
   isArray: (args, context) => `Array.isArray(${generateExpr(args[0], context)})`,
   isInteger: (args, context) => `Number.isInteger(${generateExpr(args[0], context)})`,
   isNaN: (args, context) => `Number.isNaN(${generateExpr(args[0], context)})`,
@@ -2462,12 +2462,12 @@ const BUILTIN_DECLARATIONS = {
   parseInt: (args, context) => `parseInt(${generateExpr(args[0], context)}${args.length > 1 ? ', ' + generateExpr(args[1], context) : ''})`,
   parseFloat: (args, context) => `parseFloat(${generateExpr(args[0], context)})`,
 
-  // ── v1.0.2 — Array static methods (IOPL-native).
+  // ── v1.0.2  -  Array static methods (IOPL-native).
   arrayFrom: (args, context) => `Array.from(${generateExpr(args[0], context)}${args.length > 1 ? ', ' + generateExpr(args[1], context) : ''})`,
   arrayOf: (args, context) => `Array.of(${args.map(a => generateExpr(a, context)).join(', ')})`,
   arrayIsArray: (args, context) => `Array.isArray(${generateExpr(args[0], context)})`,
 
-  // ── v1.0.2 — Object static methods (IOPL-native).
+  // ── v1.0.2  -  Object static methods (IOPL-native).
   objectFromEntries: (args, context) => `Object.fromEntries(${generateExpr(args[0], context)})`,
   objectGetOwnPropertySymbols: (args, context) => `Object.getOwnPropertySymbols(${generateExpr(args[0], context)})`,
   objectGetOwnPropertyDescriptors: (args, context) => `Object.getOwnPropertyDescriptors(${generateExpr(args[0], context)})`,
@@ -2491,7 +2491,7 @@ const BUILTIN_DECLARATIONS = {
   objectFreeze: (args, context) => `Object.freeze(${generateExpr(args[0], context)})`,
   objectSeal: (args, context) => `Object.seal(${generateExpr(args[0], context)})`,
 
-  // ── v1.0.2 — Symbol support (IOPL-native).
+  // ── v1.0.2  -  Symbol support (IOPL-native).
   symbol: (args, context) => `Symbol(${args.length > 0 ? generateExpr(args[0], context) : 'undefined'})`,
   symbolFor: (args, context) => `Symbol.for(${generateExpr(args[0], context)})`,
   symbolKeyFor: (args, context) => `Symbol.keyFor(${generateExpr(args[0], context)})`,
@@ -2508,7 +2508,7 @@ const BUILTIN_DECLARATIONS = {
   symbolToPrimitive: (_args) => `Symbol.toPrimitive`,
   symbolUnscopables: (_args) => `Symbol.unscopables`,
 
-  // ── v1.0.2 — Math static methods (IOPL-native).
+  // ── v1.0.2  -  Math static methods (IOPL-native).
   mathAbs: (args, context) => `Math.abs(${generateExpr(args[0], context)})`,
   mathMin: (args, context) => `Math.min(${args.map(a => generateExpr(a, context)).join(', ')})`,
   mathMax: (args, context) => `Math.max(${args.map(a => generateExpr(a, context)).join(', ')})`,
@@ -2546,7 +2546,7 @@ const BUILTIN_DECLARATIONS = {
   mathHypot: (args, context) => `Math.hypot(${args.map(a => generateExpr(a, context)).join(', ')})`,
   mathCbrt: (args, context) => `Math.cbrt(${generateExpr(args[0], context)})`,
 
-  // ── v1.0.2 — TypedArray support (IOPL-native).
+  // ── v1.0.2  -  TypedArray support (IOPL-native).
   int8Array: (args, context) => `new Int8Array(${args.map(a => generateExpr(a, context)).join(', ')})`,
   uint8Array: (args, context) => `new Uint8Array(${args.map(a => generateExpr(a, context)).join(', ')})`,
   uint8ClampedArray: (args, context) => `new Uint8ClampedArray(${args.map(a => generateExpr(a, context)).join(', ')})`,
@@ -2561,25 +2561,25 @@ const BUILTIN_DECLARATIONS = {
   dataView: (args, context) => `new DataView(${args.map(a => generateExpr(a, context)).join(', ')})`,
   arrayBuffer: (args, context) => `new ArrayBuffer(${args.map(a => generateExpr(a, context)).join(', ')})`,
 
-  // ── v1.0.2 — Global objects access (IOPL-native).
+  // ── v1.0.2  -  Global objects access (IOPL-native).
   globalThis: (_args) => `globalThis`,
   console: (_args) => `console`,
   process: (_args) => `process`,
   Buffer: (_args) => `Buffer`,
 
-  // ── v2.3.0 — EventSource / Server-Sent Events (IOPL-native).
+  // ── v2.3.0  -  EventSource / Server-Sent Events (IOPL-native).
   eventSource: (args, context) => `new EventSource(${args.map(a => generateExpr(a, context)).join(', ')})`,
 
-  // ── v2.2.0 — URL and URLSearchParams (IOPL-native).
+  // ── v2.2.0  -  URL and URLSearchParams (IOPL-native).
   url: (args, context) => `new URL(${generateExpr(args[0], context)}${args[1] ? `, ${generateExpr(args[1], context)}` : ''})`,
   urlSearchParams: (args, context) => `new URLSearchParams(${args.length ? generateExpr(args[0], context) : ''})`,
 
-  // ── v2.2.0 — Intl / Internationalization (IOPL-native).
+  // ── v2.2.0  -  Intl / Internationalization (IOPL-native).
   dateTimeFormat: (args, context) => `new Intl.DateTimeFormat(${generateExpr(args[0], context)}, ${generateExpr(args[1], context)})`,
   numberFormat: (args, context) => `new Intl.NumberFormat(${generateExpr(args[0], context)}, ${generateExpr(args[1], context)})`,
   collator: (args, context) => `new Intl.Collator(${generateExpr(args[0], context)}, ${generateExpr(args[1], context)})`,
 
-  // ── v2.2.0 — Crypto / Web Crypto API (IOPL-native).
+  // ── v2.2.0  -  Crypto / Web Crypto API (IOPL-native).
   cryptoRandomUUID: (_args) => `crypto.randomUUID()`,
   cryptoGetRandomValues: (args, context) => `crypto.getRandomValues(${generateExpr(args[0], context)})`,
   cryptoSubtleDigest: (args, context) => `crypto.subtle.digest(${generateExpr(args[0], context)}, ${generateExpr(args[1], context)})`,
@@ -2594,13 +2594,13 @@ const BUILTIN_DECLARATIONS = {
   cryptoSubtleWrapKey: (args, context) => `crypto.subtle.wrapKey(${args.map(a => generateExpr(a, context)).join(', ')})`,
   cryptoSubtleUnwrapKey: (args, context) => `crypto.subtle.unwrapKey(${args.map(a => generateExpr(a, context)).join(', ')})`,
 
-  // ── v2.2.0 — WeakMap / WeakSet / WeakRef / FinalizationRegistry (IOPL-native).
+  // ── v2.2.0  -  WeakMap / WeakSet / WeakRef / FinalizationRegistry (IOPL-native).
   weakMap: (_args) => `new WeakMap()`,
   weakSet: (_args) => `new WeakSet()`,
   weakRef: (args, context) => `new WeakRef(${generateExpr(args[0], context)})`,
   finalizationRegistry: (args, context) => `new FinalizationRegistry(${generateExpr(args[0], context)})`,
 
-  // ── v2.2.0 — Proxy / Reflect (IOPL-native).
+  // ── v2.2.0  -  Proxy / Reflect (IOPL-native).
   proxy: (args, context) => `new Proxy(${generateExpr(args[0], context)}, ${generateExpr(args[1], context)})`,
   reflectGet: (args, context) => `Reflect.get(${generateExpr(args[0], context)}, ${generateExpr(args[1], context)})`,
   reflectSet: (args, context) => `Reflect.set(${generateExpr(args[0], context)}, ${generateExpr(args[1], context)}, ${generateExpr(args[2], context)})`,
@@ -2612,7 +2612,7 @@ const BUILTIN_DECLARATIONS = {
   reflectDefineProperty: (args, context) => `Reflect.defineProperty(${args.map(a => generateExpr(a, context)).join(', ')})`,
   reflectGetOwnPropertyDescriptor: (args, context) => `Reflect.getOwnPropertyDescriptor(${generateExpr(args[0], context)}, ${generateExpr(args[1], context)})`,
 
-  // ── v2.2.0 — Symbol (IOPL-native).
+  // ── v2.2.0  -  Symbol (IOPL-native).
   symbol: (args, context) => `Symbol(${args.length ? generateExpr(args[0], context) : 'undefined'})`,
   symbolFor: (args, context) => `Symbol.for(${generateExpr(args[0], context)})`,
   symbolKeyFor: (args, context) => `Symbol.keyFor(${generateExpr(args[0], context)})`,
@@ -2629,12 +2629,12 @@ const BUILTIN_DECLARATIONS = {
   symbolToPrimitive: (_args) => `Symbol.toPrimitive`,
   symbolUnscopables: (_args) => `Symbol.unscopables`,
 
-  // ── v2.2.0 — BigInt (IOPL-native).
+  // ── v2.2.0  -  BigInt (IOPL-native).
   bigInt: (args, context) => `BigInt(${generateExpr(args[0], context)})`,
   bigIntAsIntN: (args, context) => `BigInt.asIntN(${generateExpr(args[0], context)}, ${generateExpr(args[1], context)})`,
   bigIntAsUintN: (args, context) => `BigInt.asUintN(${generateExpr(args[0], context)}, ${generateExpr(args[1], context)})`,
 
-  // ── v2.2.0 — Atomics / SharedArrayBuffer (IOPL-native).
+  // ── v2.2.0  -  Atomics / SharedArrayBuffer (IOPL-native).
   atomicsAdd: (args, context) => `Atomics.add(${args.map(a => generateExpr(a, context)).join(', ')})`,
   atomicsSub: (args, context) => `Atomics.sub(${args.map(a => generateExpr(a, context)).join(', ')})`,
   atomicsAnd: (args, context) => `Atomics.and(${args.map(a => generateExpr(a, context)).join(', ')})`,
@@ -2649,7 +2649,7 @@ const BUILTIN_DECLARATIONS = {
   atomicsIsLockFree: (args, context) => `Atomics.isLockFree(${generateExpr(args[0], context)})`,
   sharedArrayBuffer: (args, context) => `new SharedArrayBuffer(${generateExpr(args[0], context)})`,
 
-  // ── v2.2.0 — Error subclasses (IOPL-native).
+  // ── v2.2.0  -  Error subclasses (IOPL-native).
   error: (args, context) => `new Error(${args.length ? generateExpr(args[0], context) : ''})`,
   typeError: (args, context) => `new TypeError(${args.length ? generateExpr(args[0], context) : ''})`,
   rangeError: (args, context) => `new RangeError(${args.length ? generateExpr(args[0], context) : ''})`,
@@ -2659,12 +2659,12 @@ const BUILTIN_DECLARATIONS = {
   uriError: (args, context) => `new URIError(${args.length ? generateExpr(args[0], context) : ''})`,
   aggregateError: (args, context) => `new AggregateError(${args.map(a => generateExpr(a, context)).join(', ')})`,
 
-  // ── v2.2.0 — Blob / File / FormData (IOPL-native, browser-compatible).
+  // ── v2.2.0  -  Blob / File / FormData (IOPL-native, browser-compatible).
   blob: (args, context) => `new Blob(${args.map(a => generateExpr(a, context)).join(', ')})`,
   file: (args, context) => `new File(${args.map(a => generateExpr(a, context)).join(', ')})`,
   formData: (_args) => `new FormData()`,
 
-  // ── v1.0.36 — browser DOM (IOPL-native). All helpers guard their browser
+  // ── v1.0.361  -  browser DOM (IOPL-native). All helpers guard their browser
   // global, so the generated output throws a clear teaching error under Node.
   select: (args, context) => {
     ensureBuiltin(context, 'dom');
@@ -2682,7 +2682,7 @@ const BUILTIN_DECLARATIONS = {
     return `__parseHTML(${generateExpr(args[0], context)})`;
   },
 
-  // ── v1.0.36 — browser input (IOPL-native).
+  // ── v1.0.361  -  browser input (IOPL-native).
   localPoint: (args, context) => {
     ensureBuiltin(context, 'input');
     requireArgs('localPoint', args, 2, 'localPoint(event, canvas)');
@@ -2698,7 +2698,7 @@ const BUILTIN_DECLARATIONS = {
     return `__droppedFiles(${generateExpr(args[0], context)})`;
   },
 
-  // ── v1.0.36 — browser assets (IOPL-native). Each awaitable helper is
+  // ── v1.0.361  -  browser assets (IOPL-native). Each awaitable helper is
   // awaited here, so the surrounding function/handler is marked async.
   loadImage: (args, context) => {
     ensureBuiltin(context, 'assets');
@@ -2731,7 +2731,7 @@ const BUILTIN_DECLARATIONS = {
     return `(await __readDataUrl(${generateExpr(args[0], context)}))`;
   },
 
-  // ── v1.0.36 — Web Audio (IOPL-native).
+  // ── v1.0.361  -  Web Audio (IOPL-native).
   audioContext: (_args, context) => {
     ensureBuiltin(context, 'audio');
     return `__audioContext()`;
@@ -2742,7 +2742,7 @@ const BUILTIN_DECLARATIONS = {
     return `__audioTone(${args.map(a => generateExpr(a, context)).join(', ')})`;
   },
 
-  // ── v1.0.36 — WebSocket send helper (works with any WebSocket-like object,
+  // ── v1.0.361  -  WebSocket send helper (works with any WebSocket-like object,
   // browser or Node): strings go through verbatim, everything else is JSON.
   webSocketSend: (args, context) => {
     requireArgs('webSocketSend', args, 2, 'webSocketSend(socket, { type: "move", x: 10 })');
@@ -2751,7 +2751,7 @@ const BUILTIN_DECLARATIONS = {
     return `${ws}.send(typeof (${value}) === 'string' ? (${value}) : JSON.stringify(${value}))`;
   },
 
-  // ── v1.0.36 — WebGL (IOPL-native).
+  // ── v1.0.361  -  WebGL (IOPL-native).
   webglContext: (args, context) => {
     ensureBuiltin(context, 'gl');
     requireOneArg('webglContext', args);
@@ -2778,7 +2778,7 @@ const BUILTIN_DECLARATIONS = {
 // record that this scope emitted an `await` so handler and function bodies can
 // decide their own async-ness at generation time (see generateBlock). Routing
 // every await-emitting construct through this single function removes the need
-// for a separate hand-maintained registry of async statement types — so a new
+// for a separate hand-maintained registry of async statement types  -  so a new
 // async keyword can never silently break when used inside a route, listener, or
 // function.
 function markAsync(context) {
@@ -2786,7 +2786,7 @@ function markAsync(context) {
   // Only a construct that awaits at the true top level needs the program
   // wrapped in an async IIFE. Awaits emitted inside a user function (inFunction)
   // or inside a route/listener/404 handler (inHandler) are handled by marking
-  // that function/handler async instead — they must not drag the whole program
+  // that function/handler async instead  -  they must not drag the whole program
   // into an async wrapper, or "top-level use wraps the whole program" would be
   // the only safe nesting level for a new async keyword.
   if (!context.inFunction && !context.inHandler) context.needsAsync = true;
@@ -2797,7 +2797,7 @@ function markAsync(context) {
 // This is the single source of truth for whether a route handler, listener,
 // 404 handler, or user function must be declared `async`. Previously this was
 // decided by a separate AST walker (containsAsyncBlock) that had to be kept in
-// sync by hand with every construct that compiles down to `await` — the exact
+// sync by hand with every construct that compiles down to `await`  -  the exact
 // fragility that made "top-level use wraps the whole program" the only place
 // certain keywords (like ocr) were guaranteed to work. By observing the output
 // of generation instead, whatever a body contains is handled correctly, even if
@@ -2811,7 +2811,7 @@ function generateBlock(statements, indent, context) {
   return { out, emitted };
 }
 
-// v2.1.0 — generate a request accessor (param/query/header). These compile to
+// v2.1.0  -  generate a request accessor (param/query/header). These compile to
 // direct Express req.<bucket>[key] reads and are rejected outside routes so
 // mistakes surface at compile time with a teaching error.
 function routeAccessor(name, bucket, args, context) {
@@ -2826,7 +2826,7 @@ function routeAccessor(name, bucket, args, context) {
   return `req.${bucket}[${generateExpr(args[0], context)}]`;
 }
 
-// v2.1.1 — compile-time guard shared by request-scoped accessors that do not
+// v2.1.1  -  compile-time guard shared by request-scoped accessors that do not
 // follow the req.<bucket> shape (upload/uploads/cookie).
 function routeOnly(name, example) {
   if (!_inRoute) {
@@ -2856,15 +2856,15 @@ let _inRoute = false;
 // True while generating inside a Telegram handler body. Remaps PlainScript's
 // "reply" statement to send a chat message instead of an HTTP response.
 let _inTelegram = false;
-// v2.1.1 — true while generating inside a WhatsApp "on message" handler.
+// v2.1.1  -  true while generating inside a WhatsApp "on message" handler.
 // Remaps PlainScript's "reply" to a WhatsApp chat message and PlainScript's "message"
 // identifier to the normalized message record of the current delivery.
 let _inWhatsApp = false;
-// v2.1.0 — active "group" prefixes. Route paths are prefixed with the
+// v2.1.0  -  active "group" prefixes. Route paths are prefixed with the
 // concatenation of every enclosing group, innermost last.
 const _routePrefixes = [];
 
-// v2.1.0 — active SQL driver. "sqlite" (default) targets better-sqlite3's
+// v2.1.0  -  active SQL driver. "sqlite" (default) targets better-sqlite3's
 // synchronous prepare/run/exec API; "pg" targets node-postgres pools and
 // makes every SQL statement async. Set by database/postgres declarations.
 let _sqlDriver = 'sqlite';
@@ -2877,7 +2877,7 @@ function routePath(path) {
   return _routePrefixes.join('') + path;
 }
 
-// v2.1.0 — render the JavaScript expression that executes one SQL statement
+// v2.1.0  -  render the JavaScript expression that executes one SQL statement
 // under the active driver. kind: query | write | execute.
 function emitSqlCall(kind, sql, params, indent, context) {
   const args = params.join(', ');
@@ -2944,7 +2944,7 @@ function npmPackageName(moduleName) {
 
 function emitRequire(context, moduleName, alias) {
   // A specifier may carry a version range ("left-pad@^1.3.0"). require() takes
-  // the bare name only — the range is the installer's business (plain install).
+  // the bare name only  -  the range is the installer's business (plain install).
   const { name: bareName } = splitPackageSpec(moduleName);
   const npmName = npmPackageName(bareName);
 
@@ -2974,7 +2974,7 @@ function emitRequire(context, moduleName, alias) {
 
   if (KNOWN_PACKAGES[bareName]) return KNOWN_PACKAGES[bareName];
 
-  // RFC-0011 §5.1 — arbitrary npm packages. A name that is not a valid JS
+  // RFC-0011 §5.1  -  arbitrary npm packages. A name that is not a valid JS
   // identifier (e.g. node-fetch) is required for its side effect only.
   if (isValidIdentifier(bareName)) {
     return `const ${bareName} = require('${npmName}');`;
@@ -3031,7 +3031,7 @@ function generate(ast, contextOrOptions = createGenerationContext(), options = {
     context = createGenerationContext(opts);
   }
 
-  // v1.0.1 — reset per-program test bookkeeping so repeated generate() calls
+  // v1.0.1  -  reset per-program test bookkeeping so repeated generate() calls
   // (build pipeline) start clean.
   __testCount = 0;
   __testCatchers = [];
@@ -3072,7 +3072,7 @@ function generate(ast, contextOrOptions = createGenerationContext(), options = {
     lines.push(`if (typeof module !== 'undefined') { module.exports = { ${exported.join(', ')} }; }`);
   }
 
-  // v1.0.1 — native test runner. When any "test ... done" block exists, emit
+  // v1.0.1  -  native test runner. When any "test ... done" block exists, emit
   // the runner helper, register each test after its function declaration, and
   // execute them. Each failure prints a message and sets process.exitCode = 1.
   if (__testCatchers.length > 0) {
@@ -3116,7 +3116,7 @@ function generate(ast, contextOrOptions = createGenerationContext(), options = {
   return jsCode;
 }
 
-// ── v1.0.1 — test DSL bookkeeping ───────────────────────────────────────────
+// ── v1.0.1  -  test DSL bookkeeping ───────────────────────────────────────────
 let __testCount = 0;
 let __testCatchers = [];
 let __inTest = false;
@@ -3165,7 +3165,7 @@ function generateCondition(cond, context) {
       return `(${left}).${cond.method}(${right})`;
     }
 
-    // v2.1.1 — and / or / not combinators. The Boolean combinators operate on
+    // v2.1.1  -  and / or / not combinators. The Boolean combinators operate on
     // the same LogicalCondition nodes at both the condition level and the
     // expression level, so an operand may be either a pure condition node
     // (comparison) or an arbitrary value expression (`f()`, a collection, a
@@ -3240,11 +3240,11 @@ function generateStatement(node, indent = '', context = createGenerationContext(
       return `${indent}${target} ${op} ${value};`;
     }
 
-    // v1.0.1 — record kinds: `define a kind called "Person" with ... done`.
+    // v1.0.1  -  record kinds: `define a kind called "Person" with ... done`.
     // Names are emitted as a JS factory that returns a fresh plain object with
     // declared defaults. Constructors prompt for required fields at compile
     // time via `create a Person with ...` (see GenerateExpr CreateKind).
-    // v1.0.2 — supports `extends` for inheritance.
+    // v1.0.2  -  supports `extends` for inheritance.
     case 'DefineKindStatement': {
       let defaults = '';
       if (node.extends) {
@@ -3273,14 +3273,14 @@ function generateStatement(node, indent = '', context = createGenerationContext(
       ].join('\n');
     }
 
-    // v1.0.1 — load env file "<path>": apply KEY=VALUE pairs to process.env.
+    // v1.0.1  -  load env file "<path>": apply KEY=VALUE pairs to process.env.
     // Blank lines and `#` comments are skipped; values keep their text.
     case 'LoadEnvFileStatement': {
       ensureBuiltin(context, 'dotenv');
       return `${indent}__loadEnvFile(${JSON.stringify(node.path)});`;
     }
 
-    // v1.0.1 — native test DSL. `test "<name>" ... done` registers a runnable
+    // v1.0.1  -  native test DSL. `test "<name>" ... done` registers a runnable
     // unit; all tests are executed after the program body with a tiny runner.
     case 'TestStatement': {
       __testCount++;
@@ -3293,7 +3293,7 @@ function generateStatement(node, indent = '', context = createGenerationContext(
       return `${indent}function ${fnName}() {\n${body}\n${indent}}`;
     }
 
-    // v1.0.1 — assertion `check <a> (equals|is|contains|raises) <b>`.
+    // v1.0.1  -  assertion `check <a> (equals|is|contains|raises) <b>`.
     // For `raises`, `a` is wrapped in a thunk so the expression is evaluated
     // inside the runner's try/catch (its thrown error is the subject).
     case 'CheckStatement': {
@@ -3321,7 +3321,7 @@ function generateStatement(node, indent = '', context = createGenerationContext(
       return exports.map(e => `${indent}${e}`).join('\n');
     }
 
-    // v1.0.1 — generators: `yield <expr>` (or bare `yield`).
+    // v1.0.1  -  generators: `yield <expr>` (or bare `yield`).
     case 'YieldStatement': {
       if (!context.inFunction) {
         throw new Error('"yield" can only be used inside a function created with "make".\n\nExample:\n  make countUp(n)\n    let i = 0\n    while i less than n\n      i = i + 1\n      yield i\n    done\n  done');
@@ -3392,7 +3392,7 @@ function generateStatement(node, indent = '', context = createGenerationContext(
       return `${indent}let ${node.variable} = await __ask(${prompt});`;
     }
 
-    // v2.0.1 — ocr "<image>" as <variable> [using "<lang>"]
+    // v2.0.1  -  ocr "<image>" as <variable> [using "<lang>"]
     case 'OcrStatement': {
       ensureBuiltin(context, 'ocr');
       markAsync(context);
@@ -3464,7 +3464,7 @@ function generateStatement(node, indent = '', context = createGenerationContext(
       context.loopDepth++;
       const body = node.body.map(s => generateStatement(s, indent + '  ', context)).join('\n');
       context.loopDepth--;
-      // for index <name> in <collection> — zero-based index over a list.
+      // for index <name> in <collection>  -  zero-based index over a list.
       if (node.over != null) {
         const coll = generateExpr(node.over, context);
         return `${indent}for (let ${node.name} = 0; ${node.name} < ${coll}.length; ${node.name}++) {\n${body}\n${indent}}`;
@@ -3548,7 +3548,7 @@ function generateStatement(node, indent = '', context = createGenerationContext(
       return `${indent}class ${node.name}${superClass} {\n${body}\n${indent}}`;
     }
 
-    // v0.3 — Express runtime
+    // v0.3  -  Express runtime
 
     case 'ListenStatement': {
       const prevInHandler = context.inHandler;
@@ -3605,7 +3605,7 @@ function generateStatement(node, indent = '', context = createGenerationContext(
       return `${indent}res.json({ ${props} });`;
     }
 
-    // v1.2 — reply <value> with buttons … done (Telegram inline keyboard).
+    // v1.2  -  reply <value> with buttons … done (Telegram inline keyboard).
     // The AST stores rows of { text, data } objects (parser.js). The Telegram
     // runtime's keyboard() expects a flat list of [text, data] pairs, so each
     // button is rendered as [text, data] and rows are merged into that list.
@@ -3619,13 +3619,13 @@ function generateStatement(node, indent = '', context = createGenerationContext(
     case 'ServeFolderStatement':
       return `${indent}app.use(express.static(${JSON.stringify(node.folder)}));`;
 
-    // v0.6 — Express DX
+    // v0.6  -  Express DX
 
     case 'WebAppStatement':
       return [
         emitRequire(context, 'express'),
         `${indent}const app = express();`,
-        // v2.1.0 — parse JSON request bodies so POST/PUT handlers can read
+        // v2.1.0  -  parse JSON request bodies so POST/PUT handlers can read
         // "body of request". Harmless for GET-only v2.0.1 programs.
         `${indent}app.use(express.json());`,
       ]
@@ -3642,7 +3642,7 @@ function generateStatement(node, indent = '', context = createGenerationContext(
       return `${indent}app.${node.method}(${JSON.stringify(routePath(node.path))}, ${handlerAsync}(req, res) => {\n${block.out}\n${indent}});`;
     }
 
-    // v2.1.0 — group "<prefix>" ... done: composes routes under a shared
+    // v2.1.0  -  group "<prefix>" ... done: composes routes under a shared
     // prefix. Groups nest; every enclosed route (either form) gets the
     // concatenated prefix. Non-route statements run in program order.
     case 'GroupStatement': {
@@ -3652,7 +3652,7 @@ function generateStatement(node, indent = '', context = createGenerationContext(
       return body;
     }
 
-    // v2.1.0 — status <expr>: sets the HTTP response status code. Only valid
+    // v2.1.0  -  status <expr>: sets the HTTP response status code. Only valid
     // inside a route handler (res is in scope there).
     case 'StatusStatement':
       if (!_inRoute) {
@@ -3660,14 +3660,14 @@ function generateStatement(node, indent = '', context = createGenerationContext(
       }
       return `${indent}res.status(${generateExpr(node.value, context)});`;
 
-    // v2.2.0 — redirect to "<url>": sends an HTTP redirect from a route.
+    // v2.2.0  -  redirect to "<url>": sends an HTTP redirect from a route.
     case 'RedirectStatement':
       if (!_inRoute) {
         throw new Error('"redirect to" can only be used inside a route handler.\n\nExample:\n  route get "/old"\n    redirect to "/new"\n  done');
       }
       return `${indent}res.redirect(${generateExpr(node.url, context)});`;
 
-    // v2.1.0 — allow cors: enables cross-origin requests on the current app.
+    // v2.1.0  -  allow cors: enables cross-origin requests on the current app.
     // Applies to routes registered after this statement.
     case 'AllowCorsStatement':
       return [
@@ -3680,7 +3680,7 @@ function generateStatement(node, indent = '', context = createGenerationContext(
         `${indent}});`,
       ].join('\n');
 
-    // ── v2.1.1 — uploads, auth middleware, rate limiting, OAuth ────────────
+    // ── v2.1.1  -  uploads, auth middleware, rate limiting, OAuth ────────────
     // These register Express middleware in program order; routes declared
     // after them are protected / wired accordingly.
 
@@ -3693,7 +3693,7 @@ function generateStatement(node, indent = '', context = createGenerationContext(
       return `${indent}app.use(__uploads({ ${options.join(', ')} }));`;
     }
 
-    // require api key from <expr> — rejects requests whose x-api-key header
+    // require api key from <expr>  -  rejects requests whose x-api-key header
     // does not match. The expected key may come from env("...") or anywhere.
     case 'RequireApiKeyStatement':
       return [
@@ -3735,7 +3735,7 @@ function generateStatement(node, indent = '', context = createGenerationContext(
       return `${indent}__googleOAuth(app, { ${parts} });`;
     }
 
-    // ── v2.1.1 — route-scoped state: cookies and sessions
+    // ── v2.1.1  -  route-scoped state: cookies and sessions
 
     case 'DestroySessionStatement':
       if (!_inRoute) {
@@ -3761,7 +3761,7 @@ function generateStatement(node, indent = '', context = createGenerationContext(
       }
       return `${indent}res.clearCookie(${JSON.stringify(node.name)}, { path: '/' });`;
 
-    // when nothing matches … done — the 404 catch-all. Registered in source
+    // when nothing matches … done  -  the 404 catch-all. Registered in source
     // position, so it must come after every route (Express matches handlers
     // in registration order).
     case 'NotFoundStatement': {
@@ -3775,7 +3775,7 @@ function generateStatement(node, indent = '', context = createGenerationContext(
       return `${indent}app.use((${handlerAsync}req, res) => {\n${block.out}\n${indent}});`;
     }
 
-    // ── v2.1.1 — error handling and retries
+    // ── v2.1.1  -  error handling and retries
 
     case 'TryStatement': {
       const tryBody = (node.tryBody || node.body || []).map(s => generateStatement(s, indent + '  ', context)).join('\n');
@@ -3847,11 +3847,11 @@ function generateStatement(node, indent = '', context = createGenerationContext(
     case 'StartStatement':
       return `${indent}app.listen(${generateExpr(node.port, context)});`;
 
-    // v0.6 — SQLite DX. v2.1.0 adds parameterized SQL, captured results and
+    // v0.6  -  SQLite DX. v2.1.0 adds parameterized SQL, captured results and
     // transactions; the driver switches to PostgreSQL when a "postgres"
     // declaration is active.
 
-    // database "<file>" [using "<driver>"] — v2.1.1 opens through the
+    // database "<file>" [using "<driver>"]  -  v2.1.1 opens through the
     // portable engine chain: better-sqlite3 when its native binding works on
     // this machine, sql.js otherwise ("using" forces one engine). The opened
     // handle exposes the same prepare/exec/transaction surface either way,
@@ -3865,7 +3865,7 @@ function generateStatement(node, indent = '', context = createGenerationContext(
       return `${indent}const db = await __dbOpen(${JSON.stringify(node.file)}, ${driverArg});`;
     }
 
-    // v2.1.0 — postgres "<connection>": node-postgres pool bound to "db".
+    // v2.1.0  -  postgres "<connection>": node-postgres pool bound to "db".
     // Every SQL statement afterwards compiles to async pool queries.
     case 'PostgresStatement': {
       _sqlDriver = 'pg';
@@ -3877,7 +3877,7 @@ function generateStatement(node, indent = '', context = createGenerationContext(
       ].filter(Boolean).map(line => line.startsWith('const ') ? `${indent}${line}` : line).join('\n');
     }
 
-    // v2.2.0 — mongo "<connection>" [db "<name>"]: MongoDB client bound to "db".
+    // v2.2.0  -  mongo "<connection>" [db "<name>"]: MongoDB client bound to "db".
     // Uses the mongodb driver; subsequent query/insert/update/delete/execute
     // statements compile to MongoDB collection operations.
     case 'MongoStatement': {
@@ -3905,7 +3905,7 @@ function generateStatement(node, indent = '', context = createGenerationContext(
     case 'ExecuteStatement':
       return `${indent}${emitSqlCall('execute', node.sql, node.params, indent, context)};`;
 
-    // v2.1.0 — remember <name> as query|insert|update|delete … done
+    // v2.1.0  -  remember <name> as query|insert|update|delete … done
     case 'RememberSqlStatement': {
       const kind = node.kind === 'query' ? 'query'
         : node.kind === 'execute' ? 'execute'
@@ -3915,7 +3915,7 @@ function generateStatement(node, indent = '', context = createGenerationContext(
       return `${indent}let ${node.name} = ${emitSqlCall(kind, node.sql, node.params, indent, context)};`;
     }
 
-    // v2.1.0 — transaction … done: all enclosed database statements run
+    // v2.1.0  -  transaction … done: all enclosed database statements run
     // atomically (all succeed or none are applied).
     case 'TransactionStatement': {
       if (_sqlDriver === 'pg') {
@@ -3950,7 +3950,7 @@ function generateStatement(node, indent = '', context = createGenerationContext(
       ].join('\n');
     }
 
-    // v1.2 — Telegram statements
+    // v1.2  -  Telegram statements
 
     case 'TelegramCommandStatement': {
       ensureBuiltin(context, 'telegram');
@@ -3979,18 +3979,18 @@ function generateStatement(node, indent = '', context = createGenerationContext(
       return `${indent}await BOT.start();`;
     }
 
-    // ── v2.1.1 — WhatsApp statements ────────────────────────────────────────
+    // ── v2.1.1  -  WhatsApp statements ────────────────────────────────────────
 
-    // whatsapp bot … done — starts the Baileys runtime with the declared
+    // whatsapp bot … done  -  starts the Baileys runtime with the declared
     // auth folder and login mode, then registers every "on message" handler.
     // When no login line is present (login is null), only registers handlers
-    // without auto-starting — used by hybrid bots that pair on-demand.
+    // without auto-starting  -  used by hybrid bots that pair on-demand.
     case 'WhatsAppBotStatement': {
       ensureBuiltin(context, 'whatsapp');
       markAsync(context);
       const lines = [];
       if (node.login) {
-        // v2.1.2 — the pairing phone may be a compile-time literal or any
+        // v2.1.2  -  the pairing phone may be a compile-time literal or any
         // PlainScript expression (e.g. a variable filled by `ask`). Runtime values
         // are normalized/validated by __waNormalizePhone at startup.
         let loginArg;
@@ -4016,7 +4016,7 @@ function generateStatement(node, indent = '', context = createGenerationContext(
       return lines.join('\n');
     }
 
-    // pair whatsapp "<phone>" — on-demand WhatsApp pairing session.
+    // pair whatsapp "<phone>"  -  on-demand WhatsApp pairing session.
     // When _inTelegram is true, relays the pairing code and connection status
     // to the Telegram chat via ctx.chatId.
     case 'WhatsAppPairStatement': {
@@ -4033,7 +4033,7 @@ function generateStatement(node, indent = '', context = createGenerationContext(
       return `${indent}await __whatsappPair(${phoneArg}, null, null);`;
     }
 
-    // on message … done — registers the handler that receives each incoming
+    // on message … done  -  registers the handler that receives each incoming
     // WhatsApp message as a normalized PlainScript record on `message`.
     case 'WhatsAppOnMessageStatement': {
       ensureBuiltin(context, 'whatsapp');
@@ -4049,7 +4049,7 @@ function generateStatement(node, indent = '', context = createGenerationContext(
       ].join('\n');
     }
 
-    // log message — prints the current message record. Handler-only by
+    // log message  -  prints the current message record. Handler-only by
     // design: outside "on message" there is no message to log.
     case 'WhatsAppLogStatement':
       if (!_inWhatsApp) {
@@ -4058,7 +4058,7 @@ function generateStatement(node, indent = '', context = createGenerationContext(
       ensureBuiltin(context, 'whatsapp');
       return `${indent}console.log(__waCtx.message);`;
 
-    // v2.14 — download "<path>" — saves the current message's media to a file.
+    // v2.14  -  download "<path>"  -  saves the current message's media to a file.
     // Handler-only by design: outside "on message" there is no message media.
     case 'WhatsAppDownloadStatement':
       if (!_inWhatsApp) {
@@ -4068,7 +4068,7 @@ function generateStatement(node, indent = '', context = createGenerationContext(
       markAsync(context);
       return `${indent}await __whatsappDownload(__waCtx.message, ${JSON.stringify(node.filePath)});`;
 
-    // v2.1.0 — mail, cache, scheduling, background jobs, websocket
+    // v2.1.0  -  mail, cache, scheduling, background jobs, websocket
 
     case 'MailTransportStatement': {
       ensureBuiltin(context, 'mailer');
@@ -4102,7 +4102,7 @@ function generateStatement(node, indent = '', context = createGenerationContext(
       return `${indent}await __mailSend({ ${fields} });`;
     }
 
-    // cache "<redis-url>" — connects the shared Redis client. At the top
+    // cache "<redis-url>"  -  connects the shared Redis client. At the top
     // level the connect is awaited in program order; inside functions it is
     // connected fire-and-forget.
     case 'CacheStatement': {
@@ -4136,7 +4136,7 @@ function generateStatement(node, indent = '', context = createGenerationContext(
       ].join('\n');
     }
 
-    // v1.0.36 — every frame … done: one requestAnimationFrame loop. The next
+    // v1.0.361  -  every frame … done: one requestAnimationFrame loop. The next
     // frame is scheduled after the body so the body always runs once per
     // frame; an awaiting body makes the callback async automatically.
     case 'EveryFrameStatement': {
@@ -4153,7 +4153,7 @@ function generateStatement(node, indent = '', context = createGenerationContext(
       ].join('\n');
     }
 
-    // v1.0.36 — after <n> <unit> … done: one-shot setTimeout. The delay is an
+    // v1.0.361  -  after <n> <unit> … done: one-shot setTimeout. The delay is an
     // expression scaled by the unit; an awaiting body makes the callback async.
     case 'AfterStatement': {
       const delay = generateExpr(node.delay, context);
@@ -4290,7 +4290,7 @@ function generateStatement(node, indent = '', context = createGenerationContext(
       return `${indent}__emitter.on(${event}, (${node.paramName}) => {\n${body}\n${indent}});`;
     }
 
-    // v1.0.36 — when <target> "<event>" happens [as <name>] … done: DOM event
+    // v1.0.361  -  when <target> "<event>" happens [as <name>] … done: DOM event
     // listener. The handler param defaults to "event"; an awaiting body makes
     // the callback async automatically.
     case 'WhenTargetedStatement': {
@@ -4399,11 +4399,11 @@ function generateExpr(node, context = createGenerationContext()) {
     }
     case 'StringLiteral':    return JSON.stringify(node.value);
     case 'NumberLiteral':    return String(node.value);
-    // v2.1.1 — boolean and null literals are PlainScript keywords.
+    // v2.1.1  -  boolean and null literals are PlainScript keywords.
     case 'BooleanLiteral':   return String(node.value);
     case 'NullLiteral':      return 'null';
 
-    // v2.1.1 — HTTP client: get/post/put/patch/delete "<url>" with clauses.
+    // v2.1.1  -  HTTP client: get/post/put/patch/delete "<url>" with clauses.
     case 'HttpCall': {
       ensureBuiltin(context, 'http');
       markAsync(context);
@@ -4466,7 +4466,7 @@ function generateExpr(node, context = createGenerationContext()) {
       return `{ ${props} }`;
     }
 
-    // v1.2 — Inline object literal: { key: value, ... }
+    // v1.2  -  Inline object literal: { key: value, ... }
     case 'InlineObjectLiteral': {
       const props = node.properties
         .map(p => `${JSON.stringify(p.key)}: ${generateExpr(p.value, context)}`)
@@ -4493,7 +4493,7 @@ function generateExpr(node, context = createGenerationContext()) {
       return `${generateExpr(node.callee.object, context)}?.${node.callee.property}(${node.args.map(arg => generateExpr(arg, context)).join(', ')})`;
 
     // Function expression: (params) -> expression  →  (params) => expression.
-    // Block-bodied form: (params) do ... done  →  (params) => { ... } — reuses
+    // Block-bodied form: (params) do ... done  →  (params) => { ... }  -  reuses
     // generateBlock, the same body emitter as `make` functions, so closures,
     // effects, loops, conditionals, early returns, and async/await behave
     // exactly like ordinary functions.
@@ -4519,7 +4519,7 @@ function generateExpr(node, context = createGenerationContext()) {
     }
 
     case 'CallExpression': {
-      // Method call: receiver.method(args). Member access invoked with parens —
+      // Method call: receiver.method(args). Member access invoked with parens  - 
       // e.g. path.join("a", "b"), mrz.parse(line), fs.existsSync(("x")).
       // Postfix calls f()(), arr[0](1), mul(6)(7) also bind here; any composite
       // callee (arrow, binary, comparison/logical condition) is parenthesised so
@@ -4546,7 +4546,7 @@ function generateExpr(node, context = createGenerationContext()) {
       return `${node.name}(${node.args.map(arg => generateExpr(arg, context)).join(', ')})`;
     }
 
-    // v1.1 — Item expressions
+    // v1.1  -  Item expressions
     case 'FirstItem':
       return `${generateExpr(node.collection, context)}[0]`;
 
@@ -4564,9 +4564,9 @@ function generateExpr(node, context = createGenerationContext()) {
       return `((${obj} && ${obj}.count !== undefined) ? ${obj}.count : ((${obj} && ${obj}.length !== undefined) ? ${obj}.length : ((${obj} && ${obj}.size !== undefined) ? ${obj}.size : 0)))`;
     }
 
-    // v1.1 — Property access
+    // v1.1  -  Property access
     case 'OfExpression': {
-      // v2.1.1 — "session of request" / "user of request" read server-side
+      // v2.1.1  -  "session of request" / "user of request" read server-side
       // state managed by the session and OAuth runtimes.
       if (node.object.type === 'Identifier' && node.object.name === 'request' &&
           node.property.type === 'Identifier') {
@@ -4584,7 +4584,7 @@ function generateExpr(node, context = createGenerationContext()) {
       return `${generateExpr(node.object, context)}.${generateExpr(node.property, context)}`;
     }
 
-    // v1.1 — Collection operations
+    // v1.1  -  Collection operations
     case 'AddCall':
       return `${generateExpr(node.collection, context)}.push(${generateExpr(node.value, context)})`;
 
@@ -4598,7 +4598,7 @@ function generateExpr(node, context = createGenerationContext()) {
       ensureBuiltin(context, 'fs');
       return `fs.writeFileSync(${generateExpr(node.data, context)}, ${generateExpr(node.file, context)}, 'utf8')`;
 
-    // v1.0.1 — record constructor: `create a Person with name "Ada" and age 17`
+    // v1.0.1  -  record constructor: `create a Person with name "Ada" and age 17`
     // calls the kind factory that `define a kind called "Person"` registered.
     case 'CreateKindExpression': {
       const fields = node.pairs
@@ -4607,7 +4607,7 @@ function generateExpr(node, context = createGenerationContext()) {
       return `${node.kind}({ ${fields} })`;
     }
 
-    // v1.0.1 — concurrency combinators: `all of [...]` / `any of [...]` /
+    // v1.0.1  -  concurrency combinators: `all of [...]` / `any of [...]` /
     // `settled of [...]`. All are awaited; `settled` returns status records.
     case 'ConcurrencyExpression': {
       markAsync(context);
@@ -4617,7 +4617,7 @@ function generateExpr(node, context = createGenerationContext()) {
       return `(await Promise.all(${rhs}))`;
     }
 
-    // v1.0.1 — `spread of <collection>` → a fresh array from an iterable.
+    // v1.0.1  -  `spread of <collection>` → a fresh array from an iterable.
     case 'SpreadExpression':
       return `[...${generateExpr(node.collection, context)}]`;
 

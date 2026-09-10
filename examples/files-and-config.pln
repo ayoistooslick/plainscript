@@ -1,4 +1,4 @@
-// PlainScript 1.0.36: files and environment configuration.
+// PlainScript 1.0.361: files and environment configuration.
 remember filename as env("CONFIG_FILE")
 if filename is null
     remember filename as "config.json"

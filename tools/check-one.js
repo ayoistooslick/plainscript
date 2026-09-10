@@ -16,7 +16,7 @@ try {
   let js = files.map(({ ast }) => generate(ast, context)).filter(s => s.trim()).join('\n');
   if (context.needsAsync) js = wrapAsync(js);
   new (require('vm').Script)(js);
-  console.log(`✓ ${file} — ok`);
+  console.log(`✓ ${file}  -  ok`);
 } catch (e) {
   console.error(`✗ ${file}: ${e.message}`);
   process.exit(1);

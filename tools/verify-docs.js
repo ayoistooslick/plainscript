@@ -62,7 +62,7 @@ for (const f of FEATURES) {
     reason = e.message.split('\n')[0];
   }
   if (ok) { pass++; console.log('  OK   ' + f.cat + ' / ' + f.name + (reason ? '  [note: ' + reason + ']' : '')); }
-  else { fail++; failures.push(f.cat + ' / ' + f.name + ': ' + reason); console.log('  FAIL ' + f.cat + ' / ' + f.name + ' — ' + reason); }
+  else { fail++; failures.push(f.cat + ' / ' + f.name + ': ' + reason); console.log('  FAIL ' + f.cat + ' / ' + f.name + '  -  ' + reason); }
 }
 console.log('\n=== SUMMARY ===');
 console.log(`${pass} passed, ${fail} failed of ${FEATURES.length} entries (${skipped} compile-only)`);

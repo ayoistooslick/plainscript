@@ -1,4 +1,4 @@
-// PlainScript 1.0.36: conditions and string predicates.
+// PlainScript 1.0.361: conditions and string predicates.
 
 remember score as 87
 remember label as "PlainScript"

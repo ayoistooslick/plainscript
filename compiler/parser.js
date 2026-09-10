@@ -36,7 +36,7 @@ const NUMBER_WORDS = {
   nineteen: 19, twenty: 20,
 };
 
-// HTTP methods accepted by the route statement (v2.1.0). Lowercase only —
+// HTTP methods accepted by the route statement (v2.1.0). Lowercase only  - 
 // PlainScript keywords are lowercase by convention.
 const HTTP_METHODS = ['get', 'post', 'put', 'patch', 'delete'];
 
@@ -51,7 +51,7 @@ const TIME_UNITS = {
   day: 24 * 60 * 60 * 1000, days: 24 * 60 * 60 * 1000,
 };
 
-// v2.1.0 — split raw SQL into placeholder-free text and ordered parameter
+// v2.1.0  -  split raw SQL into placeholder-free text and ordered parameter
 // names. "{name}" marks a bound parameter; the generator renders "?" for
 // SQLite or "$1…" for PostgreSQL.
 function extractSqlParams(rawSql) {
@@ -63,7 +63,7 @@ function extractSqlParams(rawSql) {
   return { sql, params };
 }
 
-// v2.1.1 — parse an upload size limit such as "5 MB", "512 KB", "1GB" or
+// v2.1.1  -  parse an upload size limit such as "5 MB", "512 KB", "1GB" or
 // "100B" into a byte count. Returns null when the text is not a valid size.
 const UPLOAD_SIZE_UNITS = { b: 1, kb: 1024, mb: 1024 * 1024, gb: 1024 * 1024 * 1024 };
 function parseUploadSize(text) {
@@ -133,10 +133,10 @@ function parse(tokens) {
   //   comparison  := the single-comparison forms below
   //
   // Node shapes produced by the comparison level:
-  //   BinaryCondition  { type, left, op, right }      — left op right
-  //   UnaryCondition   { type, left, op }              — left is empty / is not empty
-  //   BetweenCondition { type, left, low, high }       — left between low and high
-  //   StringCondition  { type, left, method, right }   — left contains/startsWith/endsWith right
+  //   BinaryCondition  { type, left, op, right }       -  left op right
+  //   UnaryCondition   { type, left, op }               -  left is empty / is not empty
+  //   BetweenCondition { type, left, low, high }        -  left between low and high
+  //   StringCondition  { type, left, method, right }    -  left contains/startsWith/endsWith right
   // plus LogicalCondition { type, op: "and"|"or", left, right } and
   //                      { type, op: "not", operand } from the combinator levels.
 
@@ -208,7 +208,7 @@ function parse(tokens) {
   function parseComparisonCondition() {
     const left = parseExpression();
     // Comparisons are expressions too, so parseExpression may already have
-    // folded this into a comparison node — that IS the comparison level.
+    // folded this into a comparison node  -  that IS the comparison level.
     if (isComparisonNode(left)) return left;
     return tryParseComparisonOperator(left, true);
   }
@@ -228,7 +228,7 @@ function parse(tokens) {
       return { type: 'BinaryCondition', left, op: 'instanceof', right };
     }
 
-    // v2.4 — "has field" → "x" in obj (contextual: "has" followed by "field")
+    // v2.4  -  "has field" → "x" in obj (contextual: "has" followed by "field")
     if (peek().type === TOKEN.IDENTIFIER && peek().value === 'has' &&
         peekAt(1).type === TOKEN.IDENTIFIER && peekAt(1).value === 'field') {
       advance(); // has
@@ -236,21 +236,21 @@ function parse(tokens) {
       const right = parseBooleanAtom();
       return { type: 'BinaryCondition', left: right, op: 'in', right: left };
     }
-    // v2.4 — "starts as" → startsWith (contextual: "starts" followed by "as")
+    // v2.4  -  "starts as" → startsWith (contextual: "starts" followed by "as")
     if (peek().type === TOKEN.STARTS && peekAt(1).type === TOKEN.AS) {
       advance(); // starts
       advance(); // as
       const right = parseBooleanAtom();
       return { type: 'StringCondition', left, method: 'startsWith', right };
     }
-    // v2.4 — "ends as" → endsWith (contextual: "ends" followed by "as")
+    // v2.4  -  "ends as" → endsWith (contextual: "ends" followed by "as")
     if (peek().type === TOKEN.ENDS && peekAt(1).type === TOKEN.AS) {
       advance(); // ends
       advance(); // as
       const right = parseBooleanAtom();
       return { type: 'StringCondition', left, method: 'endsWith', right };
     }
-    // v2.4 — "made of" → includes (contextual: "made" followed by "of")
+    // v2.4  -  "made of" → includes (contextual: "made" followed by "of")
     if (peek().type === TOKEN.IDENTIFIER && peek().value === 'made' &&
         peekAt(1).type === TOKEN.IDENTIFIER && peekAt(1).value === 'of') {
       advance(); // made
@@ -258,7 +258,7 @@ function parse(tokens) {
       const right = parseBooleanAtom();
       return { type: 'StringCondition', left, method: 'includes', right };
     }
-    // v2.4 — "more than" → > (contextual: "more" followed by "than")
+    // v2.4  -  "more than" → > (contextual: "more" followed by "than")
     if (peek().type === TOKEN.IDENTIFIER && peek().value === 'more' &&
         peekAt(1).type === TOKEN.THAN) {
       advance(); // more
@@ -266,7 +266,7 @@ function parse(tokens) {
       const right = parseBooleanAtom();
       return { type: 'BinaryCondition', left, op: '>', right };
     }
-    // v2.4 — "fewer than" → < (contextual: "fewer" followed by "than")
+    // v2.4  -  "fewer than" → < (contextual: "fewer" followed by "than")
     if (peek().type === TOKEN.IDENTIFIER && peek().value === 'fewer' &&
         peekAt(1).type === TOKEN.THAN) {
       advance(); // fewer
@@ -274,7 +274,7 @@ function parse(tokens) {
       const right = parseBooleanAtom();
       return { type: 'BinaryCondition', left, op: '<', right };
     }
-    // v2.4 — "same as" → === (contextual: "same" followed by "as")
+    // v2.4  -  "same as" → === (contextual: "same" followed by "as")
     if (peek().type === TOKEN.IDENTIFIER && peek().value === 'same' &&
         peekAt(1).type === TOKEN.AS) {
       advance(); // same
@@ -282,7 +282,7 @@ function parse(tokens) {
       const right = parseBooleanAtom();
       return { type: 'BinaryCondition', left, op: '===', right };
     }
-    // v2.4 — "different from" → !== (contextual: "different" followed by "from")
+    // v2.4  -  "different from" → !== (contextual: "different" followed by "from")
     if (peek().type === TOKEN.IDENTIFIER && peek().value === 'different' &&
         peekAt(1).type === TOKEN.IDENTIFIER && peekAt(1).value === 'from') {
       advance(); // different
@@ -530,7 +530,7 @@ function parse(tokens) {
     if (token.type === TOKEN.GIVE)        return parseGive();
     if (token.type === TOKEN.RETURN)      return parseGive();  // alias for give
     if (token.type === TOKEN.GIVE_BACK)   return parseGive();  // alias for give
-    // v1.0.1 — generators: `yield <expr>` is only meaningful inside a function
+    // v1.0.1  -  generators: `yield <expr>` is only meaningful inside a function
     // body; the generator marks the enclosing `make ... done` as a function*.
     if (token.type === TOKEN.YIELD)       return parseYield();
     if (token.type === TOKEN.FOR)         return parseForEach();
@@ -538,14 +538,14 @@ function parse(tokens) {
     if (token.type === TOKEN.REPEAT || (token.type === TOKEN.IDENTIFIER && token.value === 'repeat')) {
       return parseRepeat();
     }
-    // v2.1.0 — every <n> <unit>s … done: interval scheduling. "every" also
+    // v2.1.0  -  every <n> <unit>s … done: interval scheduling. "every" also
     // lexes as TOKEN.EACH (the "for every" alias), so only the number+unit
     // form is intercepted; "for every item in list" keeps its meaning.
     if (token.type === TOKEN.EACH && peekAt(1).type === TOKEN.NUMBER &&
         peekAt(2).type === TOKEN.IDENTIFIER && TIME_UNITS[peekAt(2).value]) {
       return parseEvery();
     }
-    // v1.0.36 — every frame … done: requestAnimationFrame loop. "every" lexes
+    // v1.0.361  -  every frame … done: requestAnimationFrame loop. "every" lexes
     // as TOKEN.EACH; guard on the following "frame" identifier ("for every
     // item in list" is intercepted by TOKEN.FOR above).
     if (token.type === TOKEN.EACH && peekAt(1).type === TOKEN.IDENTIFIER &&
@@ -559,9 +559,9 @@ function parse(tokens) {
       return parseImport();
     }
     if (token.type === TOKEN.WHEN)        return parseWhen();
-    // v2.3 — English-like function declaration: "to add a and b together ... done"
+    // v2.3  -  English-like function declaration: "to add a and b together ... done"
     if (token.type === TOKEN.TO && peekAt(1).type === TOKEN.IDENTIFIER) return parseToFunction();
-    // v2.4 — "list with" and "record with" as expressions
+    // v2.4  -  "list with" and "record with" as expressions
     if (token.type === TOKEN.IDENTIFIER && token.value === 'list' && peekAt(1).type === TOKEN.WITH) return parseListWith();
     if (token.type === TOKEN.IDENTIFIER && token.value === 'record' && peekAt(1).type === TOKEN.WITH) return parseRecordWith(false);
     if (token.type === TOKEN.IDENTIFIER && token.value === 'put' && peekAt(1).type !== TOKEN.LPAREN) return parsePutStatement();
@@ -583,7 +583,7 @@ function parse(tokens) {
       advance();
       return { type: 'DebuggerStatement' };
     }
-    // v2.0.1 — OCR capability
+    // v2.0.1  -  OCR capability
     if (token.type === TOKEN.OCR_KW)      return parseOcr();
     // v0.6
     if (token.type === TOKEN.WEB)         return parseWebApp();
@@ -593,7 +593,7 @@ function parse(tokens) {
     if (token.type === TOKEN.DATABASE_KW) return parseDatabase();
     if (token.type === TOKEN.CONNECT_DB)  return parseDatabase();  // alias
     if (token.type === TOKEN.USE_DATABASE) return parseDatabase();  // alias
-    // v2.1.0 — query("field"): the HTTP query-string accessor. The SQLite
+    // v2.1.0  -  query("field"): the HTTP query-string accessor. The SQLite
     // block form keeps priority when "query" stands alone on a line; a
     // call form is always the accessor.
     if (token.type === TOKEN.QUERY_KW && peekAt(1).type === TOKEN.LPAREN) {
@@ -602,7 +602,7 @@ function parse(tokens) {
     if (token.type === TOKEN.QUERY_KW)    return parseSqlBlock('query',   'QueryStatement');
     if (token.type === TOKEN.INSERT_KW)   return parseSqlBlock('insert',  'InsertStatement');
     if (token.type === TOKEN.UPDATE_KW)   return parseSqlBlock('update',  'UpdateStatement');
-    // v2.1.1 — delete "<url>" is an HTTP DELETE request; a bare "delete"
+    // v2.1.1  -  delete "<url>" is an HTTP DELETE request; a bare "delete"
     // starting a raw block keeps its SQL meaning.
     if (token.type === TOKEN.DELETE_KW && tokenStartsValue(peekAt(1))) {
       return { type: 'ExpressionStatement', expression: parseHttpCall('delete') };
@@ -628,7 +628,7 @@ function parse(tokens) {
 
     // Statements starting with an identifier: call, becomes, index/member becomes
     if (token.type === TOKEN.IDENTIFIER) {
-      // v2.5 — natural string and collection verbs that transform a variable
+      // v2.5  -  natural string and collection verbs that transform a variable
       // in place: "lowercase title", "uppercase first letter of each word in title",
       // "split title by \" \"", "join title by \" \"", "trim title".
       const TRANSFORM_VERB = token.value === 'lowercase' || token.value === 'uppercase' ||
@@ -703,7 +703,7 @@ function parse(tokens) {
         return { type: 'ExpressionStatement', expression: parsePrimary() };
       }
 
-      // v1.2 — bot "<token>" / bot <expr>: creates the polling Telegram bot.
+      // v1.2  -  bot "<token>" / bot <expr>: creates the polling Telegram bot.
       // Bound to BOT by the generator's `bot` stdlib. Only intercepts when a
       // value follows; bot(...) calls and ordinary identifiers (e.g. a
       // variable named bot) keep their normal meaning.
@@ -713,7 +713,7 @@ function parse(tokens) {
         peekAt(1).type === TOKEN.LBRACKET || peekAt(1).type === TOKEN.LBRACE;
       if (token.value === 'bot' && nextIsValue) return parseBot();
 
-      // v2.1.0 — allow cors: enables CORS middleware on the current app.
+      // v2.1.0  -  allow cors: enables CORS middleware on the current app.
       // Contextual (not a reserved keyword): a variable named "allow" keeps
       // its ordinary meaning.
       if (token.value === 'allow' &&
@@ -723,7 +723,7 @@ function parse(tokens) {
         return { type: 'AllowCorsStatement' };
       }
 
-      // v2.1.0 — group "<prefix>" ... done: composes routes under a shared
+      // v2.1.0  -  group "<prefix>" ... done: composes routes under a shared
       // path prefix. Contextual like "bot": only intercepted when a quoted
       // prefix follows.
       if (token.value === 'group' && peekAt(1).type === TOKEN.STRING) {
@@ -733,7 +733,7 @@ function parse(tokens) {
         return { type: 'GroupStatement', prefix, body };
       }
 
-      // v2.1.0 — postgres "<connection>": binds the PostgreSQL driver.
+      // v2.1.0  -  postgres "<connection>": binds the PostgreSQL driver.
       // Contextual: a variable named "postgres" keeps its meaning unless a
       // connection value follows on the same line.
       if (token.value === 'postgres' && (
@@ -742,7 +742,7 @@ function parse(tokens) {
         return parsePostgres();
       }
 
-      // v2.2.0 — mongo "<connection-string>" [db "<name>"]: binds the MongoDB client.
+      // v2.2.0  -  mongo "<connection-string>" [db "<name>"]: binds the MongoDB client.
       // Contextual: a variable named "mongo" or "mongodb" keeps its meaning unless
       // a connection string follows on the same line.
       if ((token.value === 'mongo' || token.value === 'mongodb') && (
@@ -751,7 +751,7 @@ function parse(tokens) {
         return parseMongo();
       }
 
-      // v2.1.0 — cache "<redis-url>" / cache env("REDIS_URL"): connects the
+      // v2.1.0  -  cache "<redis-url>" / cache env("REDIS_URL"): connects the
       // shared Redis client used by cacheGet / cacheSet / cacheDelete.
       // Contextual like "postgres": a variable named "cache" keeps its
       // meaning unless a connection value follows on the same line.
@@ -763,7 +763,7 @@ function parse(tokens) {
         return { type: 'CacheStatement', url };
       }
 
-      // v2.1.0 — transaction … done: groups database writes atomically.
+      // v2.1.0  -  transaction … done: groups database writes atomically.
       // Contextual: "transaction becomes x" and "transaction(...)" keep
       // their ordinary variable/function meanings.
       if (token.value === 'transaction' &&
@@ -773,7 +773,7 @@ function parse(tokens) {
         return { type: 'TransactionStatement', body };
       }
 
-      // v2.1.0 — mail transport … done: configures the outgoing mailer.
+      // v2.1.0  -  mail transport … done: configures the outgoing mailer.
       if (token.value === 'mail' &&
           peekAt(1).type === TOKEN.IDENTIFIER && peekAt(1).value === 'transport') {
         advance(); // mail
@@ -781,7 +781,7 @@ function parse(tokens) {
         return { type: 'MailTransportStatement', options: parsePropertyList('"mail transport" block') };
       }
 
-      // v2.1.0 — send mail … done: sends one email through the transport.
+      // v2.1.0  -  send mail … done: sends one email through the transport.
       if (token.value === 'send' &&
           peekAt(1).type === TOKEN.IDENTIFIER && peekAt(1).value === 'mail') {
         advance(); // send
@@ -789,22 +789,22 @@ function parse(tokens) {
         return { type: 'SendMailStatement', fields: parsePropertyList('"send mail" block') };
       }
 
-      // v2.1.0 — every <n> <unit>s … done: repeat work on an interval.
-      // ("every" lexes as TOKEN.EACH — see the EACH dispatch above — so this
+      // v2.1.0  -  every <n> <unit>s … done: repeat work on an interval.
+      // ("every" lexes as TOKEN.EACH  -  see the EACH dispatch above  -  so this
       // identifier-form branch only guards against future lexer changes.)
       if (token.value === 'every' && peekAt(1).type === TOKEN.NUMBER &&
           peekAt(2).type === TOKEN.IDENTIFIER && TIME_UNITS[peekAt(2).value]) {
         return parseEvery();
       }
 
-      // v1.0.36 — every frame … done: requestAnimationFrame loop. Identifier
+      // v1.0.361  -  every frame … done: requestAnimationFrame loop. Identifier
       // mirror of the EACH dispatch above.
       if (token.value === 'every' && peekAt(1).type === TOKEN.IDENTIFIER &&
           peekAt(1).value === 'frame') {
         return parseEveryFrame();
       }
 
-      // v1.0.36 — after <n> <unit>s … done: one-shot delayed execution.
+      // v1.0.361  -  after <n> <unit>s … done: one-shot delayed execution.
       // Contextual like "retry": "after becomes 5" and after(...) keep their
       // ordinary meanings.
       if (token.value === 'after' &&
@@ -813,7 +813,7 @@ function parse(tokens) {
         return parseAfter();
       }
 
-      // v2.1.0 — schedule "<cron>" … done: run work on a cron schedule.
+      // v2.1.0  -  schedule "<cron>" … done: run work on a cron schedule.
       if (token.value === 'schedule' && peekAt(1).type === TOKEN.STRING) {
         advance(); // schedule
         const expression = advance().value; // cron string
@@ -821,7 +821,7 @@ function parse(tokens) {
         return { type: 'ScheduleStatement', expression, body };
       }
 
-      // v2.1.0 — run background <call>: fire-and-forget execution.
+      // v2.1.0  -  run background <call>: fire-and-forget execution.
       if (token.value === 'run' &&
           peekAt(1).type === TOKEN.IDENTIFIER && peekAt(1).value === 'background') {
         advance(); // run
@@ -842,13 +842,13 @@ function parse(tokens) {
         return parseRunParallelStatement();
       }
 
-      // v2.1.0 — websocket server on <port> … done: realtime endpoint.
+      // v2.1.0  -  websocket server on <port> … done: realtime endpoint.
       if (token.value === 'websocket' &&
           peekAt(1).type === TOKEN.IDENTIFIER && peekAt(1).value === 'server') {
         return parseWebSocketServer();
       }
 
-      // v2.1.1 — whatsapp bot … done: WhatsApp bot runtime (Baileys under
+      // v2.1.1  -  whatsapp bot … done: WhatsApp bot runtime (Baileys under
       // the hood). Contextual: a variable named "whatsapp" keeps its meaning;
       // only "whatsapp bot" opens the block.
       if (token.value === 'whatsapp' &&
@@ -856,7 +856,7 @@ function parse(tokens) {
         return parseWhatsAppBot();
       }
 
-      // v2.1.1 — pair whatsapp "<phone>": starts an on-demand WhatsApp pairing
+      // v2.1.1  -  pair whatsapp "<phone>": starts an on-demand WhatsApp pairing
       // session for the given phone number. Used by hybrid bots where a
       // Telegram command triggers a WhatsApp pairing flow.
       // Accepts a string literal (validated at compile time) or any expression
@@ -873,7 +873,7 @@ function parse(tokens) {
         return { type: 'WhatsAppPairStatement', phone: phoneExpr };
       }
 
-      // v2.1.1 — log message: prints the normalized message record inside an
+      // v2.1.1  -  log message: prints the normalized message record inside an
       // "on message" handler. Generation rejects it everywhere else with a
       // teaching error.
       if (token.value === 'log' &&
@@ -883,7 +883,7 @@ function parse(tokens) {
         return { type: 'WhatsAppLogStatement' };
       }
 
-      // v2.14 — download "<path>": saves the current message's media (image,
+      // v2.14  -  download "<path>": saves the current message's media (image,
       // video, audio, document, sticker, …) to a file, inside an "on message"
       // handler. Generation rejects it everywhere else with a teaching error.
       if (token.value === 'download' && peekAt(1).type === TOKEN.STRING) {
@@ -892,14 +892,14 @@ function parse(tokens) {
         return { type: 'WhatsAppDownloadStatement', filePath };
       }
 
-      // v2.1.0 — broadcast <expr>: sends to every connected socket.
+      // v2.1.0  -  broadcast <expr>: sends to every connected socket.
       if (token.value === 'broadcast') {
         advance(); // broadcast
         const value = parseExpression();
         return { type: 'BroadcastStatement', value };
       }
 
-      // v2.2.0 — send to <connection> <message>: send to a specific stored connection.
+      // v2.2.0  -  send to <connection> <message>: send to a specific stored connection.
       if (token.value === 'send' &&
           (peekAt(1).type === TOKEN.TO || (peekAt(1).type === TOKEN.IDENTIFIER && peekAt(1).value === 'to'))) {
         advance(); // send
@@ -909,7 +909,7 @@ function parse(tokens) {
         return { type: 'SendToStatement', connection, value };
       }
 
-      // v2.1.0 — send socket <expr>: replies to one connected socket.
+      // v2.1.0  -  send socket <expr>: replies to one connected socket.
       if (token.value === 'send' &&
           peekAt(1).type === TOKEN.IDENTIFIER && peekAt(1).value === 'socket') {
         advance(); // send
@@ -918,7 +918,7 @@ function parse(tokens) {
         return { type: 'SendSocketStatement', value };
       }
 
-      // v2.1.0 — status 404 / status <expr>: sets the HTTP response status.
+      // v2.1.0  -  status 404 / status <expr>: sets the HTTP response status.
       // Contextual: "status becomes 404" is still a normal reassignment of a
       // variable named "status", and "status(...)" remains a function call.
       if (token.value === 'status' && peekAt(1).type !== TOKEN.BECOMES &&
@@ -930,7 +930,7 @@ function parse(tokens) {
         return { type: 'StatusStatement', value };
       }
 
-      // v2.2.0 — redirect to "<url>": sends an HTTP redirect from a route
+      // v2.2.0  -  redirect to "<url>": sends an HTTP redirect from a route
       // handler. "redirect(...)" calls and "redirect becomes x" stay ordinary.
       if (token.value === 'redirect' && (peekAt(1).value === 'to' || peekAt(1).type === TOKEN.TO)) {
         advance(); // redirect
@@ -1016,7 +1016,7 @@ function parse(tokens) {
         return { type: 'GoogleOAuthStatement', options: parsePropertyList('"google oauth" block') };
       }
 
-      // ── v1.0.1 — capability-gap features (all contextual, IOPL-native) ──
+      // ── v1.0.1  -  capability-gap features (all contextual, IOPL-native) ──
 
       // define a kind called "Person" with … done  → record schema (classes)
       if ((token.type === TOKEN.DEFINE || (token.type === TOKEN.IDENTIFIER && token.value === 'define')) &&
@@ -1213,7 +1213,7 @@ function parse(tokens) {
       return { type: 'RememberStatement', name: target, value: parseObjectLiteral() };
     }
 
-    // v2.1.0 — remember <name> as query|insert|update|delete … done
+    // v2.1.0  -  remember <name> as query|insert|update|delete … done
     // Captures the SQL result: rows for "query", the run info (changes /
     // lastInsertRowid) for the write forms. The call form query("field")
     // is the HTTP accessor and still parses as an expression below.
@@ -1254,7 +1254,7 @@ function parseAsk() {
     return { type: 'AskStatement', variable };
   }
 
-  // v2.0.1 — OCR capability.
+  // v2.0.1  -  OCR capability.
   //
   //   ocr "<image>" as <variable>
   //   ocr "<image>" as <variable> using "<lang>"
@@ -1364,7 +1364,7 @@ function parseAsk() {
     return { type: 'FunctionDeclaration', name, params, body };
   }
 
-  // v2.3 — English-like function declaration: "to <name> <a> and <b> together ... done"
+  // v2.3  -  English-like function declaration: "to <name> <a> and <b> together ... done"
   // Parameters are identifiers joined by "and". Body ends with "together" or "done".
   function parseToFunction() {
     consume(TOKEN.TO);
@@ -1398,14 +1398,14 @@ function parseAsk() {
       }
       params.push({ name: advance().value });
     }
-    // The params loop stops at "together"/"done" — consume the terminator here
+    // The params loop stops at "together"/"done"  -  consume the terminator here
     // so parseBody parses the real body instead of treating this as an empty one.
     advance(); // consume "together" or "done"
     const body = parseBody(`function "${name}"`);
     return { type: 'FunctionDeclaration', name, params, body };
   }
 
-  // v2.3 — English-like array literal: "list with 1, 2, 3"
+  // v2.3  -  English-like array literal: "list with 1, 2, 3"
   // Parse comma-separated elements for "list with" (shared helper)
   function parseListWithElements() {
     const elements = [];
@@ -1433,7 +1433,7 @@ function parseAsk() {
     return { type: 'ArrayLiteral', elements };
   }
 
-  // v2.3 — English-like object literal: "record with name 'Alice' and age 30"
+  // v2.3  -  English-like object literal: "record with name 'Alice' and age 30"
   // consumeTerminator: true when used as expression (done closes record), false when standalone statement
   function parseRecordWith(consumeTerminator) {
     // Accept both "record_with" keyword and contextual "record" + "with"
@@ -1701,7 +1701,7 @@ function parseAsk() {
     return { type: 'GiveStatement', value };
   }
 
-  // v1.0.1 — generators: `yield <expr>` (optionally bare `yield`).
+  // v1.0.1  -  generators: `yield <expr>` (optionally bare `yield`).
   function parseYield() {
     consume(TOKEN.YIELD);
     let value = null;
@@ -1711,13 +1711,13 @@ function parseAsk() {
     return { type: 'YieldStatement', value };
   }
 
-  // v1.0.1 — record kinds: `define a kind called "Person" with … done`
+  // v1.0.1  -  record kinds: `define a kind called "Person" with … done`
   // The field block reuses the property-list grammar (`age is 0`), so each
   // field gets a default expression just like an object literal.
   function parseDefineKind() {
     advance(); // define
     const art = advance(); // "a" / "an"
-    // `define a kind called "Person"` — the word "kind" is optional prose.
+    // `define a kind called "Person"`  -  the word "kind" is optional prose.
     if (peek().type === TOKEN.IDENTIFIER && peek().value === 'kind') {
       advance(); // kind
     } else if (peek().type === TOKEN.IDENTIFIER && peek().value === 'called') {
@@ -1757,7 +1757,7 @@ function parseAsk() {
     return { type: 'DefineKindStatement', name, fields, extends: extendsKind };
   }
 
-  // v1.0.1 — record constructor (expression): `create a Person with name "Ada" and age 17`
+  // v1.0.1  -  record constructor (expression): `create a Person with name "Ada" and age 17`
   function parseCreateKind() {
     advance(); // create
     advance(); // a / an
@@ -1777,7 +1777,7 @@ function parseAsk() {
     return { type: 'CreateKindExpression', kind, pairs };
   }
 
-  // v1.0.1 — native test DSL: `test "name" … done`
+  // v1.0.1  -  native test DSL: `test "name" … done`
   function parseTestStatement() {
     advance(); // test
     const name = consume(TOKEN.STRING, 'Expected a test name string after "test".').value;
@@ -1785,7 +1785,7 @@ function parseAsk() {
     return { type: 'TestStatement', name, body };
   }
 
-  // v1.0.1 — assertions: `check <a> (equals|is|contains|raises) <b>`
+  // v1.0.1  -  assertions: `check <a> (equals|is|contains|raises) <b>`
   function parseCheckStatement() {
     advance(); // check
     // Parse the operand below the comparison level: `check` consumes the
@@ -1805,7 +1805,7 @@ function parseAsk() {
   }
 
   // for each <item> in <collection> ... done
-  // for every <item> in <collection> ... done  (alias — "every" maps to EACH token)
+  // for every <item> in <collection> ... done  (alias  -  "every" maps to EACH token)
   function parseForEach() {
     consume(TOKEN.FOR);
 
@@ -1817,7 +1817,7 @@ function parseAsk() {
         'Expected an index name after "for index".\n\nExample:\n  for index i from 0 to 9\n    show i\n  done'
       ).value;
       if (peek().type === TOKEN.IN || (peek().type === TOKEN.IDENTIFIER && peek().value === 'in')) {
-        // for index <name> in <collection> — zero-based index over a list.
+        // for index <name> in <collection>  -  zero-based index over a list.
         advance(); // in
         const collection = parseExpression();
         const body = parseBody('"for index" loop');
@@ -2063,8 +2063,8 @@ function parseAsk() {
     };
   }
 
-  // use <module>            — side-effect or canonical binding
-  // use <module> as <name>  — bind the package to a custom variable name
+  // use <module>             -  side-effect or canonical binding
+  // use <module> as <name>   -  bind the package to a custom variable name
   // <module> may carry a version range: use left-pad@^1.3.0
   function parseUse() {
     consume(TOKEN.USE);
@@ -2094,7 +2094,7 @@ function parseAsk() {
   function parseWhen() {
     consume(TOKEN.WHEN);
 
-    // v2.3 — "when <condition> ... done": English-like if statement.
+    // v2.3  -  "when <condition> ... done": English-like if statement.
     // Detect: when <expr> is ... / when <expr> above ... etc.
     // Must come after existing "when" event-handler checks.
     // Check if next token starts a condition (not someone, not "nothing", not socket,
@@ -2106,7 +2106,7 @@ function parseAsk() {
       (nextToken.type === TOKEN.IDENTIFIER && (nextToken.value === 'nothing' || nextToken.value === 'socket'));
 
     if (!isEventWhen) {
-      // v1.0.36 — when <target> "<event>" happens [as <name>] … done binds a
+      // v1.0.361  -  when <target> "<event>" happens [as <name>] … done binds a
       // DOM event listener: when button "click" happens => addEventListener.
       // Detection probes the target expression and commits only when a string
       // followed by "happens" is next; otherwise the tokens are replayed and
@@ -2127,7 +2127,7 @@ function parseAsk() {
           return { type: 'WhenTargetedStatement', target, event: eventStr, paramName, body };
         }
       } catch (_e) {
-        // Not a targeted "when" — replay and fall through to the condition form.
+        // Not a targeted "when"  -  replay and fall through to the condition form.
       }
       pos = savedPos;
 
@@ -2151,7 +2151,7 @@ function parseAsk() {
       return { type: 'IfStatement', condition, consequent, alternate: null };
     }
 
-    // v2.1.1 — "when nothing matches … done" registers the 404 catch-all.
+    // v2.1.1  -  "when nothing matches … done" registers the 404 catch-all.
     // It must appear after every route in the source; the generated handler
     // keeps that position.
     if (peek().type === TOKEN.IDENTIFIER && peek().value === 'nothing') {
@@ -2168,7 +2168,7 @@ function parseAsk() {
       return { type: 'NotFoundStatement', body };
     }
 
-    // IOPL-native — "when \"event\" happens as data … done": event listener.
+    // IOPL-native  -  "when \"event\" happens as data … done": event listener.
     // Must be checked before the "when someone" path.
     if (peek().type === TOKEN.STRING &&
         peekAt(1).type === TOKEN.HAPPENS) {
@@ -2184,7 +2184,7 @@ function parseAsk() {
       return { type: 'WhenHappensStatement', event: eventStr, paramName, body };
     }
 
-    // v2.1.0 — socket handlers inside a "websocket server" block come first:
+    // v2.1.0  -  socket handlers inside a "websocket server" block come first:
     // they read "when socket …", not "when someone …".
     const whenToken = peek();
     if (whenToken.type === TOKEN.IDENTIFIER && whenToken.value === 'socket') {
@@ -2213,7 +2213,7 @@ function parseAsk() {
     ));
   }
 
-  // v2.1.0 — socket handlers inside a "websocket server" block:
+  // v2.1.0  -  socket handlers inside a "websocket server" block:
   //   when socket connects … done
   //   when socket sends message … done
   //   when socket disconnects … done
@@ -2404,7 +2404,7 @@ function parseAsk() {
     return { type: 'ServeFolderStatement', folder };
   }
 
-  // ── v0.6 — Express DX ──────────────────────────────────────────────────────
+  // ── v0.6  -  Express DX ──────────────────────────────────────────────────────
 
   // web app
   function parseWebApp() {
@@ -2448,7 +2448,7 @@ function parseAsk() {
 
   // bot "<token>"  /  bot env("BOT_TOKEN")
   // Creates the polling Telegram bot and binds it to BOT (v1.2). The token
-  // argument may be any expression — the token literal is never required to
+  // argument may be any expression  -  the token literal is never required to
   // appear in source, and the runtime falls back to TELEGRAM_BOT_TOKEN.
   function parseBot() {
     advance(); // consume "bot"
@@ -2457,7 +2457,7 @@ function parseAsk() {
   }
 
   // start <port>  /  run on <port>
-  // start telegram bot  — explicit Telegram startup marker. Polling keeps
+  // start telegram bot   -  explicit Telegram startup marker. Polling keeps
   // the bot alive, so this form is only for documentation/intent.
   function parseStart() {
     const isRunOn = peek().type === TOKEN.RUN_ON;
@@ -2482,14 +2482,14 @@ function parseAsk() {
     return { type: 'StartStatement', port };
   }
 
-  // ── v0.6 — SQLite DX ───────────────────────────────────────────────────────
+  // ── v0.6  -  SQLite DX ───────────────────────────────────────────────────────
 
   // database "<file>" [using "<driver>"]  /  connect database "<file>" [using "<driver>"]  /  use database "<file>" [using "<driver>"]
   //
-  // v2.1.1 — the optional driver selects the SQLite engine without changing
+  // v2.1.1  -  the optional driver selects the SQLite engine without changing
   // any other PlainScript database semantics:
-  //   "native" — better-sqlite3 (requires a working native binding)
-  //   "wasm"   — sql.js WebAssembly build (runs anywhere Node runs)
+  //   "native"  -  better-sqlite3 (requires a working native binding)
+  //   "wasm"    -  sql.js WebAssembly build (runs anywhere Node runs)
   // The default ("auto") tries native first and falls back to the wasm
   // engine when the native binding is unavailable on this platform.
   function parseDatabase() {
@@ -2530,7 +2530,7 @@ function parseAsk() {
     return { type: 'DatabaseStatement', file, driver };
   }
 
-  // v2.1.0 — postgres "<connection-string>": binds the PostgreSQL pool to
+  // v2.1.0  -  postgres "<connection-string>": binds the PostgreSQL pool to
   // "db". SQL statements afterwards compile to async pool queries.
   function parsePostgres() {
     // "postgres" is contextual: only a declaration when followed by a value.
@@ -2539,7 +2539,7 @@ function parseAsk() {
     return { type: 'PostgresStatement', connection };
   }
 
-  // v2.2.0 — mongo "<connection-string>" [db "<name>"]: binds the MongoDB client.
+  // v2.2.0  -  mongo "<connection-string>" [db "<name>"]: binds the MongoDB client.
   // Usage: mongo "mongodb://localhost:27017" db "mydb"
   function parseMongo() {
     const token = advance(); // mongo or mongodb
@@ -2554,10 +2554,10 @@ function parseAsk() {
 
   // query/insert/update/delete/execute SQL_BODY DONE
   //
-  // v2.1.0 — the raw SQL may reference PlainScript variables with {name}
+  // v2.1.0  -  the raw SQL may reference PlainScript variables with {name}
   // placeholders. They are extracted at parse time and replaced: SQLite gets
   // anonymous "?" markers, PostgreSQL numbered "$1…" markers (the generator
-  // decides). Values are always passed as bound parameters — never spliced
+  // decides). Values are always passed as bound parameters  -  never spliced
   // into the SQL text.
   function parseSqlBlock(keyword, nodeType) {
     advance(); // consume the keyword token (QUERY_KW, INSERT_KW, etc.)
@@ -2573,7 +2573,7 @@ function parseAsk() {
     return { type: nodeType, ...extractSqlParams(rawSql) };
   }
 
-  // ── v2.1.1 — error handling, retries and backend middleware ───────────────
+  // ── v2.1.1  -  error handling, retries and backend middleware ───────────────
 
   function isHandledBy() {
     return peek().type === TOKEN.IDENTIFIER && peek().value === 'handled' &&
@@ -2663,7 +2663,7 @@ function parseAsk() {
       }
       advance(); // consume "done" that closes the finally block
     }
-    // No final "done" advance here — the enclosing parseBody() consumes it
+    // No final "done" advance here  -  the enclosing parseBody() consumes it
     return { type: 'TryStatement', body: tryBody, catches, finallyBody };
   }
 
@@ -2737,7 +2737,7 @@ function parseAsk() {
       if (peek().type === TOKEN.IDENTIFIER && peek().value === 'allow' && mimes === null) {
         advance(); // allow
         let elements;
-        // v2.4 — accept "list with" as alternative to bracket syntax
+        // v2.4  -  accept "list with" as alternative to bracket syntax
         if (peek().type === TOKEN.IDENTIFIER && peek().value === 'list' &&
             peekAt(1).type === TOKEN.WITH) {
           advance(); // "list"
@@ -2992,7 +2992,7 @@ function parseAsk() {
 
   // ── Expressions ────────────────────────────────────────────────────────────
 
-  // v2.1.1 — full arithmetic precedence:
+  // v2.1.1  -  full arithmetic precedence:
   //   nullish      := additive ("??" additive)*
   //   additive     := term (("+" | "-") term)*
   //   multiplicative ("term") := power (("*" | "/" | "%") power)*
@@ -3015,7 +3015,7 @@ function parseAsk() {
   // Expression-level boolean algebra: boolean operators usable in ordinary
   // value positions (e.g. `(x is above 3) and (x is below 10)` as a value).
   // Produces the SAME LogicalCondition nodes the condition level builds, so no
-  // separate boolean system exists — the existing condition generator emits
+  // separate boolean system exists  -  the existing condition generator emits
   // them, and comparisons fold as expression atoms via parseBooleanAtom.
   //   booleanOr  := booleanAnd ("or" booleanAnd)*
   //   booleanAnd := booleanNot ("and" booleanNot)*
@@ -3051,7 +3051,7 @@ function parseAsk() {
   // One boolean operand: a plain value with an optional comparison operator.
   // A comparison's OWN operands must stay at this level (never consuming
   // "and"/"or"), so the combinators above can see the "and"/"or" that joins
-  // two comparison atoms — e.g. "x is above 3 and y is below 5".
+  // two comparison atoms  -  e.g. "x is above 3 and y is below 5".
   function parseBooleanAtom() {
     const left = parseNullish();
     return tryParseComparisonOperator(left, false);
@@ -3126,7 +3126,7 @@ function parseAsk() {
       advance();
       return { type: 'AwaitExpression', value: parseUnary() };
     }
-    // v2.1.1 — await semantics: "wait for <value>" awaits an async operation.
+    // v2.1.1  -  await semantics: "wait for <value>" awaits an async operation.
     // The operand binds tightly (a full postfix chain), so
     // "wait for loadUser(id) + 1" means "(await loadUser(id)) + 1".
     // ("for" lexes as the FOR keyword, not an identifier.)
@@ -3220,11 +3220,11 @@ function parseAsk() {
 
   // primary → itemExpr | atom (postfix)*
   function parsePrimary() {
-    // Arrow function: (params) -> body — detected before grouped expression
+    // Arrow function: (params) -> body  -  detected before grouped expression
     if (peek().type === TOKEN.LPAREN && isArrowFunctionPattern()) {
       return parseArrowFunction();
     }
-    // v2.4 — "record with" and "list with" as expressions (contextual)
+    // v2.4  -  "record with" and "list with" as expressions (contextual)
     if (peek().type === TOKEN.IDENTIFIER && peek().value === 'record' &&
         peekAt(1).type === TOKEN.WITH) {
       return parseRecordWith(true);
@@ -3279,7 +3279,7 @@ function parseAsk() {
       return { type: 'CollectionReflectExpression', accessor, target };
     }
 
-    // v1.0.1 — record constructor: `create a Person with name "Ada" and age 17`.
+    // v1.0.1  -  record constructor: `create a Person with name "Ada" and age 17`.
     // `create` then an article ("a"/"an") then a kind name then "with" pairs.
     if (peek().type === TOKEN.IDENTIFIER && peek().value === 'create') {
       const a1 = peekAt(1);
@@ -3293,7 +3293,7 @@ function parseAsk() {
       }
     }
 
-    // v1.0.1 — concurrency combinators: `all of [a(), b()]`, `any of [...]`,
+    // v1.0.1  -  concurrency combinators: `all of [a(), b()]`, `any of [...]`,
     // `settled of [...]`. Guard on the identifier + "of" lookahead so plain
     // property reads like `all of the_list` still work as well as prose.
     if (peek().type === TOKEN.IDENTIFIER &&
@@ -3305,7 +3305,7 @@ function parseAsk() {
       return { type: 'ConcurrencyExpression', combo: comboKw, items };
     }
 
-    // v1.0.1 — `spread of <collection>` unfolds an iterable into a new array.
+    // v1.0.1  -  `spread of <collection>` unfolds an iterable into a new array.
     if (peek().type === TOKEN.IDENTIFIER && peek().value === 'spread' &&
         peekAt(1).type === TOKEN.IDENTIFIER && peekAt(1).value === 'of') {
       advance(); // spread
@@ -3325,7 +3325,7 @@ function parseAsk() {
 
     const item = tryParseItemExpression();
     if (item) return item;
-    // v1.0.36 — `new` works anywhere an expression is parsed (assignment
+    // v1.0.361  -  `new` works anywhere an expression is parsed (assignment
     // targets, call arguments, member chains). "new" is not a keyword, so this
     // identifier must be intercepted here; parseAtom would read it as a plain
     // Identifier and turn "new THREE.Scene()" into "new.THREE.Scene()".
@@ -3345,7 +3345,7 @@ function parseAsk() {
         node = { type: 'IndexExpression', object: node, index };
       } else if (peek().type === TOKEN.DOT) {
         advance();
-        // After ".", any word is a valid JS property/method name — including
+        // After ".", any word is a valid JS property/method name  -  including
         // words that are PlainScript keywords in other contexts (e.g. crypto
         // .update(...), obj .delete()). So accept any word token, not just an
         // identifier.
@@ -3412,7 +3412,7 @@ function parseAsk() {
         const idx = consume(TOKEN.NUMBER, 'Expected a number after "at position".').value;
         node = { type: 'IndexExpression', object: node, index: { type: 'NumberLiteral', value: idx } };
       } else if (peek().type === TOKEN.LPAREN) {
-        // Postfix call: invoke any expression — f()(), arr[0](1), mul(6)(7),
+        // Postfix call: invoke any expression  -  f()(), arr[0](1), mul(6)(7),
         // obj.method()(x), or an immediately-invoked lambda ((x) -> x + 1)(2).
         // Only continuation tokens are considered, so the call binds to the
         // chain (same rules as the existing "." / "[" cases below it).
@@ -3433,7 +3433,7 @@ function parseAsk() {
     return node;
   }
 
-  // v1.1 — Item expressions, detected before parseAtom:
+  // v1.1  -  Item expressions, detected before parseAtom:
   //   first player from players    → players[0]
   //   last player from players     → players[players.length - 1]
   //   player one from players      → players[0]
@@ -3446,7 +3446,7 @@ function parseAsk() {
     if (second.type !== TOKEN.IDENTIFIER) return null;
     if (third.type  !== TOKEN.IDENTIFIER) return null;
 
-    // v2.4 — skip "different from" which is a comparison, not an item expression
+    // v2.4  -  skip "different from" which is a comparison, not an item expression
     if (second.value === 'different' && third.value === 'from') return null;
 
     // Natural intent style: "first of <collection>" / "last of <collection>"
@@ -3457,7 +3457,7 @@ function parseAsk() {
       return { type: first.value === 'first' ? 'FirstItem' : 'LastItem', collection };
     }
 
-    // "first from players" / "last from players" — missing noun
+    // "first from players" / "last from players"  -  missing noun
     if ((first.value === 'first' || first.value === 'last') && second.value === 'from') {
       throw new Error(makeError(
         `Expected a noun after "${first.value}".\n\nExample:\n  ${first.value} player from players`,
@@ -3507,7 +3507,7 @@ function parseAsk() {
     if (token.type === TOKEN.TEMPLATE_STRING) { advance(); return { type: 'TemplateLiteral',  value: token.value }; }
     if (token.type === TOKEN.NUMBER)   { advance(); return { type: 'NumberLiteral',  value: token.value }; }
     if (token.type === TOKEN.BIGINT)   { advance(); return { type: 'BigIntLiteral',  value: token.value }; }
-    // v2.1.1 — boolean and null literals
+    // v2.1.1  -  boolean and null literals
     if (token.type === TOKEN.TRUE_KW)  { advance(); return { type: 'BooleanLiteral', value: true }; }
     if (token.type === TOKEN.FALSE_KW) { advance(); return { type: 'BooleanLiteral', value: false }; }
     if (token.type === TOKEN.NULL_KW)  { advance(); return { type: 'NullLiteral' }; }
@@ -3530,7 +3530,7 @@ function parseAsk() {
       // Bare symbol keyword - treat as Symbol() with no args
       return { type: 'CallExpression', name: 'Symbol', args: [] };
     }
-    // v2.1.1 — parenthesised grouping: (a + b) * c
+    // v2.1.1  -  parenthesised grouping: (a + b) * c
     if (token.type === TOKEN.LPAREN) {
       advance();
       const inner = parseExpression();
@@ -3540,7 +3540,7 @@ function parseAsk() {
     if (token.type === TOKEN.LBRACKET) { return parseArrayLiteral(); }
     if (token.type === TOKEN.LBRACE)   { return parseInlineObjectLiteral(); }
 
-    // v2.1.1 — HTTP client prefix form:
+    // v2.1.1  -  HTTP client prefix form:
     //   get "<url>"            post urlExpr with <body>
     //   put/patch/delete …     optional "headers { … }" and "timeout <ms>" clauses
     // The call form get(...) stays an ordinary user/builtin call.
@@ -3595,7 +3595,7 @@ function parseAsk() {
       return { type: 'Identifier', name: token.value };
     }
 
-    // v2.1.0 — query("field") as a value: the HTTP query-string accessor.
+    // v2.1.0  -  query("field") as a value: the HTTP query-string accessor.
     // The SQLite block form only applies when "query" stands alone.
     if (token.type === TOKEN.QUERY_KW && peekAt(1).type === TOKEN.LPAREN) {
       return parseCallExpression();
@@ -3607,7 +3607,7 @@ function parseAsk() {
     ));
   }
 
-  // v2.1.1 — "get", "post", "put", "patch" lex as identifiers; "delete" lexes
+  // v2.1.1  -  "get", "post", "put", "patch" lex as identifiers; "delete" lexes
   // as the SQL keyword token. All five introduce an HTTP request when followed
   // by a URL value instead of "(".
   function httpMethodWord(token) {
@@ -3626,7 +3626,7 @@ function parseAsk() {
     ].includes(token.type);
   }
 
-  // v2.1.1 — parse one HTTP request expression after its method word.
+  // v2.1.1  -  parse one HTTP request expression after its method word.
   //
   //   get <url> [headers <object>] [timeout <ms>]
   //   post|put|patch|delete <url> [with <body>] [headers <object>] [timeout <ms>]
@@ -3688,7 +3688,7 @@ function parseAsk() {
     return { type: 'ArrayLiteral', elements };
   }
 
-  // v1.2 — Inline object literal: { key: value, ... }
+  // v1.2  -  Inline object literal: { key: value, ... }
   // If `isPattern` is true, allows shorthand { x, y } for destructuring
   function parseInlineObjectLiteral(isPattern) {
     consume(TOKEN.LBRACE);
@@ -3763,7 +3763,7 @@ function parseAsk() {
     return { type: 'ObjectLiteral', properties };
   }
 
-  // v2.1.0 — "key is value" pairs until "done", shared by the mail
+  // v2.1.0  -  "key is value" pairs until "done", shared by the mail
   // statements. Returns [{ key, value }] and consumes the closing DONE.
   function parsePropertyList(contextName) {
     const properties = [];
@@ -3774,7 +3774,7 @@ function parseAsk() {
           peek()
         ));
       }
-      // v2.4 — accept keyword tokens as property names (e.g., "to" in mail transport)
+      // v2.4  -  accept keyword tokens as property names (e.g., "to" in mail transport)
       const keyToken = peek();
       if (keyToken.type === TOKEN.IDENTIFIER || keyToken.type === TOKEN.TO ||
           keyToken.type === TOKEN.FROM || keyToken.type === TOKEN.AND ||
@@ -3795,7 +3795,7 @@ function parseAsk() {
     return properties;
   }
 
-  // v2.1.0 — every <n> <unit>s … done: repeat work on an interval.
+  // v2.1.0  -  every <n> <unit>s … done: repeat work on an interval.
   // The unit is resolved to milliseconds at parse time; the generator emits
   // a plain setInterval with count * unit.
   function parseEvery() {
@@ -3816,7 +3816,7 @@ function parseAsk() {
     return { type: 'EveryStatement', count, unit, body };
   }
 
-  // v1.0.36 — every frame … done: a requestAnimationFrame loop whose body runs
+  // v1.0.361  -  every frame … done: a requestAnimationFrame loop whose body runs
   // once per animation frame. The next frame is scheduled after the body so it
   // always runs (t is the frame timestamp, like the DOM's rAF callback).
   function parseEveryFrame() {
@@ -3826,7 +3826,7 @@ function parseAsk() {
     return { type: 'EveryFrameStatement', body };
   }
 
-  // v1.0.36 — after <n> <unit>s … done: run work once after a delay.
+  // v1.0.361  -  after <n> <unit>s … done: run work once after a delay.
   //   after 5 seconds
   //       show "butter!"  ...  done
   // The delay is a number expression ("after count seconds"); the unit is
@@ -3846,7 +3846,7 @@ function parseAsk() {
     return { type: 'AfterStatement', delay, unit, body };
   }
 
-  // v2.1.0 — websocket server on <port> … done
+  // v2.1.0  -  websocket server on <port> … done
   //
   //   websocket server on 8081
   //       when socket connects … done
@@ -3897,12 +3897,12 @@ function parseAsk() {
     return { type: 'WebSocketServerStatement', port, connectBody, messageBody, disconnectBody };
   }
 
-  // v2.1.1 — whatsapp bot … done
+  // v2.1.1  -  whatsapp bot … done
   //
   //   whatsapp bot
   //       auth "session"                       (optional; session folder name)
-  //       login qr                             — or —
-  //       login pairing "2348012345678"        (literal) — or —
+  //       login qr                              -  or  - 
+  //       login pairing "2348012345678"        (literal)  -  or  - 
   //       login pairing phone                  (any value, e.g. from ask)
   //
   //       on message
@@ -3933,7 +3933,7 @@ function parseAsk() {
         ));
       }
 
-      // use baileys "<pkg>" — override the Baileys implementation package.
+      // use baileys "<pkg>"  -  override the Baileys implementation package.
       // Default is @whiskeysockets/baileys. Accepts any require-able package
       // name, so developers can pin a local adapter or another compatible fork.
       if (peek().type === TOKEN.USE && peekAt(1).value === 'baileys' && peekAt(2).type === TOKEN.STRING) {
@@ -3943,7 +3943,7 @@ function parseAsk() {
         continue;
       }
 
-      // auth "<folder>" — where WhatsApp session credentials persist.
+      // auth "<folder>"  -  where WhatsApp session credentials persist.
       if (peek().type === TOKEN.IDENTIFIER && peek().value === 'auth' &&
           peekAt(1).type === TOKEN.STRING) {
         advance(); // auth
@@ -3962,7 +3962,7 @@ function parseAsk() {
         }
         if (modeToken.type === TOKEN.IDENTIFIER && modeToken.value === 'pairing') {
           advance(); // pairing
-          // v2.1.2 — the phone may be a string literal (validated here at
+          // v2.1.2  -  the phone may be a string literal (validated here at
           // compile time) or any PlainScript value, typically a variable filled by
           // `ask`:
           //
@@ -3987,7 +3987,7 @@ function parseAsk() {
         ));
       }
 
-      // on message … done — the message handler.
+      // on message … done  -  the message handler.
       if (peek().type === TOKEN.ON && peekAt(1).type === TOKEN.IDENTIFIER && peekAt(1).value === 'message') {
         advance(); // on
         advance(); // message
@@ -4020,7 +4020,7 @@ function parseAsk() {
     const cleaned = String(raw).replace(/[\s()+\-\.]/g, '');
     if (!/^[0-9]+$/.test(cleaned)) {
       throw new Error(makeError(
-        `"${raw}" is not a valid phone number for "login pairing".\n\nUse the full international number, digits only — country code first, no "+" and no spaces:\n\nExample:\n  login pairing "2348012345678"`,
+        `"${raw}" is not a valid phone number for "login pairing".\n\nUse the full international number, digits only  -  country code first, no "+" and no spaces:\n\nExample:\n  login pairing "2348012345678"`,
         token
       ));
     }
@@ -4276,7 +4276,7 @@ function parseAsk() {
       }
       args.push(parseExpression());
     }
-    // v1.1 — collection expressions: add(item to list) / remove(item from list) / write(data to "file")
+    // v1.1  -  collection expressions: add(item to list) / remove(item from list) / write(data to "file")
     if (args.length === 1 && (
         (peek().type === TOKEN.IDENTIFIER && (peek().value === 'to' || peek().value === 'from')) ||
         peek().type === TOKEN.TO)) {
@@ -4290,7 +4290,7 @@ function parseAsk() {
     return { separator, args };
   }
 
-  // v1.1 — Build a collection or I/O expression from a "to"/"from" special form.
+  // v1.1  -  Build a collection or I/O expression from a "to"/"from" special form.
   function buildSpecialCall(name, separator, args, nameToken) {
     if (separator === 'to' && name === 'add') {
       return { type: 'AddCall', value: args[0], collection: args[1] };
@@ -4382,14 +4382,14 @@ function parseAsk() {
     return { type: 'ClassDeclaration', name, superClass, body };
   }
 
-  // new ClassName(args) — the constructor-call forms:
+  // new ClassName(args)  -  the constructor-call forms:
   //   new Foo                  → new Foo()
   //   new Foo(1, 2)            → new Foo(1, 2)
   //   new window.Thing(1, 2)   → new window.Thing(1, 2)
   //   new Foo().bar            → new Foo().bar      (postfix continues in parsePrimary)
   // Called with the "new" word already consumed. The callee is parsed as a
   // plain identifier plus a member chain so "new THREE.Scene(75)" binds the
-  // argument list to the constructor — not to a member call.
+  // argument list to the constructor  -  not to a member call.
   function parseNewExpressionCore() {
     const callee = parseNewCallee();
     let args = [];
@@ -4409,7 +4409,7 @@ function parseAsk() {
   }
 
   // The constructor name after "new": an identifier with an optional member
-  // chain. Deliberately narrower than parsePrimary — a call paren following
+  // chain. Deliberately narrower than parsePrimary  -  a call paren following
   // the callee belongs to the constructor, so it is never consumed here.
   function parseNewCallee() {
     const token = peek();

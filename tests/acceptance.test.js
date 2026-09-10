@@ -1,8 +1,8 @@
 ﻿// Acceptance tests for the v2.1.1 example projects.
 //
 // These boot the REAL compiled output of examples/ over live HTTP:
-//   • examples/football-backend/app.pln  — SQLite + sessions + api key + 404
-//   • examples/id-verification/app.pln   — uploads + ocr + name matching
+//   • examples/football-backend/app.pln   -  SQLite + sessions + api key + 404
+//   • examples/id-verification/app.pln    -  uploads + ocr + name matching
 //
 // tesseract.js is not bundled (it downloads language data on demand), so the
 // OCR engine is replaced by a deterministic stub that genuinely decodes the
@@ -133,7 +133,7 @@ function decodeIdPngText(png) {
   return lines.filter((line) => line.length > 0).join('\n');
 }
 
-console.log('\nAcceptance — football backend');
+console.log('\nAcceptance  -  football backend');
 console.log('(examples/football-backend/app.pln over live HTTP)');
 
 async function footballAcceptance() {
@@ -206,7 +206,7 @@ async function footballAcceptance() {
 
 // ── ID verification ───────────────────────────────────────────────────────────
 
-console.log('\nAcceptance — ID verification');
+console.log('\nAcceptance  -  ID verification');
 console.log('(examples/id-verification/app.pln over live HTTP)');
 
 async function idVerificationAcceptance() {

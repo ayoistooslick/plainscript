@@ -14,29 +14,29 @@ const PACKAGE_MAP = Object.freeze({
   sqlite: 'better-sqlite3',
   fs: 'fs',
   path: 'path',
-  // v2.0.1 — OCR statements are backed by tesseract.js. The mapping keeps the
+  // v2.0.1  -  OCR statements are backed by tesseract.js. The mapping keeps the
   // implementation dependency out of PlainScript's language surface: source says
   // `ocr ... as text`, tooling installs tesseract.js.
   ocr: 'tesseract.js',
-  // v2.1.0 — PostgreSQL behind the friendly "postgres" name.
+  // v2.1.0  -  PostgreSQL behind the friendly "postgres" name.
   postgres: 'pg',
-  // v2.1.0 — backend integrations keep implementation packages out of source.
+  // v2.1.0  -  backend integrations keep implementation packages out of source.
   mailer: 'nodemailer',
   scheduler: 'croner',
   websocket: 'ws',
   cache: 'redis',
-  // v2.1.1 — "accept uploads" is backed by multer; the WebAssembly SQLite
+  // v2.1.1  -  "accept uploads" is backed by multer; the WebAssembly SQLite
   // engine used by the `database` statement's fallback chain is sql.js.
   uploads: 'multer',
   'wasm-sqlite': 'sql.js',
-  // v2.1.1 — WhatsApp bots run on Baileys; QR codes render in the terminal
+  // v2.1.1  -  WhatsApp bots run on Baileys; QR codes render in the terminal
   // through qrcode-terminal. These are optional application dependencies, not
   // compiler dependencies. Pin the default adapter so `plainscript install`
   // remains reproducible; users can override it per-block with
   // `use baileys "<pkg>"`.
   whatsapp: '@whiskeysockets/baileys@6.7.24',
   'wa-qrcode': 'qrcode-terminal',
-  // v2.2.0 — MongoDB driver.
+  // v2.2.0  -  MongoDB driver.
   mongodb: 'mongodb',
 });
 
@@ -46,7 +46,7 @@ function isBuiltinModule(name) {
   return BUILTIN_MODULES.has(name) || BUILTIN_MODULES.has(`node:${name}`);
 }
 
-// v2.0.1 — split an npm specifier into its package name and version range.
+// v2.0.1  -  split an npm specifier into its package name and version range.
 //
 //   "express"        → { name: "express", spec: null }
 //   "left-pad@^1.3"  → { name: "left-pad", spec: "^1.3" }
@@ -88,7 +88,7 @@ function visit(node, onUse) {
     // The `web app` shorthand creates an Express application.
     onUse('express');
   } else if (node.type === 'DatabaseStatement') {
-    // v2.1.1 — `database` runs SQLite through a portable engine chain:
+    // v2.1.1  -  `database` runs SQLite through a portable engine chain:
     // better-sqlite3 (native) first, sql.js (WebAssembly) as the fallback.
     // "using" picks one engine explicitly.
     if (node.driver === 'wasm') {
@@ -100,31 +100,31 @@ function visit(node, onUse) {
       onUse('wasm-sqlite');
     }
   } else if (node.type === 'AcceptUploadsStatement') {
-    // v2.1.1 — `accept uploads` is backed by multer under the hood.
+    // v2.1.1  -  `accept uploads` is backed by multer under the hood.
     onUse('uploads');
   } else if (node.type === 'PostgresStatement') {
-    // v2.1.0 — `postgres "<url>"` uses node-postgres under the hood.
+    // v2.1.0  -  `postgres "<url>"` uses node-postgres under the hood.
     onUse('postgres');
   } else if (node.type === 'MongoStatement') {
-    // v2.2.0 — `mongo "<uri>"` uses mongodb driver under the hood.
+    // v2.2.0  -  `mongo "<uri>"` uses mongodb driver under the hood.
     onUse('mongodb');
   } else if (node.type === 'OcrStatement') {
-    // v2.0.1 — `ocr "<image>" as <variable>` uses tesseract.js under the hood.
+    // v2.0.1  -  `ocr "<image>" as <variable>` uses tesseract.js under the hood.
     onUse('ocr');
   } else if (node.type === 'MailTransportStatement' || node.type === 'SendMailStatement') {
-    // v2.1.0 — email statements use nodemailer under the hood.
+    // v2.1.0  -  email statements use nodemailer under the hood.
     onUse('mailer');
   } else if (node.type === 'ScheduleStatement') {
-    // v2.1.0 — cron schedules use croner under the hood.
+    // v2.1.0  -  cron schedules use croner under the hood.
     onUse('scheduler');
   } else if (node.type === 'WebSocketServerStatement') {
-    // v2.1.0 — websocket servers use ws under the hood.
+    // v2.1.0  -  websocket servers use ws under the hood.
     onUse('websocket');
   } else if (node.type === 'CacheStatement') {
-    // v2.1.0 — cache statements use the redis client under the hood.
+    // v2.1.0  -  cache statements use the redis client under the hood.
     onUse('cache');
   } else if (node.type === 'WhatsAppBotStatement') {
-    // v2.1.1 — WhatsApp bots run on Baileys and render QR codes with
+    // v2.1.1  -  WhatsApp bots run on Baileys and render QR codes with
     // qrcode-terminal; both are implementation packages, never source.
     // The user may override the Baileys package per-block with
     // `use baileys "<pkg>"`; otherwise the default is used.

@@ -1,4 +1,4 @@
-// PlainScript 1.0.36: image normalisation for the ID-verification SDK.
+// PlainScript 1.0.361: image normalisation for the ID-verification SDK.
 //
 // Depends on the `sharp` npm package plus Node built-ins fs and path. It shows
 // chained method calls (sharp(...).resize(w).toFile(...)) and member access on

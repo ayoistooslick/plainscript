@@ -26,7 +26,7 @@ code { font-size: .92em; color: #b9e6c7; }
 
 .container { width: min(1120px, calc(100% - 40px)); margin: 0 auto; }
 
-/* Full-bleed animated background — flat, no glow */
+/* Full-bleed animated background  -  flat, no glow */
 .bg-scrim, #bg-canvas {
   position: fixed;
   inset: 0;
@@ -84,7 +84,7 @@ code { font-size: .92em; color: #b9e6c7; }
 .nav-toggle[aria-expanded="true"] .nav-toggle-bar:nth-child(2) { opacity: 0; }
 .nav-toggle[aria-expanded="true"] .nav-toggle-bar:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
 
-/* Hero — asymmetric, the headline is the demo */
+/* Hero  -  asymmetric, the headline is the demo */
 .hero { position: relative; border-bottom: 1px solid var(--line); }
 .hero-content { position: relative; z-index: 1; padding: 0; }
 .hero-grid {
@@ -226,7 +226,7 @@ pre code {
 .section-lead { color: var(--muted); }
 .three-column, .feature-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); }
 
-/* Cards — flat, hairline-separated, no shadow */
+/* Cards  -  flat, hairline-separated, no shadow */
 .info-card, .feature-card, .library-card {
   padding: 24px;
   border: none;

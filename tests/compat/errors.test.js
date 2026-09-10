@@ -1,4 +1,4 @@
-// PlainScript — error-handling capability suite.
+// PlainScript  -  error-handling capability suite.
 //
 // Verifies throw / try / recover (typed + untyped) / retry by RUNNING snippets
 // and checking runtime behaviour.

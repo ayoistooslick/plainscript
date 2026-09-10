@@ -1,4 +1,4 @@
-// PlainScript 1.0.36: expression operators.
+// PlainScript 1.0.361: expression operators.
 remember sumValue as (2 + 3) * 4
 if sumValue is 20
     show "exact"

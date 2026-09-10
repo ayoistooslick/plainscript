@@ -1,4 +1,4 @@
-// PlainScript — SourceMap (V3) verification suite.
+// PlainScript  -  SourceMap (V3) verification suite.
 
 const fs = require('fs');
 const path = require('path');

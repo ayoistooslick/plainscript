@@ -76,7 +76,7 @@ Describe *what* you want. The compiler decides *how* to implement it in JavaScri
 
 ## Why PlainScript
 
-Most languages ask you to describe *how* a computation happens: loop constructs, control flow, boilerplate. PlainScript inverts that. You write source that reads like an instruction to a competent engineer, and a deterministic compiler — no rules engine, no AI, no hidden codegen — turns it into JavaScript.
+Most languages ask you to describe *how* a computation happens: loop constructs, control flow, boilerplate. PlainScript inverts that. You write source that reads like an instruction to a competent engineer, and a deterministic compiler  -  no rules engine, no AI, no hidden codegen  -  turns it into JavaScript.
 
 | | |
 |---|---|
@@ -122,7 +122,7 @@ done
 </tr>
 </table>
 
-**Current version:** `v1.0.36` — the `plainscript-lang` npm package, with a TypeScript-style production build (`plainscript build` → `dist/`, source names and structure preserved).
+**Current version:** `v1.0.361`  -  the `plainscript-lang` npm package, with a TypeScript-style production build (`plainscript build` → `dist/`, source names and structure preserved).
 
 ---
 
@@ -140,7 +140,7 @@ Adding PlainScript to an existing project:
 
 ```bash
 npm install --save-dev plainscript-lang
-# start writing src/*.pln files — plainscript build auto-discovers them
+# start writing src/*.pln files  -  plainscript build auto-discovers them
 ```
 
 No global install is required. Everything runs through `npm` scripts and `npx`.
@@ -186,7 +186,7 @@ socket export plus `useMultiFileAuthState`, `makeCacheableSignalKeyStore`, and
 
 | Command | Description |
 |---|---|
-| `plainscript run <file.pln>` | Installs missing dependencies, compiles, and executes. Runs from a scratch directory — nothing is written into your project. |
+| `plainscript run <file.pln>` | Installs missing dependencies, compiles, and executes. Runs from a scratch directory  -  nothing is written into your project. |
 | `plainscript build [file.pln]` | Compiles to `dist/`. With no argument, builds every `.pln` file under the source root, preserving names and folder structure. |
 | `plainscript check <file.pln>` | Checks syntax only. No output, no execution. |
 | `plainscript fmt <file.pln>` | Formats a PlainScript file in place. |
@@ -204,7 +204,7 @@ socket export plus `useMultiFileAuthState`, `makeCacheableSignalKeyStore`, and
 
 ## Building &amp; Configuration
 
-`plainscript build` is a deterministic production build — TypeScript-style, but for `.pln` sources — with zero configuration required.
+`plainscript build` is a deterministic production build  -  TypeScript-style, but for `.pln` sources  -  with zero configuration required.
 
 - Run with no argument and it discovers every `.pln` file under `src/`, compiling each to `dist/` while **preserving source file names and folder structure**: `src/messi.pln` → `dist/messi.js`, `src/helpers/math.pln` → `dist/helpers/math.js`.
 - `plainscript build <file.pln>` compiles a single file into `dist/`.
@@ -237,11 +237,11 @@ For projects that need custom output or source directories, add a `plainscript.c
     "build": "plainscript build",
     "prepare": "plainscript build"
   },
-  "devDependencies": { "plainscript-lang": "^1.0.36" }
+  "devDependencies": { "plainscript-lang": "^1.0.361" }
 }
 ```
 
-`src/index.pln` builds to `dist/index.js`; consumers install and `require()` it like any Node package. There is no PlainScript-specific registry or format — standard `package.json` semantics apply.
+`src/index.pln` builds to `dist/index.js`; consumers install and `require()` it like any Node package. There is no PlainScript-specific registry or format  -  standard `package.json` semantics apply.
 
 ---
 
@@ -249,7 +249,7 @@ For projects that need custom output or source directories, add a `plainscript.c
 
 PlainScript is a fixed vocabulary of English verbs compiled to JavaScript. Every
 construct follows the same rhythm: a word opens a block, `done` closes it, and
-`give` returns a value — a sentence you could say to a colleague ("if the score
+`give` returns a value  -  a sentence you could say to a colleague ("if the score
 is at least 80, show accepted, otherwise review") is valid source. The sections
 below keep the code first, with a short note on what each construct is *for* and
 the constraint that matters when you use it.
@@ -285,7 +285,7 @@ Best regards,
 The Team`
 ```
 
-Interpolation compiles directly to JavaScript template literals — it is not evaluated at compile time. Literal dollar signs without `{` are preserved as-is.
+Interpolation compiles directly to JavaScript template literals  -  it is not evaluated at compile time. Literal dollar signs without `{` are preserved as-is.
 
 ### Conditions
 
@@ -339,7 +339,7 @@ All comparison operators:
 ### Conditional expressions
 
 `choosing` is the value form of `if`: pick between two expressions and keep the
-whole thing inline — in an argument, a `give`, or a list element.
+whole thing inline  -  in an argument, a `give`, or a list element.
 
 ```
 remember verdict as choosing score is at least 90 then "A" otherwise "B"
@@ -363,7 +363,7 @@ done
 ```
 
 `make name(args)` and its `to ... together` spelling define a function; `done`
-closes it — the PlainScript form of JavaScript's `function`. `give <value>` (or
+closes it  -  the PlainScript form of JavaScript's `function`. `give <value>` (or
 `give back <value>`) returns; `give` alone simply ends the function. A `make`
 function is a value like any other, so it can be stored with `remember`, passed
 as an argument, or returned from another function. Arguments are optional with
@@ -371,7 +371,7 @@ defaults: `make label(name as "guest")`.
 
 ### Lambdas
 
-A lambda is a function without a name, written where a value is expected —
+A lambda is a function without a name, written where a value is expected  - 
 `(a, b) -> a + b` is JavaScript's `(a, b) => a + b`. Use the arrow form for a
 one-expression body and the `do ... done` form when the body has several
 statements:
@@ -484,7 +484,7 @@ show player two from players     // players[1]
 first player from players is now "Haaland"  // players[0] = "Haaland"
 ```
 
-Number words from `one` to `twenty` map to one-based positions — `player one` is the first item.
+Number words from `one` to `twenty` map to one-based positions  -  `player one` is the first item.
 
 **Collections**
 
@@ -520,7 +520,7 @@ The older `readFile()` / `writeFile()` forms still work and are unchanged.
 ### Logical Assignment
 
 The word-style assignment operators keep the common "fill the empty value"
-pattern on one line — PlainScript for `flag = flag || true` and
+pattern on one line  -  PlainScript for `flag = flag || true` and
 `val = val ?? "default"`:
 
 ```
@@ -558,13 +558,13 @@ done
 Asynchronous work uses `wait for <promise>` (or `await <promise>`). A `make`
 function or lambda that `wait for`s a promise becomes async automatically, and
 `all of [...]`, `any of [...]`, and `settled of [...]` run several promises at
-once. Events bind with `when <target> "<event>" happens [as <name>] ... done` —
-the DOM equivalent of `addEventListener` — and server/websocket forms follow
+once. Events bind with `when <target> "<event>" happens [as <name>] ... done`  - 
+the DOM equivalent of `addEventListener`  -  and server/websocket forms follow
 the same `when ... done` pattern.
 
 ### Record Kinds, Concurrency &amp; More
 
-For the shapes that repeat in a program — a user, a message, an order — declare
+For the shapes that repeat in a program  -  a user, a message, an order  -  declare
 a **record kind** and construct instances with `create`. Kinds behave like
 plain objects with a known field list: setting an unknown field throws, which
 catches typos early.
@@ -605,8 +605,8 @@ PlainScript 1.0.2 closes most of the gap with TypeScript-class languages using i
 
 **How the pieces fit together.** PlainScript is deliberately small: a handful
 of verbs (`remember`, `give`, `if` / `otherwise`, `done`) plus the collections
-and functions you just met. Everything is a value — numbers and strings,
-comparisons, collections, lambdas, whole functions — so pieces nest instead of
+and functions you just met. Everything is a value  -  numbers and strings,
+comparisons, collections, lambdas, whole functions  -  so pieces nest instead of
 needing new syntax: a lambda inside a list, a comparison handed to a filter, a
 `make` function stored in a record. When a pattern repeats, extract it into a
 `make` function (or a lambda), group related names into a module, and call the
@@ -618,7 +618,7 @@ the primitives above, available to every program.
 
 ## Backend Services
 
-Everything in this section is compiled by the deterministic compiler — no rules, no AI, no hidden codegen.
+Everything in this section is compiled by the deterministic compiler  -  no rules, no AI, no hidden codegen.
 
 ### Databases
 
@@ -628,7 +628,7 @@ Portable databases (SQLite native or WebAssembly):
 database "app.db"                  // probes better-sqlite3, falls back to sql.js
 ```
 
-`plainscript install` verifies that `better-sqlite3` actually loads. If the native module cannot be used, PlainScript warns and continues on the pure-JavaScript WebAssembly engine (`sql.js`) — the same program runs unchanged. An engine can be forced explicitly:
+`plainscript install` verifies that `better-sqlite3` actually loads. If the native module cannot be used, PlainScript warns and continues on the pure-JavaScript WebAssembly engine (`sql.js`)  -  the same program runs unchanged. An engine can be forced explicitly:
 
 ```
 database "app.db" using "native"   // hard requirement: better-sqlite3
@@ -759,8 +759,8 @@ done
 
 ## Runtime Standard Library
 
-No imports needed — these functions are built into the compiler. They are the
-standard vocabulary of everyday work — JSON, files, time, strings — so the
+No imports needed  -  these functions are built into the compiler. They are the
+standard vocabulary of everyday work  -  JSON, files, time, strings  -  so the
 first version of a program usually needs no dependency at all:
 
 | PlainScript | Description |
@@ -818,7 +818,7 @@ start 3000
 The same `.pln` you run on Node compiles to a browser script. Drive a canvas,
 handle keyboard, pointer, touch, and gamepad input, run `requestAnimationFrame`
 loops with delta time, load images and audio, and call any JavaScript library
-(Three.js, WebGL, WebGPU, Matter.js) through plain interop — no bundler needed:
+(Three.js, WebGL, WebGPU, Matter.js) through plain interop  -  no bundler needed:
 
 ```plainscript
 web app
@@ -850,8 +850,8 @@ done
 `gamepads`, `droppedFiles`, `webSocketSend`, and the WebGL helpers
 `webglContext`/`glShader`/`glProgram`/`glBuffer`) make canvas apps, games, and
 DOM UI direct. The full browser
-and game development guide — input, loops, assets, audio, state, collision,
-networking, persistence, and interop — is [docs/GAME-PROMPT.md](docs/GAME-PROMPT.md).
+and game development guide  -  input, loops, assets, audio, state, collision,
+networking, persistence, and interop  -  is [docs/GAME-PROMPT.md](docs/GAME-PROMPT.md).
 
 ## Additional Backend Capabilities
 
@@ -1017,7 +1017,7 @@ done
 export circleArea
 ```
 
-Imports are bundled per entry: `plainscript build` gives every source file its own standalone output under `dist/`, with imported code inlined. Functions, lambdas, records, and modules together are how you build your own vocabulary on top of the core verbs — a new reader puzzle (`validate(body, fields)`) is a one-line call, not a loop.
+Imports are bundled per entry: `plainscript build` gives every source file its own standalone output under `dist/`, with imported code inlined. Functions, lambdas, records, and modules together are how you build your own vocabulary on top of the core verbs  -  a new reader puzzle (`validate(body, fields)`) is a one-line call, not a loop.
 
 ---
 
@@ -1050,7 +1050,7 @@ done
 
 ## WhatsApp Bots
 
-Full WhatsApp connectivity through Baileys — the implementation package is installed automatically and never appears in source:
+Full WhatsApp connectivity through Baileys  -  the implementation package is installed automatically and never appears in source:
 
 ```
 whatsapp bot
@@ -1074,7 +1074,7 @@ done
 ```
 
 - `login qr` prints a scannable QR code; `login pairing "<number>"` prints an enter-on-phone code instead. Pairing numbers are validated at compile time (digits only after normalization, 8–15 characters).
-- `login pairing` also accepts a variable — prompt for the number at runtime instead of hard-coding it:
+- `login pairing` also accepts a variable  -  prompt for the number at runtime instead of hard-coding it:
 
 ```
 ask "WhatsApp number: " as phone

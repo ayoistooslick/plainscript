@@ -1,4 +1,4 @@
-# PlainScript 1.0.36 language specification
+# PlainScript 1.0.361 language specification
 
 This reference covers the syntax implemented by `compiler/lexer.js` and
 `compiler/parser.js`. The runtime it generates lives in
@@ -378,7 +378,7 @@ documents, buttons, lists, and more. The following helpers are available:
 `"reaction"`, `"contact"`, `"contacts"`, `"location"`, `"live-location"`,
 `"poll"`, `"group-invite"`, and `"other"`.
 
-**Full example — media, buttons, and list replies:**
+**Full example  -  media, buttons, and list replies:**
 
 ```plainscript
 whatsapp bot
@@ -449,7 +449,7 @@ PlainScript compiles to Plain JavaScript that runs in modern browsers. A
 `web app` can serve the page itself, or you compile a `.pln` to `game.js` and
 serve it with any static host. The tested workflows are:
 
-1. **Static**, served by PlainScript — `web app` + `serve folder "public"` +
+1. **Static**, served by PlainScript  -  `web app` + `serve folder "public"` +
    a `reply file` route that returns `index.html`:
 
    ```plainscript
@@ -461,10 +461,10 @@ serve it with any static host. The tested workflows are:
    start 8000
    ```
 
-2. **Static**, any host — `node compiler/cli.js build game.pln -o public/game.js`
+2. **Static**, any host  -  `node compiler/cli.js build game.pln -o public/game.js`
    and include `<script src="game.js">` after the canvas and any CDN globals.
 
-Canvas apps use the same value/property interop as everything else — canvas
+Canvas apps use the same value/property interop as everything else  -  canvas
 state is assigned with `becomes`, then a draw call runs:
 
 ```plainscript
@@ -476,7 +476,7 @@ ctx.fillRect(0, 0, 320, 240)
 
 Animation is `requestAnimationFrame`. Two native loop forms: `every frame`
 (timing-agnostic) and an explicit rAF callback with delta seconds for
-frame-rate-independent movement — see `docs/GAME-PROMPT.md` for the canonical
+frame-rate-independent movement  -  see `docs/GAME-PROMPT.md` for the canonical
 `dt` idiom. Input uses the DOM event form; `when <target> "<event>" happens`
 becomes `addEventListener`, and reading a key map uses a boolean comparison:
 
@@ -494,7 +494,7 @@ if keys["ArrowLeft"] is true
 done
 ```
 
-Browser builtins are either direct helpers or auto-awaited promises — no
+Browser builtins are either direct helpers or auto-awaited promises  -  no
 `await` is written for the loaders:
 
 - `select("canvas")` / `selectAll(".card")` / `parseHTML("<div>...</div>")`
@@ -503,7 +503,7 @@ Browser builtins are either direct helpers or auto-awaited promises — no
   → `{ok, status, data: Uint8Array}`
 - `readDataUrl(file)` → a `data:` URL string for a `File` (from
   `droppedFiles(event)` or a file input)
-- `audioContext()` + `playTone(frequency, seconds, options)` — start from a
+- `audioContext()` + `playTone(frequency, seconds, options)`  -  start from a
   user-gesture handler (`ctx.resume()`)
 - `localPoint(event, canvas)` maps client to canvas coordinates
 - `gamepads()` returns connected pads; `droppedFiles(event)` reads drag-drop
@@ -514,7 +514,7 @@ Browser builtins are either direct helpers or auto-awaited promises — no
   `setItem` plus `jsonEncode` / `jsonDecode` (JSON is a builtin data type)
 
 WebGL runs through the WebGL2 canvas API (`webglContext(canvas)`, `glShader`,
-`glProgram`, `glBuffer` — all protected by teaching errors) or a library such
+`glProgram`, `glBuffer`  -  all protected by teaching errors) or a library such
 as Three.js constructed interop-style with `new`. WebGPU is available via its
 canvas API.
 A detailed, expanding guide for browser games lives in
@@ -532,7 +532,7 @@ remember engine as matter.Engine.create()
 remember scene as new THREE.Scene()
 ```
 
-Call anything — member chains need no special syntax, and there is no wrapper
+Call anything  -  member chains need no special syntax, and there is no wrapper
 around values:
 
 ```plainscript
@@ -540,9 +540,9 @@ crypto.createHash("sha256").update("abc").digest("hex")
 mesh.scale.set(2, 2, 2)
 ```
 
-Construct with `new Type(args)` — as a statement, in `remember`, as an
+Construct with `new Type(args)`  -  as a statement, in `remember`, as an
 argument, or bare without parens (`new Enemy`). A `make` function reference is
-a first-class value — pass it as a callback:
+a first-class value  -  pass it as a callback:
 
 ```plainscript
 make fitWindow()

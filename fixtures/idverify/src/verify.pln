@@ -1,7 +1,7 @@
-// PlainScript 1.0.36: ID-verification SDK entry point.
+// PlainScript 1.0.361: ID-verification SDK entry point.
 //
 // Converted from a real Node.js verification service. This entry path runs on
-// Node built-ins alone (fs, path, crypto) — no npm install required — while the
+// Node built-ins alone (fs, path, crypto)  -  no npm install required  -  while the
 // sibling modules (mrz.pln, vision.pln) depend on npm packages. It exercises
 // async combinators (all of), typed error handling (try/recover/throw), binary
 // data (bytes, base64, sha256) and object literals.

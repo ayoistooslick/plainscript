@@ -1,4 +1,4 @@
-// PlainScript — language core capability suite.
+// PlainScript  -  language core capability suite.
 //
 // Verifies variables, functions, control flow (for each, for index, while,
 // break, continue), object/array literals, and property access by compiling and

@@ -1,5 +1,5 @@
 // SourceMap: V3 Source Map generator for PlainScript compiler.
-// Zero external dependencies — implements VLQ Base64 encoding.
+// Zero external dependencies  -  implements VLQ Base64 encoding.
 
 const BASE64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
