@@ -3165,11 +3165,28 @@ function generateCondition(cond, context) {
       return `(${left}).${cond.method}(${right})`;
     }
 
-    // v2.1.1 — and / or / not combinators.
+    // v2.1.1 — and / or / not combinators. The Boolean combinators operate on
+    // the same LogicalCondition nodes at both the condition level and the
+    // expression level, so an operand may be either a pure condition node
+    // (comparison) or an arbitrary value expression (`f()`, a collection, a
+    // number, a `set with ...` literal). Pure conditions recurse through the
+    // condition generator; everything else is emitted as a general expression.
     case 'LogicalCondition': {
-      if (cond.op === 'not') return `!(${generateCondition(cond.operand, context)})`;
+      const CONDITION_TYPES = [
+        'BinaryCondition',
+        'UnaryCondition',
+        'BetweenCondition',
+        'StringCondition',
+        'InCondition',
+        'NotInCondition',
+        'LogicalCondition',
+      ];
+      const emit = (n) => CONDITION_TYPES.includes(n.type)
+        ? generateCondition(n, context)
+        : generateExpr(n, context);
+      if (cond.op === 'not') return `!(${emit(cond.operand)})`;
       const jsOp = cond.op === 'and' ? '&&' : '||';
-      return `${generateCondition(cond.left, context)} ${jsOp} ${generateCondition(cond.right, context)}`;
+      return `${emit(cond.left)} ${jsOp} ${emit(cond.right)}`;
     }
 
     default:
@@ -4476,20 +4493,28 @@ function generateExpr(node, context = createGenerationContext()) {
       return `${generateExpr(node.callee.object, context)}?.${node.callee.property}(${node.args.map(arg => generateExpr(arg, context)).join(', ')})`;
 
     // Function expression: (params) -> expression  →  (params) => expression.
-    // Because this is an expression form, it can be assigned, passed as an
-    // argument, returned, or stored in a collection — the composition primitive
-    // that lets libraries be built without new grammar.
+    // Block-bodied form: (params) do ... done  →  (params) => { ... } — reuses
+    // generateBlock, the same body emitter as `make` functions, so closures,
+    // effects, loops, conditionals, early returns, and async/await behave
+    // exactly like ordinary functions.
     case 'ArrowFunctionExpression': {
       const prevInFunction = context.inFunction;
       context.inFunction = true;
       const prevAwait = context.emittedAwait;
       context.emittedAwait = false;
+      const paramStr = node.params.map(p => typeof p === 'object' && p ? p.name : p).join(', ');
+      if (node.block) {
+        const block = generateBlock(node.body, '  ', context);
+        const isAsync = block.emitted ? 'async ' : '';
+        context.emittedAwait = prevAwait;
+        context.inFunction = prevInFunction;
+        return `${isAsync}(${paramStr}) => {\n${block.out}\n}`;
+      }
       const body = generateExpr(node.body, context);
       const emitted = context.emittedAwait;
       context.emittedAwait = prevAwait;
       context.inFunction = prevInFunction;
       const isAsync = emitted ? 'async ' : '';
-      const paramStr = node.params.map(p => typeof p === 'object' && p ? p.name : p).join(', ');
       return `${isAsync}(${paramStr}) => ${body}`;
     }
 

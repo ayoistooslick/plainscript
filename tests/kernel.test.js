@@ -11,10 +11,21 @@ const { generate } = require('../compiler/generator');
 
 let passed = 0;
 let failed = 0;
+const asyncTests = [];
 
 function test(name, fn) {
   try {
-    fn();
+    // Async test callbacks (async lambdas, top-level await) resolve later;
+    // they are tracked so the summary waits for them before printing.
+    const result = fn();
+    if (result && typeof result.then === 'function') {
+      asyncTests.push(
+        result
+          .then(() => { console.log(`  PASS  ${name}`); passed++; })
+          .catch((err) => { console.error(`  FAIL  ${name}`); console.error(`        ${err.message}`); failed++; })
+      );
+      return;
+    }
     console.log(`  PASS  ${name}`);
     passed++;
   } catch (err) {
@@ -376,5 +387,398 @@ test('is empty on Map, object, and array', () => {
   if (r !== JSON.stringify({ ce: true, oe: true, ae: true })) throw new Error('is empty dispatch failed');
 });
 
-console.log(`\n${passed} passed, ${failed} failed\n`);
-if (failed > 0) process.exit(1);
+// ── 2. Block-bodied lambdas: (params) do ... done ───────────────────────────
+
+console.log('\n── Language Kernel: Block-Bodied Lambdas & Expression Booleans ──\n');
+
+// Unlike the sync run(): wraps the whole generated program in an async arrow
+// so a top-level `await` (which the CLI runtime supports) is legal here too.
+function runAsync(src, ret) {
+  const js = compile(src);
+  return new Function(`return (async () => {\n${js}\nreturn ${ret};\n})();`)();
+}
+
+test('single-expression lambda form is unchanged', () => {
+  const js = compile('remember d as (x) -> x * 2');
+  if (js.indexOf('=> x * 2') === -1) throw new Error('expression lambda changed');
+});
+
+test('single-expression and block lambda forms coexist', () => {
+  const js = compile('remember f as (x) -> x + 1\nremember g as (x) do\n  give x * 2\ndone');
+  if (js.indexOf('=> x + 1') === -1) throw new Error('expression lambda missing');
+  if (js.indexOf('=> {\n') === -1) throw new Error('block lambda missing');
+});
+
+test('multi-statement block lambda runs', () => {
+  const src = [
+    'remember f as (x) do',
+    '  remember doubled as x * 2',
+    '  show doubled',
+    '  give doubled + 1',
+    'done',
+    'remember r as f(5)',
+  ].join('\n');
+  if (run(src, 'r') !== 11) throw new Error('expected 11');
+});
+
+test('block lambda with zero params', () => {
+  const src = [
+    'remember produce as () do',
+    '  give 42',
+    'done',
+    'remember r as produce()',
+  ].join('\n');
+  if (run(src, 'r') !== 42) throw new Error('expected 42');
+});
+
+test('block lambda with nested conditionals', () => {
+  const src = [
+    'remember grade as (n) do',
+    '  if n is above 90',
+    '    give "A"',
+    '  otherwise',
+    '    if n is above 80',
+    '      give "B"',
+    '    otherwise',
+    '      give "C"',
+    '    done',
+    '  done',
+    'done',
+    'remember g1 as grade(95)',
+    'remember g2 as grade(85)',
+    'remember g3 as grade(60)',
+  ].join('\n');
+  const r = run(src, '[g1, g2, g3].join("")');
+  if (r !== 'ABC') throw new Error('nested conditionals failed: ' + r);
+});
+
+test('loop inside block lambda accumulates', () => {
+  const src = [
+    'remember sumOf as (xs) do',
+    '  remember sum as 0',
+    '  for each x in xs',
+    '    sum becomes sum + x',
+    '  done',
+    '  give sum',
+    'done',
+    'remember s as sumOf([1, 2, 3, 4])',
+  ].join('\n');
+  if (run(src, 's') !== 10) throw new Error('expected 10');
+});
+
+test('early return inside block lambda', () => {
+  const src = [
+    'remember firstEven as (xs) do',
+    '  for each x in xs',
+    '    if x % 2 is 0',
+    '      give x',
+    '    done',
+    '  done',
+    '  give "none"',
+    'done',
+    'remember hit as firstEven([1, 3, 4, 7])',
+    'remember miss as firstEven([1, 3, 5])',
+  ].join('\n');
+  if (run(src, 'hit + ":" + miss') !== '4:none') throw new Error('early return failed');
+});
+
+test('block lambdas close over and mutate shared state', () => {
+  const src = [
+    'remember makeCounter as (seed) do',
+    '  remember count as seed',
+    '  give () do',
+    '    count becomes count + 1',
+    '    give count',
+    '  done',
+    'done',
+    'remember c as makeCounter(10)',
+    'remember first as c()',
+    'remember second as c()',
+    'remember isolated as makeCounter(5)',
+    'remember other as isolated()',
+  ].join('\n');
+  const r = run(src, '[first, second, other].join(",")');
+  if (r !== '11,12,6') throw new Error('closure failed: ' + r);
+});
+
+test('block lambda passed to .map', () => {
+  const src = [
+    'remember nums as [1, 2, 3, 4]',
+    'remember doubled as nums.map((x) do',
+    '  remember e as x * 2',
+    '  give e',
+    'done)',
+    'remember nums2 as nums.map((x) -> x + 100)',
+  ].join('\n');
+  const r = run(src, 'JSON.stringify({ a: doubled, b: nums2 })');
+  if (r !== JSON.stringify({ a: [2, 4, 6, 8], b: [101, 102, 103, 104] })) throw new Error('map block lambda failed: ' + r);
+});
+
+test('block lambda passed to .filter', () => {
+  const src = [
+    'remember nums as [1, 2, 3, 4, 5]',
+    'remember evens as nums.filter((x) do',
+    '  give x % 2 is 0',
+    'done)',
+  ].join('\n');
+  if (run(src, 'JSON.stringify(evens)') !== '[2,4]') throw new Error('filter failed');
+});
+
+test('block lambda passed to .find returns first match', () => {
+  const src = [
+    'remember nums as [1, 2, 3, 4]',
+    'remember r as nums.find((x) do',
+    '  give x is above 2',
+    'done)',
+  ].join('\n');
+  if (run(src, 'r') !== 3) throw new Error('find failed');
+});
+
+test('block lambda passed to .forEach receives both args', () => {
+  const src = [
+    'remember keys as []',
+    'remember values as []',
+    'remember m as dictionary with "a" is 1 and "b" is 2',
+    'm.forEach((value, key) do',
+    '  keys.push(key)',
+    '  values.push(value)',
+    'done)',
+    'remember sortedK as keys.sort().join("")',
+    'remember sortedV as values.sort().join("")',
+  ].join('\n');
+  if (run(src, 'sortedK + ":" + sortedV') !== 'ab:12') throw new Error('forEach failed');
+});
+
+test('block lambda returned from a factory function', () => {
+  const src = [
+    'remember makeAdder as (n) do',
+    '  give (x) -> x + n',
+    'done',
+    'remember plus5 as makeAdder(5)',
+    'remember r as plus5(37)',
+  ].join('\n');
+  if (run(src, 'r') !== 42) throw new Error('factory failed');
+});
+
+test('chained arrow returns a block lambda', () => {
+  const src = [
+    'remember mul as (a) -> (b) do',
+    '  give a * b',
+    'done',
+    'remember applied as mul(6)',
+    'remember r as applied(7)',
+  ].join('\n');
+  if (run(src, 'r') !== 42) throw new Error('chained arrow->block failed');
+});
+
+test('block and expression lambdas stored in a list', () => {
+  const src = [
+    'remember fs as list with (x) -> x + 1, (y) do',
+    '  give y * 2',
+    'done',
+    'remember f0 as fs[0]',
+    'remember f1 as fs[1]',
+    'remember r1 as f0(1)',
+    'remember r2 as f1(10)',
+  ].join('\n');
+  if (run(src, 'JSON.stringify([r1, r2])') !== '[2,20]') throw new Error('stored lambdas failed');
+});
+
+test('try/recover inside a block lambda', () => {
+  const src = [
+    'remember safeDiv as (a, b) do',
+    '  try',
+    '    if b is 0',
+    '      raise "div by zero"',
+    '    done',
+    '    give a / b',
+    '  done',
+    '  recover as e',
+    '    give 0',
+    '  done',
+    'done',
+    'remember normal as safeDiv(10, 2)',
+    'remember bad as safeDiv(1, 0)',
+  ].join('\n');
+  if (run(src, 'JSON.stringify([normal, bad])') !== '[5,0]') throw new Error('recover inside lambda failed');
+});
+
+test('async block lambda emits async and awaits', () => {
+  const js = compile([
+    'remember get as (id) do',
+    '  remember val as await fetch(id)',
+    '  give val + 1',
+    'done',
+  ].join('\n'));
+  if (js.indexOf('async (id) => {') === -1) throw new Error('async marker missing:\n' + js);
+  if (js.indexOf('(await fetch(id))') === -1) throw new Error('await missing:\n' + js);
+});
+
+test('async block lambda runs via top-level await', async () => {
+  const src = [
+    'make fetch(id)',
+    '  give Promise.resolve(id * 2)',
+    'done',
+    'remember get as (id) do',
+    '  remember val as await fetch(id)',
+    '  give val + 1',
+    'done',
+    'remember ans as await get(21)',
+  ].join('\n');
+  const v = await runAsync(src, 'ans');
+  if (v !== 43) throw new Error('expected 43, got ' + v);
+});
+
+test('block lambda body may contain side effects via show', () => {
+  const js = compile('remember f as (x) do\n  show x\n  give x\ndone');
+  if (js.indexOf('console.log(x);') === -1) throw new Error('side effect missing:\n' + js);
+});
+
+test('block lambda errors without closing done', () => {
+  const src = 'remember f as (x) do\n  give x';
+  let threw = false;
+  try {
+    compile(src);
+  } catch (e) {
+    threw = e.message.indexOf('done') !== -1;
+  }
+  if (!threw) throw new Error('expected a teaching "done" error');
+});
+
+// ── 3. Expression-level boolean operators: and / or / not as values ─────────
+
+console.log('\n── Expression-Level Boolean Operators ──\n');
+
+test('and as a value', () => {
+  const src = [
+    'remember n as 7',
+    'let ok is n is above 3 and n is below 10',
+  ].join('\n');
+  if (run(src, 'JSON.stringify(ok)') !== 'true') throw new Error('and value failed');
+});
+
+test('or as a value', () => {
+  const src = [
+    'remember n as 1',
+    'let ok is n is above 3 or n is below 10',
+  ].join('\n');
+  if (run(src, 'JSON.stringify(ok)') !== 'true') throw new Error('or value failed');
+});
+
+test('not as a value', () => {
+  const src = [
+    'remember xs as []',
+    'let ok is not (xs is empty)',
+  ].join('\n');
+  if (run(src, 'JSON.stringify(ok)') !== 'false') throw new Error('not value failed');
+});
+
+test('and binds tighter than or', () => {
+  const src = [
+    'remember n as 5',
+    'let r is n is above 3 or n is below 10 and n is above 1',
+  ].join('\n');
+  if (run(src, 'JSON.stringify(r)') !== 'true') throw new Error('precedence failed');
+});
+
+test('parenthesized boolean groups', () => {
+  const src = [
+    'remember a as 4',
+    'remember b as 8',
+    'let ok is (a is above 3) and (b is below 10)',
+  ].join('\n');
+  if (run(src, 'JSON.stringify(ok)') !== 'true') throw new Error('group failed');
+});
+
+test('boolean expression as a function argument', () => {
+  const src = [
+    'remember classify as (ok) do',
+    '  if ok is true',
+    '    give "yes"',
+    '  otherwise',
+    '    give "no"',
+    '  done',
+    'done',
+    'remember n as 7',
+    'remember r as classify(n is above 3 and n is below 10)',
+  ].join('\n');
+  if (run(src, 'r') !== 'yes') throw new Error('boolean arg failed');
+});
+
+test('boolean expression inside an expression-lambda body (give)', () => {
+  const src = [
+    'remember f as (n) -> n is above 3 and n is below 10',
+    'remember r as f(5)',
+  ].join('\n');
+  if (run(src, 'JSON.stringify(r)') !== 'true') throw new Error('give-embedded boolean failed');
+});
+
+test('boolean expression inside a block-lambda give', () => {
+  const src = [
+    'remember f as (n) do',
+    '  give n is above 3 and n is below 10',
+    'done',
+    'remember r as f(99)',
+  ].join('\n');
+  if (run(src, 'JSON.stringify(r)') !== 'false') throw new Error('block-give boolean failed');
+});
+
+test('boolean combined in a choosing value', () => {
+  const src = [
+    'remember n as 7',
+    'remember r as choosing n is above 3 and n is below 10 then "in" otherwise "out"',
+  ].join('\n');
+  if (run(src, 'r') !== 'in') throw new Error('choosing boolean failed');
+});
+
+test('condition-level if/while still combine comparisons', () => {
+  const src = [
+    'remember hits as []',
+    'for each n in [1, 5, 9, 15]',
+    '  if n is above 3 and n is below 10',
+    '    hits.push(n)',
+    '  done',
+    'done',
+    'remember acc as 0',
+    'while acc is below 5 and acc is at least 0',
+    '  acc becomes acc + 3',
+    'done',
+  ].join('\n');
+  const r = run(src, 'JSON.stringify({ h: hits, t: acc })');
+  if (r !== JSON.stringify({ h: [5, 9], t: 6 })) throw new Error('condition-level and/or failed: ' + r);
+});
+
+test('boolean value combined with non-comparison operands', () => {
+  const src = [
+    'remember n as 1',
+    'let r is n and 1',
+    'remember s as n or 100',
+  ].join('\n');
+  const out = run(src, '[r, s].map(x => typeof x).join(",")');
+  if (out !== 'number,number') throw new Error('literal boolean operands failed: ' + out);
+});
+
+test('and/or do not consume dictionary/set/record separators', () => {
+  const js = compile([
+    'remember d as dictionary with "a" is 1 and "b" is 2 done',
+    'remember s as set with 1, 2 and 3 done',
+    'remember r as record with name "Ada" and age 30 done',
+    'remember t as tuple with 1, 2 and 3 done',
+  ].join('\n'));
+  if (js.indexOf('new Map([["a", 1], ["b", 2]])') === -1) throw new Error('dictionary separator broken:\n' + js);
+  if (js.indexOf('new Set([1, 2, 3])') === -1) throw new Error('set separator broken:\n' + js);
+  if (js.indexOf('{ "name": "Ada", "age": 30 }') === -1) throw new Error('record separator broken:\n' + js);
+});
+
+test('boolean value in an array literal element', () => {
+  const src = [
+    'remember a as 4',
+    'remember xs as [1, (a is above 3) and (a is below 10), 3]',
+  ].join('\n');
+  if (run(src, 'JSON.stringify(xs)') !== '[1,true,3]') throw new Error('array boolean failed');
+});
+
+Promise.all(asyncTests).then(() => {
+  console.log(`\n${passed} passed, ${failed} failed\n`);
+  process.exit(failed > 0 ? 1 : 0);
+});

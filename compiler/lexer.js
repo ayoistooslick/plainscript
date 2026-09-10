@@ -15,6 +15,7 @@ const TOKEN = {
   ELSE:        'ELSE',        // alias for otherwise
   DONE:        'DONE',
   END:         'END',         // alias for done
+  DO:          'DO',          // block-bodied lambda opener: (x) do ... done
   GREATER:     'GREATER',
   LESS:        'LESS',
   THAN:        'THAN',
@@ -180,6 +181,7 @@ const KEYWORDS = {
   else:      TOKEN.ELSE,
   done:      TOKEN.DONE,
   end:       TOKEN.END,
+  do:        TOKEN.DO,        // block-bodied lambda opener: (x) do ... done
   greater:   TOKEN.GREATER,
   less:      TOKEN.LESS,
   than:      TOKEN.THAN,

@@ -150,6 +150,7 @@ function parse(tokens) {
       'StringCondition',
       'InCondition',
       'NotInCondition',
+      'LogicalCondition',
     ].includes(node.type);
   }
 
@@ -223,7 +224,7 @@ function parse(tokens) {
     // ── instanceof condition ───────────────────────────────────────────────────
     if (peek().type === TOKEN.INSTANCEOF) {
       advance();
-      const right = parseExpression();
+      const right = parseBooleanAtom();
       return { type: 'BinaryCondition', left, op: 'instanceof', right };
     }
 
@@ -232,21 +233,21 @@ function parse(tokens) {
         peekAt(1).type === TOKEN.IDENTIFIER && peekAt(1).value === 'field') {
       advance(); // has
       advance(); // field
-      const right = parseExpression();
+      const right = parseBooleanAtom();
       return { type: 'BinaryCondition', left: right, op: 'in', right: left };
     }
     // v2.4 — "starts as" → startsWith (contextual: "starts" followed by "as")
     if (peek().type === TOKEN.STARTS && peekAt(1).type === TOKEN.AS) {
       advance(); // starts
       advance(); // as
-      const right = parseExpression();
+      const right = parseBooleanAtom();
       return { type: 'StringCondition', left, method: 'startsWith', right };
     }
     // v2.4 — "ends as" → endsWith (contextual: "ends" followed by "as")
     if (peek().type === TOKEN.ENDS && peekAt(1).type === TOKEN.AS) {
       advance(); // ends
       advance(); // as
-      const right = parseExpression();
+      const right = parseBooleanAtom();
       return { type: 'StringCondition', left, method: 'endsWith', right };
     }
     // v2.4 — "made of" → includes (contextual: "made" followed by "of")
@@ -254,7 +255,7 @@ function parse(tokens) {
         peekAt(1).type === TOKEN.IDENTIFIER && peekAt(1).value === 'of') {
       advance(); // made
       advance(); // of
-      const right = parseExpression();
+      const right = parseBooleanAtom();
       return { type: 'StringCondition', left, method: 'includes', right };
     }
     // v2.4 — "more than" → > (contextual: "more" followed by "than")
@@ -262,7 +263,7 @@ function parse(tokens) {
         peekAt(1).type === TOKEN.THAN) {
       advance(); // more
       advance(); // than
-      const right = parseExpression();
+      const right = parseBooleanAtom();
       return { type: 'BinaryCondition', left, op: '>', right };
     }
     // v2.4 — "fewer than" → < (contextual: "fewer" followed by "than")
@@ -270,7 +271,7 @@ function parse(tokens) {
         peekAt(1).type === TOKEN.THAN) {
       advance(); // fewer
       advance(); // than
-      const right = parseExpression();
+      const right = parseBooleanAtom();
       return { type: 'BinaryCondition', left, op: '<', right };
     }
     // v2.4 — "same as" → === (contextual: "same" followed by "as")
@@ -278,7 +279,7 @@ function parse(tokens) {
         peekAt(1).type === TOKEN.AS) {
       advance(); // same
       advance(); // as
-      const right = parseExpression();
+      const right = parseBooleanAtom();
       return { type: 'BinaryCondition', left, op: '===', right };
     }
     // v2.4 — "different from" → !== (contextual: "different" followed by "from")
@@ -286,7 +287,7 @@ function parse(tokens) {
         peekAt(1).type === TOKEN.IDENTIFIER && peekAt(1).value === 'from') {
       advance(); // different
       advance(); // from
-      const right = parseExpression();
+      const right = parseBooleanAtom();
       return { type: 'BinaryCondition', left, op: '!==', right };
     }
 
@@ -294,42 +295,42 @@ function parse(tokens) {
     // "in" / "not in" condition (e.g. if item in list)
     if (peek().type === TOKEN.IN || (peek().type === TOKEN.IDENTIFIER && peek().value === 'in')) {
       advance();
-      const right = parseExpression();
+      const right = parseBooleanAtom();
       return { type: 'InCondition', left, right };
     }
 
     if (peek().type === TOKEN.NOT && (peekAt(1).type === TOKEN.IN || (peekAt(1).type === TOKEN.IDENTIFIER && peekAt(1).value === 'in'))) {
       advance(); // not
       advance(); // in
-      const right = parseExpression();
+      const right = parseBooleanAtom();
       return { type: 'NotInCondition', left, right };
     }
 
     if (peek().type === TOKEN.CONTAINS) {
       advance();
-      const right = parseExpression();
+      const right = parseBooleanAtom();
       return { type: 'StringCondition', left, method: 'includes', right };
     }
 
     if (peek().type === TOKEN.STARTS) {
       advance();
       consume(TOKEN.WITH, makeError('Expected "with" after "starts". Use: starts with', peek()));
-      const right = parseExpression();
+      const right = parseBooleanAtom();
       return { type: 'StringCondition', left, method: 'startsWith', right };
     }
 
     if (peek().type === TOKEN.ENDS) {
       advance();
       consume(TOKEN.WITH, makeError('Expected "with" after "ends". Use: ends with', peek()));
-      const right = parseExpression();
+      const right = parseBooleanAtom();
       return { type: 'StringCondition', left, method: 'endsWith', right };
     }
 
     if (peek().type === TOKEN.BETWEEN) {
       advance();
-      const low = parseExpression();
+      const low = parseBooleanAtom();
       consume(TOKEN.AND, makeError('Expected "and" after the lower bound in "between" expression.\n\nExample:\n  if x between 1 and 10', peek()));
-      const high = parseExpression();
+      const high = parseBooleanAtom();
       return { type: 'BetweenCondition', left, low, high };
     }
 
@@ -347,7 +348,7 @@ function parse(tokens) {
     // is in <list>
     if (peek().type === TOKEN.IN || (peek().type === TOKEN.IDENTIFIER && peek().value === 'in')) {
       advance();
-      const right = parseExpression();
+      const right = parseBooleanAtom();
       return { type: 'InCondition', left, right };
     }
 
@@ -357,7 +358,7 @@ function parse(tokens) {
       // is not in <list>
       if (peek().type === TOKEN.IN || (peek().type === TOKEN.IDENTIFIER && peek().value === 'in')) {
         advance();
-        const right = parseExpression();
+        const right = parseBooleanAtom();
         return { type: 'NotInCondition', left, right };
       }
       if (peek().type === TOKEN.EMPTY) {
@@ -370,10 +371,10 @@ function parse(tokens) {
         if (peek().type === TOKEN.TO || (peek().type === TOKEN.IDENTIFIER && peek().value === 'to')) {
           advance();
         }
-        const right = parseExpression();
+        const right = parseBooleanAtom();
         return { type: 'BinaryCondition', left, op: '!==', right };
       }
-      const right = parseExpression();
+      const right = parseBooleanAtom();
       return { type: 'BinaryCondition', left, op: '!==', right };
     }
 
@@ -389,7 +390,7 @@ function parse(tokens) {
       if (peek().type === TOKEN.TO || (peek().type === TOKEN.IDENTIFIER && peek().value === 'to')) {
         advance();
       }
-      const right = parseExpression();
+      const right = parseBooleanAtom();
       return { type: 'BinaryCondition', left, op: '===', right };
     }
 
@@ -398,21 +399,21 @@ function parse(tokens) {
         (peekAt(1).type === TOKEN.THAN || (peekAt(1).type === TOKEN.IDENTIFIER && peekAt(1).value === 'than'))) {
       advance(); // more
       advance(); // than
-      const right = parseExpression();
+      const right = parseBooleanAtom();
       return { type: 'BinaryCondition', left, op: '>', right };
     }
 
     // is above  (alias: >)
     if (peek().type === TOKEN.ABOVE) {
       advance();
-      const right = parseExpression();
+      const right = parseBooleanAtom();
       return { type: 'BinaryCondition', left, op: '>', right };
     }
 
     // is below  (alias: <)
     if (peek().type === TOKEN.BELOW) {
       advance();
-      const right = parseExpression();
+      const right = parseBooleanAtom();
       return { type: 'BinaryCondition', left, op: '<', right };
     }
 
@@ -421,12 +422,12 @@ function parse(tokens) {
       advance();
       if (peek().type === TOKEN.LEAST) {
         advance();
-        const right = parseExpression();
+        const right = parseBooleanAtom();
         return { type: 'BinaryCondition', left, op: '>=', right };
       }
       if (peek().type === TOKEN.MOST) {
         advance();
-        const right = parseExpression();
+        const right = parseBooleanAtom();
         return { type: 'BinaryCondition', left, op: '<=', right };
       }
       throw new Error(makeError('Expected "least" or "most" after "at". Use: is at least / is at most', peek()));
@@ -442,10 +443,10 @@ function parse(tokens) {
         if (peek().type === TOKEN.TO || (peek().type === TOKEN.IDENTIFIER && peek().value === 'to')) {
           advance(); // to
         }
-        const right = parseExpression();
+        const right = parseBooleanAtom();
         return { type: 'BinaryCondition', left, op: '>=', right };
       }
-      const right = parseExpression();
+      const right = parseBooleanAtom();
       return { type: 'BinaryCondition', left, op: '>', right };
     }
 
@@ -459,15 +460,15 @@ function parse(tokens) {
         if (peek().type === TOKEN.TO || (peek().type === TOKEN.IDENTIFIER && peek().value === 'to')) {
           advance(); // to
         }
-        const right = parseExpression();
+        const right = parseBooleanAtom();
         return { type: 'BinaryCondition', left, op: '<=', right };
       }
-      const right = parseExpression();
+      const right = parseBooleanAtom();
       return { type: 'BinaryCondition', left, op: '<', right };
     }
 
     // is <expr>  (equality)
-    const right = parseExpression();
+    const right = parseBooleanAtom();
     return { type: 'BinaryCondition', left, op: '===', right };
   }
 
@@ -1411,10 +1412,10 @@ function parseAsk() {
     if (peek().type !== TOKEN.DONE && peek().type !== TOKEN.TOGETHER && peek().type !== TOKEN.EOF &&
         peek().type !== TOKEN.FOLDER &&
         !(peek().type === TOKEN.IDENTIFIER && (peek().value === 'folder' || peek().value === 'done' || peek().value === 'together'))) {
-      elements.push(parseExpression());
+      elements.push(parseBooleanAtom());
       while (peek().type === TOKEN.COMMA) {
         advance(); // consume comma
-        elements.push(parseExpression());
+        elements.push(parseBooleanAtom());
       }
     }
     return elements;
@@ -1481,7 +1482,9 @@ function parseAsk() {
         // fold `"a" is 1` into a comparison).
         const key = parseNullish();
         consume(TOKEN.IS, 'Expected "is" between key and value in dictionary/map.');
-        const value = parseExpression();
+        // Value is parsed below the boolean level so `"a" is 1 and "b" is 2`
+        // keeps `and` as the pair separator. Comparisons still fold.
+        const value = parseBooleanAtom();
         pairs.push({ key, value });
         if (peek().type === TOKEN.AND || (peek().type === TOKEN.IDENTIFIER && peek().value === 'and') || peek().type === TOKEN.COMMA) {
           advance();
@@ -1503,7 +1506,7 @@ function parseAsk() {
     if (peek().type !== TOKEN.DONE && peek().value !== 'done') {
       while (true) {
         if (peek().type === TOKEN.DONE || peek().value === 'done') break;
-        elements.push(parseExpression());
+        elements.push(parseBooleanAtom());
         if (peek().type === TOKEN.COMMA || peek().type === TOKEN.AND || (peek().type === TOKEN.IDENTIFIER && peek().value === 'and')) {
           advance();
           continue;
@@ -1524,7 +1527,7 @@ function parseAsk() {
     if (peek().type !== TOKEN.DONE && peek().value !== 'done') {
       while (true) {
         if (peek().type === TOKEN.DONE || peek().value === 'done') break;
-        elements.push(parseExpression());
+        elements.push(parseBooleanAtom());
         if (peek().type === TOKEN.COMMA || peek().type === TOKEN.AND || (peek().type === TOKEN.IDENTIFIER && peek().value === 'and')) {
           advance();
           continue;
@@ -1572,7 +1575,7 @@ function parseAsk() {
     if (peek().type === TOKEN.IDENTIFIER && peek().value === 'tuple') {
       advance(); // tuple
     }
-    const tupleExpr = parseExpression();
+    const tupleExpr = parseBooleanAtom();
     if (peek().type === TOKEN.INTO || (peek().type === TOKEN.IDENTIFIER && peek().value === 'into')) {
       advance(); // into
     }
@@ -1797,7 +1800,7 @@ function parseAsk() {
       ));
     }
     const op = advance().value;
-    const b = parseExpression();
+    const b = parseBooleanAtom();
     return { type: 'CheckStatement', a, op, b };
   }
 
@@ -3006,9 +3009,51 @@ function parseAsk() {
       const alternate = parseExpression();
       return { type: 'ConditionalExpression', condition, consequent, alternate };
     }
-    let left = parseNullish();
-    // Comparisons are first-class values: `x is above 3` is an expression.
-    // left-assoc handling for operator chains happens below parseExpression.
+    return parseBooleanOrExpression();
+  }
+
+  // Expression-level boolean algebra: boolean operators usable in ordinary
+  // value positions (e.g. `(x is above 3) and (x is below 10)` as a value).
+  // Produces the SAME LogicalCondition nodes the condition level builds, so no
+  // separate boolean system exists — the existing condition generator emits
+  // them, and comparisons fold as expression atoms via parseBooleanAtom.
+  //   booleanOr  := booleanAnd ("or" booleanAnd)*
+  //   booleanAnd := booleanNot ("and" booleanNot)*
+  //   booleanNot := "not" booleanNot | booleanAtom
+  function parseBooleanOrExpression() {
+    let left = parseBooleanAndExpression();
+    while (peek().type === TOKEN.OR) {
+      advance();
+      const right = parseBooleanAndExpression();
+      left = { type: 'LogicalCondition', op: 'or', left, right };
+    }
+    return left;
+  }
+
+  function parseBooleanAndExpression() {
+    let left = parseBooleanNotExpression();
+    while (peek().type === TOKEN.AND) {
+      advance();
+      const right = parseBooleanNotExpression();
+      left = { type: 'LogicalCondition', op: 'and', left, right };
+    }
+    return left;
+  }
+
+  function parseBooleanNotExpression() {
+    if (peek().type === TOKEN.NOT) {
+      advance();
+      return { type: 'LogicalCondition', op: 'not', operand: parseBooleanNotExpression() };
+    }
+    return parseBooleanAtom();
+  }
+
+  // One boolean operand: a plain value with an optional comparison operator.
+  // A comparison's OWN operands must stay at this level (never consuming
+  // "and"/"or"), so the combinators above can see the "and"/"or" that joins
+  // two comparison atoms — e.g. "x is above 3 and y is below 5".
+  function parseBooleanAtom() {
+    const left = parseNullish();
     return tryParseComparisonOperator(left, false);
   }
 
@@ -3111,13 +3156,14 @@ function parseAsk() {
 
   // Speculatively check whether the current token stream matches an arrow
   // function pattern: "(" IDENTIFIER ("," IDENTIFIER)* ")" "->" ...
+  // (or the block-bodied form "(" IDENTIFIER ("," IDENTIFIER)* ")" "do" ... "done").
   // Returns true when the pattern is detected WITHOUT consuming any tokens.
   function isArrowFunctionPattern() {
     if (peek().type !== TOKEN.LPAREN) return false;
     let j = pos + 1;
-    // Empty params: () -> ...
+    // Empty params: () -> ...  /  () do ...
     if (tokens[j] && tokens[j].type === TOKEN.RPAREN) {
-      if (tokens[j + 1] && tokens[j + 1].type === TOKEN.ARROW) return true;
+      if (tokens[j + 1] && (tokens[j + 1].type === TOKEN.ARROW || tokens[j + 1].type === TOKEN.DO)) return true;
       return false;
     }
     // At least one IDENTIFIER param
@@ -3129,13 +3175,15 @@ function parseAsk() {
       if (!tokens[j] || tokens[j].type !== TOKEN.IDENTIFIER) return false;
       j++;
     }
-    // Must be followed by ) and then ->
+    // Must be followed by ) and then -> or do
     if (!tokens[j] || tokens[j].type !== TOKEN.RPAREN) return false;
-    if (!tokens[j + 1] || tokens[j + 1].type !== TOKEN.ARROW) return false;
+    if (!tokens[j + 1] || (tokens[j + 1].type !== TOKEN.ARROW && tokens[j + 1].type !== TOKEN.DO)) return false;
     return true;
   }
 
-  // Parse an arrow function expression: (params) -> body
+  // Parse an arrow function expression: (params) -> body  (single-expression)
+  // or its block-bodied form (params) do ... done (multi-statement; distinct
+  // marker "do" so the plain arrow stays single-expression).
   function parseArrowFunction() {
     consume(TOKEN.LPAREN);
     const params = [];
@@ -3147,6 +3195,15 @@ function parseAsk() {
       }
     }
     consume(TOKEN.RPAREN, 'Expected ")" to close the parameter list.');
+    if (peek().type === TOKEN.DO) {
+      advance(); // do
+      // A block body is a genuine function body: every normal statement is
+      // valid, `done` closes it, and generation reuses the exact same body
+      // emitter as `make` functions (so closures, returns, loops, conditionals,
+      // and async/await behave identically).
+      const body = parseBody('lambda');
+      return { type: 'ArrowFunctionExpression', params, body, block: true };
+    }
     consume(TOKEN.ARROW, 'Expected "->" after the parameter list.');
     const body = parseArrowFunctionBody();
     return { type: 'ArrowFunctionExpression', params, body };
@@ -3208,7 +3265,7 @@ function parseAsk() {
       advance(); // of
       const left = parsePrimary();
       if (peek().type === TOKEN.AND || (peek().type === TOKEN.IDENTIFIER && peek().value === 'and')) advance();
-      const right = parseExpression();
+      const right = parseBooleanAtom();
       return { type: 'SetAlgebraExpression', op, left, right };
     }
 
