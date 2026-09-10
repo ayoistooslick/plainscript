@@ -1830,7 +1830,11 @@ const BUILTIN_DECLARATIONS = {
     ensureBuiltin(context, 'coll');
     return `__flatten(${generateExpr(args[0], context)})`;
   },
-  includes: (args, context) => `(${generateExpr(args[0], context)}).includes(${generateExpr(args[1], context)})`,
+  includes: (args, context) => {
+    const coll = generateExpr(args[0], context);
+    const val = generateExpr(args[1], context);
+    return `(${coll} instanceof Set ? ${coll}.has(${val}) : (${coll}).includes(${val}))`;
+  },
   paginate: (args, context) => {
     ensureBuiltin(context, 'coll');
     return `__paginate(${generateExpr(args[0], context)}, ${generateExpr(args[1], context)}, ${args.length > 2 ? generateExpr(args[2], context) : '10'})`;
@@ -2364,7 +2368,12 @@ const BUILTIN_DECLARATIONS = {
   findLastIndex: (args, context) => `(${generateExpr(args[0], context)}).findLastIndex(${generateExpr(args[1], context)})`,
   indexOf: (args, context) => `(${generateExpr(args[0], context)}).indexOf(${generateExpr(args[1], context)}${args.length > 2 ? ', ' + generateExpr(args[2], context) : ''})`,
   lastIndexOf: (args, context) => `(${generateExpr(args[0], context)}).lastIndexOf(${generateExpr(args[1], context)}${args.length > 2 ? ', ' + generateExpr(args[2], context) : ''})`,
-  includes: (args, context) => `(${generateExpr(args[0], context)}).includes(${generateExpr(args[1], context)}${args.length > 2 ? ', ' + generateExpr(args[2], context) : ''})`,
+  includes: (args, context) => {
+    const coll = generateExpr(args[0], context);
+    const val = generateExpr(args[1], context);
+    const fromIndex = args.length > 2 ? ', ' + generateExpr(args[2], context) : '';
+    return `(${coll} instanceof Set ? ${coll}.has(${val}) : (${coll}).includes(${val}${fromIndex}))`;
+  },
   join: (args, context) => `(${generateExpr(args[0], context)}).join(${args.length > 1 ? generateExpr(args[1], context) : '","'})`,
   reverse: (args, context) => `[...${generateExpr(args[0], context)}].reverse()`,
   sort: (args, context) => `[...${generateExpr(args[0], context)}].sort(${args.length > 1 ? generateExpr(args[1], context) : '(a, b) => (a < b ? -1 : a > b ? 1 : 0)'})`,
@@ -3071,7 +3080,7 @@ function generate(ast, contextOrOptions = createGenerationContext(), options = {
       `const __tests = [];`,
       `function __check(op, a, b) {`,
       `  const ok = op === 'contains'`,
-      `    ? String(a).includes(String(b))`,
+      `    ? (a instanceof Set ? a.has(b) : String(a).includes(String(b)))`,
       `    : op === 'is'`,
       `      ? a === b`,
       `      : op === 'raises'`,
@@ -3120,8 +3129,14 @@ function generateCondition(cond, context) {
       return `${generateExpr(cond.left, context)} ${cond.op} ${generateExpr(cond.right, context)}`;
 
     case 'UnaryCondition':
-      if (cond.op === 'isEmpty')    return `(${generateExpr(cond.left, context)}).length === 0`;
-      if (cond.op === 'isNotEmpty') return `(${generateExpr(cond.left, context)}).length > 0`;
+      if (cond.op === 'isEmpty') {
+        const expr = generateExpr(cond.left, context);
+        return `(${expr} instanceof Map || ${expr} instanceof Set ? ${expr}.size === 0 : (typeof ${expr} === 'object' && ${expr} !== null ? Object.keys(${expr}).length === 0 : (${expr}).length === 0))`;
+      }
+      if (cond.op === 'isNotEmpty') {
+        const expr = generateExpr(cond.left, context);
+        return `(${expr} instanceof Map || ${expr} instanceof Set ? ${expr}.size > 0 : (typeof ${expr} === 'object' && ${expr} !== null ? Object.keys(${expr}).length > 0 : (${expr}).length > 0))`;
+      }
       throw new Error(`Unknown unary condition op "${cond.op}".`);
 
     case 'BetweenCondition': {
@@ -3129,14 +3144,26 @@ function generateCondition(cond, context) {
       return `${expr} >= ${generateExpr(cond.low, context)} && ${expr} <= ${generateExpr(cond.high, context)}`;
     }
 
-    case 'InCondition':
-      return `(${generateExpr(cond.right, context)}).includes(${generateExpr(cond.left, context)})`;
+    case 'InCondition': {
+      const right = generateExpr(cond.right, context);
+      const left = generateExpr(cond.left, context);
+      return `(${right} instanceof Set ? ${right}.has(${left}) : (${right}).includes(${left}))`;
+    }
 
-    case 'NotInCondition':
-      return `!(${generateExpr(cond.right, context)}).includes(${generateExpr(cond.left, context)})`;
+    case 'NotInCondition': {
+      const right = generateExpr(cond.right, context);
+      const left = generateExpr(cond.left, context);
+      return `!(${right} instanceof Set ? ${right}.has(${left}) : (${right}).includes(${left}))`;
+    }
 
-    case 'StringCondition':
-      return `(${generateExpr(cond.left, context)}).${cond.method}(${generateExpr(cond.right, context)})`;
+    case 'StringCondition': {
+      const left = generateExpr(cond.left, context);
+      const right = generateExpr(cond.right, context);
+      if (cond.method === 'includes') {
+        return `(${left} instanceof Set ? ${left}.has(${right}) : (${left}).includes(${right}))`;
+      }
+      return `(${left}).${cond.method}(${right})`;
+    }
 
     // v2.1.1 — and / or / not combinators.
     case 'LogicalCondition': {
@@ -4296,6 +4323,16 @@ function generateLValue(node, context) {
 
 function generateExpr(node, context = createGenerationContext()) {
   switch (node.type) {
+    case 'BinaryCondition':
+    case 'UnaryCondition':
+    case 'BetweenCondition':
+    case 'InCondition':
+    case 'NotInCondition':
+    case 'StringCondition':
+    case 'LogicalCondition':
+      // Comparisons are first-class expressions (e.g. `(x) -> x is above 3`),
+      // so emit the same code the condition level produces.
+      return generateCondition(node, context);
     case 'DictionaryLiteral': {
       if (!node.pairs || node.pairs.length === 0) return 'new Map()';
       const pairs = node.pairs.map(p => `[${generateExpr(p.key, context)}, ${generateExpr(p.value, context)}]`);
@@ -4330,13 +4367,13 @@ function generateExpr(node, context = createGenerationContext()) {
     case 'CollectionReflectExpression': {
       const target = generateExpr(node.target, context);
       if (node.accessor === 'keys') {
-        return `Array.from(${target}.keys())`;
+        return `(${target} instanceof Map || ${target} instanceof Set ? Array.from(${target}.keys()) : Object.keys(${target}))`;
       }
       if (node.accessor === 'values') {
-        return `Array.from(${target}.values())`;
+        return `(${target} instanceof Map || ${target} instanceof Set ? Array.from(${target}.values()) : Object.values(${target}))`;
       }
       if (node.accessor === 'entries') {
-        return `Array.from(${target}.entries())`;
+        return `(${target} instanceof Map || ${target} instanceof Set ? Array.from(${target}.entries()) : Object.entries(${target}))`;
       }
       if (node.accessor === 'size') {
         return `(${target} instanceof Map || ${target} instanceof Set ? ${target}.size : (${target} && ${target}.size !== undefined ? ${target}.size : ${target}?.length))`;
@@ -4348,19 +4385,7 @@ function generateExpr(node, context = createGenerationContext()) {
     // v2.1.1 — boolean and null literals are PlainScript keywords.
     case 'BooleanLiteral':   return String(node.value);
     case 'NullLiteral':      return 'null';
-    // v2.1.1 — arithmetic: unary minus (binary + - * / % reuse
-    // BinaryExpression). Binary operands need parentheses so that
-    // -(2 + 3) does not flatten to -2 + 3.
-    case 'UnaryExpression':
-      return `${node.operator}${node.operand.type === 'BinaryExpression'
-        ? `(${generateExpr(node.operand, context)})`
-        : generateExpr(node.operand, context)}`;
-    // v2.1.1 — wait for <expr>: awaits an async value (fetch promises,
-    // async functions called from PlainScript, etc.).
-    case 'AwaitExpression': {
-      markAsync(context);
-      return `(await ${generateExpr(node.value, context)})`;
-    }
+
     // v2.1.1 — HTTP client: get/post/put/patch/delete "<url>" with clauses.
     case 'HttpCall': {
       ensureBuiltin(context, 'http');
@@ -4450,6 +4475,24 @@ function generateExpr(node, context = createGenerationContext()) {
     case 'OptionalCallExpression':
       return `${generateExpr(node.callee.object, context)}?.${node.callee.property}(${node.args.map(arg => generateExpr(arg, context)).join(', ')})`;
 
+    // Function expression: (params) -> expression  →  (params) => expression.
+    // Because this is an expression form, it can be assigned, passed as an
+    // argument, returned, or stored in a collection — the composition primitive
+    // that lets libraries be built without new grammar.
+    case 'ArrowFunctionExpression': {
+      const prevInFunction = context.inFunction;
+      context.inFunction = true;
+      const prevAwait = context.emittedAwait;
+      context.emittedAwait = false;
+      const body = generateExpr(node.body, context);
+      const emitted = context.emittedAwait;
+      context.emittedAwait = prevAwait;
+      context.inFunction = prevInFunction;
+      const isAsync = emitted ? 'async ' : '';
+      const paramStr = node.params.map(p => typeof p === 'object' && p ? p.name : p).join(', ');
+      return `${isAsync}(${paramStr}) => ${body}`;
+    }
+
     case 'CallExpression': {
       // Method call: receiver.method(args). Member access invoked with parens —
       // e.g. path.join("a", "b"), mrz.parse(line), fs.existsSync(("x")).
@@ -4511,8 +4554,11 @@ function generateExpr(node, context = createGenerationContext()) {
     case 'AddCall':
       return `${generateExpr(node.collection, context)}.push(${generateExpr(node.value, context)})`;
 
-    case 'RemoveCall':
-      return `${generateExpr(node.collection, context)}.splice(${generateExpr(node.collection, context)}.indexOf(${generateExpr(node.value, context)}), 1)`;
+    case 'RemoveCall': {
+      const coll = generateExpr(node.collection, context);
+      const val = generateExpr(node.value, context);
+      return `${coll} instanceof Map || ${coll} instanceof Set ? ${coll}.delete(${val}) : ${coll}.splice(${coll}.indexOf(${val}), 1)`;
+    }
 
     case 'WriteCall':
       ensureBuiltin(context, 'fs');

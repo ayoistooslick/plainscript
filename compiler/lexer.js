@@ -143,6 +143,7 @@ const TOKEN = {
   LOGICAL_OR_ASSIGN: 'LOGICAL_OR_ASSIGN',     // ||=
   LOGICAL_AND_ASSIGN: 'LOGICAL_AND_ASSIGN',   // &&=
   NULLISH_ASSIGN: 'NULLISH_ASSIGN',           // ??=
+  PLUS_ASSIGN: 'PLUS_ASSIGN',                 // ++=  (increment-assign, x += v)
   // Literals & identifiers
   IDENTIFIER:  'IDENTIFIER',
   STRING:      'STRING',
@@ -511,7 +512,7 @@ function tokenize(source) {
     if (source[i] === '?' && source[i + 1] === '?') { tokens.push({ type: TOKEN.NULLISH_COALESCE, value: '??', line: tokenLine, col: tokenCol }); i += 2; continue; }
     if (source[i] === '.' && source[i + 1] === '.' && source[i + 2] === '.') { tokens.push({ type: TOKEN.SPREAD, value: '...', line: tokenLine, col: tokenCol }); i += 3; continue; }
     if (source[i] === '.') { tokens.push({ type: TOKEN.DOT,      value: '.', line: tokenLine, col: tokenCol }); i++; continue; }
-    if (source[i] === '+' && source[i + 1] === '+' && source[i + 2] === '=') { tokens.push({ type: TOKEN.LOGICAL_AND_ASSIGN, value: '++=', line: tokenLine, col: tokenCol }); i += 3; continue; }
+    if (source[i] === '+' && source[i + 1] === '+' && source[i + 2] === '=') { tokens.push({ type: TOKEN.PLUS_ASSIGN, value: '++=', line: tokenLine, col: tokenCol }); i += 3; continue; }
     if (source[i] === '+') { tokens.push({ type: TOKEN.PLUS,     value: '+', line: tokenLine, col: tokenCol }); i++; continue; }
     // v2.1.1 — arithmetic. "->" is matched first so it never becomes MINUS.
     if (source[i] === '-' && source[i + 1] === '>') { tokens.push({ type: TOKEN.ARROW,  value: '->', line: tokenLine, col: tokenCol }); i += 2; continue; }

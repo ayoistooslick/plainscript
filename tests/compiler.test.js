@@ -2298,8 +2298,8 @@ test('add(item to collection) compiles to push', () => {
   assert(compile('add(player to players)'), 'players.push(player);');
 });
 
-test('remove(item from collection) compiles to splice', () => {
-  assert(compile('remove(player from players)'), 'players.splice(players.indexOf(player), 1);');
+test('remove(item from collection) dispatches Map/Set then splice', () => {
+  assert(compile('remove(player from players)'), 'players instanceof Map || players instanceof Set ? players.delete(player) : players.splice(players.indexOf(player), 1);');
 });
 
 test('add with a literal value', () => {
@@ -2311,16 +2311,16 @@ test('add with an item expression value', () => {
 });
 
 test('remove with a property expression value', () => {
-  assert(compile('remove(name of user from names)'), 'names.splice(names.indexOf(user.name), 1);');
+  assert(compile('remove(name of user from names)'), 'names instanceof Map || names instanceof Set ? names.delete(user.name) : names.splice(names.indexOf(user.name), 1);');
 });
 
 test('remove with an item expression value', () => {
   assert(compile('remove(last player from players)'),
-    'players.splice(players.indexOf(players[players.length - 1]), 1);');
+    'players instanceof Map || players instanceof Set ? players.delete(players[players.length - 1]) : players.splice(players.indexOf(players[players.length - 1]), 1);');
 });
 
 test('remove with a numbered item value', () => {
-  assert(compile('remove(player one from players)'), 'players.splice(players.indexOf(players[0]), 1);');
+  assert(compile('remove(player one from players)'), 'players instanceof Map || players instanceof Set ? players.delete(players[0]) : players.splice(players.indexOf(players[0]), 1);');
 });
 
 test('add works inside a for each loop', () => {

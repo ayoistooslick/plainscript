@@ -140,6 +140,41 @@ function parse(tokens) {
   // plus LogicalCondition { type, op: "and"|"or", left, right } and
   //                      { type, op: "not", operand } from the combinator levels.
 
+  // A comparison-composed expression (produced either by the condition level
+  // or, since comparisons are also expressions, directly by parseExpression).
+  function isComparisonNode(node) {
+    return node && typeof node === 'object' && [
+      'BinaryCondition',
+      'UnaryCondition',
+      'BetweenCondition',
+      'StringCondition',
+      'InCondition',
+      'NotInCondition',
+    ].includes(node.type);
+  }
+
+  // Comparison-operator continuation words/tokens. Used to disambiguate the
+  // object-literal shorthand (`let person is name is "Ada"`) from a comparison
+  // expression (`let flag is score is above 80`): if the token after the inner
+  // `is` can begin a comparison operator, the author means a comparison value.
+  function isComparisonContinuationToken(tok) {
+    return (
+      (tok.type === TOKEN.IDENTIFIER && [
+        'equal', 'more', 'fewer', 'same', 'different', 'made', 'has', 'than', 'to'
+      ].includes(tok.value))
+    ) || [
+      TOKEN.ABOVE, TOKEN.BELOW, TOKEN.AT, TOKEN.GREATER, TOKEN.LESS,
+      TOKEN.EMPTY, TOKEN.IN, TOKEN.NOT, TOKEN.CONTAINS, TOKEN.STARTS, TOKEN.ENDS, TOKEN.BETWEEN
+    ].includes(tok.type);
+  }
+
+  // True when `name is <op-word> ...` would be a comparison, not an object
+  // literal shorthand.
+  function isObjectShorthandAmbiguousWithComparison() {
+    const afterIs = peekAt(2);
+    return !!afterIs && afterIs.type !== TOKEN.EOF && isComparisonContinuationToken(afterIs);
+  }
+
   // Entry point used by if/while.
   function parseCondition() {
     let left = parseAndCondition();
@@ -171,6 +206,19 @@ function parse(tokens) {
 
   function parseComparisonCondition() {
     const left = parseExpression();
+    // Comparisons are expressions too, so parseExpression may already have
+    // folded this into a comparison node — that IS the comparison level.
+    if (isComparisonNode(left)) return left;
+    return tryParseComparisonOperator(left, true);
+  }
+
+  // Shared comparison-operator continuation. Given an already-parsed left
+  // operand, consumes the comparison operator that follows (if any) and
+  // returns the comparison node. The condition level passes required=true
+  // (throws a teaching error when no operator follows); the expression level
+  // passes required=false (returns `left` untouched, making comparisons
+  // optional in expression position the same way they are in JS).
+  function tryParseComparisonOperator(left, required) {
 
     // ── instanceof condition ───────────────────────────────────────────────────
     if (peek().type === TOKEN.INSTANCEOF) {
@@ -287,10 +335,14 @@ function parse(tokens) {
 
     // ── "is ..." comparisons ────────────────────────────────────────────────
     const isToken = peek();
-    consume(TOKEN.IS, makeError(
-      'Expected a comparison after the value. Use "is", "is above", "is below", "contains", "starts with", etc.',
-      isToken
-    ));
+    if (isToken.type !== TOKEN.IS) {
+      if (!required) return left;
+      throw new Error(makeError(
+        'Expected a comparison after the value. Use "is", "is above", "is below", "contains", "starts with", etc.',
+        isToken
+      ));
+    }
+    advance();
 
     // is in <list>
     if (peek().type === TOKEN.IN || (peek().type === TOKEN.IDENTIFIER && peek().value === 'in')) {
@@ -1034,7 +1086,19 @@ function parse(tokens) {
 
       // Assignment operators: becomes, is now, set to, change to, or becomes (||=), and becomes (&&=), nullish becomes (??=)
       let becomeOp = null;
-      if (peek().type === TOKEN.OR && peekAt(1).type === TOKEN.BECOMES) {
+      if (peek().type === TOKEN.PLUS_ASSIGN) {
+        advance(); // ++=
+        becomeOp = '+=';
+      } else if (peek().type === TOKEN.LOGICAL_OR_ASSIGN) {
+        advance(); // ||=
+        becomeOp = '||=';
+      } else if (peek().type === TOKEN.LOGICAL_AND_ASSIGN) {
+        advance(); // &&=
+        becomeOp = '&&=';
+      } else if (peek().type === TOKEN.NULLISH_ASSIGN) {
+        advance(); // ??=
+        becomeOp = '??=';
+      } else if (peek().type === TOKEN.OR && peekAt(1).type === TOKEN.BECOMES) {
         advance(); // or
         advance(); // becomes
         becomeOp = '||=';
@@ -1128,7 +1192,7 @@ function parse(tokens) {
     }
 
     // Object literal: next token is IDENTIFIER (except dictionary/map) followed by IS or BE
-    if (peek().type === TOKEN.IDENTIFIER && peek().value !== 'dictionary' && peek().value !== 'map' && (peekAt(1).type === TOKEN.IS || peekAt(1).type === TOKEN.BE)) {
+    if (peek().type === TOKEN.IDENTIFIER && peek().value !== 'dictionary' && peek().value !== 'map' && (peekAt(1).type === TOKEN.IS || peekAt(1).type === TOKEN.BE) && !isObjectShorthandAmbiguousWithComparison()) {
       const init = parseInlineObjectLiteral(false);
       return { type: 'VariableDeclaration', name: target, initializer: init, isLet, isConstant: !isLet };
     }
@@ -1144,7 +1208,7 @@ function parse(tokens) {
     );
 
     // Object literal: next token is IDENTIFIER followed by IS or BE
-    if (peek().type === TOKEN.IDENTIFIER && (peekAt(1).type === TOKEN.IS || peekAt(1).type === TOKEN.BE)) {
+    if (peek().type === TOKEN.IDENTIFIER && (peekAt(1).type === TOKEN.IS || peekAt(1).type === TOKEN.BE) && !isObjectShorthandAmbiguousWithComparison()) {
       return { type: 'RememberStatement', name: target, value: parseObjectLiteral() };
     }
 
@@ -1333,6 +1397,9 @@ function parseAsk() {
       }
       params.push({ name: advance().value });
     }
+    // The params loop stops at "together"/"done" — consume the terminator here
+    // so parseBody parses the real body instead of treating this as an empty one.
+    advance(); // consume "together" or "done"
     const body = parseBody(`function "${name}"`);
     return { type: 'FunctionDeclaration', name, params, body };
   }
@@ -1409,7 +1476,10 @@ function parseAsk() {
     if (peek().type !== TOKEN.DONE && peek().value !== 'done') {
       while (true) {
         if (peek().type === TOKEN.DONE || peek().value === 'done') break;
-        const key = parseExpression();
+        // Key parsed below the comparison level so `"a" is 1 and "b" is 2`
+        // keeps the `is` as the dictionary separator (parseExpression would
+        // fold `"a" is 1` into a comparison).
+        const key = parseNullish();
         consume(TOKEN.IS, 'Expected "is" between key and value in dictionary/map.');
         const value = parseExpression();
         pairs.push({ key, value });
@@ -1715,7 +1785,10 @@ function parseAsk() {
   // v1.0.1 — assertions: `check <a> (equals|is|contains|raises) <b>`
   function parseCheckStatement() {
     advance(); // check
-    const a = parseExpression();
+    // Parse the operand below the comparison level: `check` consumes the
+    // equals/is/contains/raises operator itself, so parseExpression must not
+    // fold `a contains b` into a comparison here.
+    const a = parseNullish();
     const opToken = peek();
     if (!['equals', 'is', 'contains', 'raises'].includes(opToken.value)) {
       throw new Error(makeError(
@@ -2934,7 +3007,9 @@ function parseAsk() {
       return { type: 'ConditionalExpression', condition, consequent, alternate };
     }
     let left = parseNullish();
-    return left;
+    // Comparisons are first-class values: `x is above 3` is an expression.
+    // left-assoc handling for operator chains happens below parseExpression.
+    return tryParseComparisonOperator(left, false);
   }
 
   function parseNullish() {
@@ -3034,8 +3109,64 @@ function parseAsk() {
     return parsePrimary();
   }
 
+  // Speculatively check whether the current token stream matches an arrow
+  // function pattern: "(" IDENTIFIER ("," IDENTIFIER)* ")" "->" ...
+  // Returns true when the pattern is detected WITHOUT consuming any tokens.
+  function isArrowFunctionPattern() {
+    if (peek().type !== TOKEN.LPAREN) return false;
+    let j = pos + 1;
+    // Empty params: () -> ...
+    if (tokens[j] && tokens[j].type === TOKEN.RPAREN) {
+      if (tokens[j + 1] && tokens[j + 1].type === TOKEN.ARROW) return true;
+      return false;
+    }
+    // At least one IDENTIFIER param
+    if (!tokens[j] || tokens[j].type !== TOKEN.IDENTIFIER) return false;
+    j++;
+    // Skip comma-separated identifiers
+    while (tokens[j] && tokens[j].type === TOKEN.COMMA) {
+      j++;
+      if (!tokens[j] || tokens[j].type !== TOKEN.IDENTIFIER) return false;
+      j++;
+    }
+    // Must be followed by ) and then ->
+    if (!tokens[j] || tokens[j].type !== TOKEN.RPAREN) return false;
+    if (!tokens[j + 1] || tokens[j + 1].type !== TOKEN.ARROW) return false;
+    return true;
+  }
+
+  // Parse an arrow function expression: (params) -> body
+  function parseArrowFunction() {
+    consume(TOKEN.LPAREN);
+    const params = [];
+    if (peek().type !== TOKEN.RPAREN) {
+      params.push(consume(TOKEN.IDENTIFIER, 'Expected a parameter name.').value);
+      while (peek().type === TOKEN.COMMA) {
+        advance();
+        params.push(consume(TOKEN.IDENTIFIER, 'Expected a parameter name after ",".').value);
+      }
+    }
+    consume(TOKEN.RPAREN, 'Expected ")" to close the parameter list.');
+    consume(TOKEN.ARROW, 'Expected "->" after the parameter list.');
+    const body = parseArrowFunctionBody();
+    return { type: 'ArrowFunctionExpression', params, body };
+  }
+
+  // Parse the body of an arrow function. Supports chained arrow functions:
+  // (x) -> (y) -> x + y
+  function parseArrowFunctionBody() {
+    if (peek().type === TOKEN.LPAREN && isArrowFunctionPattern()) {
+      return parseArrowFunction();
+    }
+    return parseExpression();
+  }
+
   // primary → itemExpr | atom (postfix)*
   function parsePrimary() {
+    // Arrow function: (params) -> body — detected before grouped expression
+    if (peek().type === TOKEN.LPAREN && isArrowFunctionPattern()) {
+      return parseArrowFunction();
+    }
     // v2.4 — "record with" and "list with" as expressions (contextual)
     if (peek().type === TOKEN.IDENTIFIER && peek().value === 'record' &&
         peekAt(1).type === TOKEN.WITH) {
