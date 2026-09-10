@@ -32,11 +32,15 @@ Describe *what* you want. The compiler decides *how* to implement it in JavaScri
   - [Variables](#variables)
   - [String Templates](#string-templates)
   - [Conditions](#conditions)
+  - [Conditional expressions](#conditional-expressions)
   - [Functions](#functions)
+  - [Lambdas](#lambdas)
   - [Arrays &amp; Objects](#arrays--objects)
+  - [Dictionaries, Sets &amp; Tuples](#dictionaries-sets--tuples)
   - [Loops](#loops)
   - [Natural-Language Expressions](#natural-language-expressions)
   - [Logical Assignment](#logical-assignment)
+  - [Error handling, async, and events](#error-handling-async-and-events)
   - [Record Kinds, Concurrency &amp; More](#record-kinds-concurrency--more)
 - [Backend Services](#backend-services)
   - [Databases](#databases)
@@ -243,6 +247,13 @@ For projects that need custom output or source directories, add a `plainscript.c
 
 ## Language Tour
 
+PlainScript is a fixed vocabulary of English verbs compiled to JavaScript. Every
+construct follows the same rhythm: a word opens a block, `done` closes it, and
+`give` returns a value — a sentence you could say to a colleague ("if the score
+is at least 80, show accepted, otherwise review") is valid source. The sections
+below keep the code first, with a short note on what each construct is *for* and
+the constraint that matters when you use it.
+
 ### Variables
 
 ```
@@ -250,6 +261,12 @@ let name be "Ayokunle"
 let age be 16
 set age to 17
 ```
+
+`remember name as "Ada"` and `let name be "Ada"` are two spellings of the same
+declaration; `set name to ...`, `name becomes ...`, and `name is now ...` all
+reassign it. Numbers, strings, and booleans behave like JavaScript primitives;
+lists, records, dictionaries, and sets are *references*, so pointing two names
+at the same list means they see the same data.
 
 ### String Templates
 
@@ -271,6 +288,13 @@ The Team`
 Interpolation compiles directly to JavaScript template literals — it is not evaluated at compile time. Literal dollar signs without `{` are preserved as-is.
 
 ### Conditions
+
+`if <condition> ... done` runs its block when the condition is true, and the
+optional `otherwise` block runs when it is false (`when ... done` is the same
+statement used in web and event contexts). Conditions read like English, and a
+comparison is itself a value: `score is at least 80` is `true` or `false`, so it
+can be stored, printed, passed to a function, or joined with `and` / `or` /
+`not`. When you need a *value* rather than a block, use `choosing` (below).
 
 ```
 when age is at least 18
@@ -312,6 +336,19 @@ All comparison operators:
 | `has field "x"` | `"x" in obj` |
 | `at position key` | `obj[key]` |
 
+### Conditional expressions
+
+`choosing` is the value form of `if`: pick between two expressions and keep the
+whole thing inline — in an argument, a `give`, or a list element.
+
+```
+remember verdict as choosing score is at least 90 then "A" otherwise "B"
+show choosing score is below 60 then "low" otherwise "ok"
+```
+
+`choosing <condition> then <a> otherwise <b>` evaluates to `<a>` when the
+condition is true and `<b>` otherwise.
+
 ### Functions
 
 ```
@@ -325,7 +362,45 @@ to multiply x and y together
 done
 ```
 
+`make name(args)` and its `to ... together` spelling define a function; `done`
+closes it — the PlainScript form of JavaScript's `function`. `give <value>` (or
+`give back <value>`) returns; `give` alone simply ends the function. A `make`
+function is a value like any other, so it can be stored with `remember`, passed
+as an argument, or returned from another function. Arguments are optional with
+defaults: `make label(name as "guest")`.
+
+### Lambdas
+
+A lambda is a function without a name, written where a value is expected —
+`(a, b) -> a + b` is JavaScript's `(a, b) => a + b`. Use the arrow form for a
+one-expression body and the `do ... done` form when the body has several
+statements:
+
+```
+remember add as (a, b) -> a + b
+show add(2, 3)
+
+remember grade as (score) do
+    if score is at least 90
+        give "excellent"
+    otherwise
+        give "keep practicing"
+    done
+done
+
+remember doubled as numbers.map((n) -> n * 2)
+```
+
+Lambdas are ordinary values: store them, put them in lists and records, pass
+them to `.map` / `.filter` / `.find` / `.forEach`, and return or chain them
+(`mul(2)(3)(5)`) to build factories and curried helpers.
+
 ### Arrays &amp; Objects
+
+`list with ...` is PlainScript's spelling of an array; `record with ... done`
+is a plain object. Both are ordinary values, so lists hold records, records
+hold lists, and lambdas can live anywhere a value can. Read and write them with
+`.name`, `[index]`, or the natural-language forms later in this tour.
 
 ```
 let players be list with "Haaland", "Foden", "Rodri"
@@ -339,7 +414,46 @@ done
 show user.name
 ```
 
+### Dictionaries, Sets & Tuples
+
+JavaScript's `Map` and `Set` have direct spellings, and tuples are fixed-size
+arrays you usually unpack all at once:
+
+```
+remember lookup as dictionary with "alpha" is 1 and "beta" is 2 done
+show lookup.get("beta")                       // 2
+
+remember tags as set with "admin", "editor", "admin" done  // duplicates collapse
+
+remember point as tuple with 10, 20 and 30 done
+unpack point into x, y and z                  // x=10, y=20, z=30
+show x + y + z
+```
+
+Dictionary and set entries are joined with `and`; a tuple separates its members
+with commas and `and` before the final member. `show <value>` accepts any value,
+and JSON data arrives as nested lists and records.
+
 ### Loops
+
+`for each item in <collection> ... done` visits every element, and `while
+<condition> ... done` repeats until the condition is false. Counted loops come
+in sentence form too:
+
+```
+repeat 5 times
+    show "tick"
+done
+
+remember energy as 9
+repeat while energy is above 0
+    energy becomes energy - 1
+done
+```
+
+`for every item in basket` is an alias for `for each`, `repeat until <condition>`
+flips the `while` sense, and `for index i from 0 to 9` gives a zero-based
+counter when you need positions.
 
 ```
 for each player in players
@@ -405,6 +519,10 @@ The older `readFile()` / `writeFile()` forms still work and are unchanged.
 
 ### Logical Assignment
 
+The word-style assignment operators keep the common "fill the empty value"
+pattern on one line — PlainScript for `flag = flag || true` and
+`val = val ?? "default"`:
+
 ```
 let flag be false
 flag or is now true
@@ -415,7 +533,52 @@ val nullish is now "default"
 show val
 ```
 
+### Error handling, async, and events
+
+Programs that fail should say so. `raise <value>` throws an error, `try` /
+`recover as err` / `finally` catch it, and `retry N times every Mms` re-runs a
+block that may fail transiently:
+
+```
+raise "not implemented"
+
+try
+    remember data as jsonDecode(raw)
+recover as err
+    show "bad json: " + message of err
+finally
+    show "request complete"
+done
+
+retry 3 times every 2 seconds
+    show "fetching..."
+done
+```
+
+Asynchronous work uses `wait for <promise>` (or `await <promise>`). A `make`
+function or lambda that `wait for`s a promise becomes async automatically, and
+`all of [...]`, `any of [...]`, and `settled of [...]` run several promises at
+once. Events bind with `when <target> "<event>" happens [as <name>] ... done` —
+the DOM equivalent of `addEventListener` — and server/websocket forms follow
+the same `when ... done` pattern.
+
 ### Record Kinds, Concurrency &amp; More
+
+For the shapes that repeat in a program — a user, a message, an order — declare
+a **record kind** and construct instances with `create`. Kinds behave like
+plain objects with a known field list: setting an unknown field throws, which
+catches typos early.
+
+```
+define a kind called "Player" with
+    name is ""
+    goals is 0
+done
+
+remember player as create a Player with name "Ada" and goals 4
+player.goals becomes player.goals + 1
+show player.goals
+```
 
 PlainScript 1.0.2 closes most of the gap with TypeScript-class languages using its own grammar. The full audit lives in [`docs/CAPABILITY_GAP_AUDIT.md`](./docs/CAPABILITY_GAP_AUDIT.md).
 
@@ -439,6 +602,17 @@ PlainScript 1.0.2 closes most of the gap with TypeScript-class languages using i
 | Exports | `export <name>` |
 
 </details>
+
+**How the pieces fit together.** PlainScript is deliberately small: a handful
+of verbs (`remember`, `give`, `if` / `otherwise`, `done`) plus the collections
+and functions you just met. Everything is a value — numbers and strings,
+comparisons, collections, lambdas, whole functions — so pieces nest instead of
+needing new syntax: a lambda inside a list, a comparison handed to a filter, a
+`make` function stored in a record. When a pattern repeats, extract it into a
+`make` function (or a lambda), group related names into a module, and call the
+abstraction the same way you call `show` or `jsonDecode`. The standard library
+and the backend capabilities that follow are exactly this: vocabulary built on
+the primitives above, available to every program.
 
 ---
 
@@ -585,7 +759,9 @@ done
 
 ## Runtime Standard Library
 
-No imports needed — these functions are built into the compiler:
+No imports needed — these functions are built into the compiler. They are the
+standard vocabulary of everyday work — JSON, files, time, strings — so the
+first version of a program usually needs no dependency at all:
 
 | PlainScript | Description |
 |---|---|
@@ -611,6 +787,12 @@ No imports needed — these functions are built into the compiler:
 ---
 
 ## Web Applications
+
+`web app` starts the HTTP stack available to every program. `route <method>
+"<path>" ... done` registers an endpoint; `reply` (or `show`) sends a response,
+`reply json ... done` sends JSON with `is`-style fields, and `start <port>`
+serves it. `status <n>` sets the response code and `when nothing matches`
+handles otherwise-unmatched requests.
 
 ```
 web app
@@ -811,16 +993,31 @@ show page.hasNext        # true if another page exists
 
 ## Multi-File Projects
 
+Programs grow into files. `import "./math.pln"` pulls a whole file into the
+current one, `import { circleArea } from "./math.pln"` and `bring circleArea
+from "./math.pln"` import specific names, and `export <name>` (or
+`export <name> and <name>`) makes names available to other files:
+
 ```
 import "./math.pln"
 import "./utils.pln"
+import { circleArea } from "./math.pln"
+bring circleArea from "./math.pln"
 
 show PI
 
 show double(5)
 ```
 
-Imports are bundled per entry: `plainscript build` gives every source file its own standalone output under `dist/`, with imported code inlined.
+```
+remember PI as 3.14159
+make circleArea(r)
+    give PI * r * r
+done
+export circleArea
+```
+
+Imports are bundled per entry: `plainscript build` gives every source file its own standalone output under `dist/`, with imported code inlined. Functions, lambdas, records, and modules together are how you build your own vocabulary on top of the core verbs — a new reader puzzle (`validate(body, fields)`) is a one-line call, not a loop.
 
 ---
 
