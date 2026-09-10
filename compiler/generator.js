@@ -4521,9 +4521,18 @@ function generateExpr(node, context = createGenerationContext()) {
     case 'CallExpression': {
       // Method call: receiver.method(args). Member access invoked with parens —
       // e.g. path.join("a", "b"), mrz.parse(line), fs.existsSync(("x")).
+      // Postfix calls f()(), arr[0](1), mul(6)(7) also bind here; any composite
+      // callee (arrow, binary, comparison/logical condition) is parenthesised so
+      // the call still applies to the whole value, not its last operand.
       if (node.callee) {
         const args = node.args.map(arg => generateExpr(arg, context)).join(', ');
-        return `${generateExpr(node.callee, context)}(${args})`;
+        const callee = generateExpr(node.callee, context);
+        const composite = node.callee.type === 'ArrowFunctionExpression' ||
+          node.callee.type === 'BinaryExpression' ||
+          node.callee.type === 'LogicalCondition' ||
+          node.callee.type === 'ComparisonCondition' ||
+          node.callee.type === 'UnaryExpression';
+        return `${composite ? `(${callee})` : callee}(${args})`;
       }
       if (STDLIB[node.name]) {
         if (node.name === 'readFile' || node.name === 'writeFile' ||

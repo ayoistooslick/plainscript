@@ -3411,6 +3411,21 @@ function parseAsk() {
         advance(); // position
         const idx = consume(TOKEN.NUMBER, 'Expected a number after "at position".').value;
         node = { type: 'IndexExpression', object: node, index: { type: 'NumberLiteral', value: idx } };
+      } else if (peek().type === TOKEN.LPAREN) {
+        // Postfix call: invoke any expression — f()(), arr[0](1), mul(6)(7),
+        // obj.method()(x), or an immediately-invoked lambda ((x) -> x + 1)(2).
+        // Only continuation tokens are considered, so the call binds to the
+        // chain (same rules as the existing "." / "[" cases below it).
+        advance(); // (
+        const { separator, args } = parseArgList();
+        consume(TOKEN.RPAREN, 'Expected ")" to close the call.');
+        if (separator) {
+          throw new Error(makeError(
+            'Postfix calls cannot use "to"/"from" arguments.\n\nExample:\n  mul(6)(7)',
+            peek()
+          ));
+        }
+        node = { type: 'CallExpression', callee: node, args };
       } else {
         break;
       }

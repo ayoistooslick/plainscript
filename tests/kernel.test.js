@@ -778,6 +778,124 @@ test('boolean value in an array literal element', () => {
   if (run(src, 'JSON.stringify(xs)') !== '[1,true,3]') throw new Error('array boolean failed');
 });
 
+// ── Postfix calls: f()(), arr[0](1), mul(6)(7) ──────────────────────────────
+
+test('curried call: mul(6)(7)', () => {
+  const src = [
+    'make mul(x)',
+    '  give (y) -> x * y',
+    'done',
+    'remember a as mul(6)',
+    'remember r as a(7)',
+  ].join('\n');
+  if (run(src, 'r') !== 42) throw new Error('curried call failed');
+});
+
+test('zero-arg chain: f()()', () => {
+  const src = [
+    'make f()',
+    '  give () -> 42',
+    'done',
+    'remember r as f()()',
+  ].join('\n');
+  if (run(src, 'r') !== 42) throw new Error('f()() failed');
+});
+
+test('call stored in array: arr[0]()', () => {
+  const src = [
+    'make one()',
+    '  give 99',
+    'done',
+    'remember arr as [one]',
+    'remember r as arr[0]()',
+  ].join('\n');
+  if (run(src, 'r') !== 99) throw new Error('arr[0]() failed');
+});
+
+test('lambda stored in list: fs[1](21)', () => {
+  const src = [
+    'remember fs as [(n) -> n + 1, (n) -> n * 2]',
+    'remember r as fs[1](21)',
+  ].join('\n');
+  if (run(src, 'r') !== 42) throw new Error('fs[1](21) failed');
+});
+
+test('method result chained: o.func()(5)', () => {
+  const src = [
+    'make ops()',
+    '  give record with func () -> (n) -> n * 4 done',
+    'done',
+    'remember o as ops()',
+    'remember r as o.func()(5)',
+  ].join('\n');
+  if (run(src, 'r') !== 20) throw new Error('method-result chained call failed');
+});
+
+test('immediately-invoked expression lambda: ((x) -> x + 1)(2)', () => {
+  const src = 'remember r as ((x) -> x + 1)(2)';
+  if (run(src, 'r') !== 3) throw new Error('expr IIFE failed');
+});
+
+test('immediately-invoked block lambda: ((x) do ... done)(n)', () => {
+  const src = 'remember r as ((x, y) do give x * y done)(6, 7)';
+  if (run(src, 'r') !== 42) throw new Error('block IIFE failed');
+});
+
+test('multi-arg chain: mul(2)(3)(5)', () => {
+  const src = [
+    'make mul(x)',
+    '  give (y) -> (z) -> x * y * z',
+    'done',
+    'remember r as mul(2)(3)(5)',
+  ].join('\n');
+  if (run(src, 'r') !== 30) throw new Error('triple chain failed');
+});
+
+test('chained call as a boolean operand', () => {
+  const src = [
+    'make above3(a)',
+    '  give a is above 3',
+    'done',
+    'remember r as above3(4) and above3(9)',
+    'remember s as above3(1) or above3(2)',
+    'remember t as (above3(4) or above3(1)) is true',
+  ].join('\n');
+  const out = run(src, 'JSON.stringify([r, s, t])');
+  if (out !== '[true,false,true]') throw new Error('chained boolean operand failed: ' + out);
+});
+
+test('index after a chained call: point(10)(20)[1]', () => {
+  const src = [
+    'make point(x)',
+    '  give (y) -> tuple with x, y and x * y done',
+    'done',
+    'remember r as point(10)(20)[1]',
+  ].join('\n');
+  if (run(src, 'r') !== 20) throw new Error('index after chained call failed');
+});
+
+test('postfix call generator emits grouping for composite callees', () => {
+  const js = compile([
+    'remember a as ((x) -> x + 1)(2)',
+    'remember b as mul(6)(7)',
+    'remember c as arr[0]()',
+  ].join('\n'));
+  if (js.indexOf('((x) => x + 1)(2)') === -1) throw new Error('arrow callee not grouped:\n' + js);
+  if (js.indexOf('mul(6)(7)') === -1) throw new Error('identifier chain mangled:\n' + js);
+  if (js.indexOf('arr[0]()') === -1) throw new Error('index chain mangled:\n' + js);
+});
+
+test('postfix calls reject to/from separator arguments', () => {
+  let threw = false;
+  try {
+    compile('mul(6)(7 to 8)');
+  } catch (err) {
+    threw = true;
+    if (err.message.indexOf('Postfix calls cannot use') === -1) throw new Error('wrong error: ' + err.message);
+  }
+  if (!threw) throw new Error('expected postfix separator rejection');
+});
+
 Promise.all(asyncTests).then(() => {
   console.log(`\n${passed} passed, ${failed} failed\n`);
   process.exit(failed > 0 ? 1 : 0);
