@@ -1,4 +1,4 @@
-// PlainScript 1.0.361: readable conditions.
+// PlainScript 1.0.362: readable conditions.
 remember score as 87
 if score is at least 80
     show "pass"

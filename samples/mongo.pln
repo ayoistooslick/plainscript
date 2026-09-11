@@ -1,4 +1,4 @@
-// PlainScript 1.0.361: MongoDB copyable starting point.
+// PlainScript 1.0.362: MongoDB copyable starting point.
 mongo "mongodb://localhost:27017" db "sample"
 remember docs as query
     SELECT * FROM notes

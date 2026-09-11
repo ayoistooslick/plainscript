@@ -506,7 +506,7 @@ function buildOne(filePath, srcDir, outDir, options = {}) {
 
 // `plainscript build <file.pln> -o <out.js>`  -  compile one entry to an explicit
 // output path (same compilation pipeline as buildOne, including source maps
-// when requested). Valuable for browser payloads such as the v1.0.361
+// when requested). Valuable for browser payloads such as the v1.0.362
 // requestAnimationFrame / addEventListener helpers, which are meant to run as
 // a single script tag.
 function writeOneFile(filePath, outputFile) {
@@ -631,7 +631,7 @@ done
 route get "/api/status"
     reply json
         status is "ok"
-        version is "1.0.361"
+        version is "1.0.362"
     done
 done
 
@@ -1014,7 +1014,7 @@ async function main() {
   switch (command) {
     case 'run':     await cmdRun(fileArg, positional.slice(2)); break;
     case 'build': {
-      // v1.0.361  -  optional -o/--output <path>. "-o" is a single-dash flag, so
+      // v1.0.362  -  optional -o/--output <path>. "-o" is a single-dash flag, so
       // it survives the "--filtered" positional list; pull it out here before
       // building the positional file argument for cmdBuild.
       let outputPath = null;

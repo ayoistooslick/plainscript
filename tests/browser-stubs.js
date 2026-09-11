@@ -1,6 +1,6 @@
 // tests/browser-stubs.js  -  ZERO-dependency browser-emulation stubs.
 //
-// Purpose: v1.0.361 adds browser-targeted PlainScript features (DOM events,
+// Purpose: v1.0.362 adds browser-targeted PlainScript features (DOM events,
 // canvas 2D, WebGL, requestAnimationFrame loops, animation/timers, input,
 // audio, asset loading, WebSocket, localStorage). The generated JS is asserted
 // by running it through tests/runtime.test.js's new Function mechanism: the

@@ -1,4 +1,4 @@
-// PlainScript 1.0.361: MongoDB.
+// PlainScript 1.0.362: MongoDB.
 //
 // The `mongo` statement binds a connection to a MongoDB instance using the
 // official `mongodb` driver. Give it a connection string and an optional

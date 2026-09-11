@@ -1,4 +1,4 @@
-// PlainScript 1.0.361: WhatsApp QR login.
+// PlainScript 1.0.362: WhatsApp QR login.
 // Showcases `use baileys`, message.type branching, media downloads,
 // and button handling.
 

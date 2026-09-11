@@ -11,7 +11,7 @@ What the script exercises:
 - `bring THREE from "three"` emits `require('three')` at the top of the build.
 - `new THREE.Scene()`, `new THREE.WebGLRenderer()`, `new THREE.SphereGeometry(...)`
   and `new THREE.Mesh(geo, mat)` fill a starfield of 150 primitives. Colors use
-  v1.0.361 hex literals (`0x40c463`), so the palette is legible at a glance.
+  v1.0.362 hex literals (`0x40c463`), so the palette is legible at a glance.
 - A resize callback `make fitWindow() ... done` passed straight to
   `window.addEventListener("resize", fitWindow)`.
 - `fetchJson("config.json")` (auto-awaiting) reads `{stars, color}` out of a

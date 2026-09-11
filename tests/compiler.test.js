@@ -2606,7 +2606,9 @@ test('version specs are stripped for require()', () => {
 });
 
 test('known packages keep their canonical binding when versioned', () => {
-  assert(compile('use sqlite@7'), `const Database = require('better-sqlite3');`);
+  const js = compile('use sqlite@7');
+  if (!js.includes('let Database;')) throw new Error(`sqlite binding must be lazy:\n${js}`);
+  if (!js.includes("require('better-sqlite3')")) throw new Error(`sqlite require missing:\n${js}`);
 });
 
 test('detect keeps version specs and maps friendly names through them', () => {

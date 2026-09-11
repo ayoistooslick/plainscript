@@ -1,4 +1,4 @@
-// PlainScript 1.0.361: loops.
+// PlainScript 1.0.362: loops.
 remember values as list with 1, 2, 3
 for each value in values
     show value

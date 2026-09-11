@@ -1,4 +1,4 @@
-# PlainScript Game Development Prompt Guide (v1.0.361)
+# PlainScript Game Development Prompt Guide (v1.0.362)
 
 The standing instruction sheet for AI agents asked to build games and
 interactive browser apps in PlainScript.
@@ -29,7 +29,7 @@ Every PlainScript block you show a user must compile  -  check it first.
 
 PlainScript is intent-oriented: you describe *what* the game should do and the
 compiler generates JavaScript. One hard rule  -  **game logic lives in
-PlainScript**. v1.0.361 reaches into any JS API from `.pln`, which makes
+PlainScript**. v1.0.362 reaches into any JS API from `.pln`, which makes
 dropping to JS tempting; do not. Every browser capability below stays
 reachable without leaving PlainScript.
 
@@ -237,7 +237,7 @@ done
 requestAnimationFrame(loop)
 ```
 
-v1.0.361 adds hex literals (`0xRRGGBB`): numeric colors use `0xffffff` instead
+v1.0.362 adds hex literals (`0xRRGGBB`): numeric colors use `0xffffff` instead
 of magic decimals, and a `"#ffffff"` string works too  -  THREE accepts all
 three.
 

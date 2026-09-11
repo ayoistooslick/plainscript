@@ -1,3 +1,3 @@
-// PlainScript 1.0.361: email application placeholder.
+// PlainScript 1.0.362: email application placeholder.
 remember recipient as "team@example.com"
 show `mail queued for ${recipient}`

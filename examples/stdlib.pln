@@ -1,4 +1,4 @@
-// PlainScript 1.0.361: standard library helpers.
+// PlainScript 1.0.362: standard library helpers.
 remember text as trim("  PlainScript  ")
 remember digest as sha256(text)
 show digest

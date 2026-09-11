@@ -1,4 +1,4 @@
-// Browser-interop compatibility guard for PlainScript v1.0.361.
+// Browser-interop compatibility guard for PlainScript v1.0.362.
 //
 // Dogfoods the browser/game canon in docs/GAME-PROMPT.md: every fenced
 // PlainScript block must compile, and the canonical snippet keeps the emitted

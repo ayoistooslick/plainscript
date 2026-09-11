@@ -545,7 +545,7 @@ function parse(tokens) {
         peekAt(2).type === TOKEN.IDENTIFIER && TIME_UNITS[peekAt(2).value]) {
       return parseEvery();
     }
-    // v1.0.361  -  every frame … done: requestAnimationFrame loop. "every" lexes
+    // v1.0.362  -  every frame … done: requestAnimationFrame loop. "every" lexes
     // as TOKEN.EACH; guard on the following "frame" identifier ("for every
     // item in list" is intercepted by TOKEN.FOR above).
     if (token.type === TOKEN.EACH && peekAt(1).type === TOKEN.IDENTIFIER &&
@@ -797,14 +797,14 @@ function parse(tokens) {
         return parseEvery();
       }
 
-      // v1.0.361  -  every frame … done: requestAnimationFrame loop. Identifier
+      // v1.0.362  -  every frame … done: requestAnimationFrame loop. Identifier
       // mirror of the EACH dispatch above.
       if (token.value === 'every' && peekAt(1).type === TOKEN.IDENTIFIER &&
           peekAt(1).value === 'frame') {
         return parseEveryFrame();
       }
 
-      // v1.0.361  -  after <n> <unit>s … done: one-shot delayed execution.
+      // v1.0.362  -  after <n> <unit>s … done: one-shot delayed execution.
       // Contextual like "retry": "after becomes 5" and after(...) keep their
       // ordinary meanings.
       if (token.value === 'after' &&
@@ -2106,7 +2106,7 @@ function parseAsk() {
       (nextToken.type === TOKEN.IDENTIFIER && (nextToken.value === 'nothing' || nextToken.value === 'socket'));
 
     if (!isEventWhen) {
-      // v1.0.361  -  when <target> "<event>" happens [as <name>] … done binds a
+      // v1.0.362  -  when <target> "<event>" happens [as <name>] … done binds a
       // DOM event listener: when button "click" happens => addEventListener.
       // Detection probes the target expression and commits only when a string
       // followed by "happens" is next; otherwise the tokens are replayed and
@@ -3325,7 +3325,7 @@ function parseAsk() {
 
     const item = tryParseItemExpression();
     if (item) return item;
-    // v1.0.361  -  `new` works anywhere an expression is parsed (assignment
+    // v1.0.362  -  `new` works anywhere an expression is parsed (assignment
     // targets, call arguments, member chains). "new" is not a keyword, so this
     // identifier must be intercepted here; parseAtom would read it as a plain
     // Identifier and turn "new THREE.Scene()" into "new.THREE.Scene()".
@@ -3816,7 +3816,7 @@ function parseAsk() {
     return { type: 'EveryStatement', count, unit, body };
   }
 
-  // v1.0.361  -  every frame … done: a requestAnimationFrame loop whose body runs
+  // v1.0.362  -  every frame … done: a requestAnimationFrame loop whose body runs
   // once per animation frame. The next frame is scheduled after the body so it
   // always runs (t is the frame timestamp, like the DOM's rAF callback).
   function parseEveryFrame() {
@@ -3826,7 +3826,7 @@ function parseAsk() {
     return { type: 'EveryFrameStatement', body };
   }
 
-  // v1.0.361  -  after <n> <unit>s … done: run work once after a delay.
+  // v1.0.362  -  after <n> <unit>s … done: run work once after a delay.
   //   after 5 seconds
   //       show "butter!"  ...  done
   // The delay is a number expression ("after count seconds"); the unit is

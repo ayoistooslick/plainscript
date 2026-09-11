@@ -6,7 +6,15 @@ const { SourceMapGenerator } = require('./sourcemap');
 // Known runtime packages and their require() statements.
 const KNOWN_PACKAGES = {
   express: `const express = require('express');`,
-  sqlite:  `const Database = require('better-sqlite3');`,
+  // v1.0.362  -  better-sqlite3 is an OPTIONAL runtime backend. The require
+  // must not run at module load: on platforms without a usable native
+  // binary (e.g. Android/Termux) `plainscript` must still compile and run
+  // programs that never touch SQLite. `Database` is resolved lazily and only
+  // errors with a teaching message when a program actually constructs a
+  // native database.
+  sqlite:  `let Database;
+try { Database = require('better-sqlite3'); }
+catch (__e) { Database = function () { throw new Error('PlainScript: the native SQLite engine (better-sqlite3) is not usable on this machine (' + (__e && __e.message ? __e.message : __e) + ').\\nInstall it with: npm install better-sqlite3\\nOr use the portable engine instead:  database "' + (arguments[0] || ':memory:') + '" using "wasm"'); }; }`,
   fs:      `const fs = require('fs');`,
   path:    `const path = require('path');`,
   axios:   `const axios = require('axios');`,
@@ -88,7 +96,7 @@ const BUILTIN_DECLARATIONS = {
     `  }`,
     `}`,
   ].join('\n'),
-  // v1.0.361  -  DOM browser runtime (select/selectAll/parseHTML). Browser
+  // v1.0.362  -  DOM browser runtime (select/selectAll/parseHTML). Browser
   // globals are guarded so the generated JS explains the problem when it is
   // run under Node instead of failing with a ReferenceError midpoint.
   dom: [
@@ -107,7 +115,7 @@ const BUILTIN_DECLARATIONS = {
     `  return template.content;`,
     `}`,
   ].join('\n'),
-  // v1.0.361  -  input runtime: pointer coordinates, gamepads, dropped files.
+  // v1.0.362  -  input runtime: pointer coordinates, gamepads, dropped files.
   input: [
     `function __localPoint(e, canvas) {`,
     `  if (typeof document === 'undefined') throw new Error('localPoint(...) needs a browser (document is not defined in Node).');`,
@@ -125,7 +133,7 @@ const BUILTIN_DECLARATIONS = {
     `  return [...(event && event.dataTransfer ? event.dataTransfer.files : [])];`,
     `}`,
   ].join('\n'),
-  // v1.0.361  -  asset-loading runtime (images, JSON, bytes, data URLs). All
+  // v1.0.362  -  asset-loading runtime (images, JSON, bytes, data URLs). All
   // helpers return promises; the STDLIB entries await them.
   assets: [
     `function __loadImage(url) {`,
@@ -162,7 +170,7 @@ const BUILTIN_DECLARATIONS = {
     `  });`,
     `}`,
   ].join('\n'),
-  // v1.0.361  -  Web Audio runtime. The AudioContext is created once and shared
+  // v1.0.362  -  Web Audio runtime. The AudioContext is created once and shared
   // (browsers cap the number), and resumed on demand because autoplay policies
   // start it suspended.
   audio: [
@@ -205,7 +213,7 @@ const BUILTIN_DECLARATIONS = {
     `  });`,
     `}`,
   ].join('\n'),
-  // v1.0.361  -  WebGL runtime: context selection plus the three compile/link/
+  // v1.0.362  -  WebGL runtime: context selection plus the three compile/link/
   // buffer helpers behind the gl* stdlib entries.
   gl: [
     `function __glContext(canvas) {`,
@@ -1345,7 +1353,12 @@ const BUILTIN_DECLARATIONS = {
     `    }`,
     `    console.error('PlainScript: native SQLite unavailable (' + __sqliteNativeReason + '); using the WebAssembly engine instead.');`,
     `  }`,
-    `  const initSqlJs = require('sql.js');`,
+    `  let initSqlJs;`,
+    `  try {`,
+    `    initSqlJs = require('sql.js');`,
+    `  } catch (__e) {`,
+    `    throw new Error('Database: SQLite is not available on this machine. The native engine (better-sqlite3) could not be loaded and the WebAssembly engine (sql.js) is not installed.\\nInstall them with:  npm install better-sqlite3 sql.js');`,
+    `  }`,
     `  const SQL = await initSqlJs();`,
     `  let raw;`,
     `  try {`,
@@ -1379,8 +1392,14 @@ const BUILTIN_DECLARATIONS = {
     `  };`,
     `}`,
     `function __sqliteWrapWasm(db, file) {`,
+    `  // v1.0.362  -  sql.js's export() ends an open transaction, so persisting`,
+    `  // mid-transaction would break the explicit COMMIT that follows. While a`,
+    `  // transaction is active, writes are only flushed to disk once, after the`,
+    `  // COMMIT succeeds (the wrapper's own persist at that point covers it).`,
+    `  let __sqliteTxn = 0;`,
     `  const persist = () => {`,
     `    if (file === ':memory:') return;`,
+    `    if (__sqliteTxn > 0) return;`,
     `    try {`,
     `      require('fs').writeFileSync(file, Buffer.from(db.export()));`,
     `    } catch (error) {`,
@@ -1420,15 +1439,19 @@ const BUILTIN_DECLARATIONS = {
     `    transaction(fn) {`,
     `      return () => {`,
     `        db.run('BEGIN');`,
+    `        __sqliteTxn++;`,
+    `        let out;`,
     `        try {`,
-    `          const out = fn();`,
+    `          out = fn();`,
     `          db.run('COMMIT');`,
-    `          persist();`,
-    `          return out;`,
     `        } catch (error) {`,
     `          try { db.run('ROLLBACK'); } catch (_) {}`,
     `          throw error;`,
+    `        } finally {`,
+    `          __sqliteTxn--;`,
     `        }`,
+    `        persist();`,
+    `        return out;`,
     `      };`,
     `    },`,
     `  };`,
@@ -2664,7 +2687,7 @@ const BUILTIN_DECLARATIONS = {
   file: (args, context) => `new File(${args.map(a => generateExpr(a, context)).join(', ')})`,
   formData: (_args) => `new FormData()`,
 
-  // ── v1.0.361  -  browser DOM (IOPL-native). All helpers guard their browser
+  // ── v1.0.362  -  browser DOM (IOPL-native). All helpers guard their browser
   // global, so the generated output throws a clear teaching error under Node.
   select: (args, context) => {
     ensureBuiltin(context, 'dom');
@@ -2682,7 +2705,7 @@ const BUILTIN_DECLARATIONS = {
     return `__parseHTML(${generateExpr(args[0], context)})`;
   },
 
-  // ── v1.0.361  -  browser input (IOPL-native).
+  // ── v1.0.362  -  browser input (IOPL-native).
   localPoint: (args, context) => {
     ensureBuiltin(context, 'input');
     requireArgs('localPoint', args, 2, 'localPoint(event, canvas)');
@@ -2698,7 +2721,7 @@ const BUILTIN_DECLARATIONS = {
     return `__droppedFiles(${generateExpr(args[0], context)})`;
   },
 
-  // ── v1.0.361  -  browser assets (IOPL-native). Each awaitable helper is
+  // ── v1.0.362  -  browser assets (IOPL-native). Each awaitable helper is
   // awaited here, so the surrounding function/handler is marked async.
   loadImage: (args, context) => {
     ensureBuiltin(context, 'assets');
@@ -2731,7 +2754,7 @@ const BUILTIN_DECLARATIONS = {
     return `(await __readDataUrl(${generateExpr(args[0], context)}))`;
   },
 
-  // ── v1.0.361  -  Web Audio (IOPL-native).
+  // ── v1.0.362  -  Web Audio (IOPL-native).
   audioContext: (_args, context) => {
     ensureBuiltin(context, 'audio');
     return `__audioContext()`;
@@ -2742,7 +2765,7 @@ const BUILTIN_DECLARATIONS = {
     return `__audioTone(${args.map(a => generateExpr(a, context)).join(', ')})`;
   },
 
-  // ── v1.0.361  -  WebSocket send helper (works with any WebSocket-like object,
+  // ── v1.0.362  -  WebSocket send helper (works with any WebSocket-like object,
   // browser or Node): strings go through verbatim, everything else is JSON.
   webSocketSend: (args, context) => {
     requireArgs('webSocketSend', args, 2, 'webSocketSend(socket, { type: "move", x: 10 })');
@@ -2751,7 +2774,7 @@ const BUILTIN_DECLARATIONS = {
     return `${ws}.send(typeof (${value}) === 'string' ? (${value}) : JSON.stringify(${value}))`;
   },
 
-  // ── v1.0.361  -  WebGL (IOPL-native).
+  // ── v1.0.362  -  WebGL (IOPL-native).
   webglContext: (args, context) => {
     ensureBuiltin(context, 'gl');
     requireOneArg('webglContext', args);
@@ -2956,12 +2979,19 @@ function emitRequire(context, moduleName, alias) {
     }
     const known = KNOWN_PACKAGES[bareName];
     if (known) {
-      const boundAs = known.match(/const (\w+)/)[1];
+      const boundAs = known.match(/(?:const|let) (\w+)/)[1];
       if (alias !== boundAs) {
         throw new Error(
           `"${bareName}" is part of PlainScript's built-in runtime and is already available as "${boundAs}". Remove "as ${alias}".`
         );
       }
+      const key = `${npmName}\0${alias}`;
+      if (context.requires.has(key)) return '';
+      context.requires.add(key);
+      // Canonical binding, e.g. express to express, sqlite to Database. Using
+      // the KNOWN entry keeps sqlite's lazy loader (better-sqlite3 is an
+      // optional backend) instead of emitting a fresh eager require.
+      return known;
     }
     const key = `${npmName}\0${alias}`;
     if (context.requires.has(key)) return '';
@@ -3880,16 +3910,16 @@ function generateStatement(node, indent = '', context = createGenerationContext(
     // v2.2.0  -  mongo "<connection>" [db "<name>"]: MongoDB client bound to "db".
     // Uses the mongodb driver; subsequent query/insert/update/delete/execute
     // statements compile to MongoDB collection operations.
+    // v1.0.362  -  mongodb is an optional backend: the require lives inside
+    // __mongoOpen (it is only evaluated when a database is actually opened),
+    // so programs that never use it start without needing the module.
     case 'MongoStatement': {
       _sqlDriver = 'mongo';
       _sqlClientVar = 'db';
       markAsync(context);
       ensureBuiltin(context, 'mongodb');
       const dbArg = node.dbName ? `, ${generateExpr(node.dbName, context)}` : '';
-      return [
-        emitRequire(context, 'mongodb'),
-        `${indent}const db = await __mongoOpen(${generateExpr(node.connection, context)}${dbArg});`,
-      ].filter(Boolean).map(line => line.startsWith('const ') ? `${indent}${line}` : line).join('\n');
+      return `${indent}const db = await __mongoOpen(${generateExpr(node.connection, context)}${dbArg});`;
     }
 
     case 'QueryStatement':
@@ -4136,7 +4166,7 @@ function generateStatement(node, indent = '', context = createGenerationContext(
       ].join('\n');
     }
 
-    // v1.0.361  -  every frame … done: one requestAnimationFrame loop. The next
+    // v1.0.362  -  every frame … done: one requestAnimationFrame loop. The next
     // frame is scheduled after the body so the body always runs once per
     // frame; an awaiting body makes the callback async automatically.
     case 'EveryFrameStatement': {
@@ -4153,7 +4183,7 @@ function generateStatement(node, indent = '', context = createGenerationContext(
       ].join('\n');
     }
 
-    // v1.0.361  -  after <n> <unit> … done: one-shot setTimeout. The delay is an
+    // v1.0.362  -  after <n> <unit> … done: one-shot setTimeout. The delay is an
     // expression scaled by the unit; an awaiting body makes the callback async.
     case 'AfterStatement': {
       const delay = generateExpr(node.delay, context);
@@ -4290,7 +4320,7 @@ function generateStatement(node, indent = '', context = createGenerationContext(
       return `${indent}__emitter.on(${event}, (${node.paramName}) => {\n${body}\n${indent}});`;
     }
 
-    // v1.0.361  -  when <target> "<event>" happens [as <name>] … done: DOM event
+    // v1.0.362  -  when <target> "<event>" happens [as <name>] … done: DOM event
     // listener. The handler param defaults to "event"; an awaiting body makes
     // the callback async automatically.
     case 'WhenTargetedStatement': {

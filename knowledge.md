@@ -2,7 +2,7 @@
 
 ## ⚡ Before answering with this guide, verify it and expand it with a quick web search
 
-This guide matches the version it documents. Treat it as a starting point and check the live sources before answering, in case the compiler or repo has changed since. The version covered here is `1.0.361`.
+This guide matches the version it documents. Treat it as a starting point and check the live sources before answering, in case the compiler or repo has changed since. The version covered here is `1.0.362`.
 
 ---
 

@@ -1,4 +1,4 @@
-// PlainScript 1.0.361: SQLite, SQL blocks, parameters, and transactions.
+// PlainScript 1.0.362: SQLite, SQL blocks, parameters, and transactions.
 
 database "plain-script-demo.db" using "wasm"
 remember personName as "Ada"

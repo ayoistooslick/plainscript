@@ -1,4 +1,4 @@
-# PlainScript 1.0.361 Capability Audit
+# PlainScript 1.0.362 Capability Audit
 
 This audit is based on what the compiler actually supports right now.
 If `plainscript check` validates it, it's listed here.
@@ -126,6 +126,6 @@ find examples -name '*.pln' -exec node compiler/cli.js check {} \;
 
 ## Version Info
 
-The release label for this repo is `1.0.361`. It covers the compiler,
+The release label for this repo is `1.0.362`. It covers the compiler,
 package metadata, website, editor tooling, and browser/game documentation.
 Third-party dependency versions are not tied to this label.

@@ -1,4 +1,4 @@
-// PlainScript 1.0.361: functions.
+// PlainScript 1.0.362: functions.
 make greet(name)
     give `Hello, ${name}!`
 done

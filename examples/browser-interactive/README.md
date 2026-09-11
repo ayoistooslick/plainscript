@@ -5,7 +5,7 @@ no canvas, no library, no bundler. Click **+10 points** and the score span
 updates; click **Log entry** to append a line to the run log; press **R** to
 reset both.
 
-It demonstrates the v1.0.361 browser API:
+It demonstrates the v1.0.362 browser API:
 
 - `document.querySelector` + `.innerHTML becomes` / `.textContent becomes`.
 - `when clickButton "click" happens` DOM event handlers.

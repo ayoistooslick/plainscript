@@ -1,4 +1,4 @@
-// Browser/game capability tests for PlainScript v1.0.361.
+// Browser/game capability tests for PlainScript v1.0.362.
 //
 // Drives the compiler through the same tokenize → parse → generate pipeline as
 // the CLI, then runs the generated JavaScript through tests/browser-stubs.js
@@ -82,7 +82,7 @@ function presetGLEnums(env, canvas) {
 
 // ── 1. new expressions ─────────────────────────────────────────────────────────
 
-console.log('\nv1.0.361 browser: new expressions');
+console.log('\nv1.0.362 browser: new expressions');
 
 test('new expressions compile to single constructor calls (no double parens)', () => {
   const js = compileProgram([
@@ -111,7 +111,7 @@ test('new expressions work as arguments, targets, and bare form', () => {
 
 // ── 2. Hex literals ────────────────────────────────────────────────────────────
 
-console.log('\nv1.0.361 browser: hex literals');
+console.log('\nv1.0.362 browser: hex literals');
 
 test('hex literals compile to decimal numbers', () => {
   const js = compileProgram('show 0xFF\nshow 0x40c463\nshow 0x0');
@@ -128,7 +128,7 @@ testAsync('hex literals run through the stub env and print decimal', async () =>
 
 // ── 3. Event statements ────────────────────────────────────────────────────────
 
-console.log('\nv1.0.361 browser: when ... happens');
+console.log('\nv1.0.362 browser: when ... happens');
 
 test('when <target> "<event>" happens compiles to addEventListener', () => {
   const js = compileProgram([
@@ -163,7 +163,7 @@ testAsync('when happens listeners fire through the environment', async () => {
 
 // ── 4. every frame loop ────────────────────────────────────────────────────────
 
-console.log('\nv1.0.361 browser: every frame');
+console.log('\nv1.0.362 browser: every frame');
 
 test('every frame compiles to a self-scheduling requestAnimationFrame loop', () => {
   const js = compileProgram([
@@ -190,7 +190,7 @@ testAsync('every frame runs once per pumped animation frame', async () => {
 
 // ── 5. after / every milliseconds ──────────────────────────────────────────────
 
-console.log('\nv1.0.361 browser: after / every <time>');
+console.log('\nv1.0.362 browser: after / every <time>');
 
 test('after <n> <unit> compiles to a scaled setTimeout', () => {
   const js = compileProgram([
@@ -236,7 +236,7 @@ testAsync('after/every timers capture the correct delay on the stub', async () =
 
 // ── 6. Browser builtins ────────────────────────────────────────────────────────
 
-console.log('\nv1.0.361 browser: builtins');
+console.log('\nv1.0.362 browser: builtins');
 
 test('browser builtins compile to their guarded helpers', () => {
   const js = compileProgram([
@@ -292,7 +292,7 @@ testAsync('select() without a browser throws a teaching error', async () => {
 
 // ── 7. Functional via stubs ────────────────────────────────────────────────────
 
-console.log('\nv1.0.361 browser: functional via stubs');
+console.log('\nv1.0.362 browser: functional via stubs');
 
 testAsync('canvas 2d program records fillRect with the right arguments', async () => {
   const env = makeBrowserEnv();
@@ -368,7 +368,7 @@ testAsync('fetchJson at top level async-wraps the whole program', async () => {
 
 // ── 8. Facts about the proven example ──────────────────────────────────────────
 
-console.log('\nv1.0.361 browser: examples/canvas-game smoke');
+console.log('\nv1.0.362 browser: examples/canvas-game smoke');
 
 testAsync('examples/canvas-game compiles and draws through three pumped frames', async () => {
   const source = fs.readFileSync(path.join(__dirname, '..', 'examples', 'canvas-game', 'src', 'game.pln'), 'utf8');
@@ -402,7 +402,7 @@ testAsync('glShader accepts the DOM-style "VERTEX_SHADER"/"FRAGMENT_SHADER" name
 
 // ── 9. Compatibility guards ────────────────────────────────────────────────────
 
-console.log('\nv1.0.361 browser: compatibility guards');
+console.log('\nv1.0.362 browser: compatibility guards');
 
 test('"text" is not shadowed by the browser builtins', () => {
   assertIncludes(compileProgram('show text(5)'), 'console.log(String(5));');

@@ -1,4 +1,4 @@
-// PlainScript 1.0.361: SQLite query blocks.
+// PlainScript 1.0.362: SQLite query blocks.
 database "sample.db" using "wasm"
 execute
     CREATE TABLE IF NOT EXISTS notes (body TEXT)
