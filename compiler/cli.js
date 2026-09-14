@@ -1024,6 +1024,12 @@ async function main() {
   if (verbose) { stage = stageVerbose;  VERBOSE = true; }
   if (quiet) REQUESTED_QUIET = true;
 
+  // Standard version flags  -  print and exit before any command dispatch.
+  // `--version` anywhere (it is already filtered from program args); `-v`
+  // only as a standalone command so `run app.pln -v` still passes -v through
+  // to the compiled program.
+  if (args.includes('--version') || (args.length === 1 && args[0] === '-v')) { cmdVersion(); return; }
+
   // Filter flags out to get the positional arguments.
   const positional = args.filter(a => !a.startsWith('--'));
   const [, , command, fileArg] = positional.length >= 2
@@ -1063,7 +1069,9 @@ async function main() {
     case 'add':     cmdAdd(fileArg);              break;
     case 'remove':  cmdRemove(fileArg);           break;
     case 'update':  cmdUpdate();                  break;
-    case 'version': cmdVersion();                 break;
+    case 'version':
+    case '--version':
+    case '-v':   cmdVersion();                 break;
     case 'help':    cmdHelp();                    break;
     default:
       // Backwards-compatible: treat the first arg as a file to run directly

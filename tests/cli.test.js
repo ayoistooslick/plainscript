@@ -71,6 +71,29 @@ test('version: prints a semver string', () => {
   assert(/1\.0\.\d+/.test(out), `expected "PlainScript v1.0.x", got:\n${out}`);
 });
 
+test('--version and -v: standard flags print the same version string', () => {
+  const viaFlag = runCli(['--version'], REPO_ROOT);
+  const viaShort = runCli(['-v'], REPO_ROOT);
+  const viaWord = runCli(['version'], REPO_ROOT);
+  assert(viaFlag.status === 0, `--version must exit 0, got ${viaFlag.status}`);
+  assert(viaShort.status === 0, `-v must exit 0, got ${viaShort.status}`);
+  const a = outputOf(viaFlag).trim();
+  const b = outputOf(viaShort).trim();
+  const c = outputOf(viaWord).trim();
+  assert(a === c && b === c, `all version forms must agree, got: ${JSON.stringify([a, b, c])}`);
+  assert(/^PlainScript v1\.0\.363$/.test(c), `expected "PlainScript v1.0.363", got: ${c}`);
+});
+
+test('-v as a program argument survives run (does not mean version)', () => {
+  const tmp = tmpDir();
+  const prog = path.join(tmp, 'echo-args.pln');
+  fs.writeFileSync(prog, 'remember a as args()\nshow "count: " + count of a\nshow "first: " + a[0]\n');
+  const r = runCli(['run', prog, '-v'], tmp);
+  assert(r.status === 0, `run must exit 0, got ${r.status}`);
+  const out = outputOf(r);
+  assert(out.includes('first: -v'), `program must receive -v as an argument, got:\n${out}`);
+});
+
 test('check: valid file prints a ✓ success line and exits 0', () => {
   const dir = tmpDir();
   fs.writeFileSync(path.join(dir, 'ok.pln'), 'show "hello"\n', 'utf8');

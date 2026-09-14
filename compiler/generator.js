@@ -408,7 +408,7 @@ const BUILTIN_DECLARATIONS = {
     `  });`,
     `}`,
   ].join('\n'),
-  // v1.0.35  -  dependency-free SVG images and visualizations.
+  // v1.0.363  -  dependency-free SVG images and visualizations.
   // The image value is an SVG string, so it can be saved, embedded, or returned
   // from a web route without a native graphics dependency.
   visualization: [

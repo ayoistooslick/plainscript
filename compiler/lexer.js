@@ -184,7 +184,7 @@ const KEYWORDS = {
   otherwise: TOKEN.OTHERWISE,
   else:      TOKEN.ELSE,
   done:      TOKEN.DONE,
-  end:       TOKEN.DONE,   // synonym for done in every block position (v1.0.37)
+  end:       TOKEN.DONE,   // synonym for done in every block position (v1.0.363)
   do:        TOKEN.DO,        // block-bodied lambda opener: (x) do ... done
   greater:   TOKEN.GREATER,
   less:      TOKEN.LESS,

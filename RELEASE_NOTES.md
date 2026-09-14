@@ -30,6 +30,8 @@ sequence of statements concurrently.
   for terminal ergonomics and writing to the error stream.
 - Global CLI flags `--quiet` (silences banner/stage/per-file chatter while
   still reporting errors) and `--verbose` (prints stage timing lines).
+- `plainscript --version` and `plainscript -v` now print the version string
+  directly, matching `plainscript version`.
 
 ## Data & AI primitives
 

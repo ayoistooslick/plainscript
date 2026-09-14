@@ -29,6 +29,9 @@ All notable changes to PlainScript are documented here.
 - Global CLI flags **`--quiet`** and **`--verbose`**: `--quiet` suppresses the
   banner, stage, and per-file `✓` chatter while still surfacing validation
   errors and non-zero exits; `--verbose` prints stage timing lines.
+- Standard version flags: `plainscript --version` and `plainscript -v` print
+  the same version string as `plainscript version` (`PlainScript v1.0.363`);
+  a `-v` placed after a program path still reaches the program's own arguments.
 
 ### Data & AI primitives
 

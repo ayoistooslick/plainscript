@@ -26,7 +26,7 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "plainscript-lang": "^1.0.35"
+    "plainscript-lang": "^1.0.363"
   },
   "dependencies": {
     "mongodb": "^7.6.0"

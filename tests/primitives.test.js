@@ -1,4 +1,4 @@
-// Tests for the PlainScript v1.0.37 primitives
+// Tests for the PlainScript v1.0.363 primitives
 //   statistics: mean / median / variance / deviation
 //   vectors:    dotProduct / magnitude / normalize
 //   randomness: randomInteger / randomChoice / weightedChoice / shuffle / sample
