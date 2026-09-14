@@ -2,7 +2,7 @@
 
 ## ⚡ Before answering with this guide, verify it and expand it with a quick web search
 
-This guide matches the version it documents. Treat it as a starting point and check the live sources before answering, in case the compiler or repo has changed since. The version covered here is `1.0.362`.
+This guide matches the version it documents. Treat it as a starting point and check the live sources before answering, in case the compiler or repo has changed since. The version covered here is `1.0.363`.
 
 ---
 
@@ -35,7 +35,7 @@ For a repository change, also run `npm test`. Never tell a vibecoder that code w
 - Source is line-oriented and case-sensitive.
 - Keywords are lowercase.
 - Indentation improves readability but does not close blocks.
-- `done` closes most blocks. The parser also supports selected aliases such as `end`, but new code should use `done`.
+- `done` closes every block. `end` is an exact synonym and closes any block just like `done`, but new code should use `done`.
 - `//` starts a single-line comment.
 - Strings use double quotes.
 - Backticks create template strings with `${expression}` interpolation.
@@ -78,7 +78,30 @@ let answer as 42
 retries becomes retries - 1
 ```
 
-Assignment forms include `becomes`, `is now`, `set ... to`, and `change ... to`. Prefer `becomes` in generated examples.
+`becomes` is also written `is now`, the prefix forms `set ... to` and `change ... to`, and the postfix forms `x set to` and `x change to`. All are synonyms; prefer `becomes` in generated examples.
+
+Compound assignment operators use the same machinery: `+=`, `-=`, `*=`, `/=`, `%=` (the legacy `++=` spelling is still accepted as `+=`). The word forms `or becomes` (`||=`), `and becomes` (`&&=`), and `nullish becomes` (`??=`) cover logical assignment:
+
+```plainscript
+remember score as 10
+score += 5          // 15
+score -= 3          // 12
+score *= 2          // 24
+score /= 4          // 6
+score %= 7          // 6 (remainder of 6 / 7)
+remember label as "ver"
+label += "nacular"  // "vernacular"
+remember counter as 0
+counter ++= 1       // legacy spelling of +=
+set score to 1      // same as "score becomes 1"
+score change to 2   // same as "score becomes 2"
+remember saved as null
+saved nullish becomes "fallback"   // ??=
+show score
+show label
+show counter
+show saved
+```
 
 Expressions can contain:
 
@@ -136,7 +159,7 @@ Supported comparison language includes:
 | `more than`, `is greater than`, `is above` | greater than |
 | `fewer than`, `is less than`, `is below` | less than |
 | `is at least` | greater than or equal |
-| `is most` | less than or equal |
+| `is at most` | less than or equal |
 | `contains` | string or collection membership |
 | `starts with`, `ends with` | string prefix or suffix |
 | `between low and high` | inclusive range |
@@ -317,17 +340,42 @@ entrypoint and import paths when adding or moving helper modules.
 Use only functions implemented in the compiler. Common groups are:
 
 - **Output and system**: `show`, `print`, `display`, `env`, `args`, `time`, `date`, `uuid`, `exit`
+- **Terminal and interactive**: `confirm`, `choose`, `clearTerminal`, `terminalWidth`, `terminalHeight`, `stderr`
 - **Strings**: `length`, `uppercase`, `lowercase`, `trim`, `replace`, `split`, `join`, `startsWith`, `endsWith`, `truncate`, `padStart`, `padEnd`
+- **Statistics and vectors**: `mean`, `median`, `variance`, `deviation`, `dotProduct`, `magnitude`, `normalize`
+- **Randomness**: `randomInteger`, `randomChoice`, `weightedChoice`, `shuffle`, `sample`
+- **Memoization and parsing**: `memoize`, `parseBoolean`, `characters`
 - **Collections**: `first`, `last`, `flatten`, `includes`, `unique`, `sort`, `reverse`, `sum`, `smallest`, `largest`, `keys`, `values`, `groupBy`, `pick`, `omit`, `range`, `clamp`
 - **Files**: `readFile`, `writeFile`, `appendFile`, `fileExists`, `copyFile`, `moveFile`, `deleteFile`, `makeFolder`, `listFolder`, `readBytes`, `writeBytes`, `joinPath`, `baseName`, `folderOf`, `extensionOf`, `fileSize`, `fileType`, `walkFolder`, `writeLine`, `appendLine`
 - **JSON and data**: `jsonEncode`, `jsonDecode`, `yamlEncode`, `yamlDecode`, `textToBytes`, `bytesToText`, `base64Encode`, `base64Decode`
 - **Security**: `sha256`, `sha1`, `md5`, `hashPassword`, `checkPassword`, `createToken`, `readToken`, `validate`
-- **Async**: `sleep`, `allOf`, `anyOf`, `settledOf`, `withTimeout`
+- **Async**: `sleep`, `all of`, `any of`, `settled of`, `withTimeout`
 - **Network**: `get`, `post`, `put`, `patch`, `delete`
 - **AI**: `chat`, `chatWith`, `embedText`, `embedWith`, `similarity`
 - **Images and visualizations**: `svgImage`, `barChart`, `lineChart`, `saveImage`, `imageDataUri`
 
 If a requested capability is not in the compiler, explain that plainly and propose the nearest supported construct or an npm package. Do not invent a function because its name sounds reasonable.
+
+`confirm("Delete file")` and `choose("Pick one", list with "a", "b")` prompt the running user. `mean`, `median`, `variance`, and `deviation` describe a numeric sample; `dotProduct`, `magnitude`, and `normalize` work on vectors. `memoize(f)` wraps a function in a cache; `parseBoolean`, `characters`, `randomInteger`, `randomChoice`, `weightedChoice`, `shuffle`, and `sample` handle parsing and randomness:
+
+```plainscript
+stderr("processing sample")
+remember data as [2, 4, 4, 4, 5, 5, 7, 9]
+show mean(data)
+show median(data)
+show round(variance(data) * 100) / 100
+show round(deviation(data) * 100) / 100
+remember unit as normalize([3, 4])
+show join(unit, ", ")
+show randomInteger(1, 6)
+show randomChoice(["heads", "tails"])
+show weightedChoice(["common", "rare"], [0.7, 0.3])
+show join(shuffle([1, 2, 3, 4, 5]), " ")
+show join(sample([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 3), " ")
+show count of characters("plain")
+show parseBoolean("yes")
+show terminalWidth()
+```
 
 ### Images and visualizations
 
@@ -739,11 +787,27 @@ show answer
 Run independent promises together:
 
 ```plainscript
-remember results as allOf([
+remember results as all of ([
     get "https://example.com/a",
     get "https://example.com/b"
 ])
 show results
+```
+
+`run in parallel ... done as <name>` runs each statement in the block as its own concurrent task and collects the statements' values in order with `Promise.all`-style concurrency (not worker threads):
+
+```plainscript
+make square(n)
+    give n * n
+done
+
+run in parallel
+    square(3)
+    square(4)
+    square(5)
+done as results
+
+show join(results, ", ")
 ```
 
 Bound failures with `try`, `recover`, and optional `finally`:
@@ -889,10 +953,10 @@ A good answer is friendly and direct, but compiler-checked. PlainScript makes co
 
 ## 18. Quick reference: Keywords & constructs
 
-**Declarations**: `remember`, `let`, `becomes`, `is now`, `set ... to`, `change ... to`
-**Blocks**: `done` (closes most blocks), `end` (alias)
+**Declarations**: `remember`, `let`, `becomes` (synonyms: `is now`, prefix `set ... to` / `change ... to`, postfix `x set to` / `x change to`), compound `+=`, `-=`, `*=`, `/=`, `%=` (legacy `++=` also accepted), `or becomes` (`||=`), `and becomes` (`&&=`), `nullish becomes` (`??=`)
+**Blocks**: `done`, `end` (exact synonym; closes any block just like `done`)
 **Conditions**: `if`, `otherwise`, `otherwise if`
-**Comparisons**: `is`, `same as`, `is not`, `different from`, `more than`, `is greater than`, `is above`, `fewer than`, `is less than`, `is below`, `is at least`, `is most`, `contains`, `starts with`, `ends with`, `between ... and ...`, `has field`, `instanceof`
+**Comparisons**: `is`, `same as`, `is not`, `different from`, `more than`, `is greater than`, `is above`, `fewer than`, `is less than`, `is below`, `is at least`, `is at most`, `contains`, `starts with`, `ends with`, `between ... and ...`, `has field`, `instanceof`
 **Logic**: `and`, `or`, `not`
 **Loops**: `for each ... in ...`, `for index ... from ... to ...`, `while ...`, `break`, `continue`
 **Functions**: `make`, `give`, `yield`
@@ -904,7 +968,13 @@ A good answer is friendly and direct, but compiler-checked. PlainScript makes co
 **Telegram**: `bot`, `when someone sends`, `when someone clicks`, `reply`, `telegramCall`, `start telegram bot`
 **AI**: `chat`, `chatWith`, `embedText`, `embedWith`, `similarity`
 **Images**: `svgImage`, `barChart`, `lineChart`, `saveImage`, `imageDataUri`
-**Async**: `try`, `recover`, `finally`, `retry`, `allOf`, `anyOf`, `settledOf`, `withTimeout`, `sleep`
+**Async**: `try`, `recover`, `finally`, `retry`, `all of`, `any of`, `settled of`, `withTimeout`, `sleep`
 **Files**: `readFile`, `writeFile`, `appendFile`, `fileExists`, `copyFile`, `moveFile`, `deleteFile`, `makeFolder`, `listFolder`
 **Testing**: `test`, `check`, `equals`, `is`, `contains`, `raises`
-**Other**: `show`, `print`, `display`, `env`, `args`, `time`, `date`, `uuid`, `exit`, `ocr`, `cache`, `cacheGet`, `cacheSet`, `cacheDelete`, `every`, `schedule`, `run background`, `websocket server`, `mail transport`, `send mail`, `reply file`
+**Regex**: `match pattern "..." in text as result`
+**Concurrency**: `run in parallel ... done as <name>`
+**Terminal**: `confirm`, `choose`, `clearTerminal`, `terminalWidth`, `terminalHeight`, `stderr`
+**Statistics and vectors**: `mean`, `median`, `variance`, `deviation`, `dotProduct`, `magnitude`, `normalize`
+**Randomness**: `randomInteger`, `randomChoice`, `weightedChoice`, `shuffle`, `sample`
+**Memoization and parsing**: `memoize`, `parseBoolean`, `characters`
+**Other**: `show`, `print`, `display`, `env`, `args`, `time`, `date`, `uuid`, `exit`, `ocr`, `cache`, `cacheGet`, `cacheSet`, `cacheDelete`, `count of`, `every`, `schedule`, `run background`, `websocket server`, `mail transport`, `send mail`, `reply file`, `mean`, `median`, `variance`, `deviation`, `dotProduct`, `magnitude`, `normalize`, `randomInteger`, `randomChoice`, `weightedChoice`, `shuffle`, `sample`, `memoize`, `parseBoolean`, `characters`, `confirm`, `choose`, `clearTerminal`, `terminalWidth`, `terminalHeight`, `stderr`

@@ -4,6 +4,85 @@ All notable changes to PlainScript are documented here.
 
 ---
 
+## [1.0.363]  -  2026-09-14
+
+### Assignment
+
+- **Compound assignment operators:** `+=`, `-=`, `*=`, `/=`, `%=` (the legacy
+  `++=` spelling is still accepted as `+=`), with the word forms `or becomes`
+  (`||=`), `and becomes` (`&&=`), and `nullish becomes` (`??=`).
+- **`set` / `change` assignment:** prefix forms `set <expr> to <value>` and
+  `change <expr> to <value>` compile to plain assignment, as do the postfix
+  aliases `<expr> set to <value>` and `<expr> change to <value>`. A variable
+  named `set` or `change` keeps its usual meaning unless a value and `to`
+  follow; `set cookie` and `set ... with` keep their own meanings.
+- **`end` is now a synonym for `done`** in every block-closing position
+  (functions, loops, conditionals, kinds, SQL blocks, and so on), so `end`
+  closes any block `done` can close.
+
+### Interactive terminal primitives
+
+- `confirm("...")` (y/n prompt returning a boolean), `choose("...", [...])`
+  (numbered picker returning the chosen option), `clearTerminal()`,
+  `terminalWidth()`, `terminalHeight()`, and `stderr(...)` (writes to
+  `console.error`).
+- Global CLI flags **`--quiet`** and **`--verbose`**: `--quiet` suppresses the
+  banner, stage, and per-file `✓` chatter while still surfacing validation
+  errors and non-zero exits; `--verbose` prints stage timing lines.
+
+### Data & AI primitives
+
+- Statistics over numeric arrays: `mean`, `median`, `variance`, `deviation`.
+- Vector helpers: `dotProduct(a, b)`, `magnitude(v)`, `normalize(v)`.
+- Randomness: `randomInteger(low, high)`, `randomChoice(list)`,
+  `weightedChoice(items, weights)`, `shuffle(list)`, `sample(list, n)`.
+- `memoize(fn)` (Map-backed caching by argument string), `parseBoolean(text)`
+  (`true`/`yes`/`1`/`on`), and `characters(text)` (splits a string into an
+  array of characters).
+
+### Concurrency
+
+- `run in parallel ... done as <name>` compiles each statement in the block to
+  a concurrent async task and resolves `Promise.all`, collecting each
+  statement's value into `name` in body order (`done` without `as <name>`
+  still runs the block concurrently).
+
+### Collections & regex
+
+- `count of <collection>` returns `.count`, `.length`, or `.size` as
+  available.
+- Regex capture via `match pattern "..." in "..." as <name>` assigns the
+  `String.match` result (full match plus capture groups).
+- `all of [...]`, `any of [...]`, and `settled of [...]` spellings for the
+  Promise combinators.
+
+### Examples
+
+- New runnable examples: `ai-memory-cli` (persistent-memory AI CLI built from
+  general primitives), `todo-cli`, `file-manager-cli`, `terminal-cli`,
+  `interactive-cli`, `stats-cli`, `random-cli`, `string-helpers`,
+  `memoize-demo`, `compound-assignments`, `normalization-forms`, and
+  `run-in-parallel`.
+
+### New tests
+
+- New suites `assignment.test.js`, `primitives.test.js`, `concurrency.test.js`,
+  `terminal.test.js`, and `cli.test.js` add 95+ assertions covering compound
+  assignment, the `set`/`change` aliases, statistics, randomness, memoization,
+  parallel execution, terminal output, and the `--quiet`/`--verbose` flags.
+
+### Fixed
+
+- Property-of assignment inside `for each` loops no longer trips the
+  numbered-item `X one from list` ambiguity, so `completed of todo`-style
+  targets assign correctly.
+- `set`/`change ... to` now compile in both prefix and postfix positions.
+- `run in parallel` collects each statement's resulting value (expression
+  statements contribute their return value) instead of only awaiting the block.
+- A batch `--quiet build` no longer leaks per-file `✓` summary chatter.
+
+---
+
 ## v2.4  -  Near-English Intent-Oriented Syntax
 
 ### New English syntax forms

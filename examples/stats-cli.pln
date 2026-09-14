@@ -1,0 +1,29 @@
+// PlainScript 1.0.363 — statistics over an arbitrary sample.
+// Usage:
+//   plainscript run examples/stats-cli.pln 2 4 4 4 5 5 7 9
+// New primitives: mean, median, variance, deviation, plus sort/first/last.
+
+make toNumbers(raw)
+    remember numbers as []
+    for each item in raw
+        push(numbers, parseFloat(item))
+    done
+    give numbers
+done
+
+make report(numbers)
+    if count of numbers is 0
+        show "no numbers given; using the default sample"
+        numbers becomes [2, 4, 4, 4, 5, 5, 7, 9]
+    done
+    remember ordered as sort(numbers)
+    show "count:     " + count of numbers
+    show "mean:      " + round(mean(numbers) * 100) / 100
+    show "median:    " + median(numbers)
+    show "variance:  " + round(variance(numbers) * 100) / 100
+    show "deviation: " + round(deviation(numbers) * 100) / 100
+    show "lowest:    " + first(ordered)
+    show "highest:   " + last(ordered)
+done
+
+report(toNumbers(args()))

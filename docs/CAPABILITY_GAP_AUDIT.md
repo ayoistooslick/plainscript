@@ -1,4 +1,4 @@
-# PlainScript 1.0.362 Capability Audit
+# PlainScript 1.0.363 Capability Audit
 
 This audit is based on what the compiler actually supports right now.
 If `plainscript check` validates it, it's listed here.
@@ -20,6 +20,14 @@ If `plainscript check` validates it, it's listed here.
 | Loop control | Implemented | `break`, `continue` |
 | String verbs | Implemented | `lowercase`, `uppercase`, `split`, `join`, `trim`, `capitalize words` |
 | Classes and `new` | Implemented | JavaScript-compatible class forms |
+| Compound assignment | Implemented | `+=`, `-=`, `*=`, `/=`, `%=`, `++=`, `or becomes`, `and becomes`, `nullish becomes` |
+| `set` / `change` assignment | Implemented | `set x to 1`, `change x to 1`, `x set to 1`, `x change to 1` |
+| Statistics | Implemented | `mean`, `median`, `variance`, `deviation` |
+| Vector math | Implemented | `dotProduct`, `magnitude`, `normalize` |
+| Randomness | Implemented | `randomInteger`, `randomChoice`, `weightedChoice`, `shuffle`, `sample` |
+| Memoization | Implemented | `memoize(fn)`, `parseBoolean`, `characters` |
+| Regex capture | Implemented | `match pattern "^(\\d+)$" in "4061" as digits` |
+| Collection size | Implemented | `count of [1, 2, 3]`, `count of "hello"` |
 
 ## Modules and Runtime
 
@@ -32,9 +40,12 @@ If `plainscript check` validates it, it's listed here.
 | Files and paths | Implemented | Read/write, bytes, folders, path helpers |
 | Crypto and auth helpers | Implemented | Hashes, passwords, tokens |
 | Async/await | Implemented | `wait for`, `await`, async propagation |
-| Concurrency | Implemented | `allOf`, `anyOf`, `settledOf`, `withTimeout` |
+| Concurrency | Implemented | `all of`, `any of`, `settled of`, `withTimeout`, `run in parallel ... done as name` |
 | Errors and retries | Implemented | `try`, `recover`, `finally`, `retry` |
 | Native tests | Implemented | `test` and `check` assertions |
+| Terminal I/O | Implemented | `confirm("...")`, `choose("...", [...])`, `stderr(...)` |
+| Terminal query | Implemented | `clearTerminal()`, `terminalWidth()`, `terminalHeight()` |
+| CLI flags | Implemented | `--quiet`, `--verbose` |
 
 ## Web and Services
 
@@ -126,6 +137,6 @@ find examples -name '*.pln' -exec node compiler/cli.js check {} \;
 
 ## Version Info
 
-The release label for this repo is `1.0.362`. It covers the compiler,
+The release label for this repo is `1.0.363`. It covers the compiler,
 package metadata, website, editor tooling, and browser/game documentation.
 Third-party dependency versions are not tied to this label.

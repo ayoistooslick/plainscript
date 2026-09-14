@@ -1,0 +1,34 @@
+// PlainScript 1.0.363 — an interactive terminal menu.
+// Usage: plainscript run examples/interactive-cli.pln
+// Runs a loop of `ask`, `confirm`, and `choose` prompts. When given the
+// non-interactive flag it self-drives with seeded answers (for tests).
+
+make playOnce(seedMode)
+    if seedMode is true
+        show "seeded: " + choose("Pick a color", ["red", "green", "blue"])
+    otherwise
+        ask "What is your name? " as guest
+        show "hello, " + guest
+        remember ok as confirm("Shall we continue")
+        if ok is true
+            show "choice: " + choose("Drink?", ["tea", "coffee", "juice"])
+        otherwise
+            show "ok, maybe next time"
+        done
+    done
+done
+
+make main()
+    remember argv as args()
+    if count of argv is at least 1 and argv at position 0 is "seeded"
+        playOnce(true)
+    otherwise
+        if count of argv is at least 1
+            show "usage: ... [seeded]"
+            exit(1)
+        done
+        playOnce(false)
+    done
+done
+
+main()

@@ -29,6 +29,7 @@ Describe *what* you want. The compiler decides *how* to implement it in JavaScri
 - [CLI Reference](#cli-reference)
 - [Building &amp; Configuration](#building--configuration)
 - [Language Tour](#language-tour)
+  - [Closing blocks with `end`](#closing-blocks-with-end)
   - [Variables](#variables)
   - [String Templates](#string-templates)
   - [Conditions](#conditions)
@@ -40,8 +41,11 @@ Describe *what* you want. The compiler decides *how* to implement it in JavaScri
   - [Loops](#loops)
   - [Natural-Language Expressions](#natural-language-expressions)
   - [Logical Assignment](#logical-assignment)
+  - [Compound Assignment](#compound-assignment)
+  - [Assignment aliases](#assignment-aliases)
   - [Error handling, async, and events](#error-handling-async-and-events)
   - [Record Kinds, Concurrency &amp; More](#record-kinds-concurrency--more)
+  - [Concurrency: `run in parallel`](#concurrency-run-in-parallel)
 - [Backend Services](#backend-services)
   - [Databases](#databases)
   - [HTTP Client](#http-client)
@@ -52,6 +56,10 @@ Describe *what* you want. The compiler decides *how* to implement it in JavaScri
   - [Google OAuth](#google-oauth)
   - [Error Handling &amp; Retries](#error-handling--retries)
 - [Runtime Standard Library](#runtime-standard-library)
+- [Interactive Terminal &amp; CLI Primitives](#interactive-terminal--cli-primitives)
+- [Statistics &amp; Vectors](#statistics--vectors)
+- [Randomness](#randomness)
+- [Memoization &amp; Parsing Helpers](#memoization--parsing-helpers)
 - [Web Applications](#web-applications)
 - [Browser games and interactive apps](#browser-games-and-interactive-apps)
 - [Additional Backend Capabilities](#additional-backend-capabilities)
@@ -63,6 +71,7 @@ Describe *what* you want. The compiler decides *how* to implement it in JavaScri
   - [Cache](#cache)
   - [AI / ML](#ai--ml)
   - [Pagination](#pagination)
+- [AI-Readiness: On-Device Intelligence](#ai-readiness-on-device-intelligence)
 - [Multi-File Projects](#multi-file-projects)
 - [Express Integration](#express-integration)
 - [WhatsApp Bots](#whatsapp-bots)
@@ -122,7 +131,7 @@ done
 </tr>
 </table>
 
-**Current version:** `v1.0.362`  -  the `plainscript-lang` npm package, with a TypeScript-style production build (`plainscript build` → `dist/`, source names and structure preserved).
+**Current version:** `v1.0.363`  -  the `plainscript-lang` npm package, with a TypeScript-style production build (`plainscript build` → `dist/`, source names and structure preserved).
 
 ---
 
@@ -188,7 +197,7 @@ socket export plus `useMultiFileAuthState`, `makeCacheableSignalKeyStore`, and
 |---|---|
 | `plainscript run <file.pln>` | Installs missing dependencies, compiles, and executes. Runs from a scratch directory  -  nothing is written into your project. |
 | `plainscript build [file.pln]` | Compiles to `dist/`. With no argument, builds every `.pln` file under the source root, preserving names and folder structure. |
-| `plainscript check <file.pln>` | Checks syntax only. No output, no execution. |
+| `plainscript check <file.pln>` | Checks syntax and dependencies only. Reports a per-file `✓` line (or an error). Never executes your program. |
 | `plainscript fmt <file.pln>` | Formats a PlainScript file in place. |
 | `plainscript new [name]` | Creates a new PlainScript project, npm-ready. |
 | `plainscript install` | Installs dependencies detected across the project's sources. |
@@ -199,6 +208,12 @@ socket export plus `useMultiFileAuthState`, `makeCacheableSignalKeyStore`, and
 | `plainscript update` | Updates all installed npm packages. |
 | `plainscript version` | Prints the compiler version. |
 | `plainscript help` | Prints help text. |
+| `--quiet` | Global flag for `run` / `build` / `check`: suppresses progress banners and per-file summary lines, printing only errors and output. |
+| `--verbose` | Global flag for `run` / `build` / `check`: prints each compile stage with its timing detail. |
+
+`--quiet` and `--verbose` are recognized anywhere in the argument list and
+apply to `run`, `build`, and `check`, e.g. `plainscript build --quiet` or
+`plainscript check src/app.pln --verbose`.
 
 ---
 
@@ -248,11 +263,30 @@ For projects that need custom output or source directories, add a `plainscript.c
 ## Language Tour
 
 PlainScript is a fixed vocabulary of English verbs compiled to JavaScript. Every
-construct follows the same rhythm: a word opens a block, `done` closes it, and
-`give` returns a value  -  a sentence you could say to a colleague ("if the score
-is at least 80, show accepted, otherwise review") is valid source. The sections
-below keep the code first, with a short note on what each construct is *for* and
-the constraint that matters when you use it.
+construct follows the same rhythm: a word opens a block, `done` — or its synonym
+`end` — closes it, and `give` returns a value  -  a sentence you could say to a
+colleague ("if the score is at least 80, show accepted, otherwise review") is
+valid source. The sections below keep the code first, with a short note on what
+each construct is *for* and the constraint that matters when you use it.
+
+### Closing blocks with `end`
+
+Every block can be closed with either `done` or its synonym `end`; the compiler
+treats them identically, so the two spellings mix freely in one file:
+
+```plainscript
+to greet name together
+    show "hello, " + name
+end
+greet("Ada")
+
+when 1 is 1
+    show "math still works"
+end
+```
+
+`end` is accepted wherever `done` is  -  functions, `if` / `when` /
+`otherwise`, loops, `list with` / `record with`, and every other block.
 
 ### Variables
 
@@ -263,8 +297,9 @@ set age to 17
 ```
 
 `remember name as "Ada"` and `let name be "Ada"` are two spellings of the same
-declaration; `set name to ...`, `name becomes ...`, and `name is now ...` all
-reassign it. Numbers, strings, and booleans behave like JavaScript primitives;
+declaration; `set name to ...`, `change name to ...`, `name becomes ...`, and
+`name is now ...` all reassign it (the full family of assignment aliases is
+listed below). Numbers, strings, and booleans behave like JavaScript primitives;
 lists, records, dictionaries, and sets are *references*, so pointing two names
 at the same list means they see the same data.
 
@@ -525,12 +560,66 @@ pattern on one line  -  PlainScript for `flag = flag || true` and
 
 ```
 let flag be false
-flag or is now true
+flag or becomes true
 show flag
 
 let val be null
-val nullish is now "default"
+val nullish becomes "default"
 show val
+```
+
+### Compound Assignment
+
+The arithmetic compound operators map straight to their JavaScript
+counterparts. `+=`, `-=`, `*=`, `/=`, and `%=` all work, and the legacy `++=`
+spelling is still accepted as `+=`:
+
+```plainscript
+let score be 10
+score += 5        // 15
+score -= 3        // 12
+score *= 2        // 24
+score /= 4        // 6
+score %= 7        // 6
+show score
+
+let counter be 0
+counter ++= 1     // legacy spelling of +=
+show counter
+```
+
+The word-style logical forms join them and compile to the same JavaScript as
+their symbols: `or becomes` is `||=`, `and becomes` is `&&=`, and `nullish
+becomes` is `??=` (the symbolic spellings work too):
+
+```plainscript
+let flag be false
+flag or becomes true         // flag = flag || true
+show flag
+
+let tally be 5
+tally and becomes 2          // tally = tally && 2
+show tally
+
+let val be null
+val nullish becomes "default"  // val = val ?? "default"
+show val
+```
+
+### Assignment aliases
+
+`becomes` has a full family of synonyms in both orders. The prefix forms
+`set name to 17` and `change name to 17`, the postfix forms `name set to 17` and
+`name change to 17`, plus the existing `name is now 17` all compile to the same
+reassignment as `name becomes 17`:
+
+```plainscript
+let name be "Ada"
+change name to "Ada Lovelace"
+name set to "A. L."
+name change to "AL"
+set name to "Ada"
+show name
 ```
 
 ### Error handling, async, and events
@@ -587,9 +676,15 @@ PlainScript 1.0.2 closes most of the gap with TypeScript-class languages using i
 
 | Category | Features |
 |---|---|
-| Record kinds (classes) | `to define a kind called "Person" with name "" end`, then `create a Person with name "Ada" and age 17`. Plain-object instances; unknown fields throw. |
-| Concurrency | `all of [...]`, `any of [...]`, `settled of [...]`, `withTimeout(promise, ms)` |
-| Generators | `yield` inside `define ... end`; consumed with `for each` or `spread of` |
+| Record kinds (classes) | `define a kind called "Person" with name "" and age 0 done`, then `create a Person with name "Ada" and age 17`. Plain-object instances; unknown fields throw. |
+| Concurrency | `all of [...]`, `any of [...]`, `settled of [...]`, `withTimeout(promise, ms)`, `run in parallel ... done as <name>` |
+| Compound assignment | `+= -= *= /= %=` plus legacy `++=`, and the word forms `or becomes` (||=), `and becomes` (&&=), `nullish becomes` (??=) |
+| Assignment aliases | prefix `set name to` / `change name to`, postfix `name set to` / `name change to`, plus `name becomes` / `name is now` |
+| Interactive CLI | `ask`, `confirm`, `choose`, `clearTerminal`, `terminalWidth`, `terminalHeight`, `stderr` |
+| Statistics &amp; vectors | `mean`, `median`, `variance`, `deviation`, `dotProduct`, `magnitude`, `normalize` |
+| Randomness | `randomInteger`, `randomChoice`, `weightedChoice`, `shuffle`, `sample` |
+| Memoization &amp; parsing | `memoize`, `parseBoolean`, `characters` |
+| Generators | `yield` inside `make name(...) ... done`; consumed with `for each` or `spread of` |
 | Reflection | `typeOf`, `fieldsOf`, `valueOf`, `hasField`, `sizeOf` |
 | Binary | `base64Encode/Decode`, `textToBytes/bytesToText`, `sha256/sha1/md5` |
 | Config | `yamlDecode/yamlEncode`, `load env file ".env"` |
@@ -602,6 +697,31 @@ PlainScript 1.0.2 closes most of the gap with TypeScript-class languages using i
 | Exports | `export <name>` |
 
 </details>
+
+### Concurrency: `run in parallel`
+
+`run in parallel ... done as <name>` runs the block's statements concurrently
+and collects each statement's value in order into the named list  -  the
+statement-level equivalent of `all of [...]`:
+
+```plainscript
+make square(n)
+    give n * n
+end
+
+run in parallel
+    square(3)
+    square(4)
+done as results
+
+show join(results, ", ")   // 9, 4
+```
+
+Each statement in the block becomes one concurrent task; the collected list has
+one entry per statement in body order, so expression statements (typically
+calls) contribute their return values. This is a single-process, promise-based
+concurrency feature (implemented with `Promise.all`)  -  it runs concurrent
+tasks, not worker threads.
 
 **How the pieces fit together.** PlainScript is deliberately small: a handful
 of verbs (`remember`, `give`, `if` / `otherwise`, `done`) plus the collections
@@ -673,7 +793,7 @@ web app
 enable sessions "a-long-random-secret"
 
 route post "/login"
-    user of session of request is username of body of request
+    user of session of request becomes username of body of request
     show "welcome"
 done
 
@@ -712,7 +832,7 @@ Files arrive as records with `name`, `type`, `size`, `data` (buffer), and `path`
 ### Rate Limiting
 
 ```
-rate limit 100 requests per minute
+limit requests to 100 per minute
 ```
 
 Sliding window per client IP; the quota-exceeded response is HTTP 429.
@@ -749,7 +869,7 @@ Custom 404 handling:
 ```
 when nothing matches
     status 404
-    show json
+    reply json
         error is "No such road"
     done
 done
@@ -786,6 +906,115 @@ first version of a program usually needs no dependency at all:
 
 ---
 
+## Interactive Terminal &amp; CLI Primitives
+
+PlainScript programs are first-class CLI citizens. `ask` reads a line, `confirm`
+asks a yes/no question, and `choose` offers an option list  -  each takes an
+optional prompt. `confirm` returns a boolean and `choose` returns the selected
+option; both are async prompts, so a program that uses them compiles to async
+JavaScript and can be driven non-interactively when answers are piped in:
+
+```plainscript
+ask "What is your name? " as guest
+show "hello, " + guest
+
+remember ok as confirm("Shall we continue")
+if ok is true
+    show "choice: " + choose("Drink?", list with "tea", "coffee", "juice")
+end
+```
+
+`clearTerminal()` clears the screen, `terminalWidth()` and `terminalHeight()`
+report the terminal size, and `stderr(...)` prints to standard error so a
+program's real output on stdout stays clean:
+
+```plainscript
+stderr("starting terminal census")
+show "width: " + terminalWidth()
+show "height: " + terminalHeight()
+clearTerminal()
+show "screen cleared"
+```
+
+---
+
+## Statistics &amp; Vectors
+
+Numeric arrays get the usual statistical summaries, and equal-length numeric
+arrays become vectors for the linear-algebra primitives behind the AI-style
+helpers (see [AI-Readiness](#ai-readiness-on-device-intelligence)):
+
+```plainscript
+remember data as [2, 4, 4, 4, 5, 5, 7, 9]
+show "mean:      " + mean(data)
+show "median:    " + median(data)
+show "variance:  " + round(variance(data) * 100) / 100
+show "deviation: " + round(deviation(data) * 100) / 100
+```
+
+`mean`, `median`, `variance`, and `deviation` each take one list. The vector
+helpers are `dotProduct(a, b)` (how aligned two lists are), `magnitude(v)` (the
+Euclidean length), and `normalize(v)` (scales a list to unit length):
+
+```plainscript
+remember a as [1, 2, 3]
+remember b as [4, 5, 6]
+show dotProduct(a, b)           // 32
+show magnitude(a)               // 3.7416573867739413
+show join(normalize(a), ", ")
+```
+
+---
+
+## Randomness
+
+Deterministic programs are the default, but games, simulations, and sampling
+reach for the random family when they need variety:
+
+```plainscript
+show randomInteger(1, 6)                        // a die roll
+let suits be list with "hearts", "spades", "clubs", "diamonds"
+show randomChoice(suits)                        // one random suit
+show weightedChoice(["common", "rare", "legendary"], [0.7, 0.25, 0.05])
+show join(shuffle(suits), " ")                  // shuffled copy
+show join(sample(suits, 2), " ")                // two random suits, no repeats
+```
+
+`randomInteger(min, max)` is inclusive on both ends; `randomChoice(list)` picks
+one element; `weightedChoice(items, weights)` picks according to a parallel
+list of weights; `shuffle(list)` returns a shuffled copy; and `sample(list, n)`
+returns `n` distinct elements.
+
+---
+
+## Memoization &amp; Parsing Helpers
+
+`memoize` wraps a function so repeated calls with the same arguments hit a
+cache  -  handy for expensive pure functions and for memoized inference in the
+AI-style patterns below:
+
+```plainscript
+make slowSquare(n)
+    give n * n
+end
+
+remember fastSquare as memoize(slowSquare)
+show fastSquare(9)
+show fastSquare(9)     // served from the cache
+```
+
+`parseBoolean` normalizes `"true"`, `"yes"`, `"1"`, and `"on"` (case- and
+whitespace-insensitive) to `true` and everything else to `false`, and
+`characters` splits a string into its individual characters:
+
+```plainscript
+show parseBoolean("yes")          // true
+show parseBoolean("off")          // false
+show join(characters("abc"), "-") // a-b-c
+```
+
+---
+
 ## Web Applications
 
 `web app` starts the HTTP stack available to every program. `route <method>
@@ -802,7 +1031,7 @@ route "/"
 done
 
 route "/api/status"
-    show json
+    reply json
         status is "ok"
         version is "2.0"
     done
@@ -991,6 +1220,37 @@ show page.hasNext        # true if another page exists
 
 ---
 
+## AI-Readiness: On-Device Intelligence
+
+The statistics, vector, randomness, memoization, and persistent-JSON primitives
+in this release compose into AI-style systems  -  retrieval scoring, ranking,
+weighted sampling, memoized inference, and durable memory  -  built entirely
+with the deterministic compiler and **no external AI provider, no API key, and
+no network call**. `examples/ai-memory-cli.pln` is a walking example: it stores
+"facts" as a JSON file, vectorizes a query with `dotProduct` / `magnitude` /
+`normalize`, and retrieves the best-matching fact by cosine similarity.
+`examples/stats-cli.pln` exercises the statistical side over an arbitrary
+sample from the command line:
+
+```plainscript
+let a be [1, 0, 1]                 // bag-of-words vector for a stored fact
+let b be [1, 1, 0]                 // bag-of-words vector for the query
+show "raw overlap: " + dotProduct(a, b)
+let unit be normalize(a)           // unit vector: magnitude becomes 1
+show "unit norm:   " + round(magnitude(unit) * 100) / 100
+```
+
+The CLI helpers keep these tools scriptable  -  for example, storing and
+querying the memory file:
+
+```bash
+plainscript run examples/ai-memory-cli.pln remember "Ada loves math and jazz"
+plainscript run examples/ai-memory-cli.pln query "who likes math"
+plainscript run examples/ai-memory-cli.pln list
+```
+
+---
+
 ## Multi-File Projects
 
 Programs grow into files. `import "./math.pln"` pulls a whole file into the
@@ -1035,7 +1295,7 @@ when someone visits "/"
 done
 
 when someone visits "/api/status"
-    show json
+    reply json
         status is "ok"
         version is "0.3"
     done

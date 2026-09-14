@@ -1,0 +1,11 @@
+// PlainScript 1.0.363 — terminal and process primitives.
+// `terminalWidth()`, `terminalHeight()`, `clearTerminal()` and `stderr(...)`
+// are CLI helpers. Error text goes to stderr so stdout stays clean.
+
+stderr("starting terminal census")
+show "width: " + terminalWidth()
+show "height: " + terminalHeight()
+stderr("clearing screen")
+clearTerminal()
+show "screen cleared"
+stderr("done")

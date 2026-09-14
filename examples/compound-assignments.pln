@@ -1,0 +1,24 @@
+// PlainScript 1.0.363 — compound arithmetic assignments.
+// The symbols `+= -= *= /= %=` map to the same assignment machinery as the
+// word forms; the legacy `++=` spelling is still accepted as `+=`.
+
+let score be 10
+score += 5        // 15
+score -= 3        // 12
+score *= 2        // 24
+score /= 4        // 6
+score %= 7        // 6 (remainder of 6 / 7)
+show "score is " + score
+
+let word be "ver"
+word += "nacular"
+show word
+
+let counter be 0
+counter ++= 1
+counter ++= 1
+counter ++= 1
+show "legacy ++= count is " + counter
+
+let items be list with "a", "b"
+show count of items

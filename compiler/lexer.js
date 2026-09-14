@@ -144,7 +144,11 @@ const TOKEN = {
   LOGICAL_OR_ASSIGN: 'LOGICAL_OR_ASSIGN',     // ||=
   LOGICAL_AND_ASSIGN: 'LOGICAL_AND_ASSIGN',   // &&=
   NULLISH_ASSIGN: 'NULLISH_ASSIGN',           // ??=
-  PLUS_ASSIGN: 'PLUS_ASSIGN',                 // ++=  (increment-assign, x += v)
+  PLUS_ASSIGN: 'PLUS_ASSIGN',                 // +=  (and its legacy spelling ++=)
+  MINUS_ASSIGN: 'MINUS_ASSIGN',               // -=
+  STAR_ASSIGN: 'STAR_ASSIGN',                 // *=
+  SLASH_ASSIGN: 'SLASH_ASSIGN',               // /=
+  PERCENT_ASSIGN: 'PERCENT_ASSIGN',           // %=
   // Literals & identifiers
   IDENTIFIER:  'IDENTIFIER',
   STRING:      'STRING',
@@ -180,7 +184,7 @@ const KEYWORDS = {
   otherwise: TOKEN.OTHERWISE,
   else:      TOKEN.ELSE,
   done:      TOKEN.DONE,
-  end:       TOKEN.END,
+  end:       TOKEN.DONE,   // synonym for done in every block position (v1.0.37)
   do:        TOKEN.DO,        // block-bodied lambda opener: (x) do ... done
   greater:   TOKEN.GREATER,
   less:      TOKEN.LESS,
@@ -466,7 +470,8 @@ function tokenize(source) {
           i = j;
           if (i < source.length && source[i] === '\n') { i++; line++; lineStart = i; }
 
-          // Collect raw lines until a line whose trimmed content is exactly "done"
+          // Collect raw lines until a line whose trimmed content is exactly
+          // "done" (or its synonym "end").
           let sql = '';
           while (i < source.length) {
             const lineEnd  = source.indexOf('\n', i);
@@ -474,7 +479,7 @@ function tokenize(source) {
             const lineText = source.slice(i, realEnd);
             const trimmed  = lineText.trim();
 
-            if (trimmed === 'done') {
+            if (trimmed === 'done' || trimmed === 'end') {
               i = realEnd < source.length ? realEnd + 1 : realEnd;
               if (realEnd < source.length) { line++; lineStart = i; }
               break;
@@ -515,13 +520,18 @@ function tokenize(source) {
     if (source[i] === '.' && source[i + 1] === '.' && source[i + 2] === '.') { tokens.push({ type: TOKEN.SPREAD, value: '...', line: tokenLine, col: tokenCol }); i += 3; continue; }
     if (source[i] === '.') { tokens.push({ type: TOKEN.DOT,      value: '.', line: tokenLine, col: tokenCol }); i++; continue; }
     if (source[i] === '+' && source[i + 1] === '+' && source[i + 2] === '=') { tokens.push({ type: TOKEN.PLUS_ASSIGN, value: '++=', line: tokenLine, col: tokenCol }); i += 3; continue; }
+    if (source[i] === '+' && source[i + 1] === '=') { tokens.push({ type: TOKEN.PLUS_ASSIGN, value: '+=', line: tokenLine, col: tokenCol }); i += 2; continue; }
     if (source[i] === '+') { tokens.push({ type: TOKEN.PLUS,     value: '+', line: tokenLine, col: tokenCol }); i++; continue; }
     // v2.1.1  -  arithmetic. "->" is matched first so it never becomes MINUS.
     if (source[i] === '-' && source[i + 1] === '>') { tokens.push({ type: TOKEN.ARROW,  value: '->', line: tokenLine, col: tokenCol }); i += 2; continue; }
+    if (source[i] === '-' && source[i + 1] === '=') { tokens.push({ type: TOKEN.MINUS_ASSIGN, value: '-=', line: tokenLine, col: tokenCol }); i += 2; continue; }
     if (source[i] === '-') { tokens.push({ type: TOKEN.MINUS,    value: '-', line: tokenLine, col: tokenCol }); i++; continue; }
     if (source[i] === '*' && source[i + 1] === '*') { tokens.push({ type: TOKEN.POWER, value: '**', line: tokenLine, col: tokenCol }); i += 2; continue; }
+    if (source[i] === '*' && source[i + 1] === '=') { tokens.push({ type: TOKEN.STAR_ASSIGN, value: '*=', line: tokenLine, col: tokenCol }); i += 2; continue; }
     if (source[i] === '*') { tokens.push({ type: TOKEN.STAR,     value: '*', line: tokenLine, col: tokenCol }); i++; continue; }
+    if (source[i] === '/' && source[i + 1] === '=') { tokens.push({ type: TOKEN.SLASH_ASSIGN, value: '/=', line: tokenLine, col: tokenCol }); i += 2; continue; }
     if (source[i] === '/') { tokens.push({ type: TOKEN.SLASH,    value: '/', line: tokenLine, col: tokenCol }); i++; continue; }
+    if (source[i] === '%' && source[i + 1] === '=') { tokens.push({ type: TOKEN.PERCENT_ASSIGN, value: '%=', line: tokenLine, col: tokenCol }); i += 2; continue; }
     if (source[i] === '%') { tokens.push({ type: TOKEN.PERCENT,  value: '%', line: tokenLine, col: tokenCol }); i++; continue; }
     if (source[i] === '|' && source[i + 1] === '|' && source[i + 2] === '=') { tokens.push({ type: TOKEN.LOGICAL_OR_ASSIGN, value: '||=', line: tokenLine, col: tokenCol }); i += 3; continue; }
     if (source[i] === '&' && source[i + 1] === '&' && source[i + 2] === '=') { tokens.push({ type: TOKEN.LOGICAL_AND_ASSIGN, value: '&&=', line: tokenLine, col: tokenCol }); i += 3; continue; }

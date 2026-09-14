@@ -1,0 +1,221 @@
+// PlainScript 1.0.363 — persistent-memory AI-style CLI.
+//
+// A tiny "assistant" with durable memory stored as JSON. No LLM, no API keys:
+// retrieval is deterministic cosine similarity over a bag-of-words vector
+// built with the new vector primitives (dotProduct / magnitude / normalize).
+// A small synonym table broadens queries so "food" also matches "toast".
+//
+// Usage:
+//   plainscript run examples/ai-memory-cli.pln note "Ada loves math and jazz"
+//   plainscript run examples/ai-memory-cli.pln query "who likes math"
+//   plainscript run examples/ai-memory-cli.pln list
+//   plainscript run examples/ai-memory-cli.pln forget 0
+//   plainscript run examples/ai-memory-cli.pln clear
+
+remember memoryFile as "ai-memory.json"
+
+make loadMemory()
+    if fileExists(memoryFile) is true
+        give jsonDecode(readFile(memoryFile))
+    otherwise
+        give []
+    done
+done
+
+make saveMemory(facts)
+    writeFile(memoryFile, jsonEncode(facts))
+done
+
+make words(text)
+    remember cleaned as toLowerCase(text)
+    remember pieces as split(cleaned, " ")
+    remember result as []
+    for each piece in pieces
+        if piece different from ""
+            push(result, piece)
+        done
+    done
+    give result
+done
+
+remember synonyms as [
+  ["food", "toast"],
+  ["food", "tasty"],
+  ["food", "snack"],
+  ["food", "meal"],
+  ["drink", "tea"],
+  ["drink", "coffee"],
+  ["drink", "juice"],
+  ["color", "red"],
+  ["color", "green"],
+  ["color", "blue"],
+  ["color", "yellow"]
+]
+
+make expand(queryWord)
+    remember out as []
+    for each row in synonyms
+        if row at position 0 is queryWord
+            push(out, row at position 1)
+        done
+    done
+    push(out, queryWord)
+    give out
+done
+
+make vectorize(vocab, ws)
+    remember v as []
+    for each term in vocab
+        remember hits as 0
+        for each w in ws
+            if w is term
+                hits becomes hits + 1
+            done
+        done
+        push(v, hits)
+    done
+    give v
+done
+
+make cosine(vocab, aWords, bWords)
+    remember a as vectorize(vocab, aWords)
+    remember b as vectorize(vocab, bWords)
+    remember lengthA as magnitude(a)
+    remember lengthB as magnitude(b)
+    if lengthA is 0 or lengthB is 0
+        give 0
+    done
+    give dotProduct(a, b) / (lengthA * lengthB)
+done
+
+make buildVocab(facts, qwords)
+    remember vocab as []
+    for each fact in facts
+        for each w in words of fact
+            if not (vocab contains w)
+                push(vocab, w)
+            done
+        done
+    done
+    for each w in qwords
+        if not (vocab contains w)
+            push(vocab, w)
+        done
+    done
+    give vocab
+done
+
+make bestMatch(qwords)
+    remember facts as loadMemory()
+    if count of facts is 0
+        give "no facts stored yet"
+    done
+    remember vocab as buildVocab(facts, qwords)
+    remember top as ""
+    remember topScore as 0
+    for each fact in facts
+        remember score as cosine(vocab, qwords, words of fact)
+        if score is more than topScore
+            topScore becomes score
+            top becomes text of fact
+        done
+    done
+    if topScore is 0
+        give "no fact matches that query"
+    done
+    give top + " (score " + round(topScore * 100) + "%)"
+done
+
+make addFact(text)
+    remember facts as loadMemory()
+    push(facts, { text: text, words: words(text) })
+    saveMemory(facts)
+done
+
+make listFacts()
+    remember facts as loadMemory()
+    if count of facts is 0
+        show "memory is empty"
+    otherwise
+        remember i as 0
+        for each fact in facts
+            show "[" + i + "] " + text of fact
+            i becomes i + 1
+        done
+    done
+done
+
+make forgetFact(index)
+    remember facts as loadMemory()
+    remember kept as []
+    remember i as 0
+    for each fact in facts
+        if i different from index
+            push(kept, fact)
+        done
+        i becomes i + 1
+    done
+    saveMemory(kept)
+    show "forgot fact " + index
+done
+
+make clearMemory()
+    saveMemory([])
+    show "memory cleared"
+done
+
+make showHelp()
+    show "Persistent-memory assistant"
+    show "  note <text>       add a fact (remember works too)"
+    show "  query <words>     retrieve the best-matching fact"
+    show "  list              show all stored facts"
+    show "  forget <index>    delete a fact by its list index"
+    show "  clear             delete everything"
+done
+
+make main()
+    remember argv as args()
+    if count of argv is 0
+        showHelp()
+        exit(0)
+    done
+    remember command as argv at position 0
+    if command is "remember" or command is "note"
+        if count of argv is at least 2
+            addFact(argv at position 1)
+            show "remembered: " + argv at position 1
+        otherwise
+            show "usage: ... note <text>"
+        done
+    otherwise if command is "query"
+        remember qwords as []
+        remember skippingFirst as true
+        for each current in argv
+            if skippingFirst is false
+                push(qwords, current)
+            done
+            skippingFirst becomes false
+        done
+        remember queryWords as []
+        for each qword in qwords
+            for each term in expand(qword)
+                push(queryWords, term)
+            done
+        done
+        show bestMatch(words(join(queryWords, " ")))
+    otherwise if command is "list"
+        listFacts()
+    otherwise if command is "forget"
+        if count of argv is at least 2
+            forgetFact(parseInt(argv at position 1, 10))
+        otherwise
+            show "usage: ... forget <index>"
+        done
+    otherwise if command is "clear"
+        clearMemory()
+    otherwise
+        showHelp()
+    done
+done
+
+main()

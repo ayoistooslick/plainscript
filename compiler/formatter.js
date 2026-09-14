@@ -10,15 +10,20 @@
 const INDENT = '    '; // 4 spaces
 
 // Keywords whose line CLOSES a block (printed at depth - 1).
-const DEDENT_WORDS = new Set(['done', 'otherwise', 'recover']);
+const DEDENT_WORDS = new Set(['done', 'end', 'otherwise', 'recover']);
 
 // Patterns whose line OPENS a new block (next line indented).
 const INDENT_STARTERS = [
   /^make\s+\S+\s*\(/,          // make name(...)
+  /^to\s+\S+/,                 // to add a and b together ...
   /^if\s+/,                    // if ...
   /^otherwise\b/,              // otherwise
   /^for\s+each\s+/,           // for each ...
+  /^for\s+every\s+/,          // for every ... in ...
+  /^for\s+index\s+/,          // for index i from ... to ...
   /^while\s+/,                 // while ...
+  /^repeat\s+\d+\s+times\b/,  // repeat N times ...
+  /^repeat\s+(with|while|until)\b/, // repeat with/while/until ...
   /^when\s+someone\s+visits/,  // when someone visits ...
   /^when\s+someone\s+(sends|clicks)\b/, // when someone sends / clicks (Telegram)
   /^when\s+socket\b/,          // when socket connects / sends message / disconnects (v2.1)
@@ -37,6 +42,14 @@ const INDENT_STARTERS = [
   /^recover\b/,                // recover [as name] (v2.1.1 error handling)
   /^retry\s+\d+\s+times\b/,    // retry N times ... (v2.1.1 retries)
   /^every\s+\d+\s+(seconds?|minutes?|hours?|days?)\b/, // every 5 minutes (v2.1)
+  /^every\s+N\s+(seconds?|minutes?|hours?|days?)\b/, // every N seconds (variable)
+  /^every\s+frame\b/,          // every frame (v2.1.1 game loop)
+  /^after\s+\d+\s+(milliseconds?|seconds?|minutes?|hours?|days?|frames?)\b/, // after 3 seconds
+  /^run\s+in\s+parallel\b/,    // run in parallel ... done as results
+/^switch\s+\S+\s+against\b/, // switch expr against ... done
+  /^match\s+\S+\s+against\b/,  // match expr against ... done
+  /^stream\s+/,                // stream "file" as line ...
+  /^test\s+"/,                 // test "name"
   /^schedule\s+"/,             // schedule "..."    (v2.1 cron)
   /^websocket\s+server\b/,     // websocket server  (v2.1)
   /^whatsapp\s+bot\s*$/,       // whatsapp bot      (v2.1.1 WhatsApp runtime)
@@ -45,6 +58,13 @@ const INDENT_STARTERS = [
   /^send\s+mail\s*$/,          // send mail         (v2.1)
   /^google\s+oauth\s*$/,       // google oauth      (v2.1.1 Google sign-in)
   /^query\b/,                  // query SQL block   (v0.6 SQLite DX)
+  /^postgres\b/,               // postgres "conn" (connection, no body)
+  /^mongo\b/,                  // mongo "conn" (connection, no body)
+  /^enable\s+sessions\b/,      // enable sessions "secret"
+  /^require\s+api\s+key\b/,    // require api key from ...
+  /^limit\s+requests\b/,       // limit requests to N per minute
+  /^accept\s+uploads\b/,       // accept uploads ...
+  /^when\s+[^\s]+(\s+"[^"]*")?\s+happens\b/, // when target "<event>" happens (v2.1.1)
   /^insert\b/,                 // insert SQL block
   /^update\b/,                 // update SQL block
   /^delete\b(?!\s*["'])/,      // delete SQL block (v2.1.1: NOT `delete "<url>"`,

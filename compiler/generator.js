@@ -69,13 +69,34 @@ const BUILTIN_DECLARATIONS = {
     `  }`,
     `}`,
   ].join('\n'),
-  // v1.1.1  -  ask runtime (RFC-0011 §14)
+  // v1.1.1  -  ask runtime (RFC-0011 §14). v1.0.363 also provides confirm /
+  // choose for interactive CLI programs.
   ask: [
     `const readline = require('readline');`,
     `async function __ask(prompt = '') {`,
     `  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });`,
     `  try {`,
     `    return await new Promise((resolve) => rl.question(prompt, resolve));`,
+    `  } finally {`,
+    `    rl.close();`,
+    `  }`,
+    `}`,
+    `async function __confirm(prompt) {`,
+    `  const answer = await __ask(prompt + ' (y/n) ');`,
+    `  return /^(y|yes|true|1)$/i.test(answer.trim());`,
+    `}`,
+    `async function __choose(prompt, options) {`,
+    `  const list = Array.from(options || []);`,
+    `  if (list.length === 0) return null;`,
+    `  if (list.length === 1) { console.log(prompt + ': ' + list[0]); return list[0]; }`,
+    `  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });`,
+    `  try {`,
+    `    console.log(prompt);`,
+    `    list.forEach((option, index) => console.log((index + 1) + ') ' + String(option)));`,
+    `    const answer = await new Promise((resolve) => rl.question('Choice (1-' + list.length + '): ', resolve));`,
+    `    const picked = parseInt(answer, 10);`,
+    `    if (Number.isInteger(picked) && picked >= 1 && picked <= list.length) return list[picked - 1];`,
+    `    return null;`,
     `  } finally {`,
     `    rl.close();`,
     `  }`,
@@ -2190,6 +2211,46 @@ const BUILTIN_DECLARATIONS = {
     const ms = args[1] != null ? `, ${generateExpr(args[1], context)}` : '';
     return `(await __withTimeout(${generateExpr(args[0], context)}${ms}))`;
   },
+
+  // ── v1.0.363  -  interactive CLI / terminal ───────────────────────────────
+  // confirm "Delete this file?"  ->  boolean (y/n prompt)
+  // choose "Pick one" list with "a", "b"  ->  the chosen option
+  // clearTerminal() / terminalWidth() / terminalHeight() / stderr(...)
+  confirm: (args, context) => {
+    ensureBuiltin(context, 'ask');
+    markAsync(context);
+    return `(await __confirm(${generateExpr(args[0], context)}))`;
+  },
+  choose: (args, context) => {
+    ensureBuiltin(context, 'ask');
+    markAsync(context);
+    return `(await __choose(${generateExpr(args[0], context)}, ${generateExpr(args[1], context)}))`;
+  },
+  clearTerminal: () => `(process.stdout.write('\\x1b[2J\\x1b[H'), undefined)`,
+  terminalWidth: () => `(process.stdout.columns || 80)`,
+  terminalHeight: () => `(process.stdout.rows || 24)`,
+  stderr: (args, context) => `(console.error(${args.map(a => generateExpr(a, context)).join(', ')}))`,
+
+  // ── v1.0.363  -  statistics, vectors, randomness ──────────────────────────
+  // Data + AI-readiness primitives for numeric arrays and sampling. All are
+  // pure, deterministic helpers except the random* family.
+  mean: (args, context) => `((a) => a.length ? a.reduce((x, y) => x + y, 0) / a.length : NaN)(${generateExpr(args[0], context)})`,
+  median: (args, context) => `((a) => { const s = a.slice().sort((x, y) => x - y); const m = Math.floor(s.length / 2); return s.length ? (s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2) : NaN; })(${generateExpr(args[0], context)})`,
+  variance: (args, context) => `((a) => { const m = a.reduce((x, y) => x + y, 0) / (a.length || 1); return a.length > 1 ? a.reduce((s, x) => s + (x - m) * (x - m), 0) / (a.length - 1) : 0; })(${generateExpr(args[0], context)})`,
+  deviation: (args, context) => `Math.sqrt(((a) => { const m = a.reduce((x, y) => x + y, 0) / (a.length || 1); return a.length > 1 ? a.reduce((s, x) => s + (x - m) * (x - m), 0) / (a.length - 1) : 0; })(${generateExpr(args[0], context)}))`,
+  dotProduct: (args, context) => `((a, b) => a.reduce((s, x, i) => s + x * b[i], 0))(${generateExpr(args[0], context)}, ${generateExpr(args[1], context)})`,
+  magnitude: (args, context) => `Math.hypot(...${generateExpr(args[0], context)})`,
+  normalize: (args, context) => `((v) => { const m = Math.hypot(...v); return m === 0 ? v.map(x => 0) : v.map(x => x / m); })(${generateExpr(args[0], context)})`,
+  randomInteger: (args, context) => `(Math.floor(Math.random() * (${generateExpr(args[1], context)} - ${generateExpr(args[0], context)} + 1)) + ${generateExpr(args[0], context)})`,
+  randomChoice: (args, context) => `((a) => a[Math.floor(Math.random() * a.length)] || a[0])(${generateExpr(args[0], context)})`,
+  shuffle: (args, context) => `((a) => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); const t = a[i]; a[i] = a[j]; a[j] = t; } return a; })(${generateExpr(args[0], context)})`,
+  sample: (args, context) => `((a, n) => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); const t = a[i]; a[i] = a[j]; a[j] = t; } return a.slice(0, n); })(${generateExpr(args[0], context)}, ${generateExpr(args[1], context)})`,
+  weightedChoice: (args, context) => `((items, weights) => { const total = weights.reduce((x, y) => x + y, 0); if (total <= 0) return items[items.length - 1]; let r = Math.random() * total; for (let i = 0; i < items.length; i++) { r -= weights[i]; if (r <= 0) return items[i]; } return items[items.length - 1]; })(${generateExpr(args[0], context)}, ${generateExpr(args[1], context)})`,
+
+  // ── v1.0.363  -  memoization, boolean/character string helpers ────────────
+  memoize: (args, context) => `((f) => { const cache = new Map(); return function (...callArgs) { const key = callArgs.join('\\u0000'); if (cache.has(key)) return cache.get(key); const value = f(...callArgs); cache.set(key, value); return value; }; })(${generateExpr(args[0], context)})`,
+  parseBoolean: (args, context) => `(['true', 'yes', '1', 'on'].includes(String(${generateExpr(args[0], context)}).trim().toLowerCase()))`,
+  characters: (args, context) => `String(${generateExpr(args[0], context)}).split('')`,
 
   // Generators / iterables
   spread: (args, context) => `[...${generateExpr(args[0], context)}]`,
@@ -4342,10 +4403,22 @@ function generateStatement(node, indent = '', context = createGenerationContext(
     }
 
     case 'RunParallelStatement': {
+      // Each statement in the block becomes one concurrent task; `Promise.all`
+      // resolves with every task's value in body order. An expression statement
+      // (typically a call) contributes its return value; any other statement
+      // runs as its own async job and contributes `undefined`.
       markAsync(context);
-      const body = (node.body || []).map(s => generateStatement(s, indent + '  ', context)).join('\n');
+      const tasks = (node.body || []).map(stmt => {
+        if (stmt.type === 'ExpressionStatement') {
+          const expr = generateExpr(stmt.expression, context);
+          return `(async () => (${expr}))()`;
+        }
+        const body = generateStatement(stmt, indent + '      ', context);
+        return `(async () => {\n${body}\n${indent}    })()`;
+      });
       const resultName = node.resultName || '__parallelResults';
-      return `${indent}const ${resultName} = await Promise.all([(async () => {\n${body}\n${indent}})()]);`;
+      const joined = tasks.join(',\n' + indent + '    ');
+      return `${indent}const ${resultName} = await Promise.all([\n${indent}    ${joined},\n${indent}]);`;
     }
 
     default:

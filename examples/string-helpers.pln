@@ -1,0 +1,23 @@
+// PlainScript 1.0.363 — string helpers including the new parsing verbs.
+// parseBoolean / characters / toUpperCase / toLowerCase / split / join.
+
+remember raw as "true"
+show parseBoolean(raw)
+
+remember messy as "  PlainScript  "
+show "[" + trim(messy) + "]"
+show toUpperCase("whisper")
+show toLowerCase("LOUD")
+
+remember sentence as "the quick brown fox"
+remember chars as characters("abc")
+show "first char: " + chars at position 0
+show "words: " + count of split(sentence, " ")
+
+remember yesCount as 0
+for each token in split("yes,no,1,off,true", ",")
+    if parseBoolean(token) is true
+        yesCount += 1
+    done
+done
+show "truthy tokens: " + yesCount

@@ -22,13 +22,13 @@
     ["{", "}"]
   ],
   "indentationRules": {
-    "increaseIndentPattern": "^\\s*(if|otherwise|make|define|function|for|while|when|route|web|database|query|insert|update|delete|execute|try|recover|finally|test|match|switch|websocket|bot|whatsapp)\\b.*$",
-    "decreaseIndentPattern": "^\\s*(done|otherwise|finally|recover)\\b.*$"
+    "increaseIndentPattern": "^\\s*(if|otherwise|make|define|function|for|repeat|while|when|route|web|database|query|insert|update|delete|execute|try|recover|finally|retry|test|match|switch|websocket|bot|whatsapp|listen|every|after|schedule|transaction|group|stream|run|mail|send|google|accept|require|enable|limit)\\b.*$",
+    "decreaseIndentPattern": "^\\s*(done|end|otherwise|finally|recover)\\b.*$"
   },
   "folding": {
     "markers": {
-      "start": "^\\s*(if|make|define|function|for|while|when|route|web|try|test|match|switch|websocket|bot|whatsapp)\\b",
-      "end": "^\\s*done\\b"
+      "start": "^\\s*(if|make|define|function|for|repeat|while|when|route|web|try|retry|test|match|switch|websocket|bot|whatsapp|transaction|group|stream)\\b",
+      "end": "^\\s*(done|end)\\b"
     }
   }
 }

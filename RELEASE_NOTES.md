@@ -1,3 +1,82 @@
+# Release 1.0.363  -  Release Notes
+
+**Release date:** 2026-09-14
+
+---
+
+## What is new in 1.0.363?
+
+This release hardens the assignment surface, adds interactive terminal and
+data/AI primitives, and introduces a `run in parallel` block that runs a whole
+sequence of statements concurrently.
+
+## Assignment
+
+- **Compound operators:** `+=`, `-=`, `*=`, `/=`, `%=` (the legacy `++=`
+  spelling still means `+=`), plus the word forms `or becomes` (`||=`),
+  `and becomes` (`&&=`), and `nullish becomes` (`??=`).
+- **`set` / `change`:** `set <expr> to <value>` and `change <expr> to <value>`
+  compile to assignment, along with the postfix aliases
+  `<expr> set to <value>` and `<expr> change to <value>`.
+- **`end` closes any block.** `end` is now a full synonym for `done`, so
+  functions, loops, and conditionals all accept either word.
+
+## Interactive terminal primitives
+
+- `confirm("Delete this file?")`  -  a `(y/n)` prompt that returns a boolean.
+- `choose("Pick one", ["a", "b"])`  -  a numbered picker that returns the
+  chosen option.
+- `clearTerminal()`, `terminalWidth()`, `terminalHeight()`, and `stderr(...)`
+  for terminal ergonomics and writing to the error stream.
+- Global CLI flags `--quiet` (silences banner/stage/per-file chatter while
+  still reporting errors) and `--verbose` (prints stage timing lines).
+
+## Data & AI primitives
+
+- Statistics: `mean`, `median`, `variance`, `deviation` on numeric arrays.
+- Vectors: `dotProduct`, `magnitude`, `normalize`.
+- Randomness: `randomInteger`, `randomChoice`, `weightedChoice`, `shuffle`,
+  `sample`.
+- Helpers: `memoize` (Map-backed caching), `parseBoolean`, `characters`.
+
+## Concurrency, collections, and regex
+
+- `run in parallel ... done as <name>` runs every statement in the block as a
+  concurrent async task and resolves `Promise.all`, collecting each statement's
+  value into `name` in body order.
+- `count of <collection>` returns the `.count`, `.length`, or `.size`.
+- `match pattern "..." in "..." as <name>` regex capture, and the `all of`,
+  `any of`, `settled of` Promise combinators.
+
+## Examples and tests
+
+- New runnable examples: `ai-memory-cli`, `todo-cli`, `file-manager-cli`,
+  `terminal-cli`, `interactive-cli`, `stats-cli`, `random-cli`,
+  `string-helpers`, `memoize-demo`, `compound-assignments`,
+  `normalization-forms`, and `run-in-parallel`.
+- New suites `assignment.test.js`, `primitives.test.js`, `concurrency.test.js`,
+  `terminal.test.js`, and `cli.test.js` add 95+ assertions for everything above.
+
+## Bug fixes
+
+- Property-of assignment inside `for each` loops (numbered-item ambiguity) is
+  fixed, so `completed of todo`-style targets assign correctly.
+- `set`/`change ... to` work in both prefix and postfix positions.
+- `run in parallel` now collects each statement's resulting value.
+- A batch `--quiet build` no longer leaks per-file summary chatter.
+
+---
+
+## Verification
+
+The repository ships a complete test suite:
+
+```bash
+npm test
+```
+
+---
+
 # PlainScript v0.1.7  -  Release Notes
 
 **Release date:** 2026

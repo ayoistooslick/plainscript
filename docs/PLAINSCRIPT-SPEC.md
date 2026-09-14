@@ -1,4 +1,4 @@
-# PlainScript 1.0.362 language specification
+# PlainScript 1.0.363 language specification
 
 This reference covers the syntax implemented by `compiler/lexer.js` and
 `compiler/parser.js`. The runtime it generates lives in
@@ -9,7 +9,8 @@ repository's maintained example set.
 
 PlainScript is a line-oriented, intent-oriented language made for Node.js.
 Source files use `.pln`. Blocks end with `done` unless the syntax says
-`together`. Whitespace does not matter.
+`together`, and `end` is accepted as a synonym for `done` in every block
+position. Whitespace does not matter.
 
 The basic declaration forms are:
 
@@ -52,6 +53,47 @@ precedence. Word forms `plus`, `minus`, `times`, and `divided by` also work.
 `??` plus unary `-`, `wait for`, `typeof`, `void`, and `delete` are
 supported.
 
+### Assignment
+
+`becomes` is the ordinary assignment operator. Compound forms combine an
+operator with assignment; the symbols `+=`, `-=`, `*=`, `/=`, and `%=` (plus
+the legacy `++=` spelling of `+=`) reuse the same grammar:
+
+```plainscript
+remember score as 10
+score += 5
+score -= 3
+score *= 2
+score /= 4
+score %= 7
+let count be 0
+count ++= 1
+show score
+```
+
+The word forms `or becomes`, `and becomes`, and `nullish becomes` map to
+the logical assignments `||=`, `&&=`, and `??=`:
+
+```plainscript
+let name be null
+name or becomes "Grace"
+name and becomes name
+name nullish becomes "default"
+show name
+```
+
+`set <expr> to <value>` and `change <expr> to <value>` are prefix synonyms
+for `becomes`, and the same words work postfixed after the expression:
+
+```plainscript
+let age be 16
+set age to 17
+change age to 18
+age set to 19
+age change to 20
+show age
+```
+
 ## Conditions
 
 ```plainscript
@@ -71,7 +113,7 @@ Operators:
 | `more than`, `is greater than`, `is above` | `>` |
 | `fewer than`, `is less than`, `is below` | `<` |
 | `is at least` | `>=` |
-| `is most` | `<=` |
+| `is at most` | `<=` |
 | `contains`, `starts with`, `ends with`, `made of` | string predicates |
 | `between low and high` | inclusive range |
 | `has field field` | property existence |
@@ -131,6 +173,33 @@ done
 Use `break` and `continue` inside loops. `match value against` uses `->`
 case arrows and `otherwise`. `switch value against` works the same way and
 is just another way to write it.
+
+Regex capture uses `match pattern "..." in text as result`:
+```plainscript
+match pattern "^(\\d+)$" in "4061" as digits
+show digits            // → "4061"
+```
+
+Collection size uses `count of`:
+```plainscript
+show count of [1, 2, 3]          // → 3
+show count of "hello"            // → 5
+```
+
+`run in parallel ... done as <name>` executes each statement in the block as
+its own concurrent async job and awaits them together with `Promise.all`,
+collecting each statement's value in body order. It is not a worker-thread
+API:
+
+```plainscript
+run in parallel
+    makeJob(1)
+    makeJob(2)
+done as results
+```
+
+An expression statement (typically a call) contributes its return value; any
+other statement runs as its own async job and contributes `undefined`.
 
 ## Record kinds
 
@@ -237,9 +306,105 @@ retry 3 times every 1 second
 done
 ```
 
-Concurrency helpers are `allOf`, `anyOf`, `settledOf`, and `withTimeout`.
+Concurrency helpers are `all of`, `any of`, `settled of`, and `withTimeout`.
 Recurring blocks use `every 5 minutes ... done` and
 `schedule "0 * * * *" ... done`.
+
+## Interactive terminal
+
+Simple CLI prompts read from stdin and write to stdout. `confirm("question")`
+asks a yes/no question and resolves to a boolean; `choose("question",
+options)` prints a numbered menu and resolves to the picked option (or `null`
+when cancelled):
+
+```plainscript
+remember ok as confirm("Delete this file?")
+remember color as choose("Pick a color", ["red", "green", "blue"])
+show color
+```
+
+`clearTerminal()` clears the screen, `terminalWidth()` and
+`terminalHeight()` report the terminal size, and `stderr(...)` writes to
+standard error so diagnostics never pollute stdout:
+
+```plainscript
+stderr("starting")
+clearTerminal()
+show "width " + terminalWidth() + " height " + terminalHeight()
+stderr("done")
+```
+
+## Statistics, vectors, and randomness
+
+Numeric statistics over an array:
+
+| Function | Result |
+| --- | --- |
+| `mean(values)` | Arithmetic mean, or `NaN` for an empty array. |
+| `median(values)` | Middle value; average of the two middle values for even-length arrays. |
+| `variance(values)` | Sample variance (`n - 1` denominator). |
+| `deviation(values)` | Sample standard deviation. |
+
+```plainscript
+remember data as [2, 4, 4, 4, 5, 5, 7, 9]
+show mean(data)
+show median(data)
+show variance(data)
+show deviation(data)
+```
+
+Vector primitives operate on numeric arrays:
+
+```plainscript
+remember a as [1, 2, 3]
+remember b as [4, 5, 6]
+show dotProduct(a, b)
+show magnitude(a)
+show normalize(a)
+```
+
+`dotProduct(a, b)` sums the element-wise products, `magnitude(v)` is the
+Euclidean length, and `normalize(v)` is the unit vector (a zero vector maps
+to the same-length zero vector).
+
+Randomness helpers (all inclusive where a range applies):
+
+```plainscript
+remember die as randomInteger(1, 6)
+remember coin as randomChoice(["heads", "tails"])
+remember loot as weightedChoice(["common", "rare", "legendary"], [0.7, 0.25, 0.05])
+remember deck as shuffle(["A", "2", "3", "4", "5"])
+remember hand as sample([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 3)
+```
+
+`randomInteger(low, high)` is inclusive on both ends, `randomChoice(items)`
+picks one element, `weightedChoice(items, weights)` picks an element weighted
+by its parallel weight, `shuffle(items)` returns a new shuffled copy, and
+`sample(items, n)` returns a shuffled copy cut to `n` elements.
+
+## Memoization and helpers
+
+`memoize(function)` wraps a callable so repeated calls with the same argument
+list hit a cache instead of re-running:
+
+```plainscript
+make slowSquare(n)
+    give n * n
+done
+
+remember fastSquare as memoize(slowSquare)
+show fastSquare(9)
+```
+
+`parseBoolean(text)` treats `"true"`, `"yes"`, `"1"`, and `"on"` (ignoring
+case and surrounding whitespace) as `true` and everything else as `false`.
+`characters(text)` splits a string into an array of its characters:
+
+```plainscript
+remember enabled as parseBoolean("yes")
+remember letters as characters("hello")
+show count of letters
+```
 
 ## AI providers
 

@@ -224,6 +224,24 @@ function discoverSources(srcDir, outDir, exclude) {
 // Project builds compile many files in one pass; per-file stage logs would
 // drown the useful output. Set before batch compilation, reset after.
 let QUIET_STAGES = false;
+let VERBOSE = false;
+// `--quiet` also disables the post-build per-file summary lines; keep the
+// command-line intent separately so a batch build's internal silencing can be
+// lifted without re-enabling chatter the user explicitly asked to mute.
+let REQUESTED_QUIET = false;
+
+// `--quiet` swaps out the banner-printing stage with a no-chatter one;
+// `--verbose` always prints the timing detail.
+function stageQuiet(label, fn) {
+  return fn();
+}
+
+function stageVerbose(label, fn) {
+  const t0 = Date.now();
+  const result = fn();
+  console.log(`${clrGreen('✓')} ${label} (${Date.now() - t0}ms)`);
+  return result;
+}
 
 function stage(label, fn) {
   const t0 = Date.now();
@@ -448,7 +466,7 @@ async function cmdRun(filePath, extraArgs = []) {
   } else {
     js = compile(filePath);
   }
-  console.log('');
+  if (!QUIET_STAGES) console.log('');
   // Execute from the entry file's directory so relative assets and CWD-based
   // behaviour match a direct `node` invocation.
   const entryDir = path.dirname(path.resolve(filePath));
@@ -469,7 +487,7 @@ async function cmdRun(filePath, extraArgs = []) {
     process.exit(1);
   }
   fs.rmSync(tmpDir, { recursive: true, force: true });
-  console.log('\nDone.');
+  if (!QUIET_STAGES) console.log('\nDone.');
 }
 
 // Compile one entry and write it to outDir with its source name preserved,
@@ -506,7 +524,7 @@ function buildOne(filePath, srcDir, outDir, options = {}) {
 
 // `plainscript build <file.pln> -o <out.js>`  -  compile one entry to an explicit
 // output path (same compilation pipeline as buildOne, including source maps
-// when requested). Valuable for browser payloads such as the v1.0.362
+// when requested). Valuable for browser payloads such as the v1.0.363
 // requestAnimationFrame / addEventListener helpers, which are meant to run as
 // a single script tag.
 function writeOneFile(filePath, outputFile) {
@@ -580,12 +598,12 @@ async function cmdBuild(filePath, outputPath) {
       outPath: buildOne(path.join(path.resolve(srcDir), rel), srcDir, outDir),
     }));
   } finally {
-    QUIET_STAGES = false;
+    QUIET_STAGES = REQUESTED_QUIET;
   }
   for (const { source, outPath } of built) {
-    console.log(`${clrGreen('✓')} ${source} -> ${outPath}`);
+    if (!QUIET_STAGES) console.log(`${clrGreen('✓')} ${source} -> ${outPath}`);
   }
-  console.log(`\n${built.length} file(s) compiled to ${outDir}/.`);
+  if (!QUIET_STAGES) console.log(`\n${built.length} file(s) compiled to ${outDir}/.`);
 }
 
 async function cmdStart(extraArgs = []) {
@@ -631,7 +649,7 @@ done
 route get "/api/status"
     reply json
         status is "ok"
-        version is "1.0.362"
+        version is "${VERSION}"
     done
 done
 
@@ -948,7 +966,7 @@ function cmdCheck(target, json) {
 
   for (const r of results) {
     if (r.ok) {
-      console.log(`${clrGreen('✓')} ${r.file}  -  ok${clrDim(` (${r.ms}ms)`)}`);
+      if (!QUIET_STAGES) console.log(`${clrGreen('✓')} ${r.file}  -  ok${clrDim(` (${r.ms}ms)`)}`);
     } else {
       console.log(`${clrRed('✗')} ${r.file}`);
       console.error(r.error);
@@ -959,7 +977,7 @@ function cmdCheck(target, json) {
     console.error(`\n${failed.length} of ${results.length} file(s) failed validation.`);
     process.exit(1);
   }
-  if (results.length > 0) {
+  if (results.length > 0 && !QUIET_STAGES) {
     console.log(clrGreen(`\n✓ ${results.length} file(s) validated.`));
   }
 }
@@ -1004,6 +1022,7 @@ async function main() {
   const json    = args.includes('--json');
   if (quiet)   { stage = stageQuiet;   QUIET_STAGES = true; }
   if (verbose) { stage = stageVerbose;  VERBOSE = true; }
+  if (quiet) REQUESTED_QUIET = true;
 
   // Filter flags out to get the positional arguments.
   const positional = args.filter(a => !a.startsWith('--'));
@@ -1014,7 +1033,7 @@ async function main() {
   switch (command) {
     case 'run':     await cmdRun(fileArg, positional.slice(2)); break;
     case 'build': {
-      // v1.0.362  -  optional -o/--output <path>. "-o" is a single-dash flag, so
+      // v1.0.363  -  optional -o/--output <path>. "-o" is a single-dash flag, so
       // it survives the "--filtered" positional list; pull it out here before
       // building the positional file argument for cmdBuild.
       let outputPath = null;

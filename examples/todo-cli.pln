@@ -1,0 +1,98 @@
+// PlainScript 1.0.363 — a persistent to-do CLI.
+// State lives in todos.json next to where you run the script.
+//
+// Usage:
+//   plainscript run examples/todo-cli.pln add "Write the release notes"
+//   plainscript run examples/todo-cli.pln list
+//   plainscript run examples/todo-cli.pln done 0
+//   plainscript run examples/todo-cli.pln remove 0
+
+remember storeFile as "todos.json"
+
+make loadTodos()
+    if fileExists(storeFile) is true
+        give jsonDecode(readFile(storeFile))
+    otherwise
+        give []
+    done
+done
+
+make saveTodos(todos)
+    writeFile(storeFile, jsonEncode(todos))
+done
+
+make label(todo)
+    if completed of todo is true
+        give "[x] " + text of todo
+    otherwise
+        give "[ ] " + text of todo
+    done
+done
+
+make showList(todos)
+    if count of todos is 0
+        show "nothing to do"
+    otherwise
+        remember i as 0
+        for each todo in todos
+            show i + ": " + label(todo)
+            i += 1
+        done
+    done
+done
+
+make main()
+    remember argv as args()
+    remember todos as loadTodos()
+    if count of argv is 0
+        show "usage: todo-cli.pln <add|list|done|remove> [text|index]"
+        exit(0)
+    done
+    remember command as argv at position 0
+    if command is "add"
+        if count of argv is at least 2
+            push(todos, { text: argv at position 1, completed: false })
+            saveTodos(todos)
+            show "added: " + argv at position 1
+        otherwise
+            show "usage: ... add <text>"
+        done
+    otherwise if command is "list"
+        showList(todos)
+    otherwise if command is "done"
+        if count of argv is at least 2
+            remember target as parseInt(argv at position 1, 10)
+            remember i as 0
+            for each todo in todos
+                if i is target
+                    completed of todo becomes true
+                done
+                i += 1
+            done
+            saveTodos(todos)
+            show "completed item " + target
+        otherwise
+            show "usage: ... done <index>"
+        done
+    otherwise if command is "remove"
+        if count of argv is at least 2
+            remember target as parseInt(argv at position 1, 10)
+            remember kept as []
+            remember i as 0
+            for each todo in todos
+                if i different from target
+                    push(kept, todo)
+                done
+                i += 1
+            done
+            saveTodos(kept)
+            show "removed item " + target
+        otherwise
+            show "usage: ... remove <index>"
+        done
+    otherwise
+        show "unknown command: " + command
+    done
+done
+
+main()

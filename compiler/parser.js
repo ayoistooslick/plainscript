@@ -993,6 +993,28 @@ function parse(tokens) {
           peekAt(1).type === TOKEN.IDENTIFIER && peekAt(1).value === 'cookie') {
         return parseSetCookie();
       }
+
+      // v1.0.363  -  prefix assignment forms: "set <target> to <value>" and
+      // "change <target> to <value>" are aliases for "<target> becomes <value>".
+      // Contextual: a variable named "set" or "change" keeps its usual meaning
+      // unless a value and "to" follow. "set cookie" and "set with" keep their
+      // own meanings and are intercepted before this point/expression level.
+      if ((token.value === 'set' || token.value === 'change') &&
+          !(peekAt(1).type === TOKEN.IDENTIFIER && peekAt(1).value === 'with')) {
+        const verb = token.value;
+        advance(); // set / change
+        const target = parseExpression();
+        if (peek().type !== TOKEN.TO &&
+            !(peek().type === TOKEN.IDENTIFIER && peek().value === 'to')) {
+          throw new Error(makeError(
+            `Expected "to" after the target of "${verb}".\n\nExample:\n  ${verb} age to 17`,
+            peek()
+          ));
+        }
+        advance(); // to
+        const value = parseExpression();
+        return { type: 'BecomeStatement', target, value, op: '=' };
+      }
       if (token.value === 'clear' &&
           peekAt(1).type === TOKEN.IDENTIFIER && peekAt(1).value === 'cookie') {
         advance(); // clear
@@ -1088,8 +1110,20 @@ function parse(tokens) {
       // Assignment operators: becomes, is now, set to, change to, or becomes (||=), and becomes (&&=), nullish becomes (??=)
       let becomeOp = null;
       if (peek().type === TOKEN.PLUS_ASSIGN) {
-        advance(); // ++=
+        advance(); // += (or the legacy ++=)
         becomeOp = '+=';
+      } else if (peek().type === TOKEN.MINUS_ASSIGN) {
+        advance(); // -=
+        becomeOp = '-=';
+      } else if (peek().type === TOKEN.STAR_ASSIGN) {
+        advance(); // *=
+        becomeOp = '*=';
+      } else if (peek().type === TOKEN.SLASH_ASSIGN) {
+        advance(); // /=
+        becomeOp = '/=';
+      } else if (peek().type === TOKEN.PERCENT_ASSIGN) {
+        advance(); // %=
+        becomeOp = '%=';
       } else if (peek().type === TOKEN.LOGICAL_OR_ASSIGN) {
         advance(); // ||=
         becomeOp = '||=';
@@ -1123,6 +1157,16 @@ function parse(tokens) {
         becomeOp = '=';
       } else if (peek().type === TOKEN.CHANGE_TO) {
         advance(); // change to
+        becomeOp = '=';
+      } else if (peek().type === TOKEN.IDENTIFIER && peek().value === 'set' &&
+                 peekAt(1).type === TOKEN.TO) {
+        advance(); // set
+        advance(); // to
+        becomeOp = '=';
+      } else if (peek().type === TOKEN.IDENTIFIER && peek().value === 'change' &&
+                 peekAt(1).type === TOKEN.TO) {
+        advance(); // change
+        advance(); // to
         becomeOp = '=';
       }
 
@@ -3492,10 +3536,18 @@ function parseAsk() {
       return { type: 'NumberedItem', index, collection };
     }
 
-    throw new Error(makeError(
-      `Expected a number word after "${first.value}" before "from".\n\nUse number words like "one", "two", "three".\n\nExample:\n  ${first.value} one from players`,
-      second
-    ));
+    // v1.0.363  -  never throw here for the "X Y of ..." shape: that is the
+    // ordinary property form ("completed of todo"), so the fall-through parses
+    // it normally. Only a plain "X Y from ..." keeps the number-word hint,
+    // since "from" cannot start a property access.
+    if (third.value === 'from') {
+      throw new Error(makeError(
+        `Expected a number word after "${first.value}" before "from".\n\nUse number words like "one", "two", "three".\n\nExample:\n  ${first.value} one from players`,
+        second
+      ));
+    }
+
+    return null;
   }
 
 // atom → STRING | NUMBER | true | false | null | undefined | BigInt | '(' expr ')' |

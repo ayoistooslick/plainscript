@@ -38,21 +38,21 @@
     },
     "numbers": {
       "name": "constant.numeric.plainscript",
-      "match": "\\b\\d+(\\.\\d+)?n?\\b"
+      "match": "\\b(0x[0-9a-fA-F]+|\\d+(\\.\\d+)?n?)\\b"
     },
     "keywords": {
       "patterns": [
         {
           "name": "keyword.control.plainscript",
-          "match": "\\b(if|otherwise|else|for|each|every|index|from|to|while|in|when|listen|route|web|start|done|try|recover|finally|retry|times|wait|accept|require|enable|limit|test|match|against|switch|case|default|break|continue|return|give|yield|on|with|and|or|not|between|contains|starts|ends|is|same|different|more|fewer|at|least|most|has|field|instanceof)\\b"
+          "match": "\\b(if|otherwise|else|for|each|every|index|from|to|while|in|repeat|until|when|someone|visits|happens|listen|start_on|serve_on|run_on|route|web|start|done|end|do|try|recover|finally|retry|times|wait|accept|require|enable|limit|test|match|against|switch|case|default|break|continue|return|give|give_back|yield|on|with|and|or|not|between|contains|starts|ends|is|same|different|more|fewer|at|least|most|has|field|instanceof|gather|filter|total|parallel|emit|stream|catches|choosing|then)\\b"
         },
         {
           "name": "keyword.declaration.plainscript",
-          "match": "\\b(remember|let|make|define|function|use|import|export|database|postgres|create|record|list|websocket|bot|whatsapp|ocr)\\b"
+          "match": "\\b(remember|let|make|define|function|use|import|include|load|export|share|expose|database|connect_db|use_database|postgres|mongo|create|record|record_with|list_with|kind|list|websocket|server|bot|whatsapp|group|ocr|new|class|extends)\\b"
         },
         {
           "name": "keyword.other.plainscript",
-          "match": "\\b(show|print|display|give|becomes|is_now|set_to|change_to|reply|respond|serve|folder|json|query|insert|update|delete|execute|transaction|cache|schedule|background|socket|connects|disconnects|message|broadcast|send|upload|uploads|cookie|session|api|key|cors)\\b"
+          "match": "\\b(show|print|display|becomes|is_now|set_to|change_to|become|delegate|ask|prompt|raise|raises|uses|fills|above|below|empty|now|back|send_back|reply|respond|serve|serve_static|serve_public|folder|file|json|query|insert|update|delete|execute|transaction|cache|schedule|background|socket|connects|disconnects|message|broadcast|send|upload|uploads|cookie|session|destroy|api|key|cors|pair|auth|login|using|symbol|debugger|pattern|together|be|plus|minus|times|divided_by|log|target)\\b"
         },
         {
           "name": "constant.language.plainscript",
@@ -62,8 +62,8 @@
     },
     "operators": {
       "patterns": [
-        {"name": "keyword.operator.plainscript", "match": "\\?\\?|\\?\\.|\\*\\*|->|\\+|-|\\*|/|%|\\b(plus|minus|times|divided by)\\b"},
-        {"name": "punctuation.separator.plainscript", "match": "[.,:()\\[\\]{}]"}
+        {"name": "keyword.operator.plainscript", "match": "\\?\\?=|\\?\\?|\\?\\.|\\*\\*|\\+=|-=|\\*=|/=|%=|\\+\\+=|\\|\\|=|&&=|[+\\-*/%]|->|\\b(plus|minus|times|divided by|divided_by)\\b"},
+        {"name": "punctuation.separator.plainscript", "match": "[\\.:,()\\[\\]{}]"}
       ]
     },
     "functions": {
