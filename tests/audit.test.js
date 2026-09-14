@@ -531,7 +531,7 @@ test('ocr accepts an in-memory buffer expression', () => {
     'ocr buf as text',
     'show text',
   ].join('\n'));
-  assertIncludes(js, 'let buf = fs.readFileSync("img.png");');
+  assertIncludes(js, 'let buf = __fs.readFileSync("img.png");');
   assertIncludes(js, 'let text = await __ocr(buf);');
 });
 

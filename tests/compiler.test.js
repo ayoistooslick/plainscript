@@ -2361,34 +2361,34 @@ test('contains works with a property expression', () => {
 
 test('read compiles to readFileSync with an fs prelude', () => {
   const js = compile('show read("users.txt")');
-  if (!js.includes(`const fs = require('fs');`)) throw new Error('missing fs prelude');
-  if (!js.includes(`fs.readFileSync("users.txt", 'utf8')`)) throw new Error('missing readFileSync');
+  if (!js.includes(`const __fs = require('fs');`)) throw new Error('missing fs prelude');
+  if (!js.includes(`__fs.readFileSync("users.txt", 'utf8')`)) throw new Error('missing readFileSync');
 });
 
 test('read works with a variable path', () => {
   const js = compile('show read(filePath)');
-  if (!js.includes(`fs.readFileSync(filePath, 'utf8')`)) throw new Error('missing readFileSync');
+  if (!js.includes(`__fs.readFileSync(filePath, 'utf8')`)) throw new Error('missing readFileSync');
 });
 
 test('write(data to file) compiles to writeFileSync with an fs prelude', () => {
   const js = compile('write("hello" to "out.txt")');
-  if (!js.includes(`const fs = require('fs');`)) throw new Error('missing fs prelude');
-  if (!js.includes(`fs.writeFileSync("hello", "out.txt", 'utf8')`)) throw new Error('missing writeFileSync');
+  if (!js.includes(`const __fs = require('fs');`)) throw new Error('missing fs prelude');
+  if (!js.includes(`__fs.writeFileSync("hello", "out.txt", 'utf8')`)) throw new Error('missing writeFileSync');
 });
 
 test('write works with a variable payload', () => {
   const js = compile('write(data to "out.txt")');
-  if (!js.includes(`fs.writeFileSync(data, "out.txt", 'utf8')`)) throw new Error('missing writeFileSync');
+  if (!js.includes(`__fs.writeFileSync(data, "out.txt", 'utf8')`)) throw new Error('missing writeFileSync');
 });
 
 test('readFile remains available (backward compat)', () => {
   const js = compile('show readFile("x.txt")');
-  if (!js.includes(`fs.readFileSync("x.txt", 'utf8')`)) throw new Error('missing readFileSync');
+  if (!js.includes(`__fs.readFileSync("x.txt", 'utf8')`)) throw new Error('missing readFileSync');
 });
 
 test('read result feeds other stdlib functions', () => {
   const js = compile('show uppercase(read("notes.txt"))');
-  if (!js.includes(`(fs.readFileSync("notes.txt", 'utf8')).toUpperCase()`)) {
+  if (!js.includes(`(__fs.readFileSync("notes.txt", 'utf8')).toUpperCase()`)) {
     throw new Error(`missing nested read: ${js}`);
   }
 });

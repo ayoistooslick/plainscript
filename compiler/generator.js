@@ -15,8 +15,6 @@ const KNOWN_PACKAGES = {
   sqlite:  `let Database;
 try { Database = require('better-sqlite3'); }
 catch (__e) { Database = function () { throw new Error('PlainScript: the native SQLite engine (better-sqlite3) is not usable on this machine (' + (__e && __e.message ? __e.message : __e) + ').\\nInstall it with: npm install better-sqlite3\\nOr use the portable engine instead:  database "' + (arguments[0] || ':memory:') + '" using "wasm"'); }; }`,
-  fs:      `const fs = require('fs');`,
-  path:    `const path = require('path');`,
   axios:   `const axios = require('axios');`,
   chalk:   `const chalk = require('chalk');`,
   // v2.1.0  -  PostgreSQL driver behind the friendly "postgres" name.
@@ -24,6 +22,13 @@ catch (__e) { Database = function () { throw new Error('PlainScript: the native 
   // v2.2.0  -  MongoDB driver.
   mongodb: `const { MongoClient } = require('mongodb');`,
 };
+
+// Node built-ins whose internal runtime binding is namespaced (__fs, __path,
+// __crypto) so generated STDLIB code cannot collide with user variables named
+// fs/path/crypto. `use fs` still binds the public name the user asked for, plus
+// the internal alias; the two bindings are tracked under separate keys so a
+// stdlib prelude (readFile etc.) never suppresses the user-facing binding.
+const ALIASED_NODE_BUILTINS = { fs: 'fs', path: 'path', crypto: 'crypto' };
 
 // PlainScript module names whose npm package name differs from the PlainScript name.
 // Used to de-duplicate runtime requires across aliases (RFC-0011 §22).
@@ -47,16 +52,16 @@ const JS_RESERVED = new Set([
 ]);
 
 const BUILTIN_DECLARATIONS = {
-  fs: `const fs = require('fs');`,
-  path: `const path = require('path');`,
-  crypto: `const crypto = require('crypto');`,
+  fs: `const __fs = require('fs');`,
+  path: `const __path = require('path');`,
+  crypto: `const __crypto = require('crypto');`,
   // v1.0.1  -  env-file runtime. Applies KEY=VALUE pairs from a .env file to
   // process.env. Blank lines and `#` comment lines are skipped.
   dotenv: [
     `function __loadEnvFile(path) {`,
-    `  const fs = require('fs');`,
+    `  const __fs = require('fs');`,
     `  let raw;`,
-    `  try { raw = fs.readFileSync(path, 'utf8'); } catch (e) { return; }`,
+    `  try { raw = __fs.readFileSync(path, 'utf8'); } catch (e) { return; }`,
     `  for (const line of raw.split(/\\r?\\n/)) {`,
     `    const trimmed = line.trim();`,
     `    if (!trimmed || trimmed.startsWith('#')) continue;`,
@@ -561,8 +566,8 @@ const BUILTIN_DECLARATIONS = {
   // v1.0.1  -  dynamic module loader.
   loadmodule: [
     `function __loadModule(spec) {`,
-    `  const path = require('path');`,
-    `  const target = (spec[0] === '.' ) ? path.resolve(process.cwd(), spec) : spec;`,
+    `  const __path = require('path');`,
+    `  const target = (spec[0] === '.' ) ? __path.resolve(process.cwd(), spec) : spec;`,
     `  try { return require(target); }`,
     `  catch (e) { if (spec[0] !== '.') return require(spec); throw e; }`,
     `}`,
@@ -570,13 +575,13 @@ const BUILTIN_DECLARATIONS = {
   // v1.0.1  -  recursive directory walker (returns full paths, files first).
   walk: [
     `function __walkFolder(dir) {`,
-    `  const fs = require('fs');`,
-    `  const path = require('path');`,
+    `  const __fs = require('fs');`,
+    `  const __path = require('path');`,
     `  const out = [];`,
     `  function rec(d) {`,
-    `    for (const entry of fs.readdirSync(d)) {`,
-    `      const full = path.join(d, entry);`,
-    `      const st = fs.statSync(full);`,
+    `    for (const entry of __fs.readdirSync(d)) {`,
+    `      const full = __path.join(d, entry);`,
+    `      const st = __fs.statSync(full);`,
     `      if (st.isDirectory()) rec(full);`,
     `      else out.push(full);`,
     `    }`,
@@ -758,10 +763,10 @@ const BUILTIN_DECLARATIONS = {
     `    const raw = message && message.raw ? message.raw : message;`,
     `    const buffer = await downloadMediaMessage(raw, 'buffer', {}, { logger: __waSilentLogger, reuploadRequest: sock.updateMediaMessage });`,
     `    if (!dest) return buffer;`,
-    `    const fs = require('fs'), path = require('path');`,
-    `    const dir = path.dirname(path.resolve(dest));`,
-    `    if (dir && dir !== '.') fs.mkdirSync(dir, { recursive: true });`,
-    `    fs.writeFileSync(dest, buffer);`,
+    `    const __fs = require('fs'), __path = require('path');`,
+    `    const dir = __path.dirname(__path.resolve(dest));`,
+    `    if (dir && dir !== '.') __fs.mkdirSync(dir, { recursive: true });`,
+    `    __fs.writeFileSync(dest, buffer);`,
     `    return dest;`,
     `  }`,
     `  async function __whatsappDownload(message, dest) {`,
@@ -1111,7 +1116,7 @@ const BUILTIN_DECLARATIONS = {
   ].join('\n'),
   // v2.1.1  -  file upload runtime (multer behind "accept uploads"). Files are
   // held in memory by default or written to disk when a folder is given.
-  // Normalised records expose: name, type, size, data (buffer) and path.
+  // Normalised records expose: name, type, size, data (buffer) and __path.
   uploads: [
     `function __uploads(options = {}) {`,
     `  const multer = require('multer');`,
@@ -1351,8 +1356,8 @@ const BUILTIN_DECLARATIONS = {
   // IOPL-native  -  line-by-line file streaming runtime.
   __streamFile: [
     `async function __streamFile(path, fn) {`,
-    `  const fs = require('fs');`,
-    `  const rl = require('readline').createInterface({ input: fs.createReadStream(path), crlfDelay: Infinity });`,
+    `  const __fs = require('fs');`,
+    `  const rl = require('readline').createInterface({ input: __fs.createReadStream(path), crlfDelay: Infinity });`,
     `  for await (const line of rl) await fn(line);`,
     `}`,
   ].join('\n'),
@@ -1710,8 +1715,8 @@ const BUILTIN_DECLARATIONS = {
     sqlite:    (args, context)  => `new Database(${args.map(arg => generateExpr(arg, context)).join(', ')})`,
   // v0.6  -  runtime standard library
   print:      (args, context) => `console.log(${args.map(arg => generateExpr(arg, context)).join(', ')})`,
-  readFile:   (args, context) => `fs.readFileSync(${generateExpr(args[0], context)}, 'utf8')`,
-  writeFile:  (args, context) => `fs.writeFileSync(${generateExpr(args[0], context)}, ${generateExpr(args[1], context)}, 'utf8')`,
+  readFile:   (args, context) => `__fs.readFileSync(${generateExpr(args[0], context)}, 'utf8')`,
+  writeFile:  (args, context) => `__fs.writeFileSync(${generateExpr(args[0], context)}, ${generateExpr(args[1], context)}, 'utf8')`,
   // v2.4.0  -  dependency-free SVG image and visualization helpers.
   svgImage: (args, context) => {
     ensureBuiltin(context, 'visualization');
@@ -1733,8 +1738,8 @@ const BUILTIN_DECLARATIONS = {
     ensureBuiltin(context, 'visualization');
     return `__imageDataUri(${args.map(arg => generateExpr(arg, context)).join(', ')})`;
   },
-  fileExists: (args, context) => `fs.existsSync(${generateExpr(args[0], context)})`,
-  read:       (args, context) => `fs.readFileSync(${generateExpr(args[0], context)}, 'utf8')`,
+  fileExists: (args, context) => `__fs.existsSync(${generateExpr(args[0], context)})`,
+  read:       (args, context) => `__fs.readFileSync(${generateExpr(args[0], context)}, 'utf8')`,
   sleep:      (args, context) => `Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ${generateExpr(args[0], context)})`,
   time:       (_args) => `Date.now()`,
   date:       (_args) => `new Date().toISOString()`,
@@ -1810,20 +1815,20 @@ const BUILTIN_DECLARATIONS = {
 
   // ── v2.1.0  -  filesystem helpers (sync, matching readFile/writeFile style)
 
-  copyFile:   (args, context) => { ensureBuiltin(context, 'fs'); return `fs.copyFileSync(${args.map(a => generateExpr(a, context)).join(', ')})`; },
-  moveFile:   (args, context) => { ensureBuiltin(context, 'fs'); return `fs.renameSync(${args.map(a => generateExpr(a, context)).join(', ')})`; },
-  deleteFile: (args, context) => { ensureBuiltin(context, 'fs'); return `fs.unlinkSync(${generateExpr(args[0], context)})`; },
-  makeFolder: (args, context) => { ensureBuiltin(context, 'fs'); return `fs.mkdirSync(${generateExpr(args[0], context)}, { recursive: true })`; },
-  deleteFolder: (args, context) => { ensureBuiltin(context, 'fs'); return `fs.rmSync(${generateExpr(args[0], context)}, { recursive: true, force: true })`; },
-  listFolder: (args, context) => { ensureBuiltin(context, 'fs'); return `fs.readdirSync(${generateExpr(args[0], context)})`; },
+  copyFile:   (args, context) => { ensureBuiltin(context, 'fs'); return `__fs.copyFileSync(${args.map(a => generateExpr(a, context)).join(', ')})`; },
+  moveFile:   (args, context) => { ensureBuiltin(context, 'fs'); return `__fs.renameSync(${args.map(a => generateExpr(a, context)).join(', ')})`; },
+  deleteFile: (args, context) => { ensureBuiltin(context, 'fs'); return `__fs.unlinkSync(${generateExpr(args[0], context)})`; },
+  makeFolder: (args, context) => { ensureBuiltin(context, 'fs'); return `__fs.mkdirSync(${generateExpr(args[0], context)}, { recursive: true })`; },
+  deleteFolder: (args, context) => { ensureBuiltin(context, 'fs'); return `__fs.rmSync(${generateExpr(args[0], context)}, { recursive: true, force: true })`; },
+  listFolder: (args, context) => { ensureBuiltin(context, 'fs'); return `__fs.readdirSync(${generateExpr(args[0], context)})`; },
   appendFile: (args, context) => {
     ensureBuiltin(context, 'fs');
-    return `fs.appendFileSync(${generateExpr(args[0], context)}, ${generateExpr(args[1], context)}, 'utf8')`;
+    return `__fs.appendFileSync(${generateExpr(args[0], context)}, ${generateExpr(args[1], context)}, 'utf8')`;
   },
-  readBytes:  (args, context) => { ensureBuiltin(context, 'fs'); return `fs.readFileSync(${generateExpr(args[0], context)})`; },
+  readBytes:  (args, context) => { ensureBuiltin(context, 'fs'); return `__fs.readFileSync(${generateExpr(args[0], context)})`; },
   writeBytes: (args, context) => {
     ensureBuiltin(context, 'fs');
-    return `fs.writeFileSync(${generateExpr(args[0], context)}, ${generateExpr(args[1], context)})`;
+    return `__fs.writeFileSync(${generateExpr(args[0], context)}, ${generateExpr(args[1], context)})`;
   },
 
   // ── v2.1.0  -  text, number and collection helpers
@@ -2174,15 +2179,15 @@ const BUILTIN_DECLARATIONS = {
   bytesToText: (args, context) => `Buffer.from(${generateExpr(args[0], context)}).toString('utf8')`,
   sha256: (args, context) => {
     ensureBuiltin(context, 'crypto');
-    return `crypto.createHash('sha256').update(String(${generateExpr(args[0], context)})).digest('hex')`;
+    return `__crypto.createHash('sha256').update(String(${generateExpr(args[0], context)})).digest('hex')`;
   },
   sha1: (args, context) => {
     ensureBuiltin(context, 'crypto');
-    return `crypto.createHash('sha1').update(String(${generateExpr(args[0], context)})).digest('hex')`;
+    return `__crypto.createHash('sha1').update(String(${generateExpr(args[0], context)})).digest('hex')`;
   },
   md5: (args, context) => {
     ensureBuiltin(context, 'crypto');
-    return `crypto.createHash('md5').update(String(${generateExpr(args[0], context)})).digest('hex')`;
+    return `__crypto.createHash('md5').update(String(${generateExpr(args[0], context)})).digest('hex')`;
   },
 
   // Serialization  -  minimal dependency-free YAML subset (see __yamlParse).
@@ -2250,7 +2255,7 @@ const BUILTIN_DECLARATIONS = {
   // ── v1.0.363  -  memoization, boolean/character string helpers ────────────
   memoize: (args, context) => `((f) => { const cache = new Map(); return function (...callArgs) { const key = callArgs.join('\\u0000'); if (cache.has(key)) return cache.get(key); const value = f(...callArgs); cache.set(key, value); return value; }; })(${generateExpr(args[0], context)})`,
   parseBoolean: (args, context) => `(['true', 'yes', '1', 'on'].includes(String(${generateExpr(args[0], context)}).trim().toLowerCase()))`,
-  characters: (args, context) => `String(${generateExpr(args[0], context)}).split('')`,
+  characters: (args, context) => `[...String(${generateExpr(args[0], context)})]`,
 
   // Generators / iterables
   spread: (args, context) => `[...${generateExpr(args[0], context)}]`,
@@ -2323,15 +2328,15 @@ const BUILTIN_DECLARATIONS = {
   // Filesystem metadata, walking, and path helpers
   fileSize: (args, context) => {
     ensureBuiltin(context, 'fs');
-    return `fs.statSync(${generateExpr(args[0], context)}).size`;
+    return `__fs.statSync(${generateExpr(args[0], context)}).size`;
   },
   fileType: (args, context) => {
     ensureBuiltin(context, 'fs');
-    return `fs.statSync(${generateExpr(args[0], context)}).isDirectory() ? 'directory' : 'file'`;
+    return `__fs.statSync(${generateExpr(args[0], context)}).isDirectory() ? 'directory' : 'file'`;
   },
   lastModified: (args, context) => {
     ensureBuiltin(context, 'fs');
-    return `new Date(fs.statSync(${generateExpr(args[0], context)}).mtimeMs).toISOString()`;
+    return `new Date(__fs.statSync(${generateExpr(args[0], context)}).mtimeMs).toISOString()`;
   },
   walkFolder: (args, context) => {
     ensureBuiltin(context, 'walk');
@@ -2339,29 +2344,29 @@ const BUILTIN_DECLARATIONS = {
   },
   joinPath: (_args, context) => {
     ensureBuiltin(context, 'path');
-    return `path.join(${_args.map(a => generateExpr(a, context)).join(', ')})`;
+    return `__path.join(${_args.map(a => generateExpr(a, context)).join(', ')})`;
   },
   baseName: (_args, context) => {
     ensureBuiltin(context, 'path');
-    return `path.basename(${generateExpr(_args[0], context)})`;
+    return `__path.basename(${generateExpr(_args[0], context)})`;
   },
   folderOf: (_args, context) => {
     ensureBuiltin(context, 'path');
-    return `path.dirname(${generateExpr(_args[0], context)})`;
+    return `__path.dirname(${generateExpr(_args[0], context)})`;
   },
   extensionOf: (_args, context) => {
     ensureBuiltin(context, 'path');
-    return `path.extname(${generateExpr(_args[0], context)})`;
+    return `__path.extname(${generateExpr(_args[0], context)})`;
   },
 
   // Streams
   writeLine: (args, context) => {
     ensureBuiltin(context, 'fs');
-    return `fs.appendFileSync(${generateExpr(args[0], context)}, ${generateExpr(args[1], context)} + '\\n', 'utf8')`;
+    return `__fs.appendFileSync(${generateExpr(args[0], context)}, ${generateExpr(args[1], context)} + '\\n', 'utf8')`;
   },
   appendLine: (args, context) => {
     ensureBuiltin(context, 'fs');
-    return `fs.appendFileSync(${generateExpr(args[0], context)}, ${generateExpr(args[1], context)} + '\\n', 'utf8')`;
+    return `__fs.appendFileSync(${generateExpr(args[0], context)}, ${generateExpr(args[1], context)} + '\\n', 'utf8')`;
   },
 
   // ── v1.0.2  -  Extended Math functions (IOPL-native).
@@ -3060,6 +3065,20 @@ function emitRequire(context, moduleName, alias) {
     return `const ${alias} = require('${npmName}');`;
   }
 
+  // `use fs` / `use path` / `use crypto` bind the PUBLIC name only
+  // (fs.readFileSync(...)). The namespaced internal alias (__fs etc.) is owned
+  // exclusively by the stdlib prelude, so the two can never collide and Node's
+  // module cache makes both requires the same object anyway. Tracked under its
+  // own key: a stdlib prelude that already required the module must not
+  // suppress the user-facing binding (and vice versa).
+  if (ALIASED_NODE_BUILTINS[bareName]) {
+    const key = `${bareName}:user`;
+    if (context.requires.has(key)) return '';
+    context.requires.add(key);
+    const publicName = ALIASED_NODE_BUILTINS[bareName];
+    return `const ${publicName} = require('${npmName}');`;
+  }
+
   if (context.requires.has(npmName)) return '';
   context.requires.add(npmName);
 
@@ -3128,6 +3147,17 @@ function generate(ast, contextOrOptions = createGenerationContext(), options = {
   __testCatchers = [];
   __inTest = false;
 
+  // User-declared top-level functions shadow STDLIB names at call sites
+  // (make sort(x) must call the user's sort, not the builtin). Merged across
+  // files so a module that declares a builtin-named function stays callable
+  // from imports. Computed before generation so calls inside the program (and
+  // the exported module surface below) see it.
+  const exported = ast.body
+    .filter(node => node.type === 'FunctionDeclaration')
+    .map(node => node.name);
+  const declared = new Set(exported);
+  context.declaredFunctions = new Set([...(context.declaredFunctions || []), ...declared]);
+
   const preludeStart = context.pendingPrelude.length;
 
   const bodyParts = [];
@@ -3150,12 +3180,6 @@ function generate(ast, contextOrOptions = createGenerationContext(), options = {
   const body = bodyParts.join('\n');
   const lines = preludeLines.concat(body).filter(Boolean);
 
-  // Top-level functions are the module's public API: export them so a built
-  // PlainScript file works as a normal CommonJS module (npm packages, require()).
-  // Harmless for programs that are only executed.
-  const exported = ast.body
-    .filter(node => node.type === 'FunctionDeclaration')
-    .map(node => node.name);
   const hasExplicitExport = ast.body.some(node => node.type === 'ExportStatement');
   // When the author uses explicit `export <name>`, they control the module
   // surface; skip the automatic function export so it does not clobber it.
@@ -3677,7 +3701,7 @@ function generateStatement(node, indent = '', context = createGenerationContext(
       if (!_inRoute) {
         throw new Error('"reply file" can only be used inside a route handler.\n\nExample:\n  route get "/"\n    reply file "public/index.html"\n  done');
       }
-      // Use path.resolve to handle relative paths correctly
+      // Use __path.resolve to handle relative paths correctly
       return `${indent}res.sendFile(require('path').resolve(${JSON.stringify(node.filePath)}));`;
 
     case 'ReplyJsonStatement': {
@@ -3889,6 +3913,15 @@ function generateStatement(node, indent = '', context = createGenerationContext(
             lines.push(`${indent}  }`);
             if (isLast) lines.push(`${indent}}`);
           } else {
+            // Untyped recover (recover as err / recover): normalize primitive
+            // throws (throw "kaboom") so both `message of err` and `text(err)`
+            // see the value; Error objects and thrown objects pass through.
+            lines.push(`${indent}  if (!(${errorName} instanceof Error)) {`);
+            lines.push(`${indent}    const __plainOrig = ${errorName};`);
+            lines.push(`${indent}    if (typeof __plainOrig !== 'object' || __plainOrig === null) {`);
+            lines.push(`${indent}      ${errorName} = { message: String(__plainOrig), toString: () => String(__plainOrig) };`);
+            lines.push(`${indent}    }`);
+            lines.push(`${indent}  }`);
             if (isFirst && isLast) {
               lines.push(catchBody);
               lines.push(`${indent}}`);
@@ -3904,6 +3937,14 @@ function generateStatement(node, indent = '', context = createGenerationContext(
         const errorName = node.catchName || '__plainError';
         const recoverBody = node.recoverBody.map(s => generateStatement(s, indent + '  ', context)).join('\n');
         lines.push(`${indent}} catch (${errorName}) {`);
+        // Normalize primitive throws (throw "kaboom") so both `message of err`
+        // and `text(err)` see the value; objects/Errors pass through untouched.
+        lines.push(`${indent}  if (!(${errorName} instanceof Error)) {`);
+        lines.push(`${indent}    const __plainOrig = ${errorName};`);
+        lines.push(`${indent}    if (typeof __plainOrig !== 'object' || __plainOrig === null) {`);
+        lines.push(`${indent}      ${errorName} = { message: String(__plainOrig), toString: () => String(__plainOrig) };`);
+        lines.push(`${indent}    }`);
+        lines.push(`${indent}  }`);
         lines.push(recoverBody);
         lines.push(`${indent}}`);
       } else {
@@ -4548,12 +4589,25 @@ function generateExpr(node, context = createGenerationContext()) {
     }
 
     // Nested binary operands get parentheses so (2 + 3) * 4 keeps its
-    // grouping instead of flattening to 2 + 3 * 4.
+    // grouping instead of flattening to 2 + 3 * 4. Comparison and logical
+    // operands also need them: "x" + (a is b) must not become "x" + a === b.
     case 'BinaryExpression': {
-      const left = node.left.type === 'BinaryExpression'
+      const needsParens = (t) =>
+        t.type === 'BinaryExpression' ||
+        t.type === 'BinaryCondition' ||
+        t.type === 'UnaryCondition' ||
+        t.type === 'BetweenCondition' ||
+        t.type === 'InCondition' ||
+        t.type === 'NotInCondition' ||
+        t.type === 'StringCondition' ||
+        t.type === 'LogicalCondition' ||
+        t.type === 'ComparisonCondition' ||
+        t.type === 'ConditionalExpression' ||
+        t.type === 'ArrowFunctionExpression';
+      const left = needsParens(node.left)
         ? `(${generateExpr(node.left, context)})`
         : generateExpr(node.left, context);
-      const right = node.right.type === 'BinaryExpression'
+      const right = needsParens(node.right)
         ? `(${generateExpr(node.right, context)})`
         : generateExpr(node.right, context);
       return `${left} ${node.operator} ${right}`;
@@ -4623,7 +4677,7 @@ function generateExpr(node, context = createGenerationContext()) {
 
     case 'CallExpression': {
       // Method call: receiver.method(args). Member access invoked with parens  - 
-      // e.g. path.join("a", "b"), mrz.parse(line), fs.existsSync(("x")).
+      // e.g. __path.join("a", "b"), mrz.parse(line), __fs.existsSync(("x")).
       // Postfix calls f()(), arr[0](1), mul(6)(7) also bind here; any composite
       // callee (arrow, binary, comparison/logical condition) is parenthesised so
       // the call still applies to the whole value, not its last operand.
@@ -4637,7 +4691,7 @@ function generateExpr(node, context = createGenerationContext()) {
           node.callee.type === 'UnaryExpression';
         return `${composite ? `(${callee})` : callee}(${args})`;
       }
-      if (STDLIB[node.name]) {
+      if (STDLIB[node.name] && !(context.declaredFunctions && context.declaredFunctions.has(node.name))) {
         if (node.name === 'readFile' || node.name === 'writeFile' ||
             node.name === 'fileExists' || node.name === 'read') {
           ensureBuiltin(context, 'fs');
@@ -4664,7 +4718,8 @@ function generateExpr(node, context = createGenerationContext()) {
 
     case 'CountOfExpression': {
       const obj = generateExpr(node.object, context);
-      return `((${obj} && ${obj}.count !== undefined) ? ${obj}.count : ((${obj} && ${obj}.length !== undefined) ? ${obj}.length : ((${obj} && ${obj}.size !== undefined) ? ${obj}.size : 0)))`;
+      const probe = (x) => `((${obj} && (${obj}).${x} !== undefined) ? (${obj}).${x} : `;
+      return `${probe('count')}${probe('length')}${probe('size')}0)))`;
     }
 
     // v1.1  -  Property access
@@ -4699,7 +4754,7 @@ function generateExpr(node, context = createGenerationContext()) {
 
     case 'WriteCall':
       ensureBuiltin(context, 'fs');
-      return `fs.writeFileSync(${generateExpr(node.data, context)}, ${generateExpr(node.file, context)}, 'utf8')`;
+      return `__fs.writeFileSync(${generateExpr(node.data, context)}, ${generateExpr(node.file, context)}, 'utf8')`;
 
     // v1.0.1  -  record constructor: `create a Person with name "Ada" and age 17`
     // calls the kind factory that `define a kind called "Person"` registered.

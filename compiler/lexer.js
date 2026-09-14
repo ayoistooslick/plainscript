@@ -437,10 +437,23 @@ function tokenize(source) {
       }
     }
 
-    // Number literal (may include decimal point or BigInt suffix 'n')
+    // Number literal (may include decimal point, scientific notation, or
+    // BigInt suffix 'n')
     if (/[0-9]/.test(source[i])) {
       let num = '';
       while (i < source.length && /[0-9.]/.test(source[i])) num += source[i++];
+      // Scientific notation: 1e6, 2.5E-3, 1e+2. Only consumed when a real
+      // exponent follows (digits after an optional sign), so `2 email` still
+      // lexes as number + identifier.
+      if (i < source.length && (source[i] === 'e' || source[i] === 'E')) {
+        let j = i + 1;
+        if (source[j] === '+' || source[j] === '-') j++;
+        if (j < source.length && /[0-9]/.test(source[j])) {
+          num += source[i++]; // e/E
+          if (source[i] === '+' || source[i] === '-') num += source[i++];
+          while (i < source.length && /[0-9]/.test(source[i])) num += source[i++];
+        }
+      }
       // Check for BigInt suffix
       if (i < source.length && source[i] === 'n') {
         i++; // consume 'n'

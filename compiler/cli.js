@@ -422,6 +422,22 @@ function compile(filePath, options = {}) {
     }
   }
 
+  // Clean top-level failure surface: uncaught errors and unhandled rejections
+  // print one concise line instead of a Node module-loader stack trace. Guarded
+  // so browser-target builds (no process) and library consumers are untouched.
+  const cleanErrorPrelude = [
+    `if (typeof process !== 'undefined' && typeof process.on === 'function') {`,
+    `  const __plainReportError = (e) => {`,
+    `    const __m = (e && typeof e === 'object' && e.message != null) ? e.message : String(e);`,
+    `    console.error('Error: ' + __m);`,
+    `    process.exit(1);`,
+    `  };`,
+    `  process.on('uncaughtException', __plainReportError);`,
+    `  process.on('unhandledRejection', __plainReportError);`,
+    `}`,
+  ].join('\n');
+  js = cleanErrorPrelude + '\n' + js;
+
   if (options.sourceMap && generationContext.sourceMapBuilder) {
     return {
       code: js,

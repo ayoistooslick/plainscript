@@ -827,7 +827,8 @@ function parse(tokens) {
         advance(); // run
         advance(); // background
         const call = parsePrimary();
-        if (call.type !== 'CallExpression') {
+        if (call.type !== 'CallExpression' && call.type !== 'AddCall' &&
+            call.type !== 'RemoveCall' && call.type !== 'WriteCall') {
           throw new Error(makeError(
             'Expected a function call after "run background".\n\nExample:\n  run background resizeImage("photo.png")',
             peek()
@@ -3453,8 +3454,14 @@ function parseAsk() {
       } else if (peek().type === TOKEN.AT && peekAt(1).type === TOKEN.IDENTIFIER && peekAt(1).value === 'position') {
         advance(); // at
         advance(); // position
-        const idx = consume(TOKEN.NUMBER, 'Expected a number after "at position".').value;
-        node = { type: 'IndexExpression', object: node, index: { type: 'NumberLiteral', value: idx } };
+        // Accept a literal number (the common form) or any expression, so
+        // loop indices and computed indexes work: xs at position i, y at
+        // position (count of xs - 1). parseExpression stops at "to"/")"/","
+        // so "set data at position 0 to 99" keeps its meaning.
+        const index = peek().type === TOKEN.NUMBER
+          ? { type: 'NumberLiteral', value: advance().value }
+          : parseExpression();
+        node = { type: 'IndexExpression', object: node, index };
       } else if (peek().type === TOKEN.LPAREN) {
         // Postfix call: invoke any expression  -  f()(), arr[0](1), mul(6)(7),
         // obj.method()(x), or an immediately-invoked lambda ((x) -> x + 1)(2).
@@ -3694,7 +3701,7 @@ function parseAsk() {
         urlToken
       ));
     }
-    const url = parsePrimary();
+    const url = parseExpression();
     let body = null;
     let headers = null;
     let timeout = null;
@@ -3760,8 +3767,10 @@ function parseAsk() {
         continue;
       }
       const keyToken = peek();
-      // Allow keywords that are valid JS identifiers as property names (e.g., "back" from "give back")
-      if (keyToken.type !== TOKEN.IDENTIFIER && keyToken.type !== TOKEN.STRING && keyToken.type !== TOKEN.BACK) {
+      // Allow keywords that are valid JS identifiers as property names (e.g., "back" from "give back"),
+      // plus strings ("with space": 1) and numbers ({ 3: "three" }) for data-shaped objects.
+      if (keyToken.type !== TOKEN.IDENTIFIER && keyToken.type !== TOKEN.STRING &&
+          keyToken.type !== TOKEN.NUMBER && keyToken.type !== TOKEN.BACK) {
         throw new Error(makeError(
           'Expected a property name inside the inline object.\n\nExample:\n  { text: "hi" }',
           keyToken
