@@ -221,6 +221,7 @@ function parse(tokens) {
     // statement/block boundaries as a bare-value condition.
     const next = peek();
     const isBoundary = next.type === TOKEN.DONE || next.type === TOKEN.OTHERWISE ||
+      next.type === TOKEN.ELSE ||
       next.type === TOKEN.TOGETHER || next.type === TOKEN.THEN || next.type === TOKEN.EOF;
     if (!isBoundary) {
       const savedPos = pos;
@@ -714,7 +715,7 @@ function parse(tokens) {
       // return statement
       if (token.value === 'return' && peekAt(1).type !== TOKEN.BECOMES && peekAt(1).type !== TOKEN.LPAREN) {
         advance();
-        const value = peek().type !== TOKEN.DONE && peek().type !== TOKEN.EOF && peek().type !== TOKEN.OTHERWISE && peek().type !== TOKEN.RBRACE
+        const value = peek().type !== TOKEN.DONE && peek().type !== TOKEN.EOF && peek().type !== TOKEN.OTHERWISE && peek().type !== TOKEN.ELSE && peek().type !== TOKEN.RBRACE
           ? parseExpression()
           : null;
         return { type: 'ReturnStatement', value };
@@ -3049,7 +3050,8 @@ function parseAsk() {
     const condition = parseCondition();
 
     const consequent = [];
-    while (peek().type !== TOKEN.OTHERWISE && peek().type !== TOKEN.DONE && peek().type !== TOKEN.TOGETHER) {
+    while (peek().type !== TOKEN.OTHERWISE && peek().type !== TOKEN.ELSE &&
+           peek().type !== TOKEN.DONE && peek().type !== TOKEN.TOGETHER) {
       if (peek().type === TOKEN.EOF) {
         throw new Error(makeError(
           'Expected keyword "done" before end of file to close the "if" block.',
@@ -3061,9 +3063,9 @@ function parseAsk() {
     }
 
     let alternate = null;
-    if (peek().type === TOKEN.OTHERWISE) {
-      // `otherwise if` is an else-if chain (sharing one `done`) ONLY when `if`
-      // sits on the same line as `otherwise`; a newline-separated `if` is a
+    if (peek().type === TOKEN.OTHERWISE || peek().type === TOKEN.ELSE) {
+      // `otherwise if` / `else if` is an else-if chain (sharing one `done`)
+      // ONLY when `if` sits on the same line; a newline-separated `if` is a
       // nested if statement with its own `done`.
       const otherwiseLine = peek().line;
       advance();
@@ -3097,7 +3099,8 @@ function parseAsk() {
     const condition = parseCondition();
 
     const consequent = [];
-    while (peek().type !== TOKEN.OTHERWISE && peek().type !== TOKEN.DONE && peek().type !== TOKEN.TOGETHER) {
+    while (peek().type !== TOKEN.OTHERWISE && peek().type !== TOKEN.ELSE &&
+           peek().type !== TOKEN.DONE && peek().type !== TOKEN.TOGETHER) {
       if (peek().type === TOKEN.EOF) {
         throw new Error(makeError(
           'Expected keyword "done" before end of file to close the "otherwise if" block.',
@@ -3109,7 +3112,7 @@ function parseAsk() {
     }
 
     let alternate = null;
-    if (peek().type === TOKEN.OTHERWISE) {
+    if (peek().type === TOKEN.OTHERWISE || peek().type === TOKEN.ELSE) {
       const otherwiseLine = peek().line;
       advance();
       if (peek().type === TOKEN.IF && peek().line === otherwiseLine) {
@@ -3165,7 +3168,7 @@ function parseAsk() {
       const condition = parseCondition();
       if (peek().type === TOKEN.THEN) advance();
       const consequent = parseExpression();
-      if (peek().type === TOKEN.OTHERWISE) advance();
+      if (peek().type === TOKEN.OTHERWISE || peek().type === TOKEN.ELSE) advance();
       const alternate = parseExpression();
       return { type: 'ConditionalExpression', condition, consequent, alternate };
     }
@@ -3957,7 +3960,7 @@ function parseAsk() {
           keyToken.type === TOKEN.OR || keyToken.type === TOKEN.NOT ||
           keyToken.type === TOKEN.IN || keyToken.type === TOKEN.WITH ||
           keyToken.type === TOKEN.AS || keyToken.type === TOKEN.IF ||
-          keyToken.type === TOKEN.OTHERWISE) {
+          keyToken.type === TOKEN.OTHERWISE || keyToken.type === TOKEN.ELSE) {
         advance();
       } else {
         throw new Error(makeError('Expected a property name.', keyToken));
@@ -4327,8 +4330,8 @@ function parseAsk() {
         ));
       }
       // otherwise → body
-      if (peek().type === TOKEN.OTHERWISE) {
-        advance(); // otherwise
+      if (peek().type === TOKEN.OTHERWISE || peek().type === TOKEN.ELSE) {
+        advance(); // otherwise/else
         consume(TOKEN.ARROW,
           'Expected "->" after "otherwise".\n\nExample:\n  otherwise → show "other"');
         defaultCase = [];
@@ -4349,6 +4352,7 @@ function parseAsk() {
         'Expected "->" after the case expression.\n\nExample:\n  "red" → show "stop"');
       const caseBody = [];
       while (peek().type !== TOKEN.DONE && peek().type !== TOKEN.OTHERWISE &&
+             peek().type !== TOKEN.ELSE &&
              !(peek().type === TOKEN.STRING || peek().type === TOKEN.NUMBER ||
                peek().type === TOKEN.TRUE_KW || peek().type === TOKEN.FALSE_KW ||
                peek().type === TOKEN.NULL_KW)) {
@@ -4498,8 +4502,8 @@ function parseAsk() {
         ));
       }
       // otherwise → body
-      if (peek().type === TOKEN.OTHERWISE) {
-        advance(); // otherwise
+      if (peek().type === TOKEN.OTHERWISE || peek().type === TOKEN.ELSE) {
+        advance(); // otherwise/else
         consume(TOKEN.ARROW, 'Expected "->" after "otherwise".\n\nExample:\n  otherwise → show "other"');
         defaultCase = [];
         while (peek().type !== TOKEN.DONE) {
@@ -4518,6 +4522,7 @@ function parseAsk() {
       consume(TOKEN.ARROW, 'Expected "->" after the case expression.\n\nExample:\n  "red" → show "stop"');
       const caseBody = [];
       while (peek().type !== TOKEN.DONE && peek().type !== TOKEN.OTHERWISE &&
+             peek().type !== TOKEN.ELSE &&
              !(peek().type === TOKEN.STRING || peek().type === TOKEN.NUMBER ||
                peek().type === TOKEN.TRUE_KW || peek().type === TOKEN.FALSE_KW ||
                peek().type === TOKEN.NULL_KW)) {

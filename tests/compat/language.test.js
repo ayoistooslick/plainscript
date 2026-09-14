@@ -200,8 +200,34 @@ done
   assert(out.includes('adult'), `expected adult:\n${out}`);
 });
 
-test('conditionals: and/or/not combine comparisons', () => {
+test('conditionals: else and else-if are aliases for otherwise', () => {
   const out = run(`
+if 1 is 2
+    show "no"
+else
+    show "else-ok"
+end
+let x be 5
+if x is 6
+    show "six"
+else if x is 5
+    show "elseif-ok"
+else
+    show "neither"
+end
+show choosing 1 is 2 then "no" else "choosing-else-ok"
+switch x against
+    1 -> show "one"
+    else -> show "switch-else-ok"
+end
+`);
+  assert(out.includes('else-ok') && out.includes('elseif-ok') &&
+    out.includes('choosing-else-ok') && out.includes('switch-else-ok') &&
+    !out.includes('neither'),
+    `expected else forms:\n${out}`);
+});
+
+test('conditionals: and/or/not combine comparisons', () => {  const out = run(`
 remember a as true
 remember b as false
 if a is true and b is false
