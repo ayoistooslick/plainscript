@@ -890,7 +890,7 @@ first version of a program usually needs no dependency at all:
 | `writeFile("path", data)` | Write text to a file |
 | `read("path")` | Read a file as UTF-8 text |
 | `fileExists("path")` | Check if a file exists |
-| `sleep(ms)` | Sleep synchronously |
+| `sleep(ms)` | Pause asynchronously; awaited when used as a bare statement, and composes concurrently inside `all of [...]` / `wait for sleep(...)` |
 | `time()` | Current Unix timestamp (`Date.now()`) |
 | `date()` | ISO date string |
 | `jsonEncode(value)` | `JSON.stringify` |

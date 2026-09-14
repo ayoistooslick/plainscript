@@ -311,11 +311,6 @@ const SQL_BLOCK_WORDS = {
   execute: TOKEN.EXECUTE_KW,
 };
 
-// `javascript` alone on a line collects raw JavaScript up to "done" (v1.0.363).
-// Word positions that are not statement position (e.g. `x is javascript`) keep
-// the identifier meaning.
-const JS_BLOCK_WORD = 'javascript';
-
 // Decode one escape sequence inside a double-quoted string, starting at
 // source[index] (the backslash). Returns [decodedText, charsConsumed].
 // Supported: \n \t \r \0 \\ \" \'  -  any other escaped character is kept as
@@ -526,41 +521,6 @@ function tokenize(source) {
         continue;
       }
 
-      // `javascript` alone on its line opens a raw JS block: collect verbatim
-      // lines until a line whose trimmed content is exactly "done"/"end".
-      // Mirrors the SQL raw-block capture (same statement-position guard).
-      if (word === JS_BLOCK_WORD) {
-        const beforeWord = source.slice(lineStart, tokenCol - 1).trim();
-        let j = i;
-        while (j < source.length && (source[j] === ' ' || source[j] === '\t')) j++;
-        if (beforeWord === '' && (j >= source.length || source[j] === '\n' || source[j] === '\r')) {
-          tokens.push({ type: TOKEN.IDENTIFIER, value: word, line: tokenLine, col: tokenCol });
-          i = j;
-          if (i < source.length && source[i] === '\n') { i++; line++; lineStart = i; }
-
-          let code = '';
-          while (i < source.length) {
-            const lineEnd  = source.indexOf('\n', i);
-            const realEnd  = lineEnd === -1 ? source.length : lineEnd;
-            const lineText = source.slice(i, realEnd);
-            const trimmed  = lineText.trim();
-
-            if (trimmed === 'done' || trimmed === 'end') {
-              i = realEnd < source.length ? realEnd + 1 : realEnd;
-              if (realEnd < source.length) { line++; lineStart = i; }
-              break;
-            }
-
-            code += lineText + '\n';
-            i = realEnd < source.length ? realEnd + 1 : realEnd;
-            if (realEnd < source.length) { line++; lineStart = i; }
-          }
-
-          tokens.push({ type: TOKEN.JS_BODY, value: code.trimEnd(), line: tokenLine, col: tokenCol });
-          tokens.push({ type: TOKEN.DONE,     value: 'done',           line, col: col() });
-          continue;
-        }
-      }
 
       const type = Object.prototype.hasOwnProperty.call(KEYWORDS, word)
         ? KEYWORDS[word]
@@ -612,4 +572,4 @@ function tokenize(source) {
   return tokens;
 }
 
-module.exports = { tokenize, TOKEN };
+module.exports = { tokenize, TOKEN, KEYWORDS };

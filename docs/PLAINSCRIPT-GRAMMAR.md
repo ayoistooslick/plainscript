@@ -39,6 +39,29 @@ execute
 Some keywords are contextual: `end` is a universal block terminator (an alias
 for `done`); `most` only forms a comparator as `is at most`.
 
+### Reserved words: names you cannot declare
+
+You cannot use a keyword as a variable, function, or parameter name. This
+includes (non-exhaustively): `log`, `start`, `empty`,
+`pattern`, `match`, `filter`, `gather`, `stream`, `emit`, `run`,
+`then`, `to`, `file`*, `load`, `route`, `database`, `raise`, `retry`,
+`between`, `contains`, `with`, `and`, `or`, `not`.
+
+\* `file` is accepted as a variable name by `remember` but not as a
+function name. `back`, `total`, `reply`, `respond`, `send` and the SQL words
+(`query`, `insert`, `update`, `delete`, `execute`) are contextual and *are*
+accepted as declaration names where unambiguous.
+
+When a reserved word is used as a name, the compiler reports a clean error
+naming the word, e.g.:
+
+```
+Line 1, Column 10: Expected a variable name after "remember".
+
+"log" is a reserved PlainScript word and cannot be used as a name here.
+Pick a different name (see docs/PLAINSCRIPT-GRAMMAR.md).
+```
+
 ### Operators
 
 | Token | Meaning |

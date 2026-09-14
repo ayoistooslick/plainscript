@@ -1748,7 +1748,13 @@ const BUILTIN_DECLARATIONS = {
     // fs.writeFileSync(path, data): data first in PlainScript, file first in fs.
     return `__fs.writeFileSync(${generateExpr(args[1], context)}, ${generateExpr(args[0], context)}, 'utf8')`;
   },
-  sleep:      (args, context) => `Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ${generateExpr(args[0], context)})`,
+  // sleep(ms) is genuinely async: it yields a promise so it composes with
+  // all of / any of / wait for. The old Atomics.wait spelling blocked the
+  // whole event loop and silently serialized "parallel" code.
+  sleep:      (args, context) => {
+    requireArgs('sleep', args, 1, 'sleep(ms)');
+    return `new Promise(r => setTimeout(r, ${generateExpr(args[0], context)}))`;
+  },
   time:       (_args) => `Date.now()`,
   date:       (_args) => `new Date().toISOString()`,
   jsonEncode: (args, context) => `JSON.stringify(${generateExpr(args[0], context)})`,
@@ -3554,6 +3560,13 @@ function generateStatement(node, indent = '', context = createGenerationContext(
         if (expr.type === 'AddCall') return `${indent}${coll}.push(${val});`;
         return `${indent}${coll} instanceof Map || ${coll} instanceof Set ? ${coll}.delete(${val}) : ${coll}.splice(${coll}.indexOf(${val}), 1);`;
       }
+      // Bare `sleep(ms)` statements await the async sleep so plain sequential
+      // programs keep their meaning ("pause here"). In expression positions
+      // (all of [...], wait for sleep(...)) the raw promise is used instead.
+      if (expr && expr.type === 'CallExpression' && expr.name === 'sleep' && expr.args && expr.args.length === 1) {
+        markAsync(context);
+        return `${indent}await new Promise(r => setTimeout(r, ${generateExpr(expr.args[0], context)}));`;
+      }
       return `${indent}${generateExpr(node.expression, context)};`;
     }
 
@@ -4141,12 +4154,6 @@ function generateStatement(node, indent = '', context = createGenerationContext(
     case 'ExecuteStatement':
       return `${indent}${emitSqlCall('execute', node.sql, node.params, indent, context)};`;
 
-    // v1.0.363  -  raw JavaScript interop block: emitted verbatim.
-    case 'RawJsStatement':
-      return node.code
-        .split('\n')
-        .map(line => `${indent}${line}`)
-        .join('\n');
 
     // v2.1.0  -  remember <name> as query|insert|update|delete … done
     case 'RememberSqlStatement': {

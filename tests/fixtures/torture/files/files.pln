@@ -1,0 +1,30 @@
+// Filesystem + JSON round-trip torture: write/read/append, paths with spaces
+use fs as fs
+
+remember dir as "torture space dir"
+if fileExists(dir) is false
+    makeFolder(dir)
+done
+
+remember file as joinPath(dir, "data.json")
+remember todos as [{title: "one", done: false}, {title: "two", done: true}]
+writeFile(file, jsonEncode(todos))
+remember loaded as jsonDecode(readFile(file))
+if count of loaded is not 2
+    exit(1)
+done
+if loaded[1].done is not true
+    exit(1)
+done
+
+writeFile(joinPath(dir, "plain.txt"), "line1")
+writeFile(joinPath(dir, "plain.txt"), readFile(joinPath(dir, "plain.txt")) + "\nline2")
+if readFile(joinPath(dir, "plain.txt")) contains "line2" is false
+    exit(1)
+done
+
+if fileExists("definitely-missing-9182.txt")
+    exit(1)
+done
+
+show "files ok"

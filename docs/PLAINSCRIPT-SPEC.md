@@ -697,6 +697,10 @@ remember engine as matter.Engine.create()
 remember scene as new THREE.Scene()
 ```
 
+> Removed: a `javascript ... done` raw block existed briefly in 1.0.363 but
+> is no longer part of the language. Interop is through imports (`use` /
+> `bring`) and normal member calls, which are always available.
+
 Call anything  -  member chains need no special syntax, and there is no wrapper
 around values:
 

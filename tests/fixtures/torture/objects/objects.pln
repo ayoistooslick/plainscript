@@ -1,0 +1,15 @@
+// Records torture: reserved-word keys, missing properties, nesting
+remember t as {title: "milk", done: false}
+show t.done
+show title of t
+if t.done is false
+    show "not done yet"
+done
+show t.missing
+show jsonEncode(t) contains "\"done\":false"
+remember deep as {a: {b: {c: [10, 20, 30]}}}
+show deep.a.b.c[1]
+remember emptyRec as jsonDecode("{}")
+show emptyRec.missing
+
+show "objects ok"

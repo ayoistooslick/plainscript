@@ -1,0 +1,54 @@
+// Functions torture: closures, recursion, higher-order, early return, match
+make mkCounter(base)
+    remember n as base
+    make inc()
+        n becomes n + 1
+        give n
+    done
+    give inc
+done
+let counter as mkCounter(10)
+if counter() is not 11
+    exit(1)
+done
+if counter() is not 12
+    exit(1)
+done
+
+make fib(n)
+    if n is less than 2
+        give n
+    done
+    give fib(n - 1) + fib(n - 2)
+done
+if fib(15) is not 610
+    exit(1)
+done
+
+make early(n)
+    if n is 0
+        give "zero"
+    done
+    give "nonzero"
+done
+if early(0) is not "zero"
+    exit(1)
+done
+
+make applyTwice(f, x)
+    give f(f(x))
+done
+make addOne(n)
+    give n + 1
+done
+if applyTwice(addOne, 5) is not 7
+    exit(1)
+done
+
+match 42 against
+    0 -> show "zero"
+    42 -> show "answer"
+    otherwise -> show "other"
+done
+
+show "fns ok"

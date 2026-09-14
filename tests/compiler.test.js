@@ -1315,16 +1315,20 @@ test('plainscript run passes bare -v through to the program', () => {
   }
 });
 
-test('javascript ... done block compiles raw JS verbatim', () => {
-  const code = compile([
-    'javascript',
-    '  const __xs = [1, 2, 3].map(x => x * 7);',
-    '  __total = __xs.join("~");',
-    'done',
-    'show __total',
-  ].join('\n'));
-  if (!code.includes('__xs.join("~")')) throw new Error('expected raw JS preserved: ' + code);
-  if (!code.includes('console.log(__total)')) throw new Error('expected show to follow block: ' + code);
+test('javascript ... done block is no longer part of the language', () => {
+  let threw = null;
+  try {
+    compile([
+      'javascript',
+      '  const __xs = [1, 2, 3].map(x => x * 7);',
+      'done',
+    ].join('\n'));
+  } catch (e) {
+    threw = e;
+  }
+  // The gateway is gone: the raw JS body is no longer captured, so the block
+  // fails at compile time with a clean PlainScript error (never emitted JS).
+  if (!threw) throw new Error('javascript block should be rejected after gateway removal');
 });
 
 test('duplicate top-level remember fails cleanly instead of emitting double let', () => {
@@ -1336,6 +1340,29 @@ test('duplicate top-level remember fails cleanly instead of emitting double let'
   }
   if (!threw || !threw.includes('Duplicate declaration') || !threw.includes('"x"')) {
     throw new Error(`expected clean duplicate-declaration error, got: ${threw}`);
+  }
+});
+
+test('reserved words used as declaration names get a clear hint', () => {
+  // Variable declaration
+  let threw = null;
+  try {
+    compile('remember log as 1');
+  } catch (e) {
+    threw = e.message;
+  }
+  if (!threw || !threw.includes('"log" is a reserved PlainScript word')) {
+    throw new Error(`expected reserved-word hint for log, got: ${threw}`);
+  }
+  // Function declaration
+  threw = null;
+  try {
+    compile('make empty(n)\n    give n\ndone');
+  } catch (e) {
+    threw = e.message;
+  }
+  if (!threw || !threw.includes('"empty" is a reserved PlainScript word')) {
+    throw new Error(`expected reserved-word hint for empty, got: ${threw}`);
   }
 });
 
@@ -1687,10 +1714,29 @@ test('fileExists() compiles to existsSync', () => {
   if (!js.includes('existsSync')) throw new Error('missing existsSync');
 });
 
-test('sleep() compiles to Atomics.wait', () => {
-  const js = compile('sleep(1000)');
-  if (!js.includes('Atomics.wait')) throw new Error('missing Atomics.wait');
-  if (!js.includes('1000')) throw new Error('missing duration');
+test('sleep(ms) is async: promise in expressions, awaited as a statement', () => {
+  // Bare statement: awaited in place so sequential programs keep working.
+  const stmt = compile('sleep(1000)');
+  if (!stmt.includes('await new Promise(r => setTimeout(r, 1000))')) {
+    throw new Error('bare sleep should await, got: ' + stmt);
+  }
+  // Expression: the raw promise, so all of runs sleeps concurrently.
+  const js = compile('remember pair as all of [sleep(50), sleep(80)]');
+  if (!js.includes('new Promise(r => setTimeout(r, 50))')) {
+    throw new Error('sleep in all of should be an unawaited promise, got: ' + js);
+  }
+  if (js.includes('Atomics.wait')) throw new Error('blocking sleep must be gone');
+});
+
+test('sleep composes concurrently inside all of', () => {
+  const js = compile([
+    'remember t0 as time()',
+    'remember results as all of [sleep(40), sleep(40), sleep(40)]',
+    'remember elapsed as time() - t0',
+    'show elapsed',
+  ].join('\n'));
+  if (!js.includes('Promise.all')) throw new Error('all of should compile to Promise.all');
+  if (!js.includes('setTimeout(r, 40)')) throw new Error('sleeps should be raw promises inside all of');
 });
 
 test('time() compiles to Date.now()', () => {

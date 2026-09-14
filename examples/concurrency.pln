@@ -10,7 +10,7 @@ make secondJob()
     give "second"
 done
 
-remember results as allOf(list with firstJob(), secondJob())
+remember results as all of [firstJob(), secondJob()]
 show results
 
 remember quick as withTimeout(firstJob(), 1000)

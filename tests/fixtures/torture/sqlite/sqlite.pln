@@ -1,0 +1,39 @@
+// SQLite-backed app torture using the idiomatic database primitives
+database ":memory:"
+
+execute
+    CREATE TABLE items (name TEXT, qty INTEGER)
+done
+
+remember a as "hammer"
+remember b as "screwdriver"
+insert
+    INSERT INTO items (name, qty) VALUES ({a}, 12), ({b}, 5), ('wrench', 0)
+done
+
+remember rows as query
+    SELECT name, qty FROM items ORDER BY qty DESC
+done
+if count of rows is not 3
+    exit(1)
+done
+
+let qtyTotal as 0
+for each row in rows
+    qtyTotal becomes qtyTotal + qty of row
+done
+if qtyTotal is not 17
+    exit(1)
+done
+
+try
+    execute
+        SELECT nonsense FROM missing_table
+    done
+    show "bad SQL should have thrown"
+    exit(1)
+recover as e
+    show `caught: ${message of e}`
+done
+
+show "sqlite ok"

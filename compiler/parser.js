@@ -1,13 +1,13 @@
 // Parser: converts a token stream into an AST (Abstract Syntax Tree).
 
-const { tokenize, TOKEN } = require('./lexer');
+const { tokenize, TOKEN, KEYWORDS } = require('./lexer');
 
 // Statement-starting PlainScript keywords, used for "did you mean?" suggestions.
 const STATEMENT_KEYWORDS = [
   'remember', 'show', 'display', 'log', 'if', 'make', 'give',
   'for', 'while', 'repeat', 'until', 'use', 'import', 'when', 'listen', 'reply', 'serve',
   'web', 'route', 'start', 'database', 'query', 'insert', 'update', 'delete', 'execute',
-  'ask', 'javascript', 'bot', 'ocr', 'try', 'recover', 'retry',
+  'ask', 'bot', 'ocr', 'try', 'recover', 'retry',
   'gather', 'filter', 'total', 'match', 'emit', 'stream', 'run',
   'switch', 'case', 'default', 'break', 'continue', 'return',
   'throw', 'catch', 'finally', 'new', 'class', 'extends', 'super',
@@ -98,11 +98,47 @@ function closestKeyword(word) {
 }
 
 // Format an error message with position info from a token when available.
+// Words that can never be used as declaration names (variable, function,
+// parameter). Documentation copy for docs/PLAINSCRIPT-GRAMMAR.md lives here so
+// the error hints and the docs cannot drift apart.
+const RESERVED_DECLARATION_WORDS = {
+  remember: true, let: true, show: true, print: true, display: true,
+  as: true, is: true, if: true, otherwise: true, else: true, done: true,
+  end: true, do: true, greater: true, less: true, than: true, make: true,
+  define: true, function: true, give: true, return: true, becomes: true,
+  for: true, each: true, every: true, in: true, while: true, use: true,
+  import: true, include: true, load: true, when: true, listens: true,
+  listen: true, on: true, json: true, file: true, serve: true, folder: true,
+  above: true, below: true, at: true, least: true, most: true, not: true,
+  empty: true, contains: true, starts: true, ends: true, with: true,
+  between: true, and: true, or: true, instanceof: true, now: true,
+  web: true, route: true, start: true, database: true, ask: true,
+  prompt: true, ocr: true, gather: true, filter: true, match: true,
+  against: true, pattern: true, parallel: true, stream: true, emit: true,
+  happens: true, catches: true, yield: true, symbol: true, debugger: true,
+  to: true, together: true, be: true, then: true, plus: true, minus: true,
+  times: true, raise: true, raises: true, choosing: true, uses: true,
+  fills: true, repeat: true, until: true, log: true,
+};
+
 function makeError(message, token) {
   if (token && token.line) {
     return `Line ${token.line}, Column ${token.col}: ${message}`;
   }
   return message;
+}
+
+// When a declaration name is a reserved word, say so explicitly instead of a
+// generic "Expected a variable/function name" (torture-test discoverability fix).
+// Note: `back`, `total`, `reply`, `respond`, `send` and SQL words are
+// deliberately usable as declaration names, so they are not listed here.
+// (`file` is accepted as a variable name by `remember` but not as a
+// function name, so it stays listed.)
+function reservedWordHint(token) {
+  if (token && token.value && Object.prototype.hasOwnProperty.call(RESERVED_DECLARATION_WORDS, token.value)) {
+    return `\n\n"${token.value}" is a reserved PlainScript word and cannot be used as a name here. Pick a different name (see docs/PLAINSCRIPT-GRAMMAR.md).`;
+  }
+  return '';
 }
 
 function parse(tokens) {
@@ -662,14 +698,6 @@ function parse(tokens) {
     if (token.type === TOKEN.DELETE_KW)   return parseSqlBlock('delete',  'DeleteStatement');
     if (token.type === TOKEN.EXECUTE_KW && peekAt(1).type === TOKEN.SQL_BODY) return parseSqlBlock('execute', 'ExecuteStatement');
 
-    // v1.0.363  -  javascript … done: raw JavaScript block, spliced verbatim
-    // into the generated program (the lexer delivers JS_BODY + DONE).
-    if (token.type === TOKEN.IDENTIFIER && token.value === 'javascript' && peekAt(1).type === TOKEN.JS_BODY) {
-      advance(); // javascript
-      const code = advance().value; // JS_BODY
-      advance(); // done
-      return { type: 'RawJsStatement', code };
-    }
 
     // IOPL-native features
     if (token.type === TOKEN.GATHER)     return parseGatherStatement();
@@ -1294,7 +1322,7 @@ function parse(tokens) {
       } else {
         target = consume(
           TOKEN.IDENTIFIER,
-          `Expected a variable name after "${isLet ? 'let' : 'remember'}".\n\nExample:\n  ${isLet ? 'let age is 16' : 'remember age as 16'}`
+          `Expected a variable name after "${isLet ? 'let' : 'remember'}".${reservedWordHint(nameToken)}\n\nExample:\n  ${isLet ? 'let age is 16' : 'remember age as 16'}`
         ).value;
       }
       nameLine = nameToken.line;
@@ -1467,7 +1495,7 @@ function parseAsk() {
     const nameToken = peek();
     if (nameToken.type !== TOKEN.IDENTIFIER && nameToken.type !== TOKEN.LOAD) {
       throw new Error(makeError(
-        `Expected a function name after "${keyword}".\n\nExample:\n  ${keyword} greet()\n    show "Hello"\n  done`,
+        `Expected a function name after "${keyword}".${reservedWordHint(nameToken)}\n\nExample:\n  ${keyword} greet()\n    show "Hello"\n  done`,
         nameToken
       ));
     }
