@@ -41,6 +41,7 @@
   },
   "dependencies": {
     "@whiskeysockets/baileys": "^7.0.0-rc14",
+    "axios": "^1.20.0",
     "mrz": "^5.0.2",
     "pg": "^8.23.0",
     "qrcode-terminal": "^0.12.0",

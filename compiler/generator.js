@@ -3240,6 +3240,10 @@ let __inTest = false;
 
 function generateCondition(cond, context) {
   switch (cond.type) {
+    case 'ConditionExpression':
+      // A bare boolean value used as a condition (`if ok`): truthy check.
+      return generateExpr(cond.value, context);
+
     case 'BinaryCondition':
       return `${generateExpr(cond.left, context)} ${cond.op} ${generateExpr(cond.right, context)}`;
 
@@ -3294,6 +3298,7 @@ function generateCondition(cond, context) {
         'StringCondition',
         'InCondition',
         'NotInCondition',
+        'ConditionExpression',
         'LogicalCondition',
       ];
       const emit = (n) => CONDITION_TYPES.includes(n.type)
@@ -4491,8 +4496,10 @@ function generateExpr(node, context = createGenerationContext()) {
     case 'NotInCondition':
     case 'StringCondition':
     case 'LogicalCondition':
+    case 'ConditionExpression':
       // Comparisons are first-class expressions (e.g. `(x) -> x is above 3`),
-      // so emit the same code the condition level produces.
+      // so emit the same code the condition level produces. ConditionExpression
+      // carries a bare boolean value from `if ok` / `while connected`.
       return generateCondition(node, context);
     case 'DictionaryLiteral': {
       if (!node.pairs || node.pairs.length === 0) return 'new Map()';

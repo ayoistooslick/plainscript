@@ -210,7 +210,32 @@ function parse(tokens) {
     // Comparisons are expressions too, so parseExpression may already have
     // folded this into a comparison node  -  that IS the comparison level.
     if (isComparisonNode(left)) return left;
-    return tryParseComparisonOperator(left, true);
+    const result = tryParseComparisonOperator(left, false);
+    if (result !== left) return result;
+    // No comparison operator: the value itself is the condition (`if ok`,
+    // `if not fileExists("x")`, `while connected`)  -  a truthy check, like
+    // JavaScript's `if (value)`. But a bare identifier followed by a word that
+    // cannot start a statement is almost certainly a typo'd comparison
+    // ("if x bigger 1" for "if x is greater than 1"), so probe the parser to
+    // keep the helpful comparison error in that case and only treat clear
+    // statement/block boundaries as a bare-value condition.
+    const next = peek();
+    const isBoundary = next.type === TOKEN.DONE || next.type === TOKEN.OTHERWISE ||
+      next.type === TOKEN.TOGETHER || next.type === TOKEN.THEN || next.type === TOKEN.EOF;
+    if (!isBoundary) {
+      const savedPos = pos;
+      try {
+        const stmt = parseStatement();
+        pos = savedPos;
+        if (!stmt) return { type: 'ConditionExpression', value: left };
+      } catch (_e) {
+        throw new Error(makeError(
+          'Expected a comparison after the value. Use "is", "is above", "is below", "contains", "starts with", etc.',
+          peek()
+        ));
+      }
+    }
+    return { type: 'ConditionExpression', value: left };
   }
 
   // Shared comparison-operator continuation. Given an already-parsed left
@@ -1489,15 +1514,42 @@ function parseAsk() {
       consume(TOKEN.WITH, 'Expected "with" after "record".');
     }
     const properties = [];
-    while (peek().type !== TOKEN.DONE && peek().type !== TOKEN.TOGETHER && peek().type !== TOKEN.EOF) {
+    const recordStartLine = peek().line;
+    while (true) {
       const keyToken = peek();
-      if (keyToken.type !== TOKEN.IDENTIFIER) {
+      // `done`/`together` may name a FREQUENT boolean field, as in a todo item:
+      // record with text "milk" and done true (a value follows on the same line).
+      if ((keyToken.type === TOKEN.DONE || keyToken.type === TOKEN.TOGETHER) &&
+          isRecordFieldValueStart(peekAt(1)) && peekAt(1).line === keyToken.line) {
+        advance(); // consume `done` (or `together`) as a field name
+      } else if (keyToken.type === TOKEN.DONE || keyToken.type === TOKEN.TOGETHER ||
+                 keyToken.type === TOKEN.EOF ||
+                 keyToken.type === TOKEN.TO || keyToken.type === TOKEN.FROM ||
+                 (keyToken.type === TOKEN.IDENTIFIER && keyToken.value === 'from') ||
+                 keyToken.type === TOKEN.RPAREN || keyToken.type === TOKEN.COMMA ||
+                 keyToken.type === TOKEN.RBRACKET) {
+        break; // block terminator, add/remove special forms, or value boundaries
+      } else if (keyToken.type === TOKEN.IDENTIFIER || keyToken.type === TOKEN.STRING ||
+                 keyToken.type === TOKEN.NUMBER) {
+        advance(); // consume key
+      } else if (isRecordFieldKeyword(keyToken)) {
+        // Keyword words (`total`, `back`) work as fields when a value follows
+        // on the same line; on a later line a keyword starts a new statement.
+        if (isRecordFieldValueStart(peekAt(1)) &&
+            peekAt(1).line === keyToken.line &&
+            (keyToken.line === recordStartLine || !isRecordStatementOpener(keyToken))) {
+          advance(); // consume keyword as a field name
+        } else {
+          break;
+        }
+      } else if (isRecordStatementOpener(keyToken)) {
+        break; // next statement begins: the record is finished
+      } else {
         throw new Error(makeError(
           'Expected a property name after "record with".\n\nExample:\n  record with name "Alice" and age 30',
           keyToken
         ));
       }
-      advance(); // consume key
       const key = keyToken.value;
       if (peek().type === TOKEN.DONE || peek().type === TOKEN.TOGETHER || peek().type === TOKEN.EOF || peek().type === TOKEN.AND) {
         properties.push({ key, value: { type: 'UndefinedLiteral' } });
@@ -1513,6 +1565,69 @@ function parseAsk() {
       advance(); // consume done/together when used as expression
     }
     return { type: 'InlineObjectLiteral', properties };
+  }
+
+  // True for keyword tokens that can serve as record field names and never
+  // begin a PlainScript statement alone (`total`, `back`). Also covers both
+  // structural words (now, folder, pattern, ...) and words that double as
+  // statement openers (status, reply, send, ...) - those only act as fields
+  // when parsed on the record's own line (see the loop above). Exotic keys
+  // (fields named `show`, `give`, ...) stay expressible via { ... } literals.
+  const RECORD_FIELD_KEYWORDS = new Set([
+    'total', 'back', 'yield', 'match', 'retry', 'cache', 'route', 'group',
+    'status', 'reply', 'send', 'log', 'bot', 'mail', 'catch', 'recover',
+    'folder', 'now', 'gather', 'stream', 'parallel', 'against', 'pattern',
+    'start', 'serve', 'listen', 'run', 'wait', 'exit', 'put', 'unpack',
+    'set', 'change', 'add', 'remove', 'write', 'read', 'load', 'schedule',
+    'every', 'accept', 'limit', 'require', 'enable', 'disable', 'allow',
+    'google', 'websocket', 'postgres', 'database', 'query', 'insert',
+    'update', 'delete', 'execute', 'transaction', 'destroy', 'redirect',
+  ]);
+  function isRecordFieldKeyword(tok) {
+    if (!tok || typeof tok.value !== 'string') return false;
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(tok.value)) return false;
+    return RECORD_FIELD_KEYWORDS.has(tok.value);
+  }
+
+  // True for keyword tokens that always begin a PlainScript statement. When
+  // one follows a record's fields, the record is finished (the keyword starts
+  // the next statement); without this, `record with a 1` followed by `show
+  // x` would try to read `show` as a field name.
+  function isRecordStatementOpener(tok) {
+    if (!tok || typeof tok.value !== 'string') return false;
+    return [
+      'show', 'print', 'display', 'log', 'let', 'remember', 'give', 'return',
+      'make', 'define', 'function', 'use', 'import', 'bring', 'export', 'ask',
+      'prompt', 'if', 'when', 'while', 'for', 'each', 'repeat', 'test', 'check',
+      'try', 'raise', 'yield', 'listen', 'start', 'serve', 'run', 'reply',
+      'status', 'send', 'wait', 'exit', 'put', 'unpack', 'set', 'change',
+      'add', 'remove', 'write', 'read', 'load', 'schedule', 'every', 'cache',
+      'route', 'group', 'redirect', 'destroy', 'accept', 'limit', 'require',
+      'enable', 'disable', 'allow', 'google', 'websocket', 'mail', 'whatsapp',
+      'telegram', 'bot', 'postgres', 'database', 'query', 'insert', 'update',
+      'delete', 'execute', 'transaction', 'retry', 'match', 'recover',
+      'finally', 'not', 'in', 'and', 'or', 'is', 'to', 'with', 'than', 'as',
+      'be', 'then', 'otherwise', 'else', 'above', 'below', 'at', 'least',
+      'most', 'between', 'contains', 'starts', 'ends', 'empty', 'now', 'back',
+      'folder', 'catch',
+    ].includes(tok.value);
+  }
+
+  // Tokens that can begin a value in "record with <name> <value>". Only these
+  // make `done` look like a field name instead of the block terminator.
+  function isRecordFieldValueStart(tok) {
+    return !!tok && [
+      TOKEN.NUMBER, TOKEN.STRING, TOKEN.IDENTIFIER, TOKEN.TRUE_KW, TOKEN.FALSE_KW,
+      TOKEN.NULL_KW, TOKEN.LPAREN, TOKEN.LBRACKET, TOKEN.LBRACE, TOKEN.MINUS,
+    ].includes(tok.type);
+  }
+
+  // Acceptable record field names beyond plain identifiers: quoted and
+  // numeric keys ({ "first name": ... } style) plus the non-structural
+  // keyword words in RECORD_FIELD_KEYWORDS handled in the loop above.
+  function isRecordFieldName(tok) {
+    return !!tok && (tok.type === TOKEN.IDENTIFIER || tok.type === TOKEN.STRING ||
+      tok.type === TOKEN.NUMBER);
   }
 
   function parseDictionaryWith() {

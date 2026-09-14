@@ -143,6 +143,42 @@ show length(nums)
   assert(out.includes('20') && out.includes('3'), `expected index+length:\n${out}`);
 });
 
+test('records: done/total/keyword field names and special-form args', () => {
+  const out = run(`
+remember tasks as []
+add(record with text "milk" and done true to tasks)
+add(record with text "bread" and done false to tasks)
+show length(tasks)
+for each t in tasks
+    show "[" + (choosing t.done then "x" otherwise " ") + "] " + text of t
+end
+remember rec as record with total 25 and names "abc" and status 200 and done false
+show rec.total
+show rec.status
+show jsonEncode(rec)
+remember quoted as record with "first name" "Ada"
+show quoted["first name"]
+let after be "next-statement"
+show after
+`);
+  assert(out.includes('2') && out.includes('[x] milk') && out.includes('[ ] bread') &&
+    out.includes('25') && out.includes('200') && out.includes('Ada') &&
+    out.includes('next-statement') && out.includes('"done":false'),
+    `expected record forms:\n${out}`);
+});
+
+test('records: ambiguous keywords never swallow following statements', () => {
+  const out = run(`
+remember r as record with a 1
+show "line after record"
+let s be record with b 2 done
+show "ok"
+show r.a
+`);
+  assert(out.includes('line after record') && out.includes('ok') && out.includes('1'),
+    `expected no swallowing:\n${out}`);
+});
+
 test('strings: concatenation and template literals', () => {
   const out = run(`
 remember who as "Ada"
@@ -180,6 +216,52 @@ done
 `);
   assert(out.includes('and-ok') && out.includes('or-ok') && out.includes('not-ok'),
     `expected logical branches:\n${out}`);
+});
+
+test('conditionals: bare boolean values are conditions (if flag)', () => {
+  const out = run(`
+remember ok as true
+remember missing as false
+if ok
+    show "flag-ok"
+done
+if not ok
+    show "never"
+done
+if not fileExists("no-such-file-xyz")
+    show "not-exists-ok"
+done
+remember n as 3
+while n
+    show "while-" + n
+    n becomes n - 1
+done
+repeat until missing
+    show "until-ok"
+    missing becomes true
+done
+remember verdict as choosing ok then "chose-ok" otherwise "no"
+show verdict
+`);
+  assert(out.includes('flag-ok') && out.includes('not-exists-ok') &&
+    out.includes('while-3') && out.includes('until-ok') && out.includes('chose-ok') &&
+    !out.includes('never'),
+    `expected bare-value condition branches:\n${out}`);
+});
+
+test('conditionals: bare booleans compose with and/or', () => {
+  const out = run(`
+remember a as true
+remember b as false
+if a and not b
+    show "compose-ok"
+done
+if b or a
+    show "or-flag-ok"
+done
+`);
+  assert(out.includes('compose-ok') && out.includes('or-flag-ok'),
+    `expected composed bare conditions:\n${out}`);
 });
 
 const { summary } = require('./_util');
