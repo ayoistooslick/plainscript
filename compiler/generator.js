@@ -1740,6 +1740,14 @@ const BUILTIN_DECLARATIONS = {
   },
   fileExists: (args, context) => `__fs.existsSync(${generateExpr(args[0], context)})`,
   read:       (args, context) => `__fs.readFileSync(${generateExpr(args[0], context)}, 'utf8')`,
+  // v1.0.363  -  write(data, "file") mirrors the natural form write(data to
+  // "file") and writeFile("file", data); previously only the "to" form existed
+  // and the comma spelling produced "write is not defined" at runtime.
+  write:      (args, context) => {
+    requireArgs('write', args, 2, 'write(data, "file.txt")');
+    // fs.writeFileSync(path, data): data first in PlainScript, file first in fs.
+    return `__fs.writeFileSync(${generateExpr(args[1], context)}, ${generateExpr(args[0], context)}, 'utf8')`;
+  },
   sleep:      (args, context) => `Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ${generateExpr(args[0], context)})`,
   time:       (_args) => `Date.now()`,
   date:       (_args) => `new Date().toISOString()`,
@@ -2989,10 +2997,30 @@ function emitSqlCall(kind, sql, params, indent, context) {
     case 'write':   return `db.prepare(\`${sql}\`).run(${args})`;
     case 'update':  return `db.prepare(\`${sql}\`).run(${args})`;
     case 'delete':  return `db.prepare(\`${sql}\`).run(${args})`;
-    case 'execute': return `db.exec(\`${sql}\`)`;
+    case 'execute':
+      // Raw exec is fine for constant SQL, but `execute` with {placeholders}
+      // must bind them: db.exec() accepts no parameters and would silently
+      // insert NULLs, so use a prepared statement when any are present.
+      return params.length === 0
+        ? `db.exec(\`${sql}\`)`
+        : `db.prepare(\`${sql}\`).run(${args})`;
     default: throw new Error(`Unknown SQL kind "${kind}".`);
   }
 }
+
+// v1.0.364  -  node types that generateCondition handles directly. Inside
+// "a and b" / "a or b" chains, operands of these types keep the classic inline
+// emission; anything else is a value expression and is evaluated exactly once.
+const CONDITION_TYPES = new Set([
+  'BinaryCondition',
+  'UnaryCondition',
+  'BetweenCondition',
+  'StringCondition',
+  'InCondition',
+  'NotInCondition',
+  'ConditionExpression',
+  'LogicalCondition',
+]);
 
 function createGenerationContext(options = {}) {
   const sourceMap = options.sourceMap || false;
@@ -3015,6 +3043,9 @@ function createGenerationContext(options = {}) {
     sourceContent,
     sourceMapBuilder: builder,
     currentLine: 1,
+    bundled: false, // true while generating inside a multi-file bundle
+    pendingExports: [], // per-file deferred export assignments (emitted at end of file)
+    importSurfaces: null, // Map<path, string[]> of local module export surfaces (bundler)
   };
 }
 
@@ -3147,6 +3178,29 @@ function generate(ast, contextOrOptions = createGenerationContext(), options = {
   __testCatchers = [];
   __inTest = false;
 
+  // Duplicate top-level declaration check: two `remember x` statements at the
+  // top level of one file (or across bundled files sharing the flat scope)
+  // emit two `let x` bindings, which Node reports as a raw SyntaxError with a
+  // stack trace. Failing here gives a clear compile-time message instead.
+  // Only direct children of the program count — route handlers and other
+  // nested blocks get their own function scopes.
+  {
+    const seen = new Set();
+    for (const stmt of ast.body) {
+      const name = (stmt.type === 'RememberStatement' || stmt.type === 'RememberSqlStatement') && typeof stmt.name === 'string'
+        ? stmt.name
+        : null;
+      if (name === null) continue;
+      if (seen.has(name)) {
+        throw new Error(
+          `Duplicate declaration: "${name}" is already declared at the top level.\n\n` +
+          `Use "${name} becomes <value>" to reassign it instead of declaring it again.`
+        );
+      }
+      seen.add(name);
+    }
+  }
+
   // User-declared top-level functions shadow STDLIB names at call sites
   // (make sort(x) must call the user's sort, not the builtin). Merged across
   // files so a module that declares a builtin-named function stays callable
@@ -3185,6 +3239,13 @@ function generate(ast, contextOrOptions = createGenerationContext(), options = {
   // surface; skip the automatic function export so it does not clobber it.
   if (exported.length > 0 && !hasExplicitExport) {
     lines.push(`if (typeof module !== 'undefined') { module.exports = { ${exported.join(', ')} }; }`);
+  }
+
+  // Deferred export assignments (from ExportStatement) are emitted at the end
+  // of the file's code so they reference fully-initialized bindings.
+  if (context.pendingExports.length > 0) {
+    lines.push(...context.pendingExports);
+    context.pendingExports = [];
   }
 
   // v1.0.1  -  native test runner. When any "test ... done" block exists, emit
@@ -3291,22 +3352,25 @@ function generateCondition(cond, context) {
     // number, a `set with ...` literal). Pure conditions recurse through the
     // condition generator; everything else is emitted as a general expression.
     case 'LogicalCondition': {
-      const CONDITION_TYPES = [
-        'BinaryCondition',
-        'UnaryCondition',
-        'BetweenCondition',
-        'StringCondition',
-        'InCondition',
-        'NotInCondition',
-        'ConditionExpression',
-        'LogicalCondition',
-      ];
-      const emit = (n) => CONDITION_TYPES.includes(n.type)
+      const emit = (n) => CONDITION_TYPES.has(n.type)
         ? generateCondition(n, context)
         : generateExpr(n, context);
       if (cond.op === 'not') return `!(${emit(cond.operand)})`;
       const jsOp = cond.op === 'and' ? '&&' : '||';
-      return `${emit(cond.left)} ${jsOp} ${emit(cond.right)}`;
+      const leftCode = emit(cond.left);
+      const rightCode = emit(cond.right);
+      // v1.0.364  -  when the left operand is a value expression (not a pure
+      // comparison node), evaluate it exactly once. "f() and g()" used to
+      // regenerate f() three times (once for the test, once per truthiness
+      // branch), doubling side effects, network calls, and awaits.
+      if (!CONDITION_TYPES.has(cond.left.type)) {
+        if (/\bawait\b/.test(leftCode) || /\bawait\b/.test(rightCode)) {
+          context.emittedAwait = true;
+          return `(await (async () => { const __lv = ${leftCode}; return __lv ${jsOp} ${rightCode}; })())`;
+        }
+        return `(() => { const __lv = ${leftCode}; return __lv ${jsOp} ${rightCode}; })()`;
+      }
+      return `${leftCode} ${jsOp} ${rightCode}`;
     }
 
     default:
@@ -3325,6 +3389,10 @@ function generateStatement(node, indent = '', context = createGenerationContext(
           ? `[${node.name.elements.map(e => generateLValue(e, context)).join(', ')}]`
           : `{ ${node.name.properties.map(p => p.key).join(', ')} }`;
         return `${indent}let ${pattern} = ${generateExpr(node.value, context)};`;
+      }
+      // v1.0.363  -  uninitialized declaration ("let undef") binds undefined.
+      if (node.value === null || node.value === undefined) {
+        return `${indent}let ${node.name} = undefined;`;
       }
       return `${indent}let ${node.name} = ${generateExpr(node.value, context)};`;
     }
@@ -3429,16 +3497,26 @@ function generateStatement(node, indent = '', context = createGenerationContext(
 
     // Enterprise & Intent-Oriented Exporting
     case 'ExportStatement': {
+      const names = node.names || (node.name ? [node.name] : []);
       if (node.exportAll && node.fromPath) {
+        // In a bundle the re-exported module is inlined lexically; the bundler
+        // merges its export surface into this file's own surface.
+        if (context.bundled) return '';
         return `${indent}Object.assign(module.exports, require(${JSON.stringify(node.fromPath)}));`;
       }
-      const names = node.names || (node.name ? [node.name] : []);
       if (node.fromPath) {
+        if (context.bundled) return '';
         const exports = names.map(n => `module.exports.${n} = require(${JSON.stringify(node.fromPath)}).${n};`);
-        return exports.map(e => `${indent}${e}`).join('\n');
+        const line = exports.map(e => `${indent}${e}`).join('\n');
+        context.pendingExports.push(line);
+        return '';
       }
+      // Deferred to the end of the file so `share x` before `remember x`
+      // does not crash with a TDZ error at runtime.
       const exports = names.map(n => `module.exports.${n} = ${n};`);
-      return exports.map(e => `${indent}${e}`).join('\n');
+      const line = exports.map(e => `${indent}${e}`).join('\n');
+      context.pendingExports.push(line);
+      return '';
     }
 
     // v1.0.1  -  generators: `yield <expr>` (or bare `yield`).
@@ -3464,8 +3542,20 @@ function generateStatement(node, indent = '', context = createGenerationContext(
       return `${indent}let [${vars}] = ${tuple};`;
     }
 
-    case 'ExpressionStatement':
+    case 'ExpressionStatement': {
+      // add(... to c) / remove(... from c) / write(... to f) keep their compact
+      // statement form only when used as a bare statement. In any value
+      // position they must evaluate to the collection instead of push()'s
+      // length / writeFileSync's undefined (torture-test regression).
+      const expr = node.expression;
+      if (expr && (expr.type === 'AddCall' || expr.type === 'RemoveCall')) {
+        const coll = generateExpr(expr.collection, context);
+        const val = generateExpr(expr.value, context);
+        if (expr.type === 'AddCall') return `${indent}${coll}.push(${val});`;
+        return `${indent}${coll} instanceof Map || ${coll} instanceof Set ? ${coll}.delete(${val}) : ${coll}.splice(${coll}.indexOf(${val}), 1);`;
+      }
       return `${indent}${generateExpr(node.expression, context)};`;
+    }
 
     // Enterprise & Intent-Oriented Importing
     case 'ImportStatement': {
@@ -3493,9 +3583,18 @@ function generateStatement(node, indent = '', context = createGenerationContext(
 
       // Local PlainScript module import
       if (node.namespace) {
+        // In a bundle the dependency's top-level bindings are already
+        // initialized (dependencies compile first), so expose them as live
+        // getters instead of a require() that can never resolve from the
+        // generated file's location.
+        const surface = context.importSurfaces && context.importSurfaces.get(node.path);
+        if (context.bundled && surface) {
+          const getters = surface.map(n => `get ${n}() { return ${n}; }`).join(', ');
+          return `${indent}const ${node.namespace} = { ${getters} };`;
+        }
         const modVar = node.path.replace(/[^a-zA-Z0-9_$]/g, '_');
         return `${indent}const ${node.namespace} = typeof __module_${modVar} !== 'undefined' ? __module_${modVar} : require(${JSON.stringify(node.path)});`;
-      }
+ }
       return '';
     }
 
@@ -4042,6 +4141,13 @@ function generateStatement(node, indent = '', context = createGenerationContext(
     case 'ExecuteStatement':
       return `${indent}${emitSqlCall('execute', node.sql, node.params, indent, context)};`;
 
+    // v1.0.363  -  raw JavaScript interop block: emitted verbatim.
+    case 'RawJsStatement':
+      return node.code
+        .split('\n')
+        .map(line => `${indent}${line}`)
+        .join('\n');
+
     // v2.1.0  -  remember <name> as query|insert|update|delete … done
     case 'RememberSqlStatement': {
       const kind = node.kind === 'query' ? 'query'
@@ -4569,6 +4675,17 @@ function generateExpr(node, context = createGenerationContext()) {
     // Content is preserved verbatim (interpolation, whitespace, line breaks).
     // Only literal backtick characters inside the content need escaping.
     case 'TemplateLiteral': {
+      // v1.0.364  -  PlainScript-only expressions inside ${...} ("message of e",
+      // "x is at least 80", "a contains b") are now parsed into real AST parts,
+      // so they compile to valid JavaScript instead of being spliced in raw.
+      // Templates without parsed parts keep the exact legacy emission.
+      if (Array.isArray(node.parts)) {
+        const pieces = node.parts.map(p => {
+          if (p.kind === 'expr') return '${' + generateExpr(p.expr, context) + '}';
+          return p.text.replace(/`/g, '\\`');
+        });
+        return '`' + pieces.join('') + '`';
+      }
       const escaped = node.value.replace(/`/g, '\\`');
       return '`' + escaped + '`';
     }
@@ -4700,7 +4817,8 @@ function generateExpr(node, context = createGenerationContext()) {
       }
       if (STDLIB[node.name] && !(context.declaredFunctions && context.declaredFunctions.has(node.name))) {
         if (node.name === 'readFile' || node.name === 'writeFile' ||
-            node.name === 'fileExists' || node.name === 'read') {
+            node.name === 'fileExists' || node.name === 'read' ||
+            node.name === 'write') {
           ensureBuiltin(context, 'fs');
         } else if (node.name === 'uuid') {
           ensureBuiltin(context, 'crypto');
@@ -4751,17 +4869,23 @@ function generateExpr(node, context = createGenerationContext()) {
 
     // v1.1  -  Collection operations
     case 'AddCall':
-      return `${generateExpr(node.collection, context)}.push(${generateExpr(node.value, context)})`;
+      // Expression form evaluates to the (mutated) collection, not push()'s
+      // new length, so `xs becomes add(x to xs)` keeps xs an array.
+      return `((__psAdd) => (__psAdd.push(${generateExpr(node.value, context)}), __psAdd))(${generateExpr(node.collection, context)})`;
 
     case 'RemoveCall': {
+      // Expression form evaluates to the (mutated) collection.
       const coll = generateExpr(node.collection, context);
       const val = generateExpr(node.value, context);
-      return `${coll} instanceof Map || ${coll} instanceof Set ? ${coll}.delete(${val}) : ${coll}.splice(${coll}.indexOf(${val}), 1)`;
+      return `((__psRem) => (${coll} instanceof Map || ${coll} instanceof Set ? __psRem.delete(${val}) : __psRem.splice(__psRem.indexOf(${val}), 1), __psRem))(${coll})`;
     }
 
     case 'WriteCall':
       ensureBuiltin(context, 'fs');
-      return `__fs.writeFileSync(${generateExpr(node.data, context)}, ${generateExpr(node.file, context)}, 'utf8')`;
+      // fs.writeFileSync(path, data): the natural form is write(data to "file"),
+      // so the FILE is the second PlainScript argument but the FIRST fs one.
+      // Both used to be swapped, creating a file named after the data string.
+      return `__fs.writeFileSync(${generateExpr(node.file, context)}, ${generateExpr(node.data, context)}, 'utf8')`;
 
     // v1.0.1  -  record constructor: `create a Person with name "Ada" and age 17`
     // calls the kind factory that `define a kind called "Person"` registered.

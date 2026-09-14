@@ -25,7 +25,7 @@ const { execFileSync } = require('child_process');
 const { tokenize } = require('./lexer');
 const { parse }    = require('./parser');
 const { generate, createGenerationContext, wrapAsync } = require('./generator');
-const { bundle, resolveDependencies } = require('./bundler');
+const { bundle, generateBundle, buildSurfaces, resolveDependencies } = require('./bundler');
 const { format }   = require('./formatter');
 const { detectDependencies, PACKAGE_MAP, isBuiltinModule, splitPackageSpec } = require('./dependency-detector');
 
@@ -399,6 +399,11 @@ function compile(filePath, options = {}) {
   });
   stage('Building dependency graph', () => files);
   stage('Checking runtime dependencies', () => ensureDependencies(files, true));
+  // Shared bundle pipeline: one context across the whole dependency graph so
+  // namespace imports get export surfaces and exports defer to end-of-file,
+  // exactly as in `bundle()`.
+  generationContext.bundled = true;
+  generationContext.importSurfaces = buildSurfaces(files);
   const parts = stage('Generating JavaScript', () =>
     files.map(({ absPath: fileAbs, ast }) => {
       const relPath = path.relative(process.cwd(), fileAbs).replace(/\\/g, '/') || path.basename(fileAbs);
@@ -474,7 +479,12 @@ async function cmdRun(filePath, extraArgs = []) {
     console.error('Usage: plainscript run <file.pln>');
     process.exit(1);
   }
-  const isSourcemap = process.argv.includes('--sourcemap') || process.argv.includes('-m') || process.env.PLAINSCRIPT_SOURCEMAP === 'true';
+  // Only recognize sourcemap flags before a `--` separator; anything after it
+  // belongs to the program itself.
+  const __argv2 = process.argv.slice(2);
+  const __sep = __argv2.indexOf('--');
+  const __cliOnly = __sep === -1 ? __argv2 : __argv2.slice(0, __sep);
+  const isSourcemap = __cliOnly.includes('--sourcemap') || __cliOnly.includes('-m') || process.env.PLAINSCRIPT_SOURCEMAP === 'true';
   let js;
   if (isSourcemap) {
     const res = compile(filePath, { sourceMap: true, outputFile: 'out.js' });
@@ -551,7 +561,12 @@ function writeOneFile(filePath, outputFile) {
   }
   const outPath = path.resolve(outputFile);
 
-  const isSourcemap = process.argv.includes('--sourcemap') || process.argv.includes('-m') || process.env.PLAINSCRIPT_SOURCEMAP === 'true';
+  // Only recognize sourcemap flags before a `--` separator; anything after it
+  // belongs to the program itself.
+  const __argv2 = process.argv.slice(2);
+  const __sep = __argv2.indexOf('--');
+  const __cliOnly = __sep === -1 ? __argv2 : __argv2.slice(0, __sep);
+  const isSourcemap = __cliOnly.includes('--sourcemap') || __cliOnly.includes('-m') || process.env.PLAINSCRIPT_SOURCEMAP === 'true';
 
   let code, mapObject;
   if (isSourcemap) {
@@ -885,9 +900,8 @@ function validateSource(absPath) {
   try {
     // resolveDependencies parses each file too, so a parse error anywhere in
     // the import graph surfaces here with a "file.pln  -  Line:Col" prefix.
-    const files = resolveDependencies(absPath);
-    const context = createGenerationContext();
-    let js = files.map(({ ast }) => generate(ast, context)).filter(s => s.trim()).join('\n');
+    const { context, parts, files } = generateBundle(absPath);
+    let js = parts.filter(s => s.trim()).join('\n');
     if (context.needsAsync) js = wrapAsync(js);
 
     // The compiler must never emit broken JavaScript. Parsing the output with
@@ -1032,10 +1046,18 @@ function cmdHelp() {
 async function main() {
   const args = process.argv.slice(2);
 
-  // Global flags  -  recognized anywhere in the argument list.
-  const quiet   = args.includes('--quiet');
-  const verbose = args.includes('--verbose');
-  const json    = args.includes('--json');
+  // `--` ends CLI flag parsing: everything after it belongs to the compiled
+  // program (`plainscript run app.pln -- --port 8080`). Without this, programs
+  // could never receive their own dash-prefixed arguments because the CLI
+  // consumed every "--" flag anywhere in the list.
+  const sepIdx = args.indexOf('--');
+  const cliArgs = sepIdx === -1 ? args : args.slice(0, sepIdx);
+  const progArgs = sepIdx === -1 ? [] : args.slice(sepIdx + 1);
+
+  // Global flags  -  recognized anywhere before `--`.
+  const quiet   = cliArgs.includes('--quiet');
+  const verbose = cliArgs.includes('--verbose');
+  const json    = cliArgs.includes('--json');
   if (quiet)   { stage = stageQuiet;   QUIET_STAGES = true; }
   if (verbose) { stage = stageVerbose;  VERBOSE = true; }
   if (quiet) REQUESTED_QUIET = true;
@@ -1044,27 +1066,27 @@ async function main() {
   // `--version` anywhere (it is already filtered from program args); `-v`
   // only as a standalone command so `run app.pln -v` still passes -v through
   // to the compiled program.
-  if (args.includes('--version') || (args.length === 1 && args[0] === '-v')) { cmdVersion(); return; }
+  if (cliArgs.includes('--version') || (args.length === 1 && args[0] === '-v')) { cmdVersion(); return; }
 
   // Filter flags out to get the positional arguments.
-  const positional = args.filter(a => !a.startsWith('--'));
+  const positional = cliArgs.filter(a => !a.startsWith('--'));
   const [, , command, fileArg] = positional.length >= 2
     ? ['', '', positional[0], positional[1]]
     : ['', '', positional[0] || '', ''];
 
   switch (command) {
-    case 'run':     await cmdRun(fileArg, positional.slice(2)); break;
+    case 'run':     await cmdRun(fileArg, [...positional.slice(2), ...progArgs]); break;
     case 'build': {
       // v1.0.363  -  optional -o/--output <path>. "-o" is a single-dash flag, so
       // it survives the "--filtered" positional list; pull it out here before
       // building the positional file argument for cmdBuild.
       let outputPath = null;
       const positionalOnly = [];
-      for (let i = 0; i < args.length; i++) {
-        const a = args[i];
+      for (let i = 0; i < cliArgs.length; i++) {
+        const a = cliArgs[i];
         if (a === '-o' || a === '--output') {
-          if (i + 1 < args.length && !args[i + 1].startsWith('-')) {
-            outputPath = args[++i];
+          if (i + 1 < cliArgs.length && !cliArgs[i + 1].startsWith('-')) {
+            outputPath = cliArgs[++i];
           } else {
             console.error('Usage: plainscript build <file.pln> -o <output.js>');
             process.exit(1);
@@ -1080,7 +1102,7 @@ async function main() {
     case 'fmt':     cmdFmt(fileArg);              break;
     case 'new':     cmdNew(fileArg);              break;
     case 'install': cmdInstall();                 break;
-    case 'start':   await cmdStart(positional.slice(2)); break;
+    case 'start':   await cmdStart([...positional.slice(2), ...progArgs]); break;
     case 'doctor':  cmdDoctor();                  break;
     case 'add':     cmdAdd(fileArg);              break;
     case 'remove':  cmdRemove(fileArg);           break;

@@ -86,6 +86,7 @@ const TOKEN = {
   CONNECT_DB:  'CONNECT_DB',  // alias for database: "connect database "app.db""
   USE_DATABASE: 'USE_DATABASE', // alias for database: "use database "app.db""
   QUERY_KW:    'QUERY_KW',
+  JS_BODY:     'JS_BODY',
   INSERT_KW:   'INSERT_KW',
   UPDATE_KW:   'UPDATE_KW',
   DELETE_KW:   'DELETE_KW',
@@ -310,6 +311,11 @@ const SQL_BLOCK_WORDS = {
   execute: TOKEN.EXECUTE_KW,
 };
 
+// `javascript` alone on a line collects raw JavaScript up to "done" (v1.0.363).
+// Word positions that are not statement position (e.g. `x is javascript`) keep
+// the identifier meaning.
+const JS_BLOCK_WORD = 'javascript';
+
 // Decode one escape sequence inside a double-quoted string, starting at
 // source[index] (the backslash). Returns [decodedText, charsConsumed].
 // Supported: \n \t \r \0 \\ \" \'  -  any other escaped character is kept as
@@ -478,7 +484,17 @@ function tokenize(source) {
         let j = i;
         while (j < source.length && (source[j] === ' ' || source[j] === '\t')) j++;
 
-        if (j >= source.length || source[j] === '\n' || source[j] === '\r') {
+        // v1.0.363  -  the raw-SQL capture must only fire when the word sits in
+        // statement position (alone on its line) or completes a declaration
+        // ("let users be query" / "remember users as query"). A word like
+        // "query" that merely ENDS a line used to capture the following lines
+        // as SQL, breaking "show query" or "to search query ... done".
+        const beforeWord = source.slice(lineStart, tokenCol - 1).trim();
+        const declarationForm = /^(let|remember)\s+[A-Za-z_][A-Za-z0-9_]*\s+(be|as|is)$/.test(beforeWord);
+        const atStatementStart = beforeWord === '';
+
+        if ((atStatementStart || declarationForm) &&
+            (j >= source.length || source[j] === '\n' || source[j] === '\r')) {
           // Advance past the newline
           i = j;
           if (i < source.length && source[i] === '\n') { i++; line++; lineStart = i; }
@@ -508,6 +524,42 @@ function tokenize(source) {
         }
         // else: stays on same line  -  parsed normally by the parser as kwType + next tokens
         continue;
+      }
+
+      // `javascript` alone on its line opens a raw JS block: collect verbatim
+      // lines until a line whose trimmed content is exactly "done"/"end".
+      // Mirrors the SQL raw-block capture (same statement-position guard).
+      if (word === JS_BLOCK_WORD) {
+        const beforeWord = source.slice(lineStart, tokenCol - 1).trim();
+        let j = i;
+        while (j < source.length && (source[j] === ' ' || source[j] === '\t')) j++;
+        if (beforeWord === '' && (j >= source.length || source[j] === '\n' || source[j] === '\r')) {
+          tokens.push({ type: TOKEN.IDENTIFIER, value: word, line: tokenLine, col: tokenCol });
+          i = j;
+          if (i < source.length && source[i] === '\n') { i++; line++; lineStart = i; }
+
+          let code = '';
+          while (i < source.length) {
+            const lineEnd  = source.indexOf('\n', i);
+            const realEnd  = lineEnd === -1 ? source.length : lineEnd;
+            const lineText = source.slice(i, realEnd);
+            const trimmed  = lineText.trim();
+
+            if (trimmed === 'done' || trimmed === 'end') {
+              i = realEnd < source.length ? realEnd + 1 : realEnd;
+              if (realEnd < source.length) { line++; lineStart = i; }
+              break;
+            }
+
+            code += lineText + '\n';
+            i = realEnd < source.length ? realEnd + 1 : realEnd;
+            if (realEnd < source.length) { line++; lineStart = i; }
+          }
+
+          tokens.push({ type: TOKEN.JS_BODY, value: code.trimEnd(), line: tokenLine, col: tokenCol });
+          tokens.push({ type: TOKEN.DONE,     value: 'done',           line, col: col() });
+          continue;
+        }
       }
 
       const type = Object.prototype.hasOwnProperty.call(KEYWORDS, word)

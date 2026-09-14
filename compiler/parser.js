@@ -1,6 +1,6 @@
 // Parser: converts a token stream into an AST (Abstract Syntax Tree).
 
-const { TOKEN } = require('./lexer');
+const { tokenize, TOKEN } = require('./lexer');
 
 // Statement-starting PlainScript keywords, used for "did you mean?" suggestions.
 const STATEMENT_KEYWORDS = [
@@ -112,6 +112,17 @@ function parse(tokens) {
   function peek()         { return tokens[pos]; }
   function peekAt(offset) { return tokens[pos + offset] || { type: TOKEN.EOF }; }
   function advance()      { return tokens[pos++]; }
+
+  // v1.0.363  -  at a block terminator? A done/together followed by "of" is a
+  // FIELD read ("done of item" - the README todo example), so it never closes a
+  // block. Every statement-bearing body loop must ask this instead of comparing
+  // the token type directly, or "done of t becomes true" inside an if/loop gets
+  // swallowed as the block's terminator.
+  function atBlockEnd() {
+    const t = peek();
+    if (t.type !== TOKEN.DONE && t.type !== TOKEN.TOGETHER) return false;
+    return !(peekAt(1).type === TOKEN.IDENTIFIER && peekAt(1).value === 'of');
+  }
 
   function consume(expectedType, hint) {
     const token = tokens[pos];
@@ -515,6 +526,18 @@ function parse(tokens) {
   function parseStatementCore() {
     const token = peek();
 
+    // v1.0.363  -  `done` can name a record field ("record with text "milk" and
+    // done true"), so the statement-position target "done of t becomes ..."
+    // must parse; anything else starting with the done keyword keeps its
+    // terminator meaning.
+    if ((token.type === TOKEN.DONE || token.type === TOKEN.TOGETHER) &&
+        peekAt(1).type === TOKEN.IDENTIFIER && peekAt(1).value === 'of') {
+      const expr = parsePrimary();
+      consume(TOKEN.BECOMES, 'Expected "becomes" after "done of <record>".\n\nExample:\n  done of item becomes true');
+      const value = parseExpression();
+      return { type: 'BecomeStatement', target: expr, value, op: '=' };
+    }
+
     // "define a kind called ..." - must check before DEFINE token dispatch
     if ((token.type === TOKEN.DEFINE || (token.type === TOKEN.IDENTIFIER && token.value === 'define')) &&
         peekAt(1).type === TOKEN.IDENTIFIER && peekAt(1).value === 'a') {
@@ -625,16 +648,28 @@ function parse(tokens) {
     if (token.type === TOKEN.QUERY_KW && peekAt(1).type === TOKEN.LPAREN) {
       return { type: 'ExpressionStatement', expression: parseCallExpression() };
     }
-    if (token.type === TOKEN.QUERY_KW)    return parseSqlBlock('query',   'QueryStatement');
-    if (token.type === TOKEN.INSERT_KW)   return parseSqlBlock('insert',  'InsertStatement');
-    if (token.type === TOKEN.UPDATE_KW)   return parseSqlBlock('update',  'UpdateStatement');
+    // v1.0.363  -  when the lexer did NOT capture a raw SQL body (the word is
+    // not alone on its line), query/insert/update/execute are ordinary names
+    // and flow through the identifier branch below.
+    if (token.type === TOKEN.QUERY_KW && peekAt(1).type === TOKEN.SQL_BODY) return parseSqlBlock('query',   'QueryStatement');
+    if (token.type === TOKEN.INSERT_KW && peekAt(1).type === TOKEN.SQL_BODY) return parseSqlBlock('insert',  'InsertStatement');
+    if (token.type === TOKEN.UPDATE_KW && peekAt(1).type === TOKEN.SQL_BODY) return parseSqlBlock('update',  'UpdateStatement');
     // v2.1.1  -  delete "<url>" is an HTTP DELETE request; a bare "delete"
     // starting a raw block keeps its SQL meaning.
     if (token.type === TOKEN.DELETE_KW && tokenStartsValue(peekAt(1))) {
       return { type: 'ExpressionStatement', expression: parseHttpCall('delete') };
     }
     if (token.type === TOKEN.DELETE_KW)   return parseSqlBlock('delete',  'DeleteStatement');
-    if (token.type === TOKEN.EXECUTE_KW)  return parseSqlBlock('execute', 'ExecuteStatement');
+    if (token.type === TOKEN.EXECUTE_KW && peekAt(1).type === TOKEN.SQL_BODY) return parseSqlBlock('execute', 'ExecuteStatement');
+
+    // v1.0.363  -  javascript … done: raw JavaScript block, spliced verbatim
+    // into the generated program (the lexer delivers JS_BODY + DONE).
+    if (token.type === TOKEN.IDENTIFIER && token.value === 'javascript' && peekAt(1).type === TOKEN.JS_BODY) {
+      advance(); // javascript
+      const code = advance().value; // JS_BODY
+      advance(); // done
+      return { type: 'RawJsStatement', code };
+    }
 
     // IOPL-native features
     if (token.type === TOKEN.GATHER)     return parseGatherStatement();
@@ -653,7 +688,7 @@ function parse(tokens) {
     }
 
     // Statements starting with an identifier: call, becomes, index/member becomes
-    if (token.type === TOKEN.IDENTIFIER) {
+    if (token.type === TOKEN.IDENTIFIER || isSqlWordIdentifier(token)) {
       // v2.5  -  natural string and collection verbs that transform a variable
       // in place: "lowercase title", "uppercase first letter of each word in title",
       // "split title by \" \"", "join title by \" \"", "trim title".
@@ -1242,6 +1277,7 @@ function parse(tokens) {
 
     // Check for destructuring patterns: [ ... ] or { ... }
     let target;
+    let nameLine = peek().line;
     if (peek().type === TOKEN.LBRACKET) {
       target = parseArrayLiteral(); // returns ArrayLiteral with elements
       target.type = 'ArrayPattern';
@@ -1252,7 +1288,7 @@ function parse(tokens) {
       // Allow contextual keywords as variable names in remember declarations
       let nameToken = peek();
       const REMEMBER_KEYWORDS = new Set([TOKEN.BACK, TOKEN.TOTAL, TOKEN.REPLY, TOKEN.RESPOND, TOKEN.SEND_BACK, TOKEN.FILE_KW]);
-      if (REMEMBER_KEYWORDS.has(nameToken.type)) {
+      if (REMEMBER_KEYWORDS.has(nameToken.type) || isSqlWordIdentifier(nameToken)) {
         advance();
         target = nameToken.value;
       } else {
@@ -1261,17 +1297,25 @@ function parse(tokens) {
           `Expected a variable name after "${isLet ? 'let' : 'remember'}".\n\nExample:\n  ${isLet ? 'let age is 16' : 'remember age as 16'}`
         ).value;
       }
+      nameLine = nameToken.line;
     }
 
     // Object literal: next token is IDENTIFIER (except dictionary/map) followed by IS or BE
     if (peek().type === TOKEN.IDENTIFIER && peek().value !== 'dictionary' && peek().value !== 'map' && (peekAt(1).type === TOKEN.IS || peekAt(1).type === TOKEN.BE) && !isObjectShorthandAmbiguousWithComparison()) {
       const init = parseInlineObjectLiteral(false);
-      return { type: 'VariableDeclaration', name: target, initializer: init, isLet, isConstant: !isLet };
+      return { type: 'RememberStatement', name: target, value: init, isLet, isConstant: !isLet };
     }
 
     // "let" uses "is" or "be" for simple vars, but also accepts "as" for both simple and destructuring
     // "remember" always uses "as"
+    // v1.0.363  -  an uninitialized declaration ("let undef") is accepted and
+    // binds undefined; typical before "undef nullish becomes "default"".
     const isDestructuring = target && typeof target === 'object' && (target.type === 'ArrayPattern' || target.type === 'ObjectPattern');
+    // The statement's name token is on the declaration line; a next token on a
+    // LATER line means no initializer follows on that line.
+    if (!isDestructuring && typeof target === 'string' && peek().line > nameLine) {
+      return { type: 'RememberStatement', name: target, value: null, isLet, isConstant: !isLet };
+    }
     const assignToken = isLet ? ((peek().type === TOKEN.IS || peek().type === TOKEN.BE) ? peek().type : TOKEN.AS) : TOKEN.AS;
     const expectedKeyword = (isLet && (peek().type === TOKEN.IS || peek().type === TOKEN.BE)) ? (peek().type === TOKEN.BE ? 'be' : 'is') : 'as';
     consume(
@@ -1447,21 +1491,34 @@ function parseAsk() {
       ));
     }
     const name = advance().value;
+    const nameLine = nameToken.line;
     const params = [];
-    // Parameters are identifiers joined by "and"
-    while (peek().type !== TOKEN.TOGETHER && peek().type !== TOKEN.DONE) {
-      if (peek().type === TOKEN.AND) {
-        advance(); // skip "and" between parameters
-        continue;
-      }
+    // Parameters are identifiers joined by "and". The header ends at
+    // "together"/"done" on the SAME line, or when the body begins on a later
+    // line. The line rule is what makes the zero-parameter form work:
+    //   to loadTodos
+    //       show "reading"
+    //   done
+    // Previously the header loop read the first body token as an attempted
+    // parameter and failed with "Expected a parameter name".
+    while (true) {
       if (peek().type === TOKEN.EOF) {
         throw new Error(makeError(
           `Expected "together" or "done" to close function "${name}" before end of file.`,
           peek()
         ));
       }
+      if (peek().line > nameLine) break; // body starts on a later line
+      if (peek().type === TOKEN.TOGETHER || peek().type === TOKEN.DONE) {
+        advance(); // header terminator on the header line
+        break;
+      }
+      if (peek().type === TOKEN.AND) {
+        advance(); // skip "and" between parameters
+        continue;
+      }
       const paramToken = peek();
-      if (paramToken.type !== TOKEN.IDENTIFIER) {
+      if (paramToken.type !== TOKEN.IDENTIFIER && !isSqlWordIdentifier(paramToken)) {
         throw new Error(makeError(
           `Expected a parameter name or "together"/"done" in function "${name}".`,
           paramToken
@@ -1469,9 +1526,6 @@ function parseAsk() {
       }
       params.push({ name: advance().value });
     }
-    // The params loop stops at "together"/"done"  -  consume the terminator here
-    // so parseBody parses the real body instead of treating this as an empty one.
-    advance(); // consume "together" or "done"
     const body = parseBody(`function "${name}"`);
     return { type: 'FunctionDeclaration', name, params, body };
   }
@@ -1494,13 +1548,31 @@ function parseAsk() {
 
   function parseListWith() {
     // Accept both "list_with" keyword and contextual "list" + "with"
+    const openerLine = peek().line;
     if (peek().type === TOKEN.LIST_WITH) {
       consume(TOKEN.LIST_WITH);
     } else {
       advance(); // "list"
       consume(TOKEN.WITH, 'Expected "with" after "list".');
     }
-    const elements = parseListWithElements();
+    // v1.0.363  -  block form: first element on a later line, one element per
+    // line, closed by its own "done"/"end". Previously the terminator was
+    // never consumed here, so "list with\n  record ...\nend" leaked "end".
+    const blockForm = peek().line > openerLine;
+    const elements = [];
+    if (blockForm) {
+      while (canContinueElement(peek())) {
+        elements.push(parseBooleanAtom());
+        while (peek().type === TOKEN.COMMA ||
+               peek().type === TOKEN.AND ||
+               (peek().type === TOKEN.IDENTIFIER && peek().value === 'and')) {
+          advance();
+        }
+      }
+    } else {
+      elements.push(...parseListWithElements());
+    }
+    consumeCollectionTerminator(openerLine, blockForm, elements.length > 0);
     return { type: 'ArrayLiteral', elements };
   }
 
@@ -1508,6 +1580,7 @@ function parseAsk() {
   // consumeTerminator: true when used as expression (done closes record), false when standalone statement
   function parseRecordWith(consumeTerminator) {
     // Accept both "record_with" keyword and contextual "record" + "with"
+    const openerLine = peek().line;
     if (peek().type === TOKEN.RECORD_WITH) {
       consume(TOKEN.RECORD_WITH);
     } else {
@@ -1516,12 +1589,20 @@ function parseAsk() {
     }
     const properties = [];
     const recordStartLine = peek().line;
+    // v1.0.363  -  block form: first field on a later line. In that shape a
+    // trailing done/together is the record's own terminator; in inline shape a
+    // done on a LATER line belongs to the enclosing block and must be left
+    // alone (it used to be swallowed, breaking "if ... record with ... done").
+    const blockForm = recordStartLine > openerLine;
     while (true) {
       const keyToken = peek();
       // `done`/`together` may name a FREQUENT boolean field, as in a todo item:
       // record with text "milk" and done true (a value follows on the same line).
+      // A following "of" is the field-READ shape ("done of item") instead, so
+      // the record must end there rather than eat "done of t ..." as fields.
       if ((keyToken.type === TOKEN.DONE || keyToken.type === TOKEN.TOGETHER) &&
-          isRecordFieldValueStart(peekAt(1)) && peekAt(1).line === keyToken.line) {
+          isRecordFieldValueStart(peekAt(1)) && peekAt(1).line === keyToken.line &&
+          peekAt(1).value !== 'of') {
         advance(); // consume `done` (or `together`) as a field name
       } else if (keyToken.type === TOKEN.DONE || keyToken.type === TOKEN.TOGETHER ||
                  keyToken.type === TOKEN.EOF ||
@@ -1562,8 +1643,8 @@ function parseAsk() {
         advance(); // consume "and"
       }
     }
-    if (consumeTerminator && (peek().type === TOKEN.DONE || peek().type === TOKEN.TOGETHER)) {
-      advance(); // consume done/together when used as expression
+    if (consumeTerminator) {
+      consumeCollectionTerminator(openerLine, blockForm, properties.length > 0);
     }
     return { type: 'InlineObjectLiteral', properties };
   }
@@ -1623,6 +1704,50 @@ function parseAsk() {
     ].includes(tok.type);
   }
 
+  // v1.0.363  -  can this token begin a collection element on a LATER line?
+  // Used to give "list with" / "dictionary with" / "set with" / "tuple with"
+  // newline-separated element forms. Deliberately conservative: only literal
+  // and literal-introducing starters qualify, so a following statement that
+  // begins with a plain identifier ("score becomes 10") or a statement keyword
+  // is never swallowed as an element.
+  function canContinueElement(tok) {
+    if (!tok || tok.type === TOKEN.EOF) return false;
+    if (tok.type === TOKEN.NUMBER || tok.type === TOKEN.STRING ||
+        tok.type === TOKEN.TRUE_KW || tok.type === TOKEN.FALSE_KW ||
+        tok.type === TOKEN.NULL_KW || tok.type === TOKEN.LPAREN ||
+        tok.type === TOKEN.LBRACKET || tok.type === TOKEN.LBRACE ||
+        tok.type === TOKEN.MINUS) return true;
+    if (tok.type === TOKEN.IDENTIFIER) {
+      return [
+        'list', 'record', 'dictionary', 'map', 'set', 'tuple', 'create',
+        'count', 'all', 'any', 'settled', 'spread', 'keys', 'values',
+        'entries', 'size', 'union', 'intersection', 'intersect', 'difference',
+        'new', 'not',
+      ].includes(tok.value);
+    }
+    return false;
+  }
+
+  // Terminator handling shared by the "X with ..." collection literals.
+  // `openerLine` is the line the "list/record/dictionary/set/tuple" token sits
+  // on; `firstContentLine` the line of the first element token. A trailing
+  // done/together is the collection's OWN terminator only when it is written
+  // on the opener line ("record with a 1 done") or the collection is in block
+  // form (first element on a later line, closed by its own done). Otherwise it
+  // belongs to the enclosing block and must be left alone, so constructs like
+  //   if ok
+  //       let r be record with name "Ada"
+  //   done
+  // stop eating the if-block's terminator.
+  function consumeCollectionTerminator(openerLine, blockForm, hasContent) {
+    if (peek().type !== TOKEN.DONE && peek().type !== TOKEN.TOGETHER) return;
+    if (!hasContent) {
+      if (peek().line === openerLine) advance(); // "list with done" on one line
+      return;
+    }
+    if (blockForm || peek().line === openerLine) advance();
+  }
+
   // Acceptable record field names beyond plain identifiers: quoted and
   // numeric keys ({ "first name": ... } style) plus the non-structural
   // keyword words in RECORD_FIELD_KEYWORDS handled in the loop above.
@@ -1631,13 +1756,29 @@ function parseAsk() {
       tok.type === TOKEN.NUMBER);
   }
 
+  // v1.0.363  -  SQL words as ordinary identifiers. "query", "insert",
+  // "update" and "execute" keep their SQL-statement meaning only when the
+  // lexer produced a raw SQL body for them (word alone on its line); anywhere
+  // else they are ordinary names, so common spellings like "let query be ..."
+  // or "to search query ... done" work. ("delete" is a JavaScript reserved
+  // word and stays reserved.)
+  function isSqlWordIdentifier(tok) {
+    return !!tok && [
+      [TOKEN.QUERY_KW, 'query'], [TOKEN.INSERT_KW, 'insert'],
+      [TOKEN.UPDATE_KW, 'update'], [TOKEN.EXECUTE_KW, 'execute'],
+    ].some(([type, word]) => tok.type === type && tok.value === word);
+  }
+
   function parseDictionaryWith() {
+    const openerLine = peek().line;
     advance(); // dictionary or map
     consume(TOKEN.WITH, 'Expected "with" after dictionary/map.');
+    // v1.0.363  -  newline-separated pairs in block form (one "key is value"
+    // per line, closed by its own done/end); see consumeCollectionTerminator.
+    const blockForm = peek().line > openerLine;
     const pairs = [];
-    if (peek().type !== TOKEN.DONE && peek().value !== 'done') {
-      while (true) {
-        if (peek().type === TOKEN.DONE || peek().value === 'done') break;
+    if (blockForm) {
+      while (canContinueElement(peek())) {
         // Key parsed below the comparison level so `"a" is 1 and "b" is 2`
         // keeps the `is` as the dictionary separator (parseExpression would
         // fold `"a" is 1` into a comparison).
@@ -1647,6 +1788,17 @@ function parseAsk() {
         // keeps `and` as the pair separator. Comparisons still fold.
         const value = parseBooleanAtom();
         pairs.push({ key, value });
+        while (peek().type === TOKEN.AND || (peek().type === TOKEN.IDENTIFIER && peek().value === 'and') || peek().type === TOKEN.COMMA) {
+          advance();
+        }
+      }
+    } else if (peek().type !== TOKEN.DONE && peek().value !== 'done') {
+      while (true) {
+        if (peek().type === TOKEN.DONE || peek().value === 'done') break;
+        const key = parseNullish();
+        consume(TOKEN.IS, 'Expected "is" between key and value in dictionary/map.');
+        const value = parseBooleanAtom();
+        pairs.push({ key, value });
         if (peek().type === TOKEN.AND || (peek().type === TOKEN.IDENTIFIER && peek().value === 'and') || peek().type === TOKEN.COMMA) {
           advance();
           continue;
@@ -1654,17 +1806,26 @@ function parseAsk() {
         break;
       }
     }
-    if (peek().type === TOKEN.DONE || (peek().type === TOKEN.IDENTIFIER && peek().value === 'done')) {
-      advance(); // done
-    }
+    consumeCollectionTerminator(openerLine, blockForm, pairs.length > 0);
     return { type: 'DictionaryLiteral', pairs };
   }
 
   function parseSetWith() {
+    const openerLine = peek().line;
     advance(); // set
     consume(TOKEN.WITH, 'Expected "with" after "set".');
+    // v1.0.363  -  newline-separated elements in block form; see
+    // consumeCollectionTerminator for the terminator rule.
+    const blockForm = peek().line > openerLine;
     const elements = [];
-    if (peek().type !== TOKEN.DONE && peek().value !== 'done') {
+    if (blockForm) {
+      while (canContinueElement(peek())) {
+        elements.push(parseBooleanAtom());
+        while (peek().type === TOKEN.COMMA || peek().type === TOKEN.AND || (peek().type === TOKEN.IDENTIFIER && peek().value === 'and')) {
+          advance();
+        }
+      }
+    } else if (peek().type !== TOKEN.DONE && peek().value !== 'done') {
       while (true) {
         if (peek().type === TOKEN.DONE || peek().value === 'done') break;
         elements.push(parseBooleanAtom());
@@ -1675,17 +1836,26 @@ function parseAsk() {
         break;
       }
     }
-    if (peek().type === TOKEN.DONE || (peek().type === TOKEN.IDENTIFIER && peek().value === 'done')) {
-      advance(); // done
-    }
+    consumeCollectionTerminator(openerLine, blockForm, elements.length > 0);
     return { type: 'SetLiteral', elements };
   }
 
   function parseTupleWith() {
+    const openerLine = peek().line;
     advance(); // tuple
     consume(TOKEN.WITH, 'Expected "with" after "tuple".');
+    // v1.0.363  -  newline-separated elements in block form; see
+    // consumeCollectionTerminator for the terminator rule.
+    const blockForm = peek().line > openerLine;
     const elements = [];
-    if (peek().type !== TOKEN.DONE && peek().value !== 'done') {
+    if (blockForm) {
+      while (canContinueElement(peek())) {
+        elements.push(parseBooleanAtom());
+        while (peek().type === TOKEN.COMMA || peek().type === TOKEN.AND || (peek().type === TOKEN.IDENTIFIER && peek().value === 'and')) {
+          advance();
+        }
+      }
+    } else if (peek().type !== TOKEN.DONE && peek().value !== 'done') {
       while (true) {
         if (peek().type === TOKEN.DONE || peek().value === 'done') break;
         elements.push(parseBooleanAtom());
@@ -1696,9 +1866,7 @@ function parseAsk() {
         break;
       }
     }
-    if (peek().type === TOKEN.DONE || (peek().type === TOKEN.IDENTIFIER && peek().value === 'done')) {
-      advance(); // done
-    }
+    consumeCollectionTerminator(openerLine, blockForm, elements.length > 0);
     return { type: 'TupleLiteral', elements };
   }
 
@@ -2297,19 +2465,19 @@ function parseAsk() {
       if (peek().type === TOKEN.THEN) {
         advance(); // consume "then"
       }
-      const consequent = [];
-      while (peek().type !== TOKEN.DONE && peek().type !== TOKEN.TOGETHER) {
-        if (peek().type === TOKEN.EOF) {
-          throw new Error(makeError(
-            'Expected keyword "done" to close the "when" block before end of file.',
-            peek()
-          ));
-        }
-        const stmt = parseStatement();
-        if (stmt) consequent.push(stmt);
+    const consequent = [];
+    while (!atBlockEnd()) {
+      if (peek().type === TOKEN.EOF) {
+        throw new Error(makeError(
+          'Expected keyword "done" to close the "when" block before end of file.',
+          peek()
+        ));
       }
-      advance(); // consume DONE or TOGETHER
-      return { type: 'IfStatement', condition, consequent, alternate: null };
+      const stmt = parseStatement();
+      if (stmt) consequent.push(stmt);
+    }
+    advance(); // consume DONE or TOGETHER
+    return { type: 'IfStatement', condition, consequent, alternate: null };
     }
 
     // v2.1.1  -  "when nothing matches … done" registers the 404 catch-all.
@@ -2747,7 +2915,7 @@ function parseAsk() {
     advance(); // try
     const tryBody = [];
     // Parse try body - stop at "done", "recover", "finally", or "handled by"
-    while (!(peek().type === TOKEN.DONE ||
+    while (!(atBlockEnd() ||
              (peek().type === TOKEN.IDENTIFIER && (peek().value === 'recover' || peek().value === 'finally')) ||
              isHandledBy())) {
       if (peek().type === TOKEN.EOF) {
@@ -2790,7 +2958,7 @@ function parseAsk() {
         }
       }
       const recoverBody = [];
-      while (peek().type !== TOKEN.DONE &&
+      while (!atBlockEnd() &&
              !(peek().type === TOKEN.IDENTIFIER && (peek().value === 'recover' || peek().value === 'finally')) &&
              !isHandledBy()) {
         if (peek().type === TOKEN.EOF) {
@@ -2812,7 +2980,7 @@ function parseAsk() {
     if (peek().type === TOKEN.IDENTIFIER && peek().value === 'finally') {
       advance(); // finally
       finallyBody = [];
-      while (peek().type !== TOKEN.DONE) {
+      while (!atBlockEnd()) {
         if (peek().type === TOKEN.EOF) {
           throw new Error(makeError(
             'Expected keyword "done" to close the "finally" block before end of file.',
@@ -3050,8 +3218,7 @@ function parseAsk() {
     const condition = parseCondition();
 
     const consequent = [];
-    while (peek().type !== TOKEN.OTHERWISE && peek().type !== TOKEN.ELSE &&
-           peek().type !== TOKEN.DONE && peek().type !== TOKEN.TOGETHER) {
+    while (peek().type !== TOKEN.OTHERWISE && peek().type !== TOKEN.ELSE && !atBlockEnd()) {
       if (peek().type === TOKEN.EOF) {
         throw new Error(makeError(
           'Expected keyword "done" before end of file to close the "if" block.',
@@ -3073,7 +3240,7 @@ function parseAsk() {
         alternate = [parseElseIfChain()];
       } else {
         alternate = [];
-        while (peek().type !== TOKEN.DONE && peek().type !== TOKEN.TOGETHER) {
+        while (!atBlockEnd()) {
           if (peek().type === TOKEN.EOF) {
             throw new Error(makeError(
               'Expected keyword "done" before end of file to close the "otherwise" block.',
@@ -3099,8 +3266,7 @@ function parseAsk() {
     const condition = parseCondition();
 
     const consequent = [];
-    while (peek().type !== TOKEN.OTHERWISE && peek().type !== TOKEN.ELSE &&
-           peek().type !== TOKEN.DONE && peek().type !== TOKEN.TOGETHER) {
+    while (peek().type !== TOKEN.OTHERWISE && peek().type !== TOKEN.ELSE && !atBlockEnd()) {
       if (peek().type === TOKEN.EOF) {
         throw new Error(makeError(
           'Expected keyword "done" before end of file to close the "otherwise if" block.',
@@ -3119,7 +3285,7 @@ function parseAsk() {
         alternate = [parseElseIfChain()];
       } else {
         alternate = [];
-        while (peek().type !== TOKEN.DONE && peek().type !== TOKEN.TOGETHER) {
+        while (!atBlockEnd()) {
           if (peek().type === TOKEN.EOF) {
             throw new Error(makeError(
               'Expected keyword "done" before end of file to close the "otherwise" block.',
@@ -3139,7 +3305,10 @@ function parseAsk() {
 
   function parseBody(context) {
     const body = [];
-    while (peek().type !== TOKEN.DONE && peek().type !== TOKEN.TOGETHER) {
+    // v1.0.363  -  "done of <record>" reads the `done` FIELD (the README todo
+    // example), so a done/together followed by "of" is never a block
+    // terminator; it starts the next statement instead.
+    while (!atBlockEnd()) {
       if (peek().type === TOKEN.EOF) {
         throw new Error(makeError(
           `Expected keyword "done" to close the ${context} before end of file.`,
@@ -3173,6 +3342,81 @@ function parseAsk() {
       return { type: 'ConditionalExpression', condition, consequent, alternate };
     }
     return parseBooleanOrExpression();
+  }
+
+  // v1.0.364  -  template interpolation is compiled, not spliced. The lexer
+  // delivers backtick content verbatim; the ${...} parts used to be emitted as
+  // raw source text, so PlainScript-only expressions inside them ("message of
+  // e", "x is at least 80", "a contains b") generated invalid or wrong
+  // JavaScript. Split the content here, tokenize each expression with the same
+  // lexer, and parse it with the ordinary expression grammar. A part that fails
+  // to parse falls back to raw text so legacy output is unchanged.
+  function parseTemplateLiteral(token) {
+    const content = token.value;
+    if (!content.includes('${')) return { type: 'TemplateLiteral', value: content };
+    const parts = [];
+    let plain = '';
+    let i = 0;
+    while (i < content.length) {
+      if (content[i] === '\\' && content[i + 1] === '$' && content[i + 2] === '{') {
+        plain += '\\${'; // keep the backslash: JS renders \${ as literal "${"
+        i += 3;
+        continue;
+      }
+      if (content[i] === '$' && content[i + 1] === '{') {
+        // Find the matching close brace, honouring nested braces and strings.
+        let depth = 1;
+        let j = i + 2;
+        let exprText = '';
+        while (j < content.length && depth > 0) {
+          const ch = content[j];
+          if (ch === '{') depth++;
+          else if (ch === '}') {
+            depth--;
+            if (depth === 0) break;
+          } else if (ch === '"' || ch === "'" || ch === '`') {
+            const quote = ch;
+            exprText += ch;
+            j++;
+            while (j < content.length) {
+              if (content[j] === '\\') { exprText += content[j] + (content[j + 1] || ''); j += 2; continue; }
+              exprText += content[j];
+              if (content[j] === quote) { j++; break; }
+              j++;
+            }
+            continue;
+          }
+          exprText += ch;
+          j++;
+        }
+        if (depth !== 0) {
+          throw new Error(makeError('Unterminated "${" in template string: the closing "}" is missing.', token));
+        }
+        if (plain) { parts.push({ kind: 'text', text: plain }); plain = ''; }
+        let parsed = null;
+        try {
+          const inner = tokenize('show ' + exprText);
+          const sub = parse(inner);
+          if (sub.body.length === 1 && sub.body[0].type === 'ShowStatement') {
+            parsed = sub.body[0].value;
+          }
+        } catch (e) {
+          if (/must contain one expression/.test(e.message)) throw e;
+          parsed = null; // not valid PlainScript: keep legacy raw-text behaviour
+        }
+        if (parsed) parts.push({ kind: 'expr', expr: parsed, raw: exprText });
+        else parts.push({ kind: 'raw', text: '${' + exprText + '}' });
+        i = j + 1;
+        continue;
+      }
+      plain += content[i];
+      i++;
+    }
+    if (plain) parts.push({ kind: 'text', text: plain });
+    if (parts.every(p => p.kind === 'text')) {
+      return { type: 'TemplateLiteral', value: parts.map(p => p.text).join('') };
+    }
+    return { type: 'TemplateLiteral', value: content, parts };
   }
 
   // Expression-level boolean algebra: boolean operators usable in ordinary
@@ -3681,7 +3925,10 @@ function parseAsk() {
     const token = peek();
 
     if (token.type === TOKEN.STRING)   { advance(); return { type: 'StringLiteral',  value: token.value }; }
-    if (token.type === TOKEN.TEMPLATE_STRING) { advance(); return { type: 'TemplateLiteral',  value: token.value }; }
+    if (token.type === TOKEN.TEMPLATE_STRING) {
+      advance();
+      return parseTemplateLiteral(token);
+    }
     if (token.type === TOKEN.NUMBER)   { advance(); return { type: 'NumberLiteral',  value: token.value }; }
     if (token.type === TOKEN.BIGINT)   { advance(); return { type: 'BigIntLiteral',  value: token.value }; }
     // v2.1.1  -  boolean and null literals
@@ -3736,7 +3983,17 @@ function parseAsk() {
 
     // Keywords that can also be used as identifiers in expression context
     const IDENTIFIER_KEYWORDS = new Set([TOKEN.BACK, TOKEN.REPLY, TOKEN.RESPOND, TOKEN.SEND_BACK, TOKEN.FILE_KW]);
-    if (token.type === TOKEN.IDENTIFIER || IDENTIFIER_KEYWORDS.has(token.type)) {
+    // v1.0.363  -  `done` can be a record field NAME ("record with text "milk"
+    // and done true", the README todo example), so it must also be readable:
+    // `done of item`, `done of item becomes true`. Accept it as a word only in
+    // the `done of <expr>` shape; a bare `done` elsewhere stays the block
+    // terminator so empty bodies and missing values still fail clearly.
+    if ((token.type === TOKEN.DONE || token.type === TOKEN.TOGETHER) &&
+        peekAt(1).type === TOKEN.IDENTIFIER && peekAt(1).value === 'of') {
+      advance();
+      return { type: 'Identifier', name: token.value };
+    }
+    if (token.type === TOKEN.IDENTIFIER || IDENTIFIER_KEYWORDS.has(token.type) || isSqlWordIdentifier(token)) {
       if (peekAt(1).type === TOKEN.USES || peekAt(1).type === TOKEN.FILLS) {
         const callee = { type: 'Identifier', name: token.value };
         advance();
@@ -3885,10 +4142,16 @@ function parseAsk() {
         continue;
       }
       const keyToken = peek();
-      // Allow keywords that are valid JS identifiers as property names (e.g., "back" from "give back"),
-      // plus strings ("with space": 1) and numbers ({ 3: "three" }) for data-shaped objects.
-      if (keyToken.type !== TOKEN.IDENTIFIER && keyToken.type !== TOKEN.STRING &&
-          keyToken.type !== TOKEN.NUMBER && keyToken.type !== TOKEN.BACK) {
+      // Allow keywords that are valid JS identifiers as property names (e.g., "back" from "give back",
+      // "done" from the block terminator), plus strings ("with space": 1) and numbers
+      // ({ 3: "three" }) for data-shaped objects. A keyword is only accepted as a key when an
+      // explicit colon follows, so block-terminator usage of "done" can never be misread here.
+      const keyIsWord = keyToken.type === TOKEN.IDENTIFIER || keyToken.type === TOKEN.STRING ||
+        keyToken.type === TOKEN.NUMBER || keyToken.type === TOKEN.BACK;
+      const keyIsColonKeyword = keyToken.type !== TOKEN.IDENTIFIER &&
+        typeof keyToken.value === 'string' && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(keyToken.value) &&
+        peekAt(1).type === TOKEN.COLON;
+      if (!keyIsWord && !keyIsColonKeyword) {
         throw new Error(makeError(
           'Expected a property name inside the inline object.\n\nExample:\n  { text: "hi" }',
           keyToken
@@ -4052,7 +4315,7 @@ function parseAsk() {
     let messageBody = null;
     let disconnectBody = null;
 
-    while (peek().type !== TOKEN.DONE) {
+    while (!atBlockEnd()) {
       if (peek().type === TOKEN.EOF) {
         throw new Error(makeError(
           'Expected keyword "done" to close the websocket block before end of file.',
@@ -4104,7 +4367,7 @@ function parseAsk() {
     let baileysModule = null;
     const handlers = [];
 
-    while (peek().type !== TOKEN.DONE) {
+    while (!atBlockEnd()) {
       if (peek().type === TOKEN.EOF) {
         throw new Error(makeError(
           'Expected keyword "done" to close the "whatsapp bot" block before end of file.',
@@ -4335,7 +4598,7 @@ function parseAsk() {
         consume(TOKEN.ARROW,
           'Expected "->" after "otherwise".\n\nExample:\n  otherwise → show "other"');
         defaultCase = [];
-        while (peek().type !== TOKEN.DONE) {
+        while (!atBlockEnd()) {
           if (peek().type === TOKEN.EOF) {
             throw new Error(makeError(
               'Expected keyword "done" to close the "match" block before end of file.',
@@ -4351,7 +4614,7 @@ function parseAsk() {
       consume(TOKEN.ARROW,
         'Expected "->" after the case expression.\n\nExample:\n  "red" → show "stop"');
       const caseBody = [];
-      while (peek().type !== TOKEN.DONE && peek().type !== TOKEN.OTHERWISE &&
+      while (!atBlockEnd() && peek().type !== TOKEN.OTHERWISE &&
              peek().type !== TOKEN.ELSE &&
              !(peek().type === TOKEN.STRING || peek().type === TOKEN.NUMBER ||
                peek().type === TOKEN.TRUE_KW || peek().type === TOKEN.FALSE_KW ||
@@ -4506,7 +4769,7 @@ function parseAsk() {
         advance(); // otherwise/else
         consume(TOKEN.ARROW, 'Expected "->" after "otherwise".\n\nExample:\n  otherwise → show "other"');
         defaultCase = [];
-        while (peek().type !== TOKEN.DONE) {
+        while (!atBlockEnd()) {
           if (peek().type === TOKEN.EOF) {
             throw new Error(makeError(
               'Expected keyword "done" to close the "switch" block before end of file.',
@@ -4521,7 +4784,7 @@ function parseAsk() {
       const test = parseExpression();
       consume(TOKEN.ARROW, 'Expected "->" after the case expression.\n\nExample:\n  "red" → show "stop"');
       const caseBody = [];
-      while (peek().type !== TOKEN.DONE && peek().type !== TOKEN.OTHERWISE &&
+      while (!atBlockEnd() && peek().type !== TOKEN.OTHERWISE &&
              peek().type !== TOKEN.ELSE &&
              !(peek().type === TOKEN.STRING || peek().type === TOKEN.NUMBER ||
                peek().type === TOKEN.TRUE_KW || peek().type === TOKEN.FALSE_KW ||

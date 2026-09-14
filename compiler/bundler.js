@@ -118,10 +118,78 @@ function resolveDependencies(entryPath) {
   return order;
 }
 
-// Compile all files in dependency order into one JavaScript string.
-function bundle(entryPath, options = {}) {
+// Collects the names a file's own ExportStatements put on its module surface.
+function getExportNames(ast) {
+  const names = [];
+  for (const node of ast.body) {
+    if (node.type !== 'ExportStatement' || node.fromPath) continue;
+    names.push(...(node.names || (node.name ? [node.name] : [])));
+  }
+  return names;
+}
+
+// Builds the export surface map for a resolved dependency graph:
+// local import path (as written) -> exported names of that module. Used by
+// namespace imports ("bring all from X as ns") which need the export surface
+// to build live getter objects, and consumed by the shared generation context.
+function buildSurfaces(files) {
+  const surfaces = new Map();
+  const astByAbs = new Map(files.map(f => [f.absPath, f.ast]));
+
+  for (const { absPath, ast } of files) {
+    const dir = path.dirname(absPath);
+    for (const node of ast.body) {
+      if (node.type === 'ImportStatement' && node.path && isLocalImportPath(node.path) && node.namespace) {
+        const resolvedAbs = resolveImportPath(dir, node.path);
+        const depAst = astByAbs.get(resolvedAbs);
+        if (depAst) {
+          // Union of explicit exports plus auto-exported function declarations
+          const explicit = getExportNames(depAst);
+          const funcs = depAst.body
+            .filter(n => n.type === 'FunctionDeclaration' && n.name)
+            .map(n => n.name);
+          const hasExplicit = depAst.body.some(n => n.type === 'ExportStatement');
+          const surface = hasExplicit ? explicit : [...new Set([...explicit, ...funcs])];
+          if (!surfaces.has(absPath)) surfaces.set(absPath, []);
+          surfaces.set(node.path, surface);
+        }
+      }
+    }
+  }
+
+  // Propagate re-exported surfaces (export ... from "...") until fixpoint so
+  // chains of re-exports resolve too.
+  for (let pass = 0; pass <= files.length; pass += 1) {
+    let changed = false;
+    for (const { absPath, ast } of files) {
+      for (const node of ast.body) {
+        if (node.type !== 'ExportStatement' || !node.fromPath || !isLocalImportPath(node.fromPath)) continue;
+        const resolvedAbs = resolveImportPath(path.dirname(absPath), node.fromPath);
+        if (!astByAbs.has(resolvedAbs)) continue;
+        const depSurface = surfaces.get(node.fromPath) || [];
+        const own = surfaces.get(absPath) || [];
+        const merged = [...new Set([...own, ...depSurface])];
+        if (merged.length !== own.length) {
+          surfaces.set(absPath, merged);
+          changed = true;
+        }
+      }
+    }
+    if (!changed) break;
+  }
+  return surfaces;
+}
+
+// Generates JavaScript for a whole resolved dependency graph with ONE shared
+// generation context. This is the single authoritative multi-file pipeline:
+// `bundle`, the CLI's compile stage, and validateSource all go through it so
+// bundled programs behave identically no matter which command produced them.
+function generateBundle(entryPath, options = {}) {
   const files = resolveDependencies(entryPath);
   const context = createGenerationContext(options);
+  context.bundled = true;
+  context.importSurfaces = buildSurfaces(files);
+
   const parts = files.map(({ absPath, ast }) => {
     const relPath = path.relative(process.cwd(), absPath).replace(/\\/g, '/') || path.basename(absPath);
     context.sourceFile = relPath;
@@ -134,6 +202,13 @@ function bundle(entryPath, options = {}) {
     const res = generate(ast, context);
     return typeof res === 'string' ? res : (res && res.code ? res.code : '');
   }).filter(js => js && js.trim() !== '');
+
+  return { files, context, parts };
+}
+
+// Compile all files in dependency order into one JavaScript string.
+function bundle(entryPath, options = {}) {
+  const { context, parts } = generateBundle(entryPath, options);
   let js = parts.join('\n');
   if (context.needsAsync) {
     js = wrapAsync(js);
@@ -154,4 +229,4 @@ function bundle(entryPath, options = {}) {
   return js;
 }
 
-module.exports = { bundle, resolveDependencies };
+module.exports = { bundle, generateBundle, buildSurfaces, resolveDependencies };

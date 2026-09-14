@@ -1285,6 +1285,60 @@ test('plainscript check validates a whole directory', () => {
   }
 });
 
+test('plainscript run passes flags after -- through to the program', () => {
+  const dir = tmpDir();
+  const plnFile = path.join(dir, 'args.pln');
+  fs.writeFileSync(plnFile, 'show join(args(), ",")\n');
+  const out = runCli(['run', plnFile, '--', '--port', '8080', '--verbose', '-v'], dir);
+  if (!out.includes('--port,8080,--verbose,-v')) {
+    throw new Error(`Expected program to receive all flags after -- but got: ${out}`);
+  }
+});
+
+test('plainscript run --verbose stays a CLI flag (not passed to the program)', () => {
+  const dir = tmpDir();
+  const plnFile = path.join(dir, 'args2.pln');
+  fs.writeFileSync(plnFile, 'show join(args(), "|")\n');
+  const out = runCli(['run', plnFile, '--verbose'], dir);
+  if (out.includes('--verbose')) {
+    throw new Error(`Expected --verbose to be consumed by the CLI but got: ${out}`);
+  }
+});
+
+test('plainscript run passes bare -v through to the program', () => {
+  const dir = tmpDir();
+  const plnFile = path.join(dir, 'args3.pln');
+  fs.writeFileSync(plnFile, 'show join(args(), "|")\n');
+  const out = runCli(['run', plnFile, '-v'], dir);
+  if (!out.includes('-v')) {
+    throw new Error(`Expected -v to be passed to the program but got: ${out}`);
+  }
+});
+
+test('javascript ... done block compiles raw JS verbatim', () => {
+  const code = compile([
+    'javascript',
+    '  const __xs = [1, 2, 3].map(x => x * 7);',
+    '  __total = __xs.join("~");',
+    'done',
+    'show __total',
+  ].join('\n'));
+  if (!code.includes('__xs.join("~")')) throw new Error('expected raw JS preserved: ' + code);
+  if (!code.includes('console.log(__total)')) throw new Error('expected show to follow block: ' + code);
+});
+
+test('duplicate top-level remember fails cleanly instead of emitting double let', () => {
+  let threw = null;
+  try {
+    compile('remember x as 1\nremember x as 2\nshow x');
+  } catch (e) {
+    threw = e.message;
+  }
+  if (!threw || !threw.includes('Duplicate declaration') || !threw.includes('"x"')) {
+    throw new Error(`expected clean duplicate-declaration error, got: ${threw}`);
+  }
+});
+
 test('plainscript check --json emits deterministic machine-readable output', () => {
   const dir = tmpDir();
   const plnFile = path.join(dir, 'ok.pln');
@@ -2298,6 +2352,29 @@ test('add(item to collection) compiles to push', () => {
   assert(compile('add(player to players)'), 'players.push(player);');
 });
 
+test('add(item to collection) as an expression evaluates to the collection', () => {
+  // push() returns the new length; the expression form must yield the array
+  // so `xs becomes add(x to xs)` keeps xs an array (torture-test regression).
+  const js = compile('remember xs as []\nxs becomes add(1 to xs)\nshow length of xs');
+  if (!js.includes('__psAdd')) {
+    throw new Error('expression add should use the identity wrapper\n' + js);
+  }
+  const out = [];
+  new Function('console', js)({ log: (...a) => out.push(a.join(' ')) });
+  if (out.join('|') !== '1') {
+    throw new Error(`expected xs to stay an array with length 1, got: ${out.join('|')}`);
+  }
+});
+
+test('remove(item from collection) as an expression evaluates to the collection', () => {
+  const js = compile('remember ys as [1, 2, 3]\nremember kept as remove(2 from ys)\nshow join(kept, ",")');
+  const out = [];
+  new Function('console', js)({ log: (...a) => out.push(a.join(' ')) });
+  if (out.join('|') !== '1,3') {
+    throw new Error(`expected kept to be the mutated array "1,3", got: ${out.join('|')}`);
+  }
+});
+
 test('remove(item from collection) dispatches Map/Set then splice', () => {
   assert(compile('remove(player from players)'), 'players instanceof Map || players instanceof Set ? players.delete(player) : players.splice(players.indexOf(player), 1);');
 });
@@ -2373,12 +2450,13 @@ test('read works with a variable path', () => {
 test('write(data to file) compiles to writeFileSync with an fs prelude', () => {
   const js = compile('write("hello" to "out.txt")');
   if (!js.includes(`const __fs = require('fs');`)) throw new Error('missing fs prelude');
-  if (!js.includes(`__fs.writeFileSync("hello", "out.txt", 'utf8')`)) throw new Error('missing writeFileSync');
+  // writeFileSync signature is (path, data): the "to" target is the path.
+  if (!js.includes(`__fs.writeFileSync("out.txt", "hello", 'utf8')`)) throw new Error('missing writeFileSync');
 });
 
 test('write works with a variable payload', () => {
   const js = compile('write(data to "out.txt")');
-  if (!js.includes(`__fs.writeFileSync(data, "out.txt", 'utf8')`)) throw new Error('missing writeFileSync');
+  if (!js.includes(`__fs.writeFileSync("out.txt", data, 'utf8')`)) throw new Error('missing writeFileSync');
 });
 
 test('readFile remains available (backward compat)', () => {
@@ -2952,6 +3030,83 @@ test('string template: plain dollar sign without interpolation', () => {
   const code = generate(parse(tokenize(src)));
   if (!code.includes('$5')) throw new Error('Dollar sign missing');
   if (code.includes('${')) throw new Error('Should not contain interpolation syntax');
+});
+
+// v1.0.364  -  interpolation is compiled, not spliced. PlainScript-only
+// expressions inside ${...} must produce valid JavaScript.
+test('string template: "of" expression inside interpolation compiles', () => {
+  const src = 'remember e as {message: "boom"}\nshow `${message of e}`';
+  const code = generate(parse(tokenize(src)));
+  if (code.includes(' of ')) throw new Error('raw of-expression leaked into JS: ' + code);
+  if (!code.includes('${e.message}')) throw new Error('expected member access in: ' + code);
+});
+
+test('string template: comparison inside interpolation compiles', () => {
+  const src = 'remember x as 50\nshow `${x is at least 80}`';
+  const code = generate(parse(tokenize(src)));
+  if (code.includes(' is at least ')) throw new Error('raw comparison leaked into JS: ' + code);
+  if (!code.includes('x >= 80')) throw new Error('expected >= in: ' + code);
+});
+
+test('string template: contains inside interpolation compiles', () => {
+  const src = 'remember a as [1, 2]\nshow `${a contains 2}`';
+  const code = generate(parse(tokenize(src)));
+  if (code.includes(' contains ')) throw new Error('raw contains leaked into JS: ' + code);
+  if (!code.includes('.includes(2)')) throw new Error('expected includes in: ' + code);
+});
+
+test('string template: escaped dollar stays literal text', () => {
+  const src = 'show `a \\${name} b`';
+  const code = generate(parse(tokenize(src)));
+  // The generated JS must render the backslash so ${name} is NOT interpolated.
+  if (!code.includes('\\${name}')) throw new Error('expected escaped dollar in: ' + code);
+});
+
+test('string template: unterminated interpolation is a clean compile error', () => {
+  try {
+    compile('show `${name`');
+    throw new Error('expected an error but none was thrown');
+  } catch (e) {
+    if (!e.message.includes('Unterminated')) throw new Error('unexpected message: ' + e.message);
+  }
+});
+
+// v1.0.364  -  keyword field names in inline objects ("done" is the block
+// terminator but a perfectly good record field).
+test('inline object: keyword "done" as a field name parses', () => {
+  const src = 'remember t as {done: false, title: "x"}\nshow t.title';
+  const code = generate(parse(tokenize(src)));
+  if (!code.includes('"done": false')) throw new Error('expected done field in: ' + code);
+});
+
+test('inline object: keyword field still fails without a colon', () => {
+  try {
+    compile('remember t as {done}');
+    throw new Error('expected an error but none was thrown');
+  } catch (e) {
+    if (!e.message.includes('Expected a property name')) throw new Error('unexpected message: ' + e.message);
+  }
+});
+
+// v1.0.364  -  value operands of and/or are evaluated exactly once.
+test('and/or: side-effecting value operand is evaluated once', () => {
+  const src = [
+    'remember calls as 0',
+    'make f()',
+    '  calls += 1',
+    '  give true',
+    'done',
+    'make g()',
+    '  give "yes"',
+    'done',
+    'show f() and g()',
+    'show calls',
+  ].join('\n');
+  const code = generate(parse(tokenize(src)));
+  // Count f() CALL sites (skip the "function f()" declaration line).
+  const fCalls = code.split('\n').filter(l => l.includes('f()') && !l.includes('function f()')).length;
+  if (fCalls !== 1) throw new Error(`expected exactly one f() call line, got ${fCalls}: ${code}`);
+  if (!code.includes('__lv = f()')) throw new Error('expected single-evaluation binding: ' + code);
 });
 
 // â”€â”€ Summary â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

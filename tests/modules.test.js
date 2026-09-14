@@ -3,10 +3,11 @@
 // Run with: node tests/modules.test.js
 
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const { tokenize, TOKEN } = require('../compiler/lexer');
 const { parse } = require('../compiler/parser');
-const { generate } = require('../compiler/generator');
+const { generate, createGenerationContext } = require('../compiler/generator');
 const { bundle } = require('../compiler/bundler');
 const { detectDependencies } = require('../compiler/dependency-detector');
 
@@ -154,6 +155,39 @@ test('bundler handles implicit .pln extension and folder index resolution', () =
 });
 
 // ── Summary ──────────────────────────────────────────────────────────────────
+
+test('generator: export statement before declaration defers assignment to end of file (no TDZ)', () => {
+  const js = generate(parse(tokenize('share who\nremember who as "leaf"')));
+  const assignIdx = js.indexOf('module.exports.who = who;');
+  const declIdx = js.indexOf('let who = "leaf"');
+  assert(assignIdx !== -1, true, 'expected deferred module.exports.who assignment');
+  assert(declIdx !== -1, true, 'expected let who declaration');
+  assert(assignIdx > declIdx, true, 'export assignment must come after declaration');
+});
+
+test('generator: namespace import of a local module builds a live getter object, not a require fallback', () => {
+  const context = createGenerationContext();
+  context.bundled = true;
+  context.importSurfaces = new Map([['./lib.pln', ['config', 'double']]]);
+  const js = generate(parse(tokenize('bring all from "./lib.pln" as lib\nshow lib.config.env')), context);
+  assert(js.includes('const lib = { get config()'), true, 'expected live getter namespace object');
+  assert(!js.includes('require("./lib.pln")'), true, 'bundled namespace import must not emit a require fallback');
+});
+
+test('bundler: namespace import resolves surface through generateBundle context', () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pln-ns-'));
+  const libFile = path.join(tmpDir, 'lib.pln');
+  const mainFile = path.join(tmpDir, 'main.pln');
+  fs.writeFileSync(libFile, 'remember config as {env: "test", retries: 3}\nmake double(n)\n  give n * 2\ndone\nexport config\nexport double');
+  fs.writeFileSync(mainFile, 'bring all from "./lib.pln" as lib\nshow lib.config.env\nshow lib.double(21)');
+  try {
+    const bundledJs = bundle(mainFile);
+    assert(bundledJs.includes('const lib = { get config()'), true, 'expected live getter namespace object');
+    assert(!bundledJs.includes('require("./lib.pln")'), true, 'bundled output must not require the .pln source');
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
 
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);
