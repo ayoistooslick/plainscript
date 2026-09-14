@@ -6,7 +6,7 @@ const { SourceMapGenerator } = require('./sourcemap');
 // Known runtime packages and their require() statements.
 const KNOWN_PACKAGES = {
   express: `const express = require('express');`,
-  // v1.0.362  -  better-sqlite3 is an OPTIONAL runtime backend. The require
+  // v1.0.363  -  better-sqlite3 is an OPTIONAL runtime backend. The require
   // must not run at module load: on platforms without a usable native
   // binary (e.g. Android/Termux) `plainscript` must still compile and run
   // programs that never touch SQLite. `Database` is resolved lazily and only
@@ -117,7 +117,7 @@ const BUILTIN_DECLARATIONS = {
     `  }`,
     `}`,
   ].join('\n'),
-  // v1.0.362  -  DOM browser runtime (select/selectAll/parseHTML). Browser
+  // v1.0.363  -  DOM browser runtime (select/selectAll/parseHTML). Browser
   // globals are guarded so the generated JS explains the problem when it is
   // run under Node instead of failing with a ReferenceError midpoint.
   dom: [
@@ -136,7 +136,7 @@ const BUILTIN_DECLARATIONS = {
     `  return template.content;`,
     `}`,
   ].join('\n'),
-  // v1.0.362  -  input runtime: pointer coordinates, gamepads, dropped files.
+  // v1.0.363  -  input runtime: pointer coordinates, gamepads, dropped files.
   input: [
     `function __localPoint(e, canvas) {`,
     `  if (typeof document === 'undefined') throw new Error('localPoint(...) needs a browser (document is not defined in Node).');`,
@@ -154,7 +154,7 @@ const BUILTIN_DECLARATIONS = {
     `  return [...(event && event.dataTransfer ? event.dataTransfer.files : [])];`,
     `}`,
   ].join('\n'),
-  // v1.0.362  -  asset-loading runtime (images, JSON, bytes, data URLs). All
+  // v1.0.363  -  asset-loading runtime (images, JSON, bytes, data URLs). All
   // helpers return promises; the STDLIB entries await them.
   assets: [
     `function __loadImage(url) {`,
@@ -191,7 +191,7 @@ const BUILTIN_DECLARATIONS = {
     `  });`,
     `}`,
   ].join('\n'),
-  // v1.0.362  -  Web Audio runtime. The AudioContext is created once and shared
+  // v1.0.363  -  Web Audio runtime. The AudioContext is created once and shared
   // (browsers cap the number), and resumed on demand because autoplay policies
   // start it suspended.
   audio: [
@@ -234,7 +234,7 @@ const BUILTIN_DECLARATIONS = {
     `  });`,
     `}`,
   ].join('\n'),
-  // v1.0.362  -  WebGL runtime: context selection plus the three compile/link/
+  // v1.0.363  -  WebGL runtime: context selection plus the three compile/link/
   // buffer helpers behind the gl* stdlib entries.
   gl: [
     `function __glContext(canvas) {`,
@@ -1413,7 +1413,7 @@ const BUILTIN_DECLARATIONS = {
     `  };`,
     `}`,
     `function __sqliteWrapWasm(db, file) {`,
-    `  // v1.0.362  -  sql.js's export() ends an open transaction, so persisting`,
+    `  // v1.0.363  -  sql.js's export() ends an open transaction, so persisting`,
     `  // mid-transaction would break the explicit COMMIT that follows. While a`,
     `  // transaction is active, writes are only flushed to disk once, after the`,
     `  // COMMIT succeeds (the wrapper's own persist at that point covers it).`,
@@ -2748,7 +2748,7 @@ const BUILTIN_DECLARATIONS = {
   file: (args, context) => `new File(${args.map(a => generateExpr(a, context)).join(', ')})`,
   formData: (_args) => `new FormData()`,
 
-  // ── v1.0.362  -  browser DOM (IOPL-native). All helpers guard their browser
+  // ── v1.0.363  -  browser DOM (IOPL-native). All helpers guard their browser
   // global, so the generated output throws a clear teaching error under Node.
   select: (args, context) => {
     ensureBuiltin(context, 'dom');
@@ -2766,7 +2766,7 @@ const BUILTIN_DECLARATIONS = {
     return `__parseHTML(${generateExpr(args[0], context)})`;
   },
 
-  // ── v1.0.362  -  browser input (IOPL-native).
+  // ── v1.0.363  -  browser input (IOPL-native).
   localPoint: (args, context) => {
     ensureBuiltin(context, 'input');
     requireArgs('localPoint', args, 2, 'localPoint(event, canvas)');
@@ -2782,7 +2782,7 @@ const BUILTIN_DECLARATIONS = {
     return `__droppedFiles(${generateExpr(args[0], context)})`;
   },
 
-  // ── v1.0.362  -  browser assets (IOPL-native). Each awaitable helper is
+  // ── v1.0.363  -  browser assets (IOPL-native). Each awaitable helper is
   // awaited here, so the surrounding function/handler is marked async.
   loadImage: (args, context) => {
     ensureBuiltin(context, 'assets');
@@ -2815,7 +2815,7 @@ const BUILTIN_DECLARATIONS = {
     return `(await __readDataUrl(${generateExpr(args[0], context)}))`;
   },
 
-  // ── v1.0.362  -  Web Audio (IOPL-native).
+  // ── v1.0.363  -  Web Audio (IOPL-native).
   audioContext: (_args, context) => {
     ensureBuiltin(context, 'audio');
     return `__audioContext()`;
@@ -2826,7 +2826,7 @@ const BUILTIN_DECLARATIONS = {
     return `__audioTone(${args.map(a => generateExpr(a, context)).join(', ')})`;
   },
 
-  // ── v1.0.362  -  WebSocket send helper (works with any WebSocket-like object,
+  // ── v1.0.363  -  WebSocket send helper (works with any WebSocket-like object,
   // browser or Node): strings go through verbatim, everything else is JSON.
   webSocketSend: (args, context) => {
     requireArgs('webSocketSend', args, 2, 'webSocketSend(socket, { type: "move", x: 10 })');
@@ -2835,7 +2835,7 @@ const BUILTIN_DECLARATIONS = {
     return `${ws}.send(typeof (${value}) === 'string' ? (${value}) : JSON.stringify(${value}))`;
   },
 
-  // ── v1.0.362  -  WebGL (IOPL-native).
+  // ── v1.0.363  -  WebGL (IOPL-native).
   webglContext: (args, context) => {
     ensureBuiltin(context, 'gl');
     requireOneArg('webglContext', args);
@@ -3971,7 +3971,7 @@ function generateStatement(node, indent = '', context = createGenerationContext(
     // v2.2.0  -  mongo "<connection>" [db "<name>"]: MongoDB client bound to "db".
     // Uses the mongodb driver; subsequent query/insert/update/delete/execute
     // statements compile to MongoDB collection operations.
-    // v1.0.362  -  mongodb is an optional backend: the require lives inside
+    // v1.0.363  -  mongodb is an optional backend: the require lives inside
     // __mongoOpen (it is only evaluated when a database is actually opened),
     // so programs that never use it start without needing the module.
     case 'MongoStatement': {
@@ -4227,7 +4227,7 @@ function generateStatement(node, indent = '', context = createGenerationContext(
       ].join('\n');
     }
 
-    // v1.0.362  -  every frame … done: one requestAnimationFrame loop. The next
+    // v1.0.363  -  every frame … done: one requestAnimationFrame loop. The next
     // frame is scheduled after the body so the body always runs once per
     // frame; an awaiting body makes the callback async automatically.
     case 'EveryFrameStatement': {
@@ -4244,7 +4244,7 @@ function generateStatement(node, indent = '', context = createGenerationContext(
       ].join('\n');
     }
 
-    // v1.0.362  -  after <n> <unit> … done: one-shot setTimeout. The delay is an
+    // v1.0.363  -  after <n> <unit> … done: one-shot setTimeout. The delay is an
     // expression scaled by the unit; an awaiting body makes the callback async.
     case 'AfterStatement': {
       const delay = generateExpr(node.delay, context);
@@ -4381,7 +4381,7 @@ function generateStatement(node, indent = '', context = createGenerationContext(
       return `${indent}__emitter.on(${event}, (${node.paramName}) => {\n${body}\n${indent}});`;
     }
 
-    // v1.0.362  -  when <target> "<event>" happens [as <name>] … done: DOM event
+    // v1.0.363  -  when <target> "<event>" happens [as <name>] … done: DOM event
     // listener. The handler param defaults to "event"; an awaiting body makes
     // the callback async automatically.
     case 'WhenTargetedStatement': {

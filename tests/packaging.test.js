@@ -1,4 +1,4 @@
-// Packaging regression tests for PlainScript v1.0.362.
+// Packaging regression tests for PlainScript v1.0.363.
 //
 // These guard the dependency architecture that makes `plainscript-lang`
 // installable on platforms where better-sqlite3 has no usable native binary
@@ -117,7 +117,7 @@ async function runGenerated(js, provider = {}) {
 
 test('package.json: better-sqlite3 is optional, never a mandatory dependency', () => {
   const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
-  assert(pkg.version === '1.0.362', `expected version 1.0.362, got ${pkg.version}`);
+  assert(pkg.version === '1.0.363', `expected version 1.0.363, got ${pkg.version}`);
   assert(!pkg.dependencies || !pkg.dependencies['better-sqlite3'],
     'better-sqlite3 must not be a mandatory dependency');
   assert(pkg.optionalDependencies && pkg.optionalDependencies['better-sqlite3'],
@@ -295,12 +295,12 @@ test('packed package installs with optional dependencies omitted and still runs'
     const versionOut = execFileSync(process.execPath,
       ['-e', "console.log(require('./node_modules/plainscript-lang/compiler/version').VERSION)"],
       { cwd: tmp, encoding: 'utf8' });
-    assert(versionOut.trim() === '1.0.362', `compiler version from packed artifact: ${versionOut.trim()}`);
+    assert(versionOut.trim() === '1.0.363', `compiler version from packed artifact: ${versionOut.trim()}`);
 
     const cliOut = execFileSync(process.execPath,
       [path.join(installed, 'compiler', 'cli.js'), 'version'],
       { cwd: tmp, encoding: 'utf8' });
-    assertIncludes(cliOut, '1.0.362', 'packed CLI version output');
+    assertIncludes(cliOut, '1.0.363', 'packed CLI version output');
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }

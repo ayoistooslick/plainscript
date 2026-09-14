@@ -1,4 +1,4 @@
-// PlainScript 1.0.362: functions.
+// PlainScript 1.0.363: functions.
 make double(value)
     give value + value
 done

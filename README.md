@@ -252,7 +252,7 @@ For projects that need custom output or source directories, add a `plainscript.c
     "build": "plainscript build",
     "prepare": "plainscript build"
   },
-  "devDependencies": { "plainscript-lang": "^1.0.362" }
+  "devDependencies": { "plainscript-lang": "^1.0.363" }
 }
 ```
 
@@ -748,7 +748,7 @@ Portable databases (SQLite native or WebAssembly):
 database "app.db"                  // probes better-sqlite3, falls back to sql.js
 ```
 
-`plainscript install` verifies that `better-sqlite3` actually loads. Since 1.0.362 the native engine ships as an **optional dependency**: installing `plainscript-lang` can never fail because a native binary is missing for the platform (e.g. Android/Termux), and programs that never open a database start without it. If the native module cannot be used, PlainScript warns and continues on the pure-JavaScript WebAssembly engine (`sql.js`)  -  the same program runs unchanged. An engine can be forced explicitly:
+`plainscript install` verifies that `better-sqlite3` actually loads. Since 1.0.363 the native engine ships as an **optional dependency**: installing `plainscript-lang` can never fail because a native binary is missing for the platform (e.g. Android/Termux), and programs that never open a database start without it. If the native module cannot be used, PlainScript warns and continues on the pure-JavaScript WebAssembly engine (`sql.js`)  -  the same program runs unchanged. An engine can be forced explicitly:
 
 ```
 database "app.db" using "native"   // hard requirement: better-sqlite3
