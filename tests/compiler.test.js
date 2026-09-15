@@ -3157,6 +3157,43 @@ test('and/or: side-effecting value operand is evaluated once', () => {
 
 // â”€â”€ Summary â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
+// v1.0.364  -  nullish equality: `is null` catches undefined too, `is undefined`
+// stays the strict escape hatch (torture finding: `first of []` yields undefined
+// but `if x is null` was false, so correct guards silently failed).
+test('nullish: is null catches undefined (missing array slot)', () => {
+  const src = [
+    'remember letters as []',
+    'remember f as first of letters',
+    'if f is null',
+    '  show "missing"',
+    'otherwise',
+    '  show "present"',
+    'done',
+  ].join('\n');
+  const code = generate(parse(tokenize(src)));
+  if (!code.includes('== null')) throw new Error('expected nullish emission: ' + code);
+});
+
+test('nullish: is not null is nullish too', () => {
+  const code = generate(parse(tokenize('if 1 is not null\n  show "y"\ndone')));
+  if (!code.includes('!= null')) throw new Error('expected nullish emission: ' + code);
+});
+
+test('nullish: is undefined stays strict', () => {
+  const code = generate(parse(tokenize('if 1 is undefined\n  show "y"\ndone')));
+  if (!code.includes('=== undefined')) throw new Error('expected strict emission: ' + code);
+});
+
+test('nullish: null is undefined remains strictly false', () => {
+  const code = generate(parse(tokenize('if null is undefined\n  show "y"\ndone')));
+  if (!code.includes('null === undefined')) throw new Error('expected strict literal-literal emission: ' + code);
+});
+
+test('nullish: plain === comparisons are untouched', () => {
+  const code = generate(parse(tokenize('if 1 is 1\n  show "y"\ndone')));
+  if (!code.includes('1 === 1')) throw new Error('expected untouched ===: ' + code);
+});
+
 Promise.all(pendingPluginTests).then(() => {
   console.log(`\n${passed + failed} tests: ${passed} passed, ${failed} failed`);
   if (failed > 0) process.exit(1);

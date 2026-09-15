@@ -3311,8 +3311,38 @@ function generateCondition(cond, context) {
       // A bare boolean value used as a condition (`if ok`): truthy check.
       return generateExpr(cond.value, context);
 
-    case 'BinaryCondition':
+    case 'BinaryCondition': {
+      // v1.0.364  -  nullish equality. `x is null` guards against BOTH null and
+      // undefined, because PlainScript builtins deliberately differ: env() of a
+      // missing variable yields null while `first of []` yields undefined. A
+      // guard the programmer wrote correctly must not silently fail (torture
+      // finding: `if x is null` was false for missing array slots). `is null`
+      // is therefore nullish (== null); `is undefined` stays the strict
+      // escape hatch (=== undefined). Literal-vs-literal keeps JS semantics.
+      const NULLISH_OPS = { '===': '==', '!==': '!=' };
+      if (NULLISH_OPS[cond.op]) {
+        const isNullLit = n => n.type === 'NullLiteral';
+        const isUndefLit = n => n.type === 'UndefinedLiteral';
+        const litSide = isNullLit(cond.left) ? 'left' : isNullLit(cond.right) ? 'right'
+          : isUndefLit(cond.left) ? 'left' : isUndefLit(cond.right) ? 'right' : null;
+        if (litSide !== null) {
+          const otherSide = litSide === 'left' ? 'right' : 'left';
+          const litNode = cond[litSide];
+          const otherNode = cond[otherSide];
+          // Only bridge when the other operand is a real value, so
+          // `null is undefined` keeps its JS meaning (false).
+          if (!isNullLit(otherNode) && !isUndefLit(otherNode)) {
+            const otherCode = `(${generateExpr(otherNode, context)})`;
+            if (isNullLit(litNode)) {
+              return `${otherCode} ${NULLISH_OPS[cond.op]} null`;
+            }
+            // strict escape hatch: `is undefined` matches undefined only
+            return `${otherCode} ${cond.op} undefined`;
+          }
+        }
+      }
       return `${generateExpr(cond.left, context)} ${cond.op} ${generateExpr(cond.right, context)}`;
+    }
 
     case 'UnaryCondition':
       if (cond.op === 'isEmpty') {

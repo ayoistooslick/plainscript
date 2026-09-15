@@ -148,7 +148,6 @@ function parse(tokens) {
   function peek()         { return tokens[pos]; }
   function peekAt(offset) { return tokens[pos + offset] || { type: TOKEN.EOF }; }
   function advance()      { return tokens[pos++]; }
-
   // v1.0.363  -  at a block terminator? A done/together followed by "of" is a
   // FIELD read ("done of item" - the README todo example), so it never closes a
   // block. Every statement-bearing body loop must ask this instead of comparing
@@ -158,6 +157,61 @@ function parse(tokens) {
     const t = peek();
     if (t.type !== TOKEN.DONE && t.type !== TOKEN.TOGETHER) return false;
     return !(peekAt(1).type === TOKEN.IDENTIFIER && peekAt(1).value === 'of');
+  }
+
+  // v1.0.364  -  recursion depth guards. Nesting beyond ~700 levels recurses
+  // past V8's stack and crashes with a raw "Maximum call stack size exceeded"
+  // RangeError — no position, no PlainScript message. Both recursive funnels
+  // (expressions via parsePrimary, statements via parseBody) count depth and
+  // fail with a clean positional error long before the stack runs out. The
+  // limits are deliberately far below the measured crash threshold (~700
+  // expression levels / ~850 block levels) because the guards themselves
+  // consume stack; real code never nests anywhere near these numbers.
+  // ParseDepthError is a sentinel: speculative-parse probe sites (which catch
+  // and replay) must rethrow it, or deep inputs get re-parsed exponentially.
+  class ParseDepthError extends Error {}
+  const MAX_EXPR_DEPTH = 300;
+  const MAX_STMT_DEPTH = 200;
+  let exprDepth = 0;
+  let stmtDepth = 0;
+  // The typo-probe below speculatively parses a full statement to produce a
+  // helpful "Expected a comparison" error. Nested conditions make that probe
+  // re-parse the whole remainder at every level — exponential behaviour that
+  // hangs on legitimately deep (but valid) nesting. Two bounds keep it cheap:
+  // 1. block-structured statement starters are never probed (a typo'd
+  //    comparison cannot look like "if ..."; probing would re-parse their
+  //    entire bodies), and
+  // 2. probes may only nest a bounded number of levels; deeper levels take the
+  //    plain bare-value condition path, which is what the probe concludes.
+  const MAX_CONDITION_PROBE_DEPTH = 3;
+  let conditionProbeDepth = 0;
+  const PROBE_BLOCKER_SET = new Set(
+    ['IF', 'WHILE', 'FOR', 'REPEAT', 'EACH', 'EVERY', 'MAKE', 'DEFINE', 'FUNCTION',
+     'TO', 'TRY', 'WHEN', 'USE', 'IMPORT', 'INCLUDE', 'LOAD', 'GATHER', 'FILTER_KW',
+     'TOTAL', 'MATCH', 'EMIT', 'STREAM', 'LISTEN', 'START_KW', 'START_ON', 'SERVE',
+     'SERVE_ON', 'SERVE_STATIC', 'SERVE_PUBLIC', 'DATABASE_KW', 'CONNECT_DB',
+     'USE_DATABASE', 'ROUTE_KW', 'WEB', 'ASK', 'PROMPT', 'OCR_KW', 'REPLY',
+     'RESPOND', 'SEND_BACK', 'DEBUGGER_KW', 'TEST']
+      .filter(k => TOKEN[k] !== undefined)
+      .map(k => TOKEN[k])
+  );
+  const PROBE_BLOCKER_WORDS = new Set(
+    ['bring', 'repeat', 'define', 'when', 'start', 'serve', 'database', 'every',
+     'try', 'catch', 'class', 'test', 'respond', 'listen']
+  );
+
+  function parsePrimary() {
+    if (++exprDepth > MAX_EXPR_DEPTH) {
+      throw new ParseDepthError(makeError(
+        `Expression is nested more than ${MAX_EXPR_DEPTH} levels deep. Split it into intermediate variables.`,
+        peek()
+      ));
+    }
+    try {
+      return parsePrimaryInner();
+    } finally {
+      exprDepth--;
+    }
   }
 
   function consume(expectedType, hint) {
@@ -270,17 +324,25 @@ function parse(tokens) {
     const isBoundary = next.type === TOKEN.DONE || next.type === TOKEN.OTHERWISE ||
       next.type === TOKEN.ELSE ||
       next.type === TOKEN.TOGETHER || next.type === TOKEN.THEN || next.type === TOKEN.EOF;
-    if (!isBoundary) {
+    const probeBlockedByToken = PROBE_BLOCKER_SET.has(next.type) ||
+      (next.type === TOKEN.IDENTIFIER && PROBE_BLOCKER_WORDS.has(next.value));
+    if (!isBoundary && !probeBlockedByToken && conditionProbeDepth < MAX_CONDITION_PROBE_DEPTH) {
       const savedPos = pos;
+      conditionProbeDepth++;
       try {
         const stmt = parseStatement();
         pos = savedPos;
         if (!stmt) return { type: 'ConditionExpression', value: left };
-      } catch (_e) {
+      } catch (e) {
+        // Depth-limit sentinels must never be swallowed by speculative probes:
+        // the alternative is exponential re-parsing of deep inputs.
+        if (e instanceof ParseDepthError) throw e;
         throw new Error(makeError(
           'Expected a comparison after the value. Use "is", "is above", "is below", "contains", "starts with", etc.',
           peek()
         ));
+      } finally {
+        conditionProbeDepth--;
       }
     }
     return { type: 'ConditionExpression', value: left };
@@ -2483,8 +2545,10 @@ function parseAsk() {
           const body = parseBody('"when happens" block');
           return { type: 'WhenTargetedStatement', target, event: eventStr, paramName, body };
         }
-      } catch (_e) {
+      } catch (e) {
         // Not a targeted "when"  -  replay and fall through to the condition form.
+        // (Depth-limit sentinels propagate — see parseComparisonCondition.)
+        if (e instanceof ParseDepthError) throw e;
       }
       pos = savedPos;
 
@@ -3242,6 +3306,13 @@ function parseAsk() {
   // ── Conditions ─────────────────────────────────────────────────────────────
 
   function parseIf() {
+    if (++stmtDepth > MAX_STMT_DEPTH) {
+      throw new ParseDepthError(makeError(
+        `Blocks are nested more than ${MAX_STMT_DEPTH} levels deep. Split the program into functions or reduce nesting.`,
+        peek()
+      ));
+    }
+    try {
     consume(TOKEN.IF);
     const condition = parseCondition();
 
@@ -3283,6 +3354,9 @@ function parseAsk() {
 
     advance(); // consume DONE or TOGETHER
     return { type: 'IfStatement', condition, consequent, alternate };
+    } finally {
+      stmtDepth--;
+    }
   }
 
   // `otherwise if <condition> ... [otherwise if ...] [otherwise ...] done`
@@ -3290,6 +3364,13 @@ function parseAsk() {
   // trailing `otherwise` supplies the final else. The trailing `done` belongs to
   // the outermost `if` and is consumed there, not here.
   function parseElseIfChain() {
+    if (++stmtDepth > MAX_STMT_DEPTH) {
+      throw new ParseDepthError(makeError(
+        `Blocks are nested more than ${MAX_STMT_DEPTH} levels deep. Split the program into functions or reduce nesting.`,
+        peek()
+      ));
+    }
+    try {
     advance(); // consume IF
     const condition = parseCondition();
 
@@ -3327,11 +3408,28 @@ function parseAsk() {
     }
 
     return { type: 'IfStatement', condition, consequent, alternate };
+    } finally {
+      stmtDepth--;
+    }
   }
 
   // ── Shared helpers ──────────────────────────────────────────────────────────
 
   function parseBody(context) {
+    if (++stmtDepth > MAX_STMT_DEPTH) {
+      throw new ParseDepthError(makeError(
+        `Blocks are nested more than ${MAX_STMT_DEPTH} levels deep. Split the program into functions or reduce nesting.`,
+        peek()
+      ));
+    }
+    try {
+      return parseBodyInner(context);
+    } finally {
+      stmtDepth--;
+    }
+  }
+
+  function parseBodyInner(context) {
     const body = [];
     // v1.0.363  -  "done of <record>" reads the `done` FIELD (the README todo
     // example), so a done/together followed by "of" is never a block
@@ -3429,7 +3527,7 @@ function parseAsk() {
             parsed = sub.body[0].value;
           }
         } catch (e) {
-          if (/must contain one expression/.test(e.message)) throw e;
+          if (/must contain one expression/.test(e.message) || e instanceof ParseDepthError) throw e;
           parsed = null; // not valid PlainScript: keep legacy raw-text behaviour
         }
         if (parsed) parts.push({ kind: 'expr', expr: parsed, raw: exprText });
@@ -3654,7 +3752,7 @@ function parseAsk() {
   }
 
   // primary → itemExpr | atom (postfix)*
-  function parsePrimary() {
+  function parsePrimaryInner() {
     // Arrow function: (params) -> body  -  detected before grouped expression
     if (peek().type === TOKEN.LPAREN && isArrowFunctionPattern()) {
       return parseArrowFunction();
@@ -4907,12 +5005,26 @@ function parseAsk() {
 
   // ── Program ────────────────────────────────────────────────────────────────
 
-  const body = [];
-  while (peek().type !== TOKEN.EOF) {
-    const stmt = parseStatement();
-    if (stmt) body.push(stmt);
+  // v1.0.364  -  last-resort backstop: any stack overflow that escapes the
+  // recursive descent (the depth guards fire first, but unguarded paths like
+  // class-in-class nesting must never leak a raw RangeError either) becomes
+  // a clean PlainScript error. By the time this catch runs the stack has
+  // unwound, so building the replacement error is safe.
+  try {
+    const body = [];
+    while (peek().type !== TOKEN.EOF) {
+      const stmt = parseStatement();
+      if (stmt) body.push(stmt);
+    }
+    return { type: 'Program', body };
+  } catch (e) {
+    if (e instanceof RangeError) {
+      throw new Error(
+        'Program is too deeply nested to compile. Split it into functions or intermediate variables.'
+      );
+    }
+    throw e;
   }
-  return { type: 'Program', body };
 }
 
 module.exports = { parse };

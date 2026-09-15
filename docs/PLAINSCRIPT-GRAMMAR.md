@@ -111,6 +111,36 @@ remember rec as record with name "Ada" and age 17
 Arrays and records come in both a bracket and a word form; the two normalize
 to the same AST.
 
+### Nullish equality (v1.0.364)
+
+`is null` is deliberately **nullish**: it matches `null` *and* `undefined`.
+PlainScript builtins intentionally differ — `env()` of a missing variable
+yields `null`, while reading a missing array slot (e.g. `first of []`)
+yields `undefined` — so a guard written as `is null` must never silently
+fail on the other nullish value:
+
+```plainscript
+remember f as first of []
+if f is null          // true — catches null AND undefined
+    show "missing"
+done
+```
+
+`is undefined` is the strict escape hatch (matches `undefined` only), and
+comparing the two literals to each other keeps JavaScript semantics
+(`null is undefined` is false). `is not null` is nullish the same way.
+
+### Parser limits
+
+Expressions may nest up to 300 levels deep and blocks up to 200 levels deep
+(real code never comes close). Beyond the limit compilation fails with a
+clean positional error — never a JavaScript stack trace. Runtime failures of
+common shapes (calling a non-function, reading a property of a missing value,
+invalid JSON) are translated into PlainScript wording with a hint; run with
+`--sourcemap` to also get the source-mapped `.pln` stack line.
+
+## 4. Variables and assignment
+
 ## 4. Variables and assignment
 
 Declaration — all three are identical and compile to the same JavaScript:

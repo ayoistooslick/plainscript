@@ -428,17 +428,53 @@ function compile(filePath, options = {}) {
   }
 
   // Clean top-level failure surface: uncaught errors and unhandled rejections
-  // print one concise line instead of a Node module-loader stack trace. Guarded
-  // so browser-target builds (no process) and library consumers are untouched.
+  // print one concise line instead of a Node module-loader stack trace, and the
+  // most common raw JavaScript runtime errors are translated into PlainScript
+  // wording with an actionable hint (v1.0.364). A raised user error keeps its
+  // exact message; only JS-native error shapes are translated. Guarded so
+  // browser-target builds (no process) and library consumers are untouched.
+  // With --sourcemap/-m the (source-mapped) stack is appended, giving real
+  // .pln line numbers for runtime failures.
   const cleanErrorPrelude = [
     `if (typeof process !== 'undefined' && typeof process.on === 'function') {`,
-    `  const __plainReportError = (e) => {`,
-    `    const __m = (e && typeof e === 'object' && e.message != null) ? e.message : String(e);`,
-    `    console.error('Error: ' + __m);`,
+    `  const __plainTranslate = (m) => {`,
+    `    const h = m.match(/^(.+?) is not a function$/);`,
+    `    if (h) {`,
+    `      const r = h[1];`,
+    `      const hint = /^[A-Za-z_$][\\w$]*$/.test(r)`,
+    `        ? 'check that ' + r + ' is defined with "make ' + r + '(...)" before calling it'`,
+    `        : 'check that the value is a function before calling it';`,
+    `      return 'Runtime error: ' + r + ' is not a function.\\n       hint: ' + hint;`,
+    `    }`,
+    `    const pr = m.match(/^Cannot read propert(?:y|ies) of (undefined|null)(?: \\(reading '([^']*)'\\))?$/);`,
+    `    const prOld = m.match(/^Cannot read propert(?:y|ies) '([^']*)' of (undefined|null)$/);`,
+    `    if (pr || prOld) {`,
+    `      const prop = pr ? pr[2] : prOld[1];`,
+    `      const missing = (pr ? pr[1] : prOld[2]) === 'null' ? 'null' : 'undefined';`,
+    `      const access = prop != null && prop !== '' ? (/^\\d+$/.test(prop) ? 'x?.[' + prop + ']' : 'x?.' + prop) : 'x?.prop';`,
+    `      const where = prop != null && prop !== '' ? " '" + prop + "'" : '';`,
+    `      return 'Runtime error: tried to read' + where + ' from a missing value (' + missing + ').\\n       hint: guard the access first (if x is null) or use optional access (' + access + ')';`,
+    `    }`,
+    `    if (m.includes(' is not iterable')) {`,
+    `      return 'Runtime error: a value is not iterable.\\n       hint: loops, spread and destructuring need an array, string, or Map/Set';`,
+    `    }`,
+    `    if (m.endsWith('is not valid JSON')) {`,
+    `      return 'Runtime error: invalid JSON - ' + m + '\\n       hint: decode untrusted text inside "try ... recover" to handle bad input';`,
+    `    }`,
+    `    return null;`,
+    `  };`,
+    `  const __plainReport = (e, rejection) => {`,
+    `    const m = (e && typeof e === 'object' && e.message != null) ? String(e.message) : String(e);`,
+    `    const t = __plainTranslate(m);`,
+    `    const head = rejection ? 'Unhandled rejection: ' : '';`,
+    `    console.error(head + (t !== null ? t : 'Error: ' + m));`,
+    `    if (process.execArgv && process.execArgv.includes('--enable-source-maps') && e && e.stack) {`,
+    `      console.error(e.stack);`,
+    `    }`,
     `    process.exit(1);`,
     `  };`,
-    `  process.on('uncaughtException', __plainReportError);`,
-    `  process.on('unhandledRejection', __plainReportError);`,
+    `  process.on('uncaughtException', (e) => __plainReport(e, false));`,
+    `  process.on('unhandledRejection', (e) => __plainReport(e, true));`,
     `}`,
   ].join('\n');
   js = cleanErrorPrelude + '\n' + js;
