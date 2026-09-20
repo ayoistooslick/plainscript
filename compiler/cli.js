@@ -1000,6 +1000,16 @@ function cmdUpdate() {
 // file in dependency order, and verify the emitted JavaScript is syntactically
 // valid  -  all without writing anything to disk. Returns a deterministic
 // result record; `deps` are the npm packages the sources require.
+function annotateSourceTree(node, sourceFile, seen = new Set()) {
+  if (!node || typeof node !== 'object' || seen.has(node)) return;
+  seen.add(node);
+  if (node.type) node.sourceFile = sourceFile;
+  for (const value of Object.values(node)) {
+    if (Array.isArray(value)) value.forEach(item => annotateSourceTree(item, sourceFile, seen));
+    else if (value && typeof value === 'object') annotateSourceTree(value, sourceFile, seen);
+  }
+}
+
 function validateSource(absPath) {
   const rel = path.relative(process.cwd(), absPath) || absPath;
   const t0 = Date.now();
@@ -1007,11 +1017,16 @@ function validateSource(absPath) {
     // resolveDependencies parses each file too, so a parse error anywhere in
     // the import graph surfaces here with a "file.pln  -  Line:Col" prefix.
     const { context, parts, files } = generateBundle(absPath);
-    const typedAst = { type: 'Program', body: files.flatMap(file => file.ast ? file.ast.body : []) };
+    const typedBodies = files.map(file => {
+      const relFile = path.relative(process.cwd(), file.absPath) || file.absPath;
+      annotateSourceTree(file.ast, relFile);
+      return file.ast ? file.ast.body : [];
+    });
+    const typedAst = { type: 'Program', body: typedBodies.flat() };
     const typeResult = checkTypes(typedAst);
     if (typeResult.diagnostics.length > 0) {
       const details = typeResult.diagnostics.map(item =>
-        `${rel}:${item.range.start.line + 1}:${item.range.start.character + 1} ${item.code} ${item.message}`
+        `${item.file || rel}:${item.range.start.line + 1}:${item.range.start.character + 1} ${item.code} ${item.message}`
       ).join('\n');
       throw new Error(`Static type checking failed:\n${details}`);
     }

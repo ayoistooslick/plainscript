@@ -1,0 +1,21 @@
+type User
+    id is number
+    name is text
+done
+
+let users as list of User is [
+    { id: 1, name: "Ada" },
+    { id: 2, name: "Grace" }
+]
+
+let usersById as dictionary of User is {
+    first: { id: 1, name: "Ada" },
+    second: { id: 2, name: "Grace" }
+}
+
+make firstUser() returns User
+    give users[0]
+done
+
+show firstUser().name
+show usersById.first.name

@@ -86,7 +86,7 @@ test('unknown type syntax fails with a teaching error', () => {
 test('return contracts accept matching values and infer typed calls', () => {
   const result = checkTypes(parse(tokenize(`make add(a as number, b as number) returns number
   give a + b
-done
+ done
 remember total as add(2, 3)`)));
   assert.deepStrictEqual(result.diagnostics, []);
 });
@@ -94,11 +94,57 @@ remember total as add(2, 3)`)));
 test('return contracts reject mismatched and missing values', () => {
   const result = checkTypes(parse(tokenize(`make bad() returns number
   give "not a number"
-done
+ done
 make missing() returns text
-done`)));
+ done`)));
   assert(result.diagnostics.some(item => item.code === 'PLN-TYPE-RETURN' && /bad/.test(item.message)));
   assert(result.diagnostics.some(item => item.code === 'PLN-TYPE-RETURN-MISSING' && /missing/.test(item.message)));
 });
 
-console.log('7 tests: passed');
+test('typed let validates every record in a list and preserves its element type', () => {
+  const result = checkTypes(parse(tokenize(`type User
+  id is number
+  name is text
+ done
+let users as list of User is [{ id: 1, name: "David" }, { id: "wrong", name: "Samuel" }]
+make first() returns User
+  give users[0]
+ done`)));
+  assert(result.diagnostics.some(item => /element 2/.test(item.message) && /id/.test(item.message)));
+  assert(!result.diagnostics.some(item => item.code === 'PLN-TYPE-RETURN'));
+});
+
+test('nested dictionaries and lists validate recursively', () => {
+  const result = checkTypes(parse(tokenize(`type User
+  id is number
+ done
+type Groups
+  users is dictionary of list of User
+ done
+make load() returns Groups
+  give { users: { admins: [{ id: 1 }], guests: [{ id: "bad" }] } }
+ done`)));
+  assert(result.diagnostics.some(item => /guests/.test(item.message) && /id/.test(item.message)));
+});
+
+test('optional and union collection elements accept valid alternatives', () => {
+  const result = checkTypes(parse(tokenize(`let values as list of optional number is [1, null, 3]
+let mixed as dictionary of number or text is { count: 2, label: "ok" }`)));
+  assert.deepStrictEqual(result.diagnostics, []);
+});
+
+test('null checks narrow optional values within the non-null branch', () => {
+  const result = checkTypes(parse(tokenize(`type User
+  name is text
+ done
+make read(user as optional User) returns text
+  if user is not null
+    give user.name
+  otherwise
+    give "unknown"
+  done
+ done`)));
+  assert.deepStrictEqual(result.diagnostics, []);
+});
+
+console.log('11 tests: passed');

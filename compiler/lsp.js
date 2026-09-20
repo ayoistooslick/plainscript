@@ -7,7 +7,7 @@ const fs = require('fs');
 const { tokenize } = require('./lexer');
 const { parse } = require('./parser');
 const { lowerToIR } = require('./ir');
-const { checkTypes } = require('./type-checker');
+const { checkTypes, typeName } = require('./type-checker');
 
 function parsePosition(message) {
   const match = /Line (\d+), Column (\d+)/.exec(String(message));
@@ -108,13 +108,13 @@ class LspService {
     const type = (result.ast.body || []).find(node => node.type === 'TypeDeclaration' && node.name === hit.word);
     const fn = (result.ast.body || []).find(node => (node.type === 'FunctionDeclaration' || node.type === 'IntentDeclaration') && node.name === hit.word);
     if (type) {
-      const fields = (type.fields || []).map(field => `- ${field.key}: ${JSON.stringify(field.type)}`).join('\n');
+      const fields = (type.fields || []).map(field => `- ${field.key}: ${typeName(field.type)}`).join('\n');
       return { contents: { kind: 'markdown', value: `**type ${type.name}**\n\n${fields}` } };
     }
     if (fn) {
-      const params = (fn.params || []).map(param => `${param.name}${param.typeAnnotation ? ` as ${JSON.stringify(param.typeAnnotation)}` : ''}`).join(', ');
+      const params = (fn.params || []).map(param => `${param.name}${param.typeAnnotation ? ` as ${typeName(param.typeAnnotation)}` : ''}`).join(', ');
       const prefix = fn.type === 'IntentDeclaration' ? 'intend' : 'make';
-      const returns = fn.returnType ? ` returns ${JSON.stringify(fn.returnType)}` : '';
+      const returns = fn.returnType ? ` returns ${typeName(fn.returnType)}` : '';
       return { contents: { kind: 'markdown', value: `**${prefix} ${fn.name}(${params})${returns}**` } };
     }
     return null;
@@ -122,7 +122,7 @@ class LspService {
 
   completion(uri) {
     const result = this.analyze(uri);
-    const labels = ['remember', 'show', 'make', 'intend', 'type', 'if', 'otherwise', 'for', 'while', 'done', 'give', 'match', 'test'];
+    const labels = ['remember', 'show', 'make', 'intend', 'type', 'if', 'otherwise', 'for', 'while', 'done', 'give', 'match', 'test', 'list', 'dictionary', 'optional', 'returns'];
     if (result.ast) {
       for (const node of result.ast.body) {
         if (node.name) labels.push(node.name);
@@ -149,6 +149,55 @@ class LspService {
     }];
   }
 
+  references(uri, position) {
+    const document = this.document(uri);
+    if (!document) return [];
+    const hit = wordAt(document.text, position);
+    if (!hit) return [];
+    const escaped = hit.word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const pattern = new RegExp(`\\b${escaped}\\b`, 'g');
+    const locations = [];
+    document.text.split(/\r?\n/).forEach((line, lineIndex) => {
+      let match;
+      while ((match = pattern.exec(line))) {
+        locations.push({ uri, range: {
+          start: { line: lineIndex, character: match.index },
+          end: { line: lineIndex, character: match.index + hit.word.length },
+        }});
+      }
+    });
+    return locations;
+  }
+
+  rename(uri, position, newName) {
+    if (!newName || !/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(newName)) return null;
+    const references = this.references(uri, position);
+    if (!references.length) return null;
+    return { changes: { [uri]: references.map(location => ({ range: location.range, newText: newName })) } };
+  }
+
+  signatureHelp(uri, position) {
+    const document = this.document(uri);
+    const result = this.analyze(uri);
+    if (!document || !result.ast) return null;
+    const line = (document.text.split(/\r?\n/)[position.line] || '').slice(0, position.character);
+    const match = /([A-Za-z_$][A-Za-z0-9_$]*)\([^()]*$/.exec(line);
+    if (!match) return null;
+    const fn = (result.ast.body || []).find(node =>
+      (node.type === 'FunctionDeclaration' || node.type === 'IntentDeclaration') && node.name === match[1]
+    );
+    if (!fn) return null;
+    const parameters = (fn.params || []).map(param => ({
+      label: `${param.name}${param.typeAnnotation ? ` as ${typeName(param.typeAnnotation)}` : ''}`,
+    }));
+    const activeParameter = (line.slice(match.index).match(/,/g) || []).length;
+    const returns = fn.returnType ? ` returns ${typeName(fn.returnType)}` : '';
+    return { signatures: [{
+      label: `${match[1]}(${parameters.map(param => param.label).join(', ')})${returns}`,
+      parameters,
+    }], activeParameter };
+  }
+
   request(method, params = {}) {
     switch (method) {
       case 'initialize':
@@ -157,11 +206,17 @@ class LspService {
           hoverProvider: true,
           completionProvider: { triggerCharacters: ['.', ' '] },
           definitionProvider: true,
+          referencesProvider: true,
+          renameProvider: true,
+          signatureHelpProvider: { triggerCharacters: ['(', ','] },
         }, serverInfo: { name: 'plainscript-lsp', version: '1.0.0' } };
       case 'shutdown': this.shutdownRequested = true; return null;
       case 'textDocument/hover': return this.hover(params.textDocument.uri, params.position);
       case 'textDocument/completion': return this.completion(params.textDocument.uri);
       case 'textDocument/definition': return this.definition(params.textDocument.uri, params.position);
+      case 'textDocument/references': return this.references(params.textDocument.uri, params.position);
+      case 'textDocument/rename': return this.rename(params.textDocument.uri, params.position, params.newName);
+      case 'textDocument/signatureHelp': return this.signatureHelp(params.textDocument.uri, params.position);
       case 'textDocument/documentSymbol': return this.symbols(params.textDocument.uri);
       case 'workspace/symbol': {
         const all = [];

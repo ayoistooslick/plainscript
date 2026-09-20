@@ -34,6 +34,7 @@ function lowerDeclaration(node) {
     parameters: lowerValue(node.params || []),
     body: lowerValue(node.body || []),
   };
+  if (node.returnType) out.returnType = lowerValue(node.returnType);
   if (node.type === 'IntentDeclaration') {
     out.intent = lowerValue(node.intent || { kind: 'declaration', name: node.name });
   }

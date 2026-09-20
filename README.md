@@ -131,7 +131,7 @@ done
 </tr>
 </table>
 
-**Current version:** `v1.0.363`  -  the `plainscript-lang` npm package, with a TypeScript-style production build (`plainscript build` → `dist/`, source names and structure preserved).
+**Current version:** `v1.1.0`  -  the `plainscript-lang` npm package, with a TypeScript-style production build (`plainscript build` → `dist/`, source names and structure preserved).
 
 ---
 
@@ -200,7 +200,7 @@ socket export plus `useMultiFileAuthState`, `makeCacheableSignalKeyStore`, and
 | `plainscript ir <file.pln>` | Emits the stable, backend-neutral compiler IR as JSON for tooling and diagnostics. |
 | `plainscript-lsp` | Runs the stdio Language Server Protocol service for editor diagnostics, hover, completion, definitions, and symbols. |
 | `plainscript build [file.pln]` | Compiles to `dist/`. With no argument, builds every `.pln` file under the source root, preserving names and folder structure. |
-| `plainscript check <file.pln>` | Checks syntax and dependencies only. Reports a per-file `✓` line (or an error). Never executes your program. |
+| `plainscript check <file.pln>` | Resolves imports, runs static contract/type checking, validates generated JavaScript, and reports a per-file `✓` line (or an error). Never executes your program. |
 | `plainscript fmt <file.pln>` | Formats a PlainScript file in place. |
 | `plainscript new [name]` | Creates a new PlainScript project, npm-ready. |
 | `plainscript install` | Installs dependencies detected across the project's sources. |
@@ -261,7 +261,7 @@ For projects that need custom output or source directories, add a `plainscript.c
     "build": "plainscript build",
     "prepare": "plainscript build"
   },
-  "devDependencies": { "plainscript-lang": "^1.0.363" }
+  "devDependencies": { "plainscript-lang": "^1.1.0" }
 }
 ```
 
@@ -436,10 +436,21 @@ show greet({ id: 1, name: "Ada" })
 ```
 
 Missing required fields and incompatible values fail before the function body
-runs. The static checker now reports unknown fields, missing required fields,
-incompatible literal values, unknown contract names, arity errors, and invalid
-member access to editor tooling. Whole-program inference and exhaustiveness
-checking remain future work.
+runs. Functions and intents can declare return contracts with `returns` or
+`returning`; the checker validates returned values and reports missing returns.
+Collection contracts can be used on mutable bindings:
+
+```text
+let users as list of User is [{ id: 1, name: "Ada" }]
+let usersById as dictionary of User is { first: { id: 1, name: "Ada" } }
+```
+
+List elements, dictionary values, and nested record fields are checked
+recursively. Optional and union element types are supported. The static checker
+reports unknown fields, missing required fields, incompatible literal values,
+unknown contract names, arity errors, invalid assignments, unsafe optional
+member access, and invalid member access to editor tooling. Whole-program
+inference and exhaustiveness checking remain future work.
 
 ### Language-server tooling
 
@@ -450,9 +461,10 @@ plainscript-lsp
 ```
 
 The server implements `initialize`, document open/change/close notifications,
-`textDocument/publishDiagnostics`, hover, completion, definition, and document
-symbol requests. Editors should launch it as a standard LSP process and send
-JSON-RPC messages using the normal `Content-Length` framing.
+`textDocument/publishDiagnostics`, type-rich hover, completion, definition,
+references, rename, signature help, and document-symbol requests. Editors
+should launch it as a standard LSP process and send JSON-RPC messages using the
+normal `Content-Length` framing.
 
 ### Intent declarations
 
@@ -813,7 +825,7 @@ Portable databases (SQLite native or WebAssembly):
 database "app.db"                  // probes better-sqlite3, falls back to sql.js
 ```
 
-`plainscript install` verifies that `better-sqlite3` actually loads. Since 1.0.363 the native engine ships as an **optional dependency**: installing `plainscript-lang` can never fail because a native binary is missing for the platform (e.g. Android/Termux), and programs that never open a database start without it. If the native module cannot be used, PlainScript warns and continues on the pure-JavaScript WebAssembly engine (`sql.js`)  -  the same program runs unchanged. An engine can be forced explicitly:
+`plainscript install` verifies that `better-sqlite3` actually loads. The native engine ships as an **optional dependency**: installing `plainscript-lang` can never fail because a native binary is missing for the platform (e.g. Android/Termux), and programs that never open a database start without it. If the native module cannot be used, PlainScript warns and continues on the pure-JavaScript WebAssembly engine (`sql.js`)  -  the same program runs unchanged. An engine can be forced explicitly:
 
 ```plainscript
 database "app.db" using "native"   // hard requirement: better-sqlite3

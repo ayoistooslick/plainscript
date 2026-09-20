@@ -151,6 +151,14 @@ let y be 6
 remember z as 7
 ```
 
+Mutable bindings may carry a recursive collection or record contract between
+the name and initializer:
+
+```text
+let users as list of User is [{ id: 1, name: "Ada" }]
+let usersById as dictionary of User is { first: { id: 1, name: "Ada" } }
+```
+
 Reassignment (word-formed; PlainScript has no `=` symbol):
 
 ```plainscript
@@ -206,9 +214,10 @@ make greet(user as User)
 done
 ```
 
-The generated function validates `user` before entering its body. This slice
-provides runtime contracts; static inference and compile-time field checking
-are not yet implemented.
+The generated function validates `user` before entering its body. The static
+checker also validates literal arguments, typed bindings, return contracts,
+collection elements, nested fields, and known member access. It remains
+conservative for expressions whose types are unknown.
 
 ## 5. Statements and blocks
 

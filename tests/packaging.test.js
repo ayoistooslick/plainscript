@@ -1,4 +1,4 @@
-// Packaging regression tests for PlainScript v1.0.363.
+// Packaging regression tests for the current PlainScript release.
 //
 // These guard the dependency architecture that makes `plainscript-lang`
 // installable on platforms where better-sqlite3 has no usable native binary
@@ -21,6 +21,7 @@ const { execFileSync } = require('child_process');
 const { tokenize } = require('../compiler/lexer');
 const { parse } = require('../compiler/parser');
 const { generate, createGenerationContext, wrapAsync } = require('../compiler/generator');
+const { VERSION } = require('../compiler/version');
 
 const ROOT = path.join(__dirname, '..');
 
@@ -117,7 +118,7 @@ async function runGenerated(js, provider = {}) {
 
 test('package.json: better-sqlite3 is optional, never a mandatory dependency', () => {
   const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
-  assert(pkg.version === '1.0.363', `expected version 1.0.363, got ${pkg.version}`);
+  assert(pkg.version === VERSION, `package/compiler versions must agree: ${pkg.version} vs ${VERSION}`);
   assert(!pkg.dependencies || !pkg.dependencies['better-sqlite3'],
     'better-sqlite3 must not be a mandatory dependency');
   assert(pkg.optionalDependencies && pkg.optionalDependencies['better-sqlite3'],
@@ -295,12 +296,12 @@ test('packed package installs with optional dependencies omitted and still runs'
     const versionOut = execFileSync(process.execPath,
       ['-e', "console.log(require('./node_modules/plainscript-lang/compiler/version').VERSION)"],
       { cwd: tmp, encoding: 'utf8' });
-    assert(versionOut.trim() === '1.0.363', `compiler version from packed artifact: ${versionOut.trim()}`);
+    assert(versionOut.trim() === VERSION, `compiler version from packed artifact: ${versionOut.trim()}`);
 
     const cliOut = execFileSync(process.execPath,
       [path.join(installed, 'compiler', 'cli.js'), 'version'],
       { cwd: tmp, encoding: 'utf8' });
-    assertIncludes(cliOut, '1.0.363', 'packed CLI version output');
+    assertIncludes(cliOut, VERSION, 'packed CLI version output');
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }

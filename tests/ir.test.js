@@ -30,6 +30,21 @@ test('intent declarations lower to callable IR with metadata', () => {
   assert.strictEqual(ir.body[0].parameters[0].kind, 'Object');
 });
 
+test('IR preserves return contracts and typed collection bindings', () => {
+  const ir = lowerToIR(parseSource(`type User
+  id is number
+done
+make getUsers() returns list of User
+  give []
+done
+let users as list of User is []`));
+  const fn = ir.body.find(item => item.kind === 'FunctionDeclaration');
+  const binding = ir.body.find(item => item.kind === 'RememberStatement');
+  assert.strictEqual(fn.returnType.kind, 'list');
+  assert.strictEqual(fn.returnType.value.name, 'User');
+  assert.strictEqual(binding.typeAnnotation.kind, 'list');
+});
+
 test('intent declarations remain callable at runtime', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'plainscript-intent-'));
   const file = path.join(dir, 'intent.pln');
@@ -57,4 +72,4 @@ test('ir CLI emits machine-readable JSON', () => {
   assert.strictEqual(ir.body[0].kind, 'IntentDeclaration');
 });
 
-console.log('5 tests: passed');
+console.log('6 tests: passed');

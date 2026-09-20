@@ -71,4 +71,27 @@ test('LSP provides completion, hover, definition, and stdio JSON-RPC', () => {
   assert(result.stdout.includes('"id":1'));
 });
 
-console.log('5 tests: passed');
+test('LSP exposes recursive type hover and semantic navigation', () => {
+  const service = new LspService();
+  const uri = 'file:///tmp/plain-lsp-depth.pln';
+  service.setDocument(uri, `type User\n  id is number\ndone\nmake getUsers() returns list of User\n  give []\ndone\nshow getUsers()`, 1);
+  const hover = service.hover(uri, { line: 3, character: 7 });
+  assert(hover.contents.value.includes('returns list of User'));
+  assert.strictEqual(service.request('initialize').capabilities.referencesProvider, true);
+  assert.strictEqual(service.request('initialize').capabilities.renameProvider, true);
+  assert(service.references(uri, { line: 6, character: 7 }).length >= 2);
+  const rename = service.rename(uri, { line: 6, character: 7 }, 'loadUsers');
+  assert(rename.changes[uri].length >= 2);
+});
+
+test('LSP returns signature help for typed functions', () => {
+  const service = new LspService();
+  const uri = 'file:///tmp/plain-lsp-signature.pln';
+  service.setDocument(uri, 'make add(a as number, b as number) returns number\n  give a + b\ndone\nshow add(1, 2)', 1);
+  const help = service.signatureHelp(uri, { line: 3, character: 12 });
+  assert(help);
+  assert(help.signatures[0].label.includes('a as number'));
+  assert.strictEqual(help.activeParameter, 1);
+});
+
+console.log('7 tests: passed');

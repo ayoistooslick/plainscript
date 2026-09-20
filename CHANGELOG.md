@@ -4,6 +4,36 @@ All notable changes to PlainScript are documented here.
 
 ---
 
+## [1.1.0]  -  2026-09-20
+
+### Language depth
+
+- Function and intent return contracts with `returns` and `returning`.
+- Return-value validation, missing-return diagnostics, unknown-contract
+  diagnostics, and recursive return-type propagation through calls.
+- Typed mutable bindings such as `let users as list of User is [...]`.
+- Recursive validation for lists, dictionaries, nested records, optional
+  elements, union elements, and collection return contracts.
+- Known collection indexed access contributes its element type to checking.
+- Conservative expression typing for literals, variables, calls, arithmetic,
+  comparisons, member access, indexing, assignments, and conditionals.
+- Branch-local narrowing for optional and nullable values after null checks.
+- Cross-file static checking for resolved imports and missing imported symbols.
+
+### Tooling and interoperability
+
+- LSP hover now renders recursive contract types and function signatures.
+- LSP references, rename, and signature-help requests are supported.
+- IR preserves function return contracts and typed binding annotations.
+- `plainscript check` reports static diagnostics with the relevant source file
+  when validating an import graph.
+
+### Validation
+
+- Added real-world `examples/typed-collections.pln` coverage.
+- Added focused type, module, IR, LSP, documentation, compatibility, and
+  packaging regression tests.
+
 ## [1.0.363]  -  2026-09-14
 
 ### Assignment

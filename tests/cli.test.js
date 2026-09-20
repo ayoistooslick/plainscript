@@ -1,7 +1,7 @@
 // CLI tests for PlainScript  -  global --quiet / --verbose flags and the
 // version / check / build / run commands, driven as real child processes.
 //
-//   version:  prints a semver string (PlainScript v1.0.minor)
+//   version:  prints a semver string (PlainScript vMAJOR.MINOR.PATCH)
 //   check:    ✓ success line for valid files, ✗ + error + non-zero exit for bad ones
 //   --quiet:  suppresses the ✓/✗ per-file chatter and stage lines, never errors
 //   --quiet:  still surfaces validation errors and non-zero exits
@@ -67,8 +67,8 @@ function tmpDir(prefix = 'plainscript-cli-') {
 test('version: prints a semver string', () => {
   const r = runCli(['version'], REPO_ROOT);
   assert(r.status === 0, `version exit code must be 0, got ${r.status}`);
-  const out = outputOf(r);
-  assert(/1\.0\.\d+/.test(out), `expected "PlainScript v1.0.x", got:\n${out}`);
+  const out = outputOf(r).trim();
+  assert(/^PlainScript v\d+\.\d+\.\d+$/.test(out), `expected a semver version, got:\n${out}`);
 });
 
 test('--version and -v: standard flags print the same version string', () => {
@@ -81,7 +81,7 @@ test('--version and -v: standard flags print the same version string', () => {
   const b = outputOf(viaShort).trim();
   const c = outputOf(viaWord).trim();
   assert(a === c && b === c, `all version forms must agree, got: ${JSON.stringify([a, b, c])}`);
-  assert(/^PlainScript v1\.0\.363$/.test(c), `expected "PlainScript v1.0.363", got: ${c}`);
+  assert(/^PlainScript v\d+\.\d+\.\d+$/.test(c), `expected a semver version, got: ${c}`);
 });
 
 test('-v as a program argument survives run (does not mean version)', () => {

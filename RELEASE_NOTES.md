@@ -1,3 +1,54 @@
+# Release 1.1.0  -  Release Notes
+
+**Release date:** 2026-09-20
+
+---
+
+## What is new in 1.1.0?
+
+PlainScript 1.1.0 is the language-depth release. The compiler now carries
+declared types further through functions, collections, expressions, branches,
+and resolved local modules while remaining conservative when a value cannot be
+known statically.
+
+### Contracts and collections
+
+- Functions and intents accept `returns` and `returning` contracts.
+- Return values are checked statically, missing returns are diagnosed, and
+  declared return types propagate through calls.
+- Typed mutable bindings support recursive `list of T` and `dictionary of T`
+  contracts with `let name as Type is value`.
+- List elements, dictionary values, nested records, optional elements, and
+  union elements are validated recursively.
+- Known collection indexing contributes the element type to later checks.
+
+### Expression and flow checking
+
+- Known primitive, record, collection, and function result types flow through
+  literals, variables, arithmetic, comparisons, member access, indexing,
+  assignments, and conditional expressions.
+- Null checks narrow optional values within their checked branch.
+- Diagnostics remain conservative for unknown expressions and preserve the
+  existing contract error families.
+
+### Modules and tooling
+
+- Resolved local import graphs participate in static checking, including
+  imported contracts and functions.
+- Missing imported symbols receive deterministic module diagnostics.
+- The LSP provides recursive type hover, references, rename, signature help,
+  completion, definition lookup, and diagnostics.
+- IR preserves return contracts and typed binding annotations.
+- `plainscript check` reports static diagnostics with source-file context.
+
+### Validation
+
+- Added `examples/typed-collections.pln` as a real runnable example.
+- Full compiler, backend, compatibility, torture, packaging, IR, LSP, module,
+  type, and documentation validation passes.
+
+---
+
 # Release 1.0.363  -  Release Notes
 
 **Release date:** 2026-09-14

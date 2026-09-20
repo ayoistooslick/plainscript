@@ -8,8 +8,9 @@ const path = require('path');
 const { tokenize, TOKEN } = require('../compiler/lexer');
 const { parse } = require('../compiler/parser');
 const { generate, createGenerationContext } = require('../compiler/generator');
-const { bundle } = require('../compiler/bundler');
+const { bundle, resolveDependencies } = require('../compiler/bundler');
 const { detectDependencies } = require('../compiler/dependency-detector');
+const { checkTypes } = require('../compiler/type-checker');
 
 let passed = 0;
 let failed = 0;
@@ -184,6 +185,36 @@ test('bundler: namespace import resolves surface through generateBundle context'
     const bundledJs = bundle(mainFile);
     assert(bundledJs.includes('const lib = { get config()'), true, 'expected live getter namespace object');
     assert(!bundledJs.includes('require("./lib.pln")'), true, 'bundled output must not require the .pln source');
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test('static checker resolves imported contracts and return types across files', () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pln-cross-file-types-'));
+  const modelFile = path.join(tmpDir, 'model.pln');
+  const mainFile = path.join(tmpDir, 'main.pln');
+  fs.writeFileSync(modelFile, `type User\n  id is number\n  name is text\ndone\nmake getUsers() returns list of User\n  give [{ id: 1, name: "Ada" }]\ndone\nexport User\nexport getUsers`);
+  fs.writeFileSync(mainFile, `bring User and getUsers from "./model.pln"\nmake first() returns User\n  give getUsers()[0]\ndone\nshow first().name`);
+  try {
+    const files = resolveDependencies(mainFile);
+    const ast = { type: 'Program', body: files.flatMap(file => file.ast.body) };
+    assert(checkTypes(ast).diagnostics.length, 0, 'cross-file contracts should resolve');
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test('static checker reports an unknown imported symbol deterministically', () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pln-cross-file-missing-'));
+  const modelFile = path.join(tmpDir, 'model.pln');
+  const mainFile = path.join(tmpDir, 'main.pln');
+  fs.writeFileSync(modelFile, 'make present()\n  give 1\ndone\nexport present');
+  fs.writeFileSync(mainFile, 'bring missing from "./model.pln"\nshow missing()');
+  try {
+    const files = resolveDependencies(mainFile);
+    const ast = { type: 'Program', body: files.flatMap(file => file.ast.body) };
+    assert(checkTypes(ast).diagnostics.some(item => item.code === 'PLN-MODULE-UNKNOWN'), true, 'missing imports should be diagnosed');
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }

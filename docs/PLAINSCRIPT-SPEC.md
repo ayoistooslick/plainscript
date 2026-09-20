@@ -231,6 +231,19 @@ The checker powers the stdio language server started with `plainscript-lsp`.
 The server publishes these diagnostics and provides hover, completion,
 definition, and document-symbol responses using standard LSP JSON-RPC framing.
 
+Mutable bindings can declare recursive collection contracts with `as` before
+the initializer:
+
+```text
+let users as list of User is [{ id: 1, name: "Ada" }]
+let usersById as dictionary of User is { first: { id: 1, name: "Ada" } }
+```
+
+The checker validates every list element and dictionary value, including nested
+record fields. Optional and union element types use the same rules as function
+contracts. A known `list of T` or `dictionary of T` contributes `T` to indexed
+access, and null checks narrow optional values within the checked branch.
+
 ## Control flow
 
 ```plainscript

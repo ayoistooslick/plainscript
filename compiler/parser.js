@@ -1403,10 +1403,35 @@ function parse(tokens) {
       nameLine = nameToken.line;
     }
 
+    let typeAnnotation = null;
+    // Typed mutable binding: `let users as list of User is [...]`. The
+    // lookahead keeps legacy `let value as 42` default/initializer syntax
+    // unchanged because only a recognized type expression followed by `is` or
+    // `be` enters this path.
+    if (isLet && peek().type === TOKEN.AS && isTypeNameStart(peekAt(1))) {
+      const saved = pos;
+      advance();
+      try {
+        const candidate = parseTypeSpec();
+        if (peek().type === TOKEN.IS || peek().type === TOKEN.BE) {
+          typeAnnotation = candidate;
+          advance();
+        } else {
+          pos = saved;
+        }
+      } catch (_) {
+        pos = saved;
+      }
+    }
+
     // Object literal: next token is IDENTIFIER (except dictionary/map) followed by IS or BE
     if (peek().type === TOKEN.IDENTIFIER && peek().value !== 'dictionary' && peek().value !== 'map' && (peekAt(1).type === TOKEN.IS || peekAt(1).type === TOKEN.BE) && !isObjectShorthandAmbiguousWithComparison()) {
       const init = parseInlineObjectLiteral(false);
-      return { type: 'RememberStatement', name: target, value: init, isLet, isConstant: !isLet };
+      return { type: 'RememberStatement', name: target, value: init, typeAnnotation, isLet, isConstant: !isLet };
+    }
+
+    if (typeAnnotation) {
+      return { type: 'RememberStatement', name: target, value: parseExpression(), typeAnnotation, isLet, isConstant: !isLet };
     }
 
     // "let" uses "is" or "be" for simple vars, but also accepts "as" for both simple and destructuring
@@ -1417,7 +1442,7 @@ function parse(tokens) {
     // The statement's name token is on the declaration line; a next token on a
     // LATER line means no initializer follows on that line.
     if (!isDestructuring && typeof target === 'string' && peek().line > nameLine) {
-      return { type: 'RememberStatement', name: target, value: null, isLet, isConstant: !isLet };
+      return { type: 'RememberStatement', name: target, value: null, typeAnnotation, isLet, isConstant: !isLet };
     }
     const assignToken = isLet ? ((peek().type === TOKEN.IS || peek().type === TOKEN.BE) ? peek().type : TOKEN.AS) : TOKEN.AS;
     const expectedKeyword = (isLet && (peek().type === TOKEN.IS || peek().type === TOKEN.BE)) ? (peek().type === TOKEN.BE ? 'be' : 'is') : 'as';
@@ -1428,7 +1453,7 @@ function parse(tokens) {
 
     // Object literal: next token is IDENTIFIER followed by IS or BE
     if (peek().type === TOKEN.IDENTIFIER && (peekAt(1).type === TOKEN.IS || peekAt(1).type === TOKEN.BE) && !isObjectShorthandAmbiguousWithComparison()) {
-      return { type: 'RememberStatement', name: target, value: parseObjectLiteral() };
+      return { type: 'RememberStatement', name: target, value: parseObjectLiteral(), typeAnnotation };
     }
 
     // v2.1.0  -  remember <name> as query|insert|update|delete … done
@@ -1447,7 +1472,7 @@ function parse(tokens) {
     }
 
     const value = parseExpression();
-    return { type: 'RememberStatement', name: target, value };
+    return { type: 'RememberStatement', name: target, value, typeAnnotation };
   }
 
   // ask <variable>
@@ -1613,18 +1638,19 @@ function parseAsk() {
   const primitiveTypeNames = new Set(['any', 'number', 'text', 'boolean', 'null', 'object']);
   function isTypeNameStart(token) {
     return token && token.type === TOKEN.IDENTIFIER &&
-      (declaredTypeNames.has(token.value) || primitiveTypeNames.has(token.value) || /^[A-Z]/.test(token.value));
+      (declaredTypeNames.has(token.value) || primitiveTypeNames.has(token.value) ||
+       ['optional', 'list', 'dictionary'].includes(token.value) || /^[A-Z]/.test(token.value));
   }
   function parseTypeAtom() {
     const token = peek();
     if (token.type === TOKEN.IDENTIFIER && token.value === 'optional') {
       advance();
-      return { kind: 'optional', value: parseTypeAtom() };
+      return { kind: 'optional', value: parseTypeSpec() };
     }
     if (token.type === TOKEN.IDENTIFIER && (token.value === 'list' || token.value === 'dictionary')) {
       const kind = advance().value;
       if (peek().type === TOKEN.IDENTIFIER && peek().value === 'of') advance();
-      return { kind, value: parseTypeAtom() };
+      return { kind, value: parseTypeSpec() };
     }
     if (!isTypeNameStart(token) && token.type !== TOKEN.NULL_KW) {
       throw new Error(makeError('Expected a type name (number, text, boolean, object, or a declared type).', token));
