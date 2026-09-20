@@ -14,6 +14,8 @@ If `plainscript check` validates it, it's listed here.
 | Records and record kinds | Implemented | `define a kind called "User" with ... done` |
 | Conditions | Implemented | `if ... otherwise ... done` |
 | Functions | Implemented | `make add(a, b) ... done` |
+| Intent declarations | Implemented | `intend greet(name) ... done`; preserved in AST and IR |
+| Runtime data contracts | Implemented | `type User ... done`, typed parameters, unions and collections |
 | Generators | Implemented | `yield value` |
 | For and while loops | Implemented | `for each ... done`, `while ... done` |
 | Match and switch | Implemented | `match value against ... done` |
@@ -46,6 +48,7 @@ If `plainscript check` validates it, it's listed here.
 | Terminal I/O | Implemented | `confirm("...")`, `choose("...", [...])`, `stderr(...)` |
 | Terminal query | Implemented | `clearTerminal()`, `terminalWidth()`, `terminalHeight()` |
 | CLI flags | Implemented | `--quiet`, `--verbose` |
+| Compiler IR inspection | Implemented | `plainscript ir file.pln` emits versioned JSON |
 
 ## Web and Services
 

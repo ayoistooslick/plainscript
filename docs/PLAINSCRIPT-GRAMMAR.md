@@ -223,6 +223,7 @@ equivalent; `end` maps to the same terminator as `done` in the lexer.
 | `while <cond>` | body | `done` |
 | `repeat <n> times` / `repeat with <v> [...]` / `repeat while/until <cond>` | body | `done` |
 | `make <name>(<params>)` (also `define <name>(<params>)`) | body | `done` |
+| `intend <name>(<params>)` | body | `done` |
 | `match <value> against` | `->` cases + `otherwise ->` | `done` |
 | `switch <value> against` | `->` cases | `done` |
 | `try` | body with `recover as <err>` / `finally` clauses | `done` |

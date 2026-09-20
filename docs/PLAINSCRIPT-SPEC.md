@@ -154,6 +154,28 @@ done
 `yield` turns a function into a generator. Functions can use `wait for` and
 other async operations.
 
+`intend name(params)` is a callable declaration equivalent to `make` at
+runtime, but it remains an `IntentDeclaration` in the AST and compiler IR. This
+metadata is reserved for future contract analysis, documentation generation,
+and semantic diagnostics.
+
+```plainscript
+intend greet(name)
+    give `Hello ${name}`
+done
+```
+
+Tooling can inspect the backend-neutral representation with:
+
+```bash
+plainscript ir path/to/program.pln
+```
+
+The command emits versioned JSON and preserves statement kinds, source spans,
+function parameters, and intent metadata. The JavaScript backend continues to
+consume the existing AST while alternate backends are developed against this
+stable boundary.
+
 ## Typed data contracts
 
 Contextual `type` declarations describe the required shape of a record. A

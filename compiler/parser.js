@@ -4,7 +4,7 @@ const { tokenize, TOKEN, KEYWORDS } = require('./lexer');
 
 // Statement-starting PlainScript keywords, used for "did you mean?" suggestions.
 const STATEMENT_KEYWORDS = [
-  'remember', 'show', 'display', 'log', 'if', 'make', 'give',
+  'remember', 'show', 'display', 'log', 'if', 'make', 'intend', 'give',
   'for', 'while', 'repeat', 'until', 'use', 'import', 'when', 'listen', 'reply', 'serve',
   'web', 'route', 'start', 'database', 'query', 'insert', 'update', 'delete', 'execute',
   'ask', 'bot', 'ocr', 'try', 'recover', 'retry',
@@ -623,6 +623,12 @@ function parse(tokens) {
 
   function parseStatementCore() {
     const token = peek();
+
+    // Intent declarations share function semantics but remain distinct in the
+    // AST so future tooling can retain the author's stated intent.
+    if (token.type === TOKEN.IDENTIFIER && token.value === 'intend') {
+      return parseIntentDeclaration();
+    }
 
     // `type User ... done` is contextual so existing identifier expressions
     // remain compatible outside statement position.
@@ -1576,6 +1582,23 @@ function parseAsk() {
     return { type: 'FunctionDeclaration', name, params, body };
   }
 
+  function parseIntentDeclaration() {
+    advance(); // intend
+    const nameToken = consume(TOKEN.IDENTIFIER, 'Expected an intent name after "intend".');
+    const name = nameToken.value;
+    consume(TOKEN.LPAREN, `Expected "(" after intent name "${name}".`);
+    const params = parseParamList();
+    consume(TOKEN.RPAREN, 'Expected ")" to close the intent parameter list.');
+    const body = parseBody(`intent "${name}"`);
+    return {
+      type: 'IntentDeclaration',
+      name,
+      params,
+      body,
+      intent: { kind: 'declaration', name, parameterCount: params.length },
+    };
+  }
+
   const primitiveTypeNames = new Set(['any', 'number', 'text', 'boolean', 'null', 'object']);
   function isTypeNameStart(token) {
     return token && token.type === TOKEN.IDENTIFIER &&
@@ -1828,7 +1851,7 @@ function parseAsk() {
     if (!tok || typeof tok.value !== 'string') return false;
     return [
       'show', 'print', 'display', 'log', 'let', 'remember', 'give', 'return',
-      'make', 'define', 'function', 'use', 'import', 'bring', 'export', 'ask',
+      'make', 'intend', 'define', 'function', 'use', 'import', 'bring', 'export', 'ask',
       'prompt', 'if', 'when', 'while', 'for', 'each', 'repeat', 'test', 'check',
       'try', 'raise', 'yield', 'listen', 'start', 'serve', 'run', 'reply',
       'status', 'send', 'wait', 'exit', 'put', 'unpack', 'set', 'change',

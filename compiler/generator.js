@@ -3184,7 +3184,7 @@ function containsYield(statements) {
     if (stmt.type === 'IfStatement') {
       if (containsYield(stmt.consequent)) return true;
       if (stmt.alternate && containsYield(stmt.alternate)) return true;
-    } else if (stmt.type !== 'FunctionDeclaration' && stmt.body && Array.isArray(stmt.body)) {
+    } else if (stmt.type !== 'FunctionDeclaration' && stmt.type !== 'IntentDeclaration' && stmt.body && Array.isArray(stmt.body)) {
       if (containsYield(stmt.body)) return true;
     }
   }
@@ -3250,7 +3250,7 @@ function generate(ast, contextOrOptions = createGenerationContext(), options = {
   // from imports. Computed before generation so calls inside the program (and
   // the exported module surface below) see it.
   const exported = ast.body
-    .filter(node => node.type === 'FunctionDeclaration')
+    .filter(node => node.type === 'FunctionDeclaration' || node.type === 'IntentDeclaration')
     .map(node => node.name);
   const declared = new Set(exported);
   context.declaredFunctions = new Set([...(context.declaredFunctions || []), ...declared]);
@@ -3706,7 +3706,8 @@ function generateStatement(node, indent = '', context = createGenerationContext(
       return `${indent}__plainTypes[${JSON.stringify(node.name)}] = { fields: ${schema} };`;
     }
 
-    case 'FunctionDeclaration': {
+    case 'FunctionDeclaration':
+    case 'IntentDeclaration': {
       const prevInFunction = context.inFunction;
       context.inFunction = true;
       const block = generateBlock(node.body, indent + '  ', context);

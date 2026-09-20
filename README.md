@@ -197,6 +197,7 @@ socket export plus `useMultiFileAuthState`, `makeCacheableSignalKeyStore`, and
 |---|---|
 | `plainscript run <file.pln>` | Installs missing dependencies, compiles, and executes. Runs from a scratch directory  -  nothing is written into your project. |
 | `plainscript test [target]` | Runs a PlainScript test file or all `*.test.pln` / `*.spec.pln` files under `tests/` (or `test/`). |
+| `plainscript ir <file.pln>` | Emits the stable, backend-neutral compiler IR as JSON for tooling and diagnostics. |
 | `plainscript build [file.pln]` | Compiles to `dist/`. With no argument, builds every `.pln` file under the source root, preserving names and folder structure. |
 | `plainscript check <file.pln>` | Checks syntax and dependencies only. Reports a per-file `✓` line (or an error). Never executes your program. |
 | `plainscript fmt <file.pln>` | Formats a PlainScript file in place. |
@@ -436,6 +437,21 @@ show greet({ id: 1, name: "Ada" })
 Missing required fields and incompatible values fail before the function body
 runs. This is the first contract-system slice; whole-program inference,
 exhaustiveness checking, and static field diagnostics remain future work.
+
+### Intent declarations
+
+`intend` declares a callable function while preserving the author's semantic
+intent in the AST and compiler IR. It currently has the same execution rules
+as `make`, making it safe to use today while leaving room for contract,
+documentation, and semantic-analysis tooling.
+
+```plainscript
+intend greet(name)
+    give `Hello ${name}`
+done
+
+show greet("Ada")
+```
 
 ### Lambdas
 

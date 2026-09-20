@@ -25,6 +25,7 @@ const { execFileSync } = require('child_process');
 const { tokenize } = require('./lexer');
 const { parse }    = require('./parser');
 const { generate, createGenerationContext, wrapAsync } = require('./generator');
+const { serializeIR } = require('./ir');
 const { bundle, generateBundle, buildSurfaces, resolveDependencies } = require('./bundler');
 const { format }   = require('./formatter');
 const { detectDependencies, PACKAGE_MAP, isBuiltinModule, splitPackageSpec } = require('./dependency-detector');
@@ -68,6 +69,7 @@ ${section('BUILD & CHECK')}
   plainscript check [target]  Validate imports + generate + JS output (no writes)
                                target: a .pln file, a directory, or none = project scan
                                --json  emits deterministic machine-readable output
+  plainscript ir <file.pln>     Print the backend-neutral compiler IR as JSON
   plainscript fmt <file.pln>    Format a file in place
 
 ${section('PACKAGES')}
@@ -1139,7 +1141,20 @@ function cmdFmt(filePath) {
 function cmdVersion() {
   console.log(`PlainScript v${VERSION}`);
 }
-
+function cmdIR(filePath) {
+  if (!filePath) {
+    console.error('Usage: plainscript ir <file.pln>');
+    process.exit(1);
+  }
+  const absPath = path.resolve(filePath);
+  if (!fs.existsSync(absPath)) {
+    console.error(`File not found: ${filePath}`);
+    process.exit(1);
+  }
+  const source = fs.readFileSync(absPath, 'utf8');
+  const ast = parse(tokenize(source));
+  process.stdout.write(serializeIR(ast));
+}
 function cmdHelp() {
   console.log(HELP);
 }
@@ -1202,6 +1217,7 @@ async function main() {
       break;
     }
     case 'check':   cmdCheck(fileArg, json);    break;
+    case 'ir':      cmdIR(fileArg);              break;
     case 'test':    cmdTest(fileArg);            break;
     case 'fmt':     cmdFmt(fileArg);              break;
     case 'new':     cmdNew(fileArg);              break;
