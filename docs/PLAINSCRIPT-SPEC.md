@@ -134,6 +134,26 @@ done
 show add(2, 3)
 ```
 
+Functions and intents may declare a return contract with `returns` (or the
+equivalent `returning`) after the parameter list. The static checker validates
+each `give`/`return` value and reports a missing return when a declared
+function has no return value:
+
+```plainscript
+make add(a as number, b as number) returns number
+    give a + b
+done
+
+intend greeting(name as text) returns text
+    give `Hello, ${name}`
+done
+```
+
+Return contracts use the same primitive, optional, list, dictionary, union, and
+declared-record types as parameter contracts. Untyped functions remain valid,
+and a function call with a return contract contributes that type to subsequent
+static checking.
+
 Function parameters can have simple defaults:
 
 ```plainscript

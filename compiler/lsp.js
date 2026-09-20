@@ -114,7 +114,8 @@ class LspService {
     if (fn) {
       const params = (fn.params || []).map(param => `${param.name}${param.typeAnnotation ? ` as ${JSON.stringify(param.typeAnnotation)}` : ''}`).join(', ');
       const prefix = fn.type === 'IntentDeclaration' ? 'intend' : 'make';
-      return { contents: { kind: 'markdown', value: `[1m${prefix} ${fn.name}(${params})[0m` } };
+      const returns = fn.returnType ? ` returns ${JSON.stringify(fn.returnType)}` : '';
+      return { contents: { kind: 'markdown', value: `**${prefix} ${fn.name}(${params})${returns}**` } };
     }
     return null;
   }

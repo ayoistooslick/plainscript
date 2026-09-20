@@ -139,9 +139,21 @@ function checkTypes(ast, options = {}) {
     }
     if (node.type === 'CallExpression') {
       const fn = functions.get(node.name);
-      if (fn) return 'any';
+      if (fn && fn.returnType) return typeName(fn.returnType);
       return 'any';
     }
+    if (node.type === 'BinaryExpression') {
+      if (['===', '!==', '>', '<', '>=', '<=', 'in'].includes(node.operator)) return 'boolean';
+      const left = infer(node.left, env, origin);
+      const right = infer(node.right, env, origin);
+      if (node.operator === '+' && (left === 'text' || right === 'text')) return 'text';
+      if (['+', '-', '*', '/', '%'].includes(node.operator) && left === 'number' && right === 'number') return 'number';
+      return 'any';
+    }
+    if (node.type === 'ConditionExpression' || node.type === 'BinaryCondition' ||
+        node.type === 'UnaryCondition' || node.type === 'BetweenCondition' ||
+        node.type === 'StringCondition' || node.type === 'InCondition' ||
+        node.type === 'NotInCondition' || node.type === 'LogicalCondition') return 'boolean';
     return 'any';
   }
 
@@ -228,6 +240,12 @@ function checkTypes(ast, options = {}) {
           if (param.name) nested.set(param.name, { type: param.typeAnnotation && param.typeAnnotation.kind === 'name' ? param.typeAnnotation.name : 'any', node: param });
         }
         checkStatements(node.body, nested);
+        checkFunctionReturns(node, nested);
+      } else if (node.type === 'GiveStatement' || node.type === 'ReturnStatement') {
+        // Returns are checked by the containing function so top-level `give`
+        // remains a valid legacy expression boundary, while expressions still
+        // receive their normal member and argument diagnostics.
+        checkExpression(node.value, env, node);
       } else {
         for (const value of Object.values(node)) {
           if (value && typeof value === 'object') {
@@ -235,6 +253,35 @@ function checkTypes(ast, options = {}) {
             else if (value.type && value.type !== 'TypeDeclaration') checkExpression(value, env, node);
           }
         }
+      }
+    }
+  }
+
+  function collectReturns(statements, result = []) {
+    for (const node of statements || []) {
+      if (!node || typeof node !== 'object') continue;
+      if (node.type === 'GiveStatement' || node.type === 'ReturnStatement') result.push(node);
+      for (const key of ['body', 'consequent', 'alternate', 'handlers', 'finalizer']) {
+        const child = node[key];
+        if (Array.isArray(child)) collectReturns(child, result);
+        else if (child && typeof child === 'object') collectReturns([child], result);
+      }
+    }
+    return result;
+  }
+
+  function checkFunctionReturns(fn, env) {
+    if (!fn.returnType) return;
+    addTypeSpecErrors(fn.returnType, fn);
+    const returns = collectReturns(fn.body);
+    if (returns.length === 0) {
+      diagnostics.push(diagnostic(`Function "${fn.name}" declares ${typeName(fn.returnType)} but does not return a value.`, fn, 'PLN-TYPE-RETURN-MISSING'));
+      return;
+    }
+    for (const statement of returns) {
+      const actual = statement.value ? infer(statement.value, env, statement) : 'null';
+      if (!specMatches(actual, fn.returnType, schemas)) {
+        diagnostics.push(diagnostic(`Function "${fn.name}" returns ${typeName(fn.returnType)} but this return produces ${actual}.`, statement, 'PLN-TYPE-RETURN'));
       }
     }
   }
