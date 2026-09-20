@@ -201,9 +201,15 @@ The current implementation emits the contract into the generated program and
 validates typed arguments at function entry. Required fields must be present;
 primitive values must match their declared type. `optional T` accepts a missing
 or null value, while `T or null` accepts null in addition to `T`. A declared
-contract can also be used inside `list of` and `dictionary of`. Static field
-inference, generic types, and compile-time exhaustiveness checking are not yet
-part of this slice.
+contract can also be used inside `list of` and `dictionary of`. The static
+checker consumes the same AST and IR and reports unknown contract names, arity
+errors, invalid literal fields, missing required fields, and invalid member
+access. Generic types, whole-program inference, and compile-time exhaustiveness
+checking are not yet part of this slice.
+
+The checker powers the stdio language server started with `plainscript-lsp`.
+The server publishes these diagnostics and provides hover, completion,
+definition, and document-symbol responses using standard LSP JSON-RPC framing.
 
 ## Control flow
 

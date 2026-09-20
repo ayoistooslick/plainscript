@@ -1536,15 +1536,20 @@ test('plainscript version shows the compiler version', () => {
   if (!out.includes(VERSION)) throw new Error(`Expected version ${VERSION} but got: ${out}`);
 });
 
-test('package.json exposes a plainscript bin with a node shebang', () => {
+test('package.json exposes plainscript and plainscript-lsp bins with node shebangs', () => {
   const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
   if (!pkg.bin || pkg.bin.plainscript !== './compiler/cli.js') throw new Error('missing "plainscript" bin');
-  if (Object.keys(pkg.bin).length !== 1) throw new Error('package.json must expose exactly one bin');
+  if (pkg.bin['plainscript-lsp'] !== './compiler/lsp.js') throw new Error('missing "plainscript-lsp" bin');
+  if (Object.keys(pkg.bin).length !== 2) throw new Error('package.json must expose exactly two PlainScript bins');
   if (pkg.preferGlobal) throw new Error('preferGlobal must be false: plainscript installs locally as a devDependency');
   if (pkg.name !== 'plainscript-lang') throw new Error('package name must be "plainscript-lang"');
   const firstLine = fs.readFileSync(path.join(__dirname, '..', 'compiler', 'cli.js'), 'utf8').split('\n')[0];
   if (firstLine.trim() !== '#!/usr/bin/env node') {
     throw new Error('compiler/cli.js must start with a node shebang for global installs');
+  }
+  const lspFirstLine = fs.readFileSync(path.join(__dirname, '..', 'compiler', 'lsp.js'), 'utf8').split('\n')[0];
+  if (lspFirstLine.trim() !== '#!/usr/bin/env node') {
+    throw new Error('compiler/lsp.js must start with a node shebang for global installs');
   }
 });
 

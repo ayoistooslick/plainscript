@@ -16,6 +16,7 @@ If `plainscript check` validates it, it's listed here.
 | Functions | Implemented | `make add(a, b) ... done` |
 | Intent declarations | Implemented | `intend greet(name) ... done`; preserved in AST and IR |
 | Runtime data contracts | Implemented | `type User ... done`, typed parameters, unions and collections |
+| Static contract diagnostics | Implemented | AST/IR checker reports field, arity, literal-value, and unknown-type errors |
 | Generators | Implemented | `yield value` |
 | For and while loops | Implemented | `for each ... done`, `while ... done` |
 | Match and switch | Implemented | `match value against ... done` |
@@ -49,6 +50,7 @@ If `plainscript check` validates it, it's listed here.
 | Terminal query | Implemented | `clearTerminal()`, `terminalWidth()`, `terminalHeight()` |
 | CLI flags | Implemented | `--quiet`, `--verbose` |
 | Compiler IR inspection | Implemented | `plainscript ir file.pln` emits versioned JSON |
+| Language-server protocol | Implemented | `plainscript-lsp` stdio server with diagnostics, hover, completion, definitions, symbols |
 
 ## Web and Services
 

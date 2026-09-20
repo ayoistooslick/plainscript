@@ -198,6 +198,7 @@ socket export plus `useMultiFileAuthState`, `makeCacheableSignalKeyStore`, and
 | `plainscript run <file.pln>` | Installs missing dependencies, compiles, and executes. Runs from a scratch directory  -  nothing is written into your project. |
 | `plainscript test [target]` | Runs a PlainScript test file or all `*.test.pln` / `*.spec.pln` files under `tests/` (or `test/`). |
 | `plainscript ir <file.pln>` | Emits the stable, backend-neutral compiler IR as JSON for tooling and diagnostics. |
+| `plainscript-lsp` | Runs the stdio Language Server Protocol service for editor diagnostics, hover, completion, definitions, and symbols. |
 | `plainscript build [file.pln]` | Compiles to `dist/`. With no argument, builds every `.pln` file under the source root, preserving names and folder structure. |
 | `plainscript check <file.pln>` | Checks syntax and dependencies only. Reports a per-file `✓` line (or an error). Never executes your program. |
 | `plainscript fmt <file.pln>` | Formats a PlainScript file in place. |
@@ -435,8 +436,23 @@ show greet({ id: 1, name: "Ada" })
 ```
 
 Missing required fields and incompatible values fail before the function body
-runs. This is the first contract-system slice; whole-program inference,
-exhaustiveness checking, and static field diagnostics remain future work.
+runs. The static checker now reports unknown fields, missing required fields,
+incompatible literal values, unknown contract names, arity errors, and invalid
+member access to editor tooling. Whole-program inference and exhaustiveness
+checking remain future work.
+
+### Language-server tooling
+
+The compiler IR and static checker are available through a stdio LSP server:
+
+```bash
+plainscript-lsp
+```
+
+The server implements `initialize`, document open/change/close notifications,
+`textDocument/publishDiagnostics`, hover, completion, definition, and document
+symbol requests. Editors should launch it as a standard LSP process and send
+JSON-RPC messages using the normal `Content-Length` framing.
 
 ### Intent declarations
 

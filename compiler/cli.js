@@ -26,6 +26,7 @@ const { tokenize } = require('./lexer');
 const { parse }    = require('./parser');
 const { generate, createGenerationContext, wrapAsync } = require('./generator');
 const { serializeIR } = require('./ir');
+const { checkTypes } = require('./type-checker');
 const { bundle, generateBundle, buildSurfaces, resolveDependencies } = require('./bundler');
 const { format }   = require('./formatter');
 const { detectDependencies, PACKAGE_MAP, isBuiltinModule, splitPackageSpec } = require('./dependency-detector');
@@ -1006,6 +1007,14 @@ function validateSource(absPath) {
     // resolveDependencies parses each file too, so a parse error anywhere in
     // the import graph surfaces here with a "file.pln  -  Line:Col" prefix.
     const { context, parts, files } = generateBundle(absPath);
+    const typedAst = { type: 'Program', body: files.flatMap(file => file.ast ? file.ast.body : []) };
+    const typeResult = checkTypes(typedAst);
+    if (typeResult.diagnostics.length > 0) {
+      const details = typeResult.diagnostics.map(item =>
+        `${rel}:${item.range.start.line + 1}:${item.range.start.character + 1} ${item.code} ${item.message}`
+      ).join('\n');
+      throw new Error(`Static type checking failed:\n${details}`);
+    }
     let js = parts.filter(s => s.trim()).join('\n');
     if (context.needsAsync) js = wrapAsync(js);
 
