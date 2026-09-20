@@ -135,8 +135,8 @@ editor tooling ship together.
   `print city of address of customer`, `let data is read("users.txt")`.
 - Multi-file projects bundle imports per entry; every source file gets its
   own standalone output under `dist/`.
-- JavaScript Gateway: raw JavaScript inside `javascript ... end` blocks
-  with full async support; any npm package joins via `use <package>`.
+- JavaScript and npm interoperability use supported `use`, `bring`, and
+  `import` forms. Raw `javascript ... end` blocks are rejected by the compiler.
 
 ## Backend capabilities
 
@@ -170,7 +170,8 @@ engine, no AI, no hidden codegen:
   `groupBy`, `startsWith`, `endsWith`, `truncate`, `padStart`, `padEnd`.
 - Record kinds (classes), concurrency combinators (`all of`/`any of`/`settled of`),
   generators (`yield`), reflection, binary data, YAML, CLI/process helpers,
-  Map/Set wrappers, and the JS Gateway escape hatch.
+  Map/Set wrappers, and dynamic module loading through the supported runtime
+  helper. Raw JavaScript blocks are not supported.
 
 ## WhatsApp bots
 

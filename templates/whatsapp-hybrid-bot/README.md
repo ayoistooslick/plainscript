@@ -17,7 +17,7 @@ export TELEGRAM_BOT_TOKEN="your-telegram-token"
 export WHATSAPP_PHONE="2348012345678"   # full international number, digits only
 npx plainscript build src/app.pln -o dist/app.js
 node dist/app.js
-```
+```plainscript
 
 When the WhatsApp session is new, a pairing code is printed in the terminal.
 Enter it on your phone: WhatsApp > Settings > Linked devices > Link a device >

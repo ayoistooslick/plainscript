@@ -245,7 +245,8 @@ release.
   remove | update | check | fmt | doctor | version | help`.
 - **Complete language:** variables, conditions, functions, arrays, objects,
   loops, string templates with `${...}` interpolation, PlainScript Expressions,
-  multi-file projects, and a JavaScript Gateway with full async support.
+  multi-file projects, and JavaScript/npm interoperability through supported
+  imports (raw JavaScript blocks are not part of the language).
 - **Deterministic backend capabilities** compiled by the same compiler  -  web
   apps and routing, SQLite (native or WebAssembly) and PostgreSQL databases
   with transactions, sessions with signed cookies, password hashing and HMAC

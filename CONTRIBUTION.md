@@ -19,8 +19,8 @@ PlainScript is a Node.js project.
 
 Clone the repository and install dependencies:
 ```bash
-git clone https://github.com/ayoistooslick/plain-code.git
-cd plain-code
+git clone https://github.com/ayoistooslick/plainscript.git
+cd plainscript
 npm install
 ```
 Run the test suite with:
@@ -88,19 +88,20 @@ If you add or modify syntax:
 
 Do not remove existing syntax or change its meaning without documenting the compatibility impact.
 
-JavaScript Gateway
+JavaScript and npm interoperability
 
-PlainScript supports a JavaScript Gateway for cases where PlainScript does not yet provide native syntax or functionality.
+Raw JavaScript blocks are **not part of the current language**. The compiler rejects
+`javascript ... done`; do not document or add examples that depend on that escape
+hatch. When a feature needs an ecosystem library, use PlainScript's supported
+`use`, `bring`, or `import` forms and call the imported API from PlainScript.
 
-This includes JavaScript blocks and JavaScript interoperability.
+When changing JavaScript or npm interoperability:
 
-When modifying the JavaScript Gateway:
-
-- Preserve JavaScript blocks verbatim where the language requires it.
-- Ensure PlainScript variables can continue to interact with gateway code correctly.
-- Test async behavior.
-- Test gateway behavior inside functions, routes, and loops where applicable.
-- Test npm package detection and imports, including hyphenated and scoped package names.
+- Add a compiler test for the supported PlainScript form.
+- Test async behavior inside functions, routes, and loops where applicable.
+- Test package detection and imports, including hyphenated and scoped package names.
+- Keep generated JavaScript as an implementation detail; users should not have to
+  paste JavaScript into a `.pln` file.
 
 Dependencies
 

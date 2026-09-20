@@ -507,6 +507,14 @@ function nodeModulesSearchPaths(entryDir) {
     if (parent === dir) break;
     dir = parent;
   }
+  // `plainscript run` executes generated code from an OS temporary directory.
+  // A staged file outside the compiler project has no ancestor relationship
+  // with the compiler's own dependencies, so keep this installation as a
+  // fallback after project-local paths have had priority.
+  const compilerModules = path.resolve(__dirname, '..', 'node_modules');
+  if (fs.existsSync(compilerModules) && !paths.includes(compilerModules)) {
+    paths.push(compilerModules);
+  }
   return paths;
 }
 

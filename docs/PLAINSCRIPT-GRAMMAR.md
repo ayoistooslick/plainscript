@@ -20,7 +20,7 @@ PlainScript is lexed into tokens first. Almost every line begins with a
 keyword; the parser dispatches statements off the first token. The full
 keyword set:
 
-```
+```text
 remember  let  show  print  display  as  is  if  otherwise  else  done  end
 do  greater  less  than  make  define  function  give  return  give back
 becomes  is now  set to  change to  for  each  every  in  while  use
@@ -55,7 +55,7 @@ accepted as declaration names where unambiguous.
 When a reserved word is used as a name, the compiler reports a clean error
 naming the word, e.g.:
 
-```
+```text
 Line 1, Column 10: Expected a variable name after "remember".
 
 "log" is a reserved PlainScript word and cannot be used as a name here.

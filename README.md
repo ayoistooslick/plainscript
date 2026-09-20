@@ -181,7 +181,7 @@ whatsapp bot
     auth "session"
     login qr
 done
-```
+```plainscript
 
 For a local adapter, install it from the project directory (for example,
 `npm install ./vendor/baileys`) and ensure it exposes the Baileys default
@@ -214,6 +214,12 @@ socket export plus `useMultiFileAuthState`, `makeCacheableSignalKeyStore`, and
 `--quiet` and `--verbose` are recognized anywhere in the argument list and
 apply to `run`, `build`, and `check`, e.g. `plainscript build --quiet` or
 `plainscript check src/app.pln --verbose`.
+
+`run` keeps project-local `node_modules` first. Because generated JavaScript is
+executed from a temporary directory, the CLI then falls back to the
+PlainScript installation's own dependencies (for example, `sql.js` or a
+usable `better-sqlite3`) rather than requiring generated files to be written
+into the project.
 
 ---
 
@@ -290,7 +296,7 @@ end
 
 ### Variables
 
-```
+```plainscript
 let name be "Ayokunle"
 let age be 16
 set age to 17
@@ -307,7 +313,7 @@ at the same list means they see the same data.
 
 Backtick-delimited strings preserve whitespace and support `${expression}` interpolation:
 
-```
+```plainscript
 let name be "World"
 let greeting be `Hello ${name}!`
 show greeting
@@ -331,8 +337,8 @@ comparison is itself a value: `score is at least 80` is `true` or `false`, so it
 can be stored, printed, passed to a function, or joined with `and` / `or` /
 `not`. When you need a *value* rather than a block, use `choosing` (below).
 
-```
-when age is at least 18
+```plainscript
+if age is at least 18
     show "Adult"
 otherwise
     show "Teenager"
@@ -376,7 +382,7 @@ All comparison operators:
 `choosing` is the value form of `if`: pick between two expressions and keep the
 whole thing inline  -  in an argument, a `give`, or a list element.
 
-```
+```plainscript
 remember verdict as choosing score is at least 90 then "A" otherwise "B"
 show choosing score is below 60 then "low" otherwise "ok"
 ```
@@ -386,7 +392,7 @@ condition is true and `<b>` otherwise.
 
 ### Functions
 
-```
+```plainscript
 to add a and b together
     give back a + b
 done
@@ -411,7 +417,7 @@ A lambda is a function without a name, written where a value is expected  -
 one-expression body and the `do ... done` form when the body has several
 statements:
 
-```
+```plainscript
 remember add as (a, b) -> a + b
 show add(2, 3)
 
@@ -437,7 +443,7 @@ is a plain object. Both are ordinary values, so lists hold records, records
 hold lists, and lambdas can live anywhere a value can. Read and write them with
 `.name`, `[index]`, or the natural-language forms later in this tour.
 
-```
+```plainscript
 let players be list with "Haaland", "Foden", "Rodri"
 show players[0]
 set players[1] to "Palmer"
@@ -454,7 +460,7 @@ show user.name
 JavaScript's `Map` and `Set` have direct spellings, and tuples are fixed-size
 arrays you usually unpack all at once:
 
-```
+```plainscript
 remember lookup as dictionary with "alpha" is 1 and "beta" is 2 done
 show lookup.get("beta")                       // 2
 
@@ -475,7 +481,7 @@ and JSON data arrives as nested lists and records.
 <condition> ... done` repeats until the condition is false. Counted loops come
 in sentence form too:
 
-```
+```plainscript
 repeat 5 times
     show "tick"
 done
@@ -490,7 +496,7 @@ done
 flips the `while` sense, and `for index i from 0 to 9` gives a zero-based
 counter when you need positions.
 
-```
+```plainscript
 for each player in players
     show player
 done
@@ -510,7 +516,7 @@ Collections, properties, and files read like sentences.
 
 **Items**
 
-```
+```plainscript
 let players be list with "Haaland", "Foden", "Rodri"
 
 show first player from players   // players[0]
@@ -523,7 +529,7 @@ Number words from `one` to `twenty` map to one-based positions  -  `player one` 
 
 **Collections**
 
-```
+```plainscript
 show players length              // players.length
 add("Palmer" to players)         // players.push("Palmer")
 remove("Rodri" from players)     // players.splice(players.indexOf("Rodri"), 1)
@@ -535,7 +541,7 @@ done
 
 **Properties**
 
-```
+```plainscript
 show name of user                // user.name
 show city of address of customer // customer.address.city
 name of user is now "Ayo"        // user.name = "Ayo"
@@ -545,7 +551,7 @@ name of user is now "Ayo"        // user.name = "Ayo"
 
 **Files**
 
-```
+```plainscript
 let data be read("users.txt")   // fs.readFileSync("users.txt", 'utf8')
 write(data to "users.txt")      // fs.writeFileSync(data, "users.txt", 'utf8')
 ```
@@ -558,7 +564,7 @@ The word-style assignment operators keep the common "fill the empty value"
 pattern on one line  -  PlainScript for `flag = flag || true` and
 `val = val ?? "default"`:
 
-```
+```plainscript
 let flag be false
 flag or becomes true
 show flag
@@ -744,13 +750,13 @@ Everything in this section is compiled by the deterministic compiler  -  no rule
 
 Portable databases (SQLite native or WebAssembly):
 
-```
+```plainscript
 database "app.db"                  // probes better-sqlite3, falls back to sql.js
 ```
 
 `plainscript install` verifies that `better-sqlite3` actually loads. Since 1.0.363 the native engine ships as an **optional dependency**: installing `plainscript-lang` can never fail because a native binary is missing for the platform (e.g. Android/Termux), and programs that never open a database start without it. If the native module cannot be used, PlainScript warns and continues on the pure-JavaScript WebAssembly engine (`sql.js`)  -  the same program runs unchanged. An engine can be forced explicitly:
 
-```
+```plainscript
 database "app.db" using "native"   // hard requirement: better-sqlite3
 database "app.db" using "wasm"     // hard requirement: sql.js
 ```
@@ -759,7 +765,7 @@ The WebAssembly engine persists the whole database to disk after every write, so
 
 ### HTTP Client
 
-```
+```plainscript
 let r be get "https://api.example.com/users"
 when ok of r
     show status of r
@@ -775,7 +781,7 @@ Methods: `get`, `post … with <body>`, `put`, `patch`, `delete "<url>"`. Respon
 
 ### Authentication
 
-```
+```plainscript
 let hash be hashPassword("correct horse")
 when checkPassword(password of body of request, hash)
     let token be createToken(user, env("TOKEN_SECRET"), 3600)
@@ -788,7 +794,7 @@ let payload be readToken(token, env("TOKEN_SECRET"))
 
 ### Sessions &amp; Cookies
 
-```
+```plainscript
 web app
 enable sessions "a-long-random-secret"
 
@@ -809,15 +815,18 @@ done
 
 Sessions ride an HMAC-signed `HttpOnly` cookie (`plainscript.sid`). The store is in-memory: restarting the server signs everyone out.
 
-```
-set cookie "theme" to "dark" expires in 7 days
-show cookie("theme")
-clear cookie "theme"
+```plainscript
+web app
+route get "/theme"
+    set cookie "theme" to "dark" expires in 7 days
+    show cookie("theme")
+    clear cookie "theme"
+done
 ```
 
 ### File Uploads
 
-```
+```plainscript
 accept uploads limit "5 MB" allow list with "image/png", "image/jpeg" folder "uploads"
 
 route post "/scan"
@@ -831,7 +840,7 @@ Files arrive as records with `name`, `type`, `size`, `data` (buffer), and `path`
 
 ### Rate Limiting
 
-```
+```plainscript
 limit requests to 100 per minute
 ```
 
@@ -839,7 +848,7 @@ Sliding window per client IP; the quota-exceeded response is HTTP 429.
 
 ### Google OAuth
 
-```
+```plainscript
 google oauth
     id is env("GOOGLE_ID")
     secret is env("GOOGLE_SECRET")
@@ -852,7 +861,7 @@ Registers `/auth/google` (redirect) and `/auth/google/callback` (code-for-token 
 
 ### Error Handling &amp; Retries
 
-```
+```plainscript
 try
     let data be jsonDecode(raw)
 recover as err
@@ -866,7 +875,7 @@ done
 
 Custom 404 handling:
 
-```
+```plainscript
 when nothing matches
     status 404
     reply json
