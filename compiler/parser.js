@@ -1578,8 +1578,13 @@ function parseAsk() {
     consume(TOKEN.LPAREN, `Expected "(" after function name "${name}".`);
     const params = parseParamList();
     consume(TOKEN.RPAREN, 'Expected ")" to close the parameter list.');
+    let returnType = null;
+    if (peek().type === TOKEN.IDENTIFIER && (peek().value === 'returns' || peek().value === 'returning')) {
+      advance();
+      returnType = parseTypeSpec();
+    }
     const body = parseBody(`function "${name}"`);
-    return { type: 'FunctionDeclaration', name, params, body };
+    return { type: 'FunctionDeclaration', name, params, returnType, body };
   }
 
   function parseIntentDeclaration() {
@@ -1589,11 +1594,17 @@ function parseAsk() {
     consume(TOKEN.LPAREN, `Expected "(" after intent name "${name}".`);
     const params = parseParamList();
     consume(TOKEN.RPAREN, 'Expected ")" to close the intent parameter list.');
+    let returnType = null;
+    if (peek().type === TOKEN.IDENTIFIER && (peek().value === 'returns' || peek().value === 'returning')) {
+      advance();
+      returnType = parseTypeSpec();
+    }
     const body = parseBody(`intent "${name}"`);
     return {
       type: 'IntentDeclaration',
       name,
       params,
+      returnType,
       body,
       intent: { kind: 'declaration', name, parameterCount: params.length },
     };

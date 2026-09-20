@@ -6,6 +6,7 @@ const { spawnSync } = require('child_process');
 const { tokenize } = require('../compiler/lexer');
 const { parse } = require('../compiler/parser');
 const { generate, createGenerationContext, wrapAsync } = require('../compiler/generator');
+const { checkTypes } = require('../compiler/type-checker');
 
 function compile(source) {
   return generate(parse(tokenize(source)), createGenerationContext());
@@ -82,4 +83,22 @@ test('unknown type syntax fails with a teaching error', () => {
  done`), /type name|declared type/i);
 });
 
-console.log('5 tests: passed');
+test('return contracts accept matching values and infer typed calls', () => {
+  const result = checkTypes(parse(tokenize(`make add(a as number, b as number) returns number
+  give a + b
+done
+remember total as add(2, 3)`)));
+  assert.deepStrictEqual(result.diagnostics, []);
+});
+
+test('return contracts reject mismatched and missing values', () => {
+  const result = checkTypes(parse(tokenize(`make bad() returns number
+  give "not a number"
+done
+make missing() returns text
+done`)));
+  assert(result.diagnostics.some(item => item.code === 'PLN-TYPE-RETURN' && /bad/.test(item.message)));
+  assert(result.diagnostics.some(item => item.code === 'PLN-TYPE-RETURN-MISSING' && /missing/.test(item.message)));
+});
+
+console.log('7 tests: passed');
