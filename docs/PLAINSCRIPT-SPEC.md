@@ -154,6 +154,35 @@ done
 `yield` turns a function into a generator. Functions can use `wait for` and
 other async operations.
 
+## Typed data contracts
+
+Contextual `type` declarations describe the required shape of a record. A
+function parameter can refer to a declared type after `as`; unlike a default
+literal such as `name as "friend"`, a type name is an identifier such as
+`User`.
+
+```plainscript
+type User
+    id is number
+    name is text
+    active is optional boolean
+    tags is list of text
+    metadata is dictionary of text
+done
+
+make greet(user as User)
+    give `Hello, ${user.name}`
+done
+```
+
+The current implementation emits the contract into the generated program and
+validates typed arguments at function entry. Required fields must be present;
+primitive values must match their declared type. `optional T` accepts a missing
+or null value, while `T or null` accepts null in addition to `T`. A declared
+contract can also be used inside `list of` and `dictionary of`. Static field
+inference, generic types, and compile-time exhaustiveness checking are not yet
+part of this slice.
+
 ## Control flow
 
 ```plainscript

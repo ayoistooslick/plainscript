@@ -410,6 +410,32 @@ function is a value like any other, so it can be stored with `remember`, passed
 as an argument, or returned from another function. Arguments are optional with
 defaults: `make label(name as "guest")`.
 
+### Typed data contracts
+
+PlainScript supports contextual `type` declarations for records and typed
+function parameters. The compiler records the contract in the AST and emitted
+programs validate typed arguments at runtime with clear field-level errors.
+Primitive types are `number`, `text`, `boolean`, `object`, and `null`; contracts
+also support `optional`, `list of`, `dictionary of`, and `or` unions.
+
+```plainscript
+type User
+    id is number
+    name is text
+    active is optional boolean
+done
+
+make greet(user as User)
+    give `Hello ${user.name}`
+done
+
+show greet({ id: 1, name: "Ada" })
+```
+
+Missing required fields and incompatible values fail before the function body
+runs. This is the first contract-system slice; whole-program inference,
+exhaustiveness checking, and static field diagnostics remain future work.
+
 ### Lambdas
 
 A lambda is a function without a name, written where a value is expected  - 

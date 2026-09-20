@@ -188,6 +188,28 @@ remember [a, b] as pair
 remember { x, y } as point
 ```
 
+Typed contracts use a contextual `type` declaration. Field annotations are
+required unless they use `optional`; nested collection annotations and simple
+unions are supported.
+
+```plainscript
+type User
+    id is number
+    name is text
+    active is optional boolean
+    tags is list of text
+    metadata is dictionary of text
+done
+
+make greet(user as User)
+    give user.name
+done
+```
+
+The generated function validates `user` before entering its body. This slice
+provides runtime contracts; static inference and compile-time field checking
+are not yet implemented.
+
 ## 5. Statements and blocks
 
 Blocks open with a keyword line and close with `done` **or** `end`. They are

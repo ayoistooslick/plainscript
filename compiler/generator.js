@@ -2914,6 +2914,42 @@ function generateBlock(statements, indent, context) {
   return { out, emitted };
 }
 
+// Runtime contract support for the contextual `type` declaration. Schemas are
+// deliberately plain data so a future static checker or alternate backend can
+// consume the same AST representation.
+function ensureTypeRuntime(context) {
+  if (context.typeRuntime) return;
+  context.typeRuntime = true;
+  context.pendingPrelude.push([
+    'const __plainTypes = Object.create(null);',
+    'function __plainMatchesType(value, spec, path) {',
+    '  if (spec.kind === "optional") return value == null || __plainMatchesType(value, spec.value, path);',
+    '  if (spec.kind === "union") return spec.values.some(s => __plainMatchesType(value, s, path));',
+    '  if (spec.kind === "list") return Array.isArray(value) && value.every((v, i) => __plainMatchesType(v, spec.value, `${path}[${i}]`));',
+    '  if (spec.kind === "dictionary") return value !== null && typeof value === "object" && !Array.isArray(value) && Object.entries(value).every(([k, v]) => __plainMatchesType(v, spec.value, `${path}.${k}`));',
+    '  if (spec.name === "any") return true;',
+    '  if (spec.name === "number") return typeof value === "number" && Number.isFinite(value);',
+    '  if (spec.name === "text") return typeof value === "string";',
+    '  if (spec.name === "boolean") return typeof value === "boolean";',
+    '  if (spec.name === "null") return value === null;',
+    '  if (spec.name === "object") return value !== null && typeof value === "object";',
+    '  try { __plainValidateType(spec.name, value, path); return true; } catch (_) { return false; }',
+    '}',
+    'function __plainValidateType(name, value, path = name) {',
+    '  const schema = __plainTypes[name];',
+    '  if (!schema) throw new Error(`Unknown PlainScript type "${name}".`);',
+    '  if (value == null || typeof value !== "object" || Array.isArray(value)) throw new Error(`${path} must be an object matching type ${name}.`);',
+    '  for (const field of schema.fields) {',
+    '    const fieldPath = `${path}.${field.key}`;',
+    '    if (value[field.key] === undefined) { if (field.type.kind !== "optional") throw new Error(`${fieldPath} is required by type ${name}.`); continue; }',
+    '    if (!__plainMatchesType(value[field.key], field.type, fieldPath)) throw new Error(`${fieldPath} does not match type ${name}.${field.key}.`);',
+    '  }',
+    '  return true;',
+    '}',
+    'function __plainAssertType(spec, value, path) { if (!__plainMatchesType(value, spec, path)) throw new Error(`${path} does not match its declared type.`); return value; }',
+  ].join('\n'));
+}
+
 // v2.1.0  -  generate a request accessor (param/query/header). These compile to
 // direct Express req.<bucket>[key] reads and are rejected outside routes so
 // mistakes surface at compile time with a teaching error.
@@ -3052,6 +3088,7 @@ function createGenerationContext(options = {}) {
     bundled: false, // true while generating inside a multi-file bundle
     pendingExports: [], // per-file deferred export assignments (emitted at end of file)
     importSurfaces: null, // Map<path, string[]> of local module export surfaces (bundler)
+    typeRuntime: false,
   };
 }
 
@@ -3663,6 +3700,12 @@ function generateStatement(node, indent = '', context = createGenerationContext(
       return `${indent}let ${node.variable} = await __ocr(${image}${langArg});`;
     }
 
+    case 'TypeDeclaration': {
+      ensureTypeRuntime(context);
+      const schema = JSON.stringify(node.fields || []);
+      return `${indent}__plainTypes[${JSON.stringify(node.name)}] = { fields: ${schema} };`;
+    }
+
     case 'FunctionDeclaration': {
       const prevInFunction = context.inFunction;
       context.inFunction = true;
@@ -3692,7 +3735,13 @@ function generateStatement(node, indent = '', context = createGenerationContext(
         }
         return p;
       }).join(', ');
-      return `${indent}${isAsync}function${isGen} ${node.name}(${paramStr}) {\n${block.out}\n${indent}}`;
+      const checks = node.params
+        .filter(p => p && p.typeAnnotation && p.name)
+        .map(p => `${indent}  __plainAssertType(${JSON.stringify(p.typeAnnotation)}, ${p.name}, ${JSON.stringify(`${node.name}.${p.name}`)});`)
+        .join('\n');
+      if (checks) ensureTypeRuntime(context);
+      const bodyWithChecks = checks ? `${checks}\n${block.out}` : block.out;
+      return `${indent}${isAsync}function${isGen} ${node.name}(${paramStr}) {\n${bodyWithChecks}\n${indent}}`;
     }
 
     case 'IfStatement': {

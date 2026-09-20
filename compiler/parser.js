@@ -144,7 +144,7 @@ function reservedWordHint(token) {
 function parse(tokens) {
   let pos = 0;
   let _inRepeatCount = false;
-
+  const declaredTypeNames = new Set(['any', 'number', 'text', 'boolean', 'null', 'object']);
   function peek()         { return tokens[pos]; }
   function peekAt(offset) { return tokens[pos + offset] || { type: TOKEN.EOF }; }
   function advance()      { return tokens[pos++]; }
@@ -623,6 +623,13 @@ function parse(tokens) {
 
   function parseStatementCore() {
     const token = peek();
+
+    // `type User ... done` is contextual so existing identifier expressions
+    // remain compatible outside statement position.
+    if (token.type === TOKEN.IDENTIFIER && token.value === 'type' &&
+        peekAt(1).type === TOKEN.IDENTIFIER) {
+      return parseTypeDeclaration();
+    }
 
     // v1.0.363  -  `done` can name a record field ("record with text "milk" and
     // done true"), so the statement-position target "done of t becomes ..."
@@ -1569,6 +1576,58 @@ function parseAsk() {
     return { type: 'FunctionDeclaration', name, params, body };
   }
 
+  const primitiveTypeNames = new Set(['any', 'number', 'text', 'boolean', 'null', 'object']);
+  function isTypeNameStart(token) {
+    return token && token.type === TOKEN.IDENTIFIER &&
+      (declaredTypeNames.has(token.value) || primitiveTypeNames.has(token.value) || /^[A-Z]/.test(token.value));
+  }
+  function parseTypeAtom() {
+    const token = peek();
+    if (token.type === TOKEN.IDENTIFIER && token.value === 'optional') {
+      advance();
+      return { kind: 'optional', value: parseTypeAtom() };
+    }
+    if (token.type === TOKEN.IDENTIFIER && (token.value === 'list' || token.value === 'dictionary')) {
+      const kind = advance().value;
+      if (peek().type === TOKEN.IDENTIFIER && peek().value === 'of') advance();
+      return { kind, value: parseTypeAtom() };
+    }
+    if (!isTypeNameStart(token) && token.type !== TOKEN.NULL_KW) {
+      throw new Error(makeError('Expected a type name (number, text, boolean, object, or a declared type).', token));
+    }
+    advance();
+    return { kind: 'name', name: token.value };
+  }
+  function parseTypeSpec() {
+    const types = [parseTypeAtom()];
+    while ((peek().type === TOKEN.OR || (peek().type === TOKEN.IDENTIFIER && peek().value === 'or')) &&
+           peekAt(1).line === peek().line) {
+      advance();
+      types.push(parseTypeAtom());
+    }
+    return types.length === 1 ? types[0] : { kind: 'union', values: types };
+  }
+  function parseTypeDeclaration() {
+    advance(); // type
+    const nameToken = consume(TOKEN.IDENTIFIER, 'Expected a type name after "type".');
+    const name = nameToken.value;
+    if (declaredTypeNames.has(name)) {
+      throw new Error(makeError(`Type "${name}" is already declared.`, nameToken));
+    }
+    declaredTypeNames.add(name);
+    const fields = [];
+    while (!atBlockEnd()) {
+      if (peek().type === TOKEN.EOF) {
+        throw new Error(makeError(`Expected keyword "done" to close type "${name}".`, peek()));
+      }
+      const field = consume(TOKEN.IDENTIFIER, `Expected a field name in type "${name}".`);
+      consume(TOKEN.IS, `Expected "is" after field name "${field.value}".`);
+      fields.push({ key: field.value, type: parseTypeSpec(), optional: false });
+    }
+    advance();
+    return { type: 'TypeDeclaration', name, fields };
+  }
+
   // v2.3  -  English-like function declaration: "to <name> <a> and <b> together ... done"
   // Parameters are identifiers joined by "and". Body ends with "together" or "done".
   function parseToFunction() {
@@ -2055,8 +2114,12 @@ function parseAsk() {
       const param = { name };
       if (peek().type === TOKEN.AS) {
         advance(); // as
-        const dv = parseDefaultValue();
-        if (dv) param.defaultValue = dv;
+        if (isTypeNameStart(peek())) {
+          param.typeAnnotation = parseTypeSpec();
+        } else {
+          const dv = parseDefaultValue();
+          if (dv) param.defaultValue = dv;
+        }
       }
       return param;
     }
