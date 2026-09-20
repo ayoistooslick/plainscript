@@ -112,6 +112,23 @@ test('check: invalid file prints ✗ + error and exits non-zero', () => {
   assert(out.includes('bad.pln'), `failure line must name the file, got:\n${out}`);
 });
 
+test('test: runs an explicit PlainScript test file', () => {
+  const dir = tmpDir();
+  const file = path.join(dir, 'math.test.pln');
+  fs.writeFileSync(file, [
+    'make add(a, b)',
+    '  give a + b',
+    'done',
+    'test "addition"',
+    '  check add(2, 3) equals 5',
+    'done',
+  ].join('\n'), 'utf8');
+  const r = runCli(['test', file], dir);
+  assert(r.status === 0, `test command must exit 0, got ${r.status}:\n${outputOf(r)}`);
+  assert(outputOf(r).includes('addition'), `test output must name the test, got:\n${outputOf(r)}`);
+  assert(outputOf(r).includes('1 PlainScript test file'), `test output must summarize files, got:\n${outputOf(r)}`);
+});
+
 test('--quiet check: valid file prints no ✓/✗ lines and exits 0', () => {
   const dir = tmpDir();
   fs.writeFileSync(path.join(dir, 'ok.pln'), 'show "hello"\n', 'utf8');

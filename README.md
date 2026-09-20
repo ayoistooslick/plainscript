@@ -196,6 +196,7 @@ socket export plus `useMultiFileAuthState`, `makeCacheableSignalKeyStore`, and
 | Command | Description |
 |---|---|
 | `plainscript run <file.pln>` | Installs missing dependencies, compiles, and executes. Runs from a scratch directory  -  nothing is written into your project. |
+| `plainscript test [target]` | Runs a PlainScript test file or all `*.test.pln` / `*.spec.pln` files under `tests/` (or `test/`). |
 | `plainscript build [file.pln]` | Compiles to `dist/`. With no argument, builds every `.pln` file under the source root, preserving names and folder structure. |
 | `plainscript check <file.pln>` | Checks syntax and dependencies only. Reports a per-file `✓` line (or an error). Never executes your program. |
 | `plainscript fmt <file.pln>` | Formats a PlainScript file in place. |
@@ -725,7 +726,7 @@ PlainScript 1.0.2 closes most of the gap with TypeScript-class languages using i
 | Streams | `writeLine`, `appendLine` |
 | Collections | `keyMap/mapSet/mapGet/mapHas/mapDelete`, `newSet/addToSet` |
 | Dynamic modules | `loadModule("./m")` |
-| Native tests | `test "name" ... end` with `check a equals b`, `check a contains b`, `check a is b`, `check <expr> raises "msg"` |
+| Native tests | `test "name" ... end` with `check a equals b`, `check a contains b`, `check a is b`, `check <expr> raises "msg"`; run files with `plainscript test` |
 | Exports | `export <name>` |
 
 </details>

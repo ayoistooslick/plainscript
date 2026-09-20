@@ -57,6 +57,7 @@ ${clrBold(`PlainScript v${VERSION}`)} ${clrDim('· .pln compiles to readable Nod
 ${section('START')}
   plainscript new [name]        Scaffold a new project with a working app.pln
   plainscript run <file.pln>    Install missing deps, compile, execute
+  plainscript test [target]     Run PlainScript test files
   plainscript start             Build src/app.pln and run it from dist/
 
 ${section('BUILD & CHECK')}
@@ -558,6 +559,64 @@ async function cmdRun(filePath, extraArgs = []) {
   }
   fs.rmSync(tmpDir, { recursive: true, force: true });
   if (!QUIET_STAGES) console.log('\nDone.');
+}
+
+function discoverTestFiles(root) {
+  const files = [];
+  function walk(dir) {
+    if (!fs.existsSync(dir)) return;
+    for (const name of fs.readdirSync(dir).sort()) {
+      if (name.startsWith('.')) continue;
+      const full = path.join(dir, name);
+      const stat = fs.statSync(full);
+      if (stat.isDirectory()) walk(full);
+      else if (name.endsWith('.test.pln') || name.endsWith('.spec.pln')) files.push(full);
+    }
+  }
+  walk(root);
+  return files;
+}
+
+// Run native PlainScript test files through the same real CLI path as users.
+// Explicit files/directories are supported; with no target, conventional
+// tests/**/*.test.pln and tests/**/*.spec.pln files are discovered.
+function cmdTest(target) {
+  let files;
+  if (target) {
+    const abs = path.resolve(target);
+    if (!fs.existsSync(abs)) {
+      console.error(`Test target not found: ${target}`);
+      process.exit(1);
+    }
+    files = fs.statSync(abs).isDirectory() ? discoverTestFiles(abs) : [abs];
+  } else {
+    files = discoverTestFiles(path.resolve('tests'));
+    if (files.length === 0) files = discoverTestFiles(path.resolve('test'));
+  }
+  if (files.length === 0) {
+    console.error('No PlainScript test files found. Name files *.test.pln or *.spec.pln, or pass a file explicitly.');
+    process.exit(1);
+  }
+  let failed = 0;
+  for (const file of files) {
+    const relative = path.relative(process.cwd(), file) || file;
+    try {
+      execFileSync(process.execPath, [__filename, 'run', file], {
+        stdio: 'inherit',
+        cwd: process.cwd(),
+        env: process.env,
+      });
+      if (!QUIET_STAGES) console.log(`${clrGreen('✓')} ${relative}`);
+    } catch (_) {
+      failed++;
+      console.error(`${clrRed('✗')} ${relative}`);
+    }
+  }
+  if (failed) {
+    console.error(`\n${failed} of ${files.length} PlainScript test file(s) failed.`);
+    process.exit(1);
+  }
+  if (!QUIET_STAGES) console.log(`\n${files.length} PlainScript test file(s) passed.`);
 }
 
 // Compile one entry and write it to outDir with its source name preserved,
@@ -1143,6 +1202,7 @@ async function main() {
       break;
     }
     case 'check':   cmdCheck(fileArg, json);    break;
+    case 'test':    cmdTest(fileArg);            break;
     case 'fmt':     cmdFmt(fileArg);              break;
     case 'new':     cmdNew(fileArg);              break;
     case 'install': cmdInstall();                 break;
