@@ -271,7 +271,7 @@ equivalent; `end` maps to the same terminator as `done` in the lexer.
 | `switch <value> against` | `->` cases | `done` |
 | `try` | body with `recover as <err>` / `finally` clauses | `done` |
 | `web app` / `route <method> "<path>"` / `when someone visits "<path>"` / `listen on <port>` blocks | body | `done` |
-| `database "file.db"` SQL blocks (`query`, `insert`, `update`, `delete`, `execute`) | raw SQL | `done` (or `end`) |
+| `database "file.db"` SQL blocks (`query`, `insert`, `update`, `delete`, `execute`) | raw SQL with `{name}` bound parameters | `done` (or `end`) |
 | `run in parallel` | concurrent statements (each statement's value is awaited and resolved with `Promise.all`, collected in body order) | `done as <name>` |
 | `when "<event>" happens` | body | `done` |
 | `every <interval>` / `schedule "<cron>"` | body | `done` |
@@ -280,7 +280,43 @@ equivalent; `end` maps to the same terminator as `done` in the lexer.
 | `test "<name>"` | `check` / `equals` / `raises` | `done` |
 
 A `make` body that contains `yield` compiles to a generator function
-(`function*`). SQL block text is passed through verbatim to SQLite.
+(`function*`). SQL block text is passed through to the selected database driver,
+except for safe PlainScript parameter placeholders.
+
+### SQL interpolation
+
+SQL placeholders use a PlainScript value expression inside braces. The compiler
+replaces `{name}` or `{imageHash(image)}` with a driver parameter marker and
+passes the resulting value separately to the prepared statement; values are
+never concatenated into SQL text.
+
+```plainscript
+remember email as request.body.email
+remember rows as query
+    SELECT receipt_id FROM receipts WHERE email = {email}
+done
+```
+
+Expressions are parsed as PlainScript before compilation. Malformed or raw
+statement text is rejected at compile time; for example, this is invalid:
+
+```text
+{imageHash(image); DROP TABLE receipts}
+```
+
+For complex expressions, binding first is still recommended because it makes
+the source and inferred value easier to read:
+
+```plainscript
+remember receiptHash as imageHash(image)
+remember rows as query
+    SELECT receipt_id FROM receipts WHERE hash = {receiptHash}
+done
+```
+
+The same binding rule applies to `query`, `insert`, `update`, `delete`, and
+`execute`. SQL injection attempts supplied as values remain data because the
+prepared statement receives them as parameters.
 
 ## 6. Expressions
 

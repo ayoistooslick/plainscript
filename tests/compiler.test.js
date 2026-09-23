@@ -1906,6 +1906,48 @@ test('"query" block compiles to db.prepare().all()', () => {
   if (!js.includes('SELECT * FROM users')) throw new Error('missing SQL');
 });
 
+test('SQL identifier placeholders remain bound parameters', () => {
+  const src = [
+    'remember input as "\' OR 1=1 --"',
+    'remember rows as query',
+    '    SELECT * FROM users WHERE name = {input}',
+    'done',
+  ].join('\n');
+  const js = compile(src);
+  if (!js.includes('WHERE name = ?')) throw new Error('placeholder was not normalized: ' + js);
+  if (!js.includes('.all(input)')) throw new Error('placeholder was not bound: ' + js);
+  const sqlText = js.slice(js.indexOf('db.prepare('), js.indexOf(').all('));
+  if (sqlText.includes('OR 1=1')) throw new Error('parameter value was spliced into SQL: ' + js);
+});
+
+test('SQL value-expression placeholders are validated and remain bound', () => {
+  const js = compile('remember rows as query\n    SELECT * FROM receipts WHERE hash = {imageHash(image)}\ndone');
+  if (!js.includes('WHERE hash = ?')) throw new Error('expression placeholder was not normalized: ' + js);
+  if (!js.includes('.all(imageHash(image))')) throw new Error('expression result was not bound: ' + js);
+});
+
+test('malformed SQL expression placeholders fail with a safe correction', () => {
+  let error = null;
+  try {
+    compile('remember rows as query\n    SELECT * FROM receipts WHERE hash = {imageHash(image); DROP TABLE receipts}\ndone');
+  } catch (caught) {
+    error = caught;
+  }
+  if (!error) throw new Error('expected malformed expression placeholder to fail');
+  if (!error.message.includes('PlainScript value expression')) throw new Error('missing placeholder guidance: ' + error.message);
+  if (!error.message.includes('remember receiptHash as imageHash(image)')) throw new Error('missing corrected example: ' + error.message);
+});
+
+test('SQL unmatched interpolation braces fail clearly', () => {
+  let error = null;
+  try {
+    compile('query\n    SELECT * FROM users WHERE name = {input\ndone');
+  } catch (caught) {
+    error = caught;
+  }
+  if (!error || !error.message.includes('unmatched')) throw new Error('expected unmatched-brace diagnostic');
+});
+
 test('"insert" block compiles to db.prepare().run()', () => {
   const src = 'insert\n    INSERT INTO users (name) VALUES ("Alice")\ndone';
   const js = compile(src);

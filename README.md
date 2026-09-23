@@ -836,6 +836,28 @@ database "app.db" using "wasm"     // hard requirement: sql.js
 
 The WebAssembly engine persists the whole database to disk after every write, so data survives restarts either way.
 
+SQL blocks use bound PlainScript value placeholders. `{name}` or
+`{imageHash(image)}` becomes a prepared statement parameter; the resulting value
+is never concatenated into SQL text:
+
+```plainscript
+remember email as request.body.email
+remember rows as query
+    SELECT receipt_id FROM receipts WHERE email = {email}
+done
+```
+
+Placeholders are parsed as PlainScript expressions, while raw statement text or
+malformed expressions are rejected at compile time. For complex expressions,
+bind the expression first:
+
+```plainscript
+remember receiptHash as imageHash(image)
+remember rows as query
+    SELECT receipt_id FROM receipts WHERE hash = {receiptHash}
+done
+```
+
 ### HTTP Client
 
 ```plainscript

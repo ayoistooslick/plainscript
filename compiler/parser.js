@@ -53,13 +53,44 @@ const TIME_UNITS = {
 
 // v2.1.0  -  split raw SQL into placeholder-free text and ordered parameter
 // names. "{name}" marks a bound parameter; the generator renders "?" for
-// SQLite or "$1…" for PostgreSQL.
+// SQLite or "$1…" for PostgreSQL. A value expression is also accepted after
+// parsing it as PlainScript, but its result remains a bound parameter and is
+// never inserted into the SQL text.
 function extractSqlParams(rawSql) {
   const params = [];
-  const sql = String(rawSql).replace(/\{([A-Za-z_][A-Za-z0-9_]*)\}/g, (_match, name) => {
+  const source = String(rawSql);
+  const sql = source.replace(/\{([^{}]*)\}/g, (_match, content) => {
+    const name = String(content).trim();
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
+      if (/[;{}]/.test(name)) {
+        throw new Error(
+          'SQL placeholders must contain a PlainScript value expression, not raw statement text.\n\n' +
+          `Found "{${content}}". Bind the expression before the query, for example:\n` +
+          '  remember receiptHash as imageHash(image)\n' +
+          '  query\n    SELECT * FROM receipts WHERE hash = {receiptHash}\n  done'
+        );
+      }
+      try {
+        const expressionAst = parse(tokenize(`remember __sqlParameter as ${name}`));
+        if (!expressionAst || expressionAst.body.length !== 1 || expressionAst.body[0].type !== 'RememberStatement') throw new Error('invalid expression');
+      } catch (_) {
+        throw new Error(
+          'SQL placeholders must contain a valid PlainScript value expression.\n\n' +
+          `Found "{${content}}". Bind the expression before the query, for example:\n` +
+          '  remember receiptHash as imageHash(image)\n' +
+          '  query\n    SELECT * FROM receipts WHERE hash = {receiptHash}\n  done'
+        );
+      }
+    }
     params.push(name);
     return '?';
   });
+  if (/[{}]/.test(sql)) {
+    throw new Error(
+      'SQL interpolation contains an unmatched "{" or "}".\n\n' +
+      'Use {name} for a bound PlainScript value; SQL text must not contain raw interpolated expressions.'
+    );
+  }
   return { sql, params };
 }
 
