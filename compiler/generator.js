@@ -3653,9 +3653,12 @@ function generateStatement(node, indent = '', context = createGenerationContext(
         }
         if (node.names && node.names.length > 0) {
           const reqName = node.path.replace(/[^a-zA-Z0-9_$]/g, '_');
-          emitRequire(context, node.path, `__pkg_${reqName}`);
-          const destructuring = `const { ${node.names.join(', ')} } = __pkg_${reqName};`;
-          return `${indent}${destructuring}`;
+          const requireLine = emitRequire(context, node.path, `__pkg_${reqName}`);
+          const bindings = (node.namedImports && node.namedImports.length > 0)
+            ? node.namedImports.map(({ imported, local }) => imported === local ? imported : `${imported}: ${local}`)
+            : node.names;
+          const destructuring = `const { ${bindings.join(', ')} } = __pkg_${reqName};`;
+          return [requireLine, `${indent}${destructuring}`].filter(Boolean).join('\n');
         }
         const pkg = emitRequire(context, node.path, null);
         return pkg ? `${indent}${pkg}` : '';
@@ -3674,7 +3677,13 @@ function generateStatement(node, indent = '', context = createGenerationContext(
         }
         const modVar = node.path.replace(/[^a-zA-Z0-9_$]/g, '_');
         return `${indent}const ${node.namespace} = typeof __module_${modVar} !== 'undefined' ? __module_${modVar} : require(${JSON.stringify(node.path)});`;
- }
+      }
+      if (node.namedImports && node.namedImports.some(({ imported, local }) => imported !== local)) {
+        return node.namedImports
+          .filter(({ imported, local }) => imported !== local)
+          .map(({ imported, local }) => `${indent}const ${local} = ${imported};`)
+          .join('\n');
+      }
       return '';
     }
 

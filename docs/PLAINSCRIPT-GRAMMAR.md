@@ -318,7 +318,22 @@ The same binding rule applies to `query`, `insert`, `update`, `delete`, and
 `execute`. SQL injection attempts supplied as values remain data because the
 prepared statement receives them as parameters.
 
-## 6. Expressions
+## 6. Module and npm imports
+
+Selective imports may rename an exported symbol with `as`:
+
+```plainscript
+import { createHash as hash, randomUUID } from "crypto"
+```
+
+For npm packages, the compiler emits a CommonJS `require` and destructures the
+requested exports. The example creates local bindings named `hash` and
+`randomUUID`, while the package exports remain `createHash` and `randomUUID`.
+The same syntax works for local `.pln` modules; the bundler creates the alias
+after resolving the dependency. A plain `import { name } from ...` keeps the
+exported name unchanged.
+
+## 7. Expressions
 
 Recursive-descent parsing with precedence. Member access uses `of`:
 

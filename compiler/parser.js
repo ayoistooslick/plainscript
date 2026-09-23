@@ -2535,11 +2535,19 @@ function parseAsk() {
     if (peek().type === TOKEN.LBRACE) {
       advance(); // {
       const names = [];
+      const namedImports = [];
       while (true) {
-        names.push(consume(
+        const imported = consume(
           TOKEN.IDENTIFIER,
           'Expected an exported name inside the import braces.\n\nExample:\n  import { helper } from "./util.pln"'
-        ).value);
+        ).value;
+        let local = imported;
+        if (peek().type === TOKEN.AS) {
+          advance();
+          local = consume(TOKEN.IDENTIFIER, 'Expected a local name after "as" in the import braces.').value;
+        }
+        names.push(imported);
+        namedImports.push({ imported, local });
         if (peek().type === TOKEN.COMMA) { advance(); continue; }
         break;
       }
@@ -2551,7 +2559,7 @@ function parseAsk() {
         TOKEN.STRING,
         'Expected a file path string after the import.\n\nExample:\n  import { helper } from "./util.pln"'
       ).value;
-      return { type: 'ImportStatement', path: filePath, names };
+      return { type: 'ImportStatement', path: filePath, names, namedImports };
     }
 
     // Form 2: bring all from "path" as math / import all as math from "path" / import * as math from "path"

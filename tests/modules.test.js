@@ -68,6 +68,16 @@ test('parser parses package imports: bring get from "axios"', () => {
   assert(stmt.defaultImport, 'get');
 });
 
+test('parser preserves named import aliases', () => {
+  const ast = parse(tokenize('import { createHash as hash, randomUUID } from "crypto"'));
+  const stmt = ast.body[0];
+  assert(JSON.stringify(stmt.names), JSON.stringify(['createHash', 'randomUUID']));
+  assert(JSON.stringify(stmt.namedImports), JSON.stringify([
+    { imported: 'createHash', local: 'hash' },
+    { imported: 'randomUUID', local: 'randomUUID' },
+  ]));
+});
+
 test('parser parses path-aliased imports: bring button from "@/components/button.pln"', () => {
   const ast = parse(tokenize('bring button from "@/components/button.pln"'));
   const stmt = ast.body[0];
@@ -103,6 +113,12 @@ test('dependency detector detects npm packages imported via bring/import', () =>
 test('generator emits CommonJS require for npm package imports', () => {
   const js = generate(parse(tokenize('bring axios from "axios"')));
   assert(js.includes('require("axios")') || js.includes("require('axios')"), true, 'missing require("axios")');
+});
+
+test('generator emits explicit local names for aliased npm exports', () => {
+  const js = generate(parse(tokenize('import { createHash as hash } from "crypto"\nshow hash')));
+  assert(js.includes('const { createHash: hash }'), true, 'missing named export alias');
+  assert(js.includes("require('crypto')") || js.includes('require("crypto")'), true, 'missing package require');
 });
 
 test('generator emits barrel re-export assignments', () => {

@@ -1383,6 +1383,21 @@ export circleArea
 
 Imports are bundled per entry: `plainscript build` gives every source file its own standalone output under `dist/`, with imported code inlined. Functions, lambdas, records, and modules together are how you build your own vocabulary on top of the core verbs  -  a new reader puzzle (`validate(body, fields)`) is a one-line call, not a loop.
 
+### npm and JavaScript imports
+
+Named package exports may be given an explicit PlainScript local name:
+
+```plainscript
+import { createHash as hash, randomUUID } from "crypto"
+show hash
+```
+
+The compiler emits a CommonJS `require` followed by destructuring, so
+`createHash as hash` becomes the JavaScript binding `{ createHash: hash }`.
+Unaliased named imports retain their exported name. The same brace syntax is
+accepted for local PlainScript modules; aliased names become local bindings in
+the bundled output.
+
 ---
 
 ## Express Integration

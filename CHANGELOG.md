@@ -20,13 +20,19 @@ All notable changes to PlainScript are documented here.
   forms.
 - Namespace-aware diagnostics identify common non-canonical standard-library
   names and provide a real canonical suggestion.
+- SQL placeholders now validate PlainScript value expressions while preserving
+  bound-parameter execution and rejecting malformed or raw statement text.
+- Named npm and local-module imports support explicit aliases such as
+  `import { createHash as hash } from "crypto"` with deterministic CommonJS
+  destructuring output.
 
 ### Documentation and validation
 
 - Updated the grammar reference with the v1.1.1 keyword escaping, comparison,
   and async/Promise behavior.
 - Added focused regressions for async calls, nested Promise use, escaped names,
-  comparison compatibility, and namespace diagnostics.
+  comparison compatibility, namespace diagnostics, SQL parameterization, and
+  named import aliases.
 
 ## [1.1.0]  -  2026-09-20
 
