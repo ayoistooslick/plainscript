@@ -4,7 +4,7 @@ This document is the single source of truth for the PlainScript language
 surface. Compiler behavior (`compiler/lexer.js`, `compiler/parser.js`,
 `compiler/generator.js`) overrides any prose in this or other docs.
 
-Version: 1.0.363
+Version: 1.1.1
 
 ---
 
@@ -62,6 +62,14 @@ Line 1, Column 10: Expected a variable name after "remember".
 Pick a different name (see docs/PLAINSCRIPT-GRAMMAR.md).
 ```
 
+Reserved words may be used deliberately by enclosing the word in backticks. The
+escaped form is an identifier, not a template string:
+
+```plainscript
+remember `now` as 1
+show `now`
+```
+
 ### Operators
 
 | Token | Meaning |
@@ -73,6 +81,11 @@ Pick a different name (see docs/PLAINSCRIPT-GRAMMAR.md).
 | `.` `?.` `??` | member access, optional chain, nullish coalesce |
 | `...` | spread |
 | `(` `)` `[` `]` `{` `}` `,` `:` | grouping, literals, comma, object colon |
+
+Natural-language comparisons normalize to the same binary operators. Supported
+forms include `is greater than` / `is more than` (`>`), `is less than` / `is
+fewer than` (`<`), `is greater than or equal to` / `is more than or equal to`
+(`>=`), `is less than or equal to` (`<=`), and `is at least` / `is at most`.
 
 ### Assignment operators
 
@@ -218,6 +231,27 @@ The generated function validates `user` before entering its body. The static
 checker also validates literal arguments, typed bindings, return contracts,
 collection elements, nested fields, and known member access. It remains
 conservative for expressions whose types are unknown.
+
+### Async values and Promise contracts
+
+Calls to asynchronous functions are tracked as `Promise of T` values. A
+function body containing `wait for` is therefore asynchronous even when its
+resolved return contract is written as `returns text`. Use `wait for` when a
+resolved value is required:
+
+```plainscript
+make verify() returns text
+    wait for sleep(10)
+    give "verified"
+done
+
+remember result as wait for verify()
+```
+
+The checker reports `PLN-ASYNC-MISSING-AWAIT` when a Promise is assigned,
+passed to a typed synchronous parameter, or returned where a resolved value is
+required. Explicit raw contracts may use `returns Promise of text`; the body
+is still checked against the resolved `text` value.
 
 ## 5. Statements and blocks
 

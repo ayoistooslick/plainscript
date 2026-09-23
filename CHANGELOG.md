@@ -4,6 +4,30 @@ All notable changes to PlainScript are documented here.
 
 ---
 
+## [1.1.1]  -  2026-09-23
+
+### Predictable compiler behavior
+
+- Promise-producing calls and async function bodies now propagate `Promise of T`
+  through the static checker, with `PLN-ASYNC-MISSING-AWAIT` diagnostics when a
+  resolved value is used without `wait for`.
+- Explicit `Promise of T` return contracts are supported and validate their
+  resolved values.
+- Reserved keyword identifiers may be escaped with backticks, including in
+  variable, function, parameter, and expression positions.
+- Natural-language comparison aliases such as `more than or equal to` and
+  `fewer than` normalize to the same comparison operators as their established
+  forms.
+- Namespace-aware diagnostics identify common non-canonical standard-library
+  names and provide a real canonical suggestion.
+
+### Documentation and validation
+
+- Updated the grammar reference with the v1.1.1 keyword escaping, comparison,
+  and async/Promise behavior.
+- Added focused regressions for async calls, nested Promise use, escaped names,
+  comparison compatibility, and namespace diagnostics.
+
 ## [1.1.0]  -  2026-09-20
 
 ### Language depth

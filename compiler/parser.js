@@ -148,6 +148,9 @@ function parse(tokens) {
   function peek()         { return tokens[pos]; }
   function peekAt(offset) { return tokens[pos + offset] || { type: TOKEN.EOF }; }
   function advance()      { return tokens[pos++]; }
+  function isIdentifierToken(token) {
+    return token && (token.type === TOKEN.IDENTIFIER || token.type === TOKEN.ESCAPED_IDENTIFIER);
+  }
   // v1.0.363  -  at a block terminator? A done/together followed by "of" is a
   // FIELD read ("done of item" - the README todo example), so it never closes a
   // block. Every statement-bearing body loop must ask this instead of comparing
@@ -529,13 +532,29 @@ function parse(tokens) {
       return { type: 'BinaryCondition', left, op: '===', right };
     }
 
-    // is more than <expr>
+    // is more than [or equal to] <expr>
     if (peek().type === TOKEN.IDENTIFIER && peek().value === 'more' &&
         (peekAt(1).type === TOKEN.THAN || (peekAt(1).type === TOKEN.IDENTIFIER && peekAt(1).value === 'than'))) {
       advance(); // more
       advance(); // than
+      if (peek().type === TOKEN.OR && peekAt(1).type === TOKEN.IDENTIFIER && peekAt(1).value === 'equal') {
+        advance();
+        advance();
+        if (peek().type === TOKEN.TO || (peek().type === TOKEN.IDENTIFIER && peek().value === 'to')) advance();
+        const right = parseBooleanAtom();
+        return { type: 'BinaryCondition', left, op: '>=', right };
+      }
       const right = parseBooleanAtom();
       return { type: 'BinaryCondition', left, op: '>', right };
+    }
+
+    // is fewer than <expr> (natural-language alias for less than)
+    if (peek().type === TOKEN.IDENTIFIER && peek().value === 'fewer' &&
+        (peekAt(1).type === TOKEN.THAN || (peekAt(1).type === TOKEN.IDENTIFIER && peekAt(1).value === 'than'))) {
+      advance();
+      advance();
+      const right = parseBooleanAtom();
+      return { type: 'BinaryCondition', left, op: '<', right };
     }
 
     // is above  (alias: >)
@@ -1391,7 +1410,7 @@ function parse(tokens) {
       // Allow contextual keywords as variable names in remember declarations
       let nameToken = peek();
       const REMEMBER_KEYWORDS = new Set([TOKEN.BACK, TOKEN.TOTAL, TOKEN.REPLY, TOKEN.RESPOND, TOKEN.SEND_BACK, TOKEN.FILE_KW]);
-      if (REMEMBER_KEYWORDS.has(nameToken.type) || isSqlWordIdentifier(nameToken)) {
+      if (isIdentifierToken(nameToken) || REMEMBER_KEYWORDS.has(nameToken.type) || isSqlWordIdentifier(nameToken)) {
         advance();
         target = nameToken.value;
       } else {
@@ -1593,7 +1612,7 @@ function parseAsk() {
     const keyword = isDefine ? 'define' : isFunction ? 'function' : 'make';
     // Allow "load" as a function name (it's also a keyword for "load env file")
     const nameToken = peek();
-    if (nameToken.type !== TOKEN.IDENTIFIER && nameToken.type !== TOKEN.LOAD) {
+    if (!isIdentifierToken(nameToken) && nameToken.type !== TOKEN.LOAD) {
       throw new Error(makeError(
         `Expected a function name after "${keyword}".${reservedWordHint(nameToken)}\n\nExample:\n  ${keyword} greet()\n    show "Hello"\n  done`,
         nameToken
@@ -1614,7 +1633,9 @@ function parseAsk() {
 
   function parseIntentDeclaration() {
     advance(); // intend
-    const nameToken = consume(TOKEN.IDENTIFIER, 'Expected an intent name after "intend".');
+    const nameToken = peek();
+    if (!isIdentifierToken(nameToken)) throw new Error(makeError('Expected an intent name after "intend".', nameToken));
+    advance();
     const name = nameToken.value;
     consume(TOKEN.LPAREN, `Expected "(" after intent name "${name}".`);
     const params = parseParamList();
@@ -1643,6 +1664,11 @@ function parseAsk() {
   }
   function parseTypeAtom() {
     const token = peek();
+    if (token.type === TOKEN.IDENTIFIER && (token.value === 'Promise' || token.value === 'promise')) {
+      advance();
+      if (peek().type === TOKEN.IDENTIFIER && peek().value === 'of') advance();
+      return { kind: 'promise', value: parseTypeSpec() };
+    }
     if (token.type === TOKEN.IDENTIFIER && token.value === 'optional') {
       advance();
       return { kind: 'optional', value: parseTypeSpec() };
@@ -2137,7 +2163,9 @@ function parseAsk() {
       // Rest parameter: ...args
       if (peek().type === TOKEN.SPREAD) {
         advance();
-        const name = consume(TOKEN.IDENTIFIER, 'Expected a parameter name after "...".').value;
+        const restToken = peek();
+        if (!isIdentifierToken(restToken)) throw new Error(makeError('Expected a parameter name after "...".', restToken));
+        const name = advance().value;
         return { type: 'RestElement', name };
       }
       // Destructuring: [a, b] or {x, y}
@@ -2166,7 +2194,7 @@ function parseAsk() {
       // identifier names when used as a parameter, mirroring `remember`.
       const PARAM_KEYWORDS = new Set([TOKEN.BACK, TOKEN.REPLY, TOKEN.RESPOND, TOKEN.SEND_BACK, TOKEN.FILE_KW]);
       let name;
-      if (PARAM_KEYWORDS.has(peek().type)) {
+      if (isIdentifierToken(peek()) || PARAM_KEYWORDS.has(peek().type)) {
         name = advance().value;
       } else {
         name = consume(TOKEN.IDENTIFIER, 'Expected a parameter name.').value;
@@ -4242,7 +4270,7 @@ function parseAsk() {
       advance();
       return { type: 'Identifier', name: token.value };
     }
-    if (token.type === TOKEN.IDENTIFIER || IDENTIFIER_KEYWORDS.has(token.type) || isSqlWordIdentifier(token)) {
+    if (isIdentifierToken(token) || IDENTIFIER_KEYWORDS.has(token.type) || isSqlWordIdentifier(token)) {
       if (peekAt(1).type === TOKEN.USES || peekAt(1).type === TOKEN.FILLS) {
         const callee = { type: 'Identifier', name: token.value };
         advance();
@@ -4304,7 +4332,7 @@ function parseAsk() {
   function tokenStartsValue(token) {
     return [
       TOKEN.STRING, TOKEN.TEMPLATE_STRING, TOKEN.NUMBER,
-      TOKEN.IDENTIFIER, TOKEN.LBRACKET, TOKEN.LBRACE,
+      TOKEN.IDENTIFIER, TOKEN.ESCAPED_IDENTIFIER, TOKEN.LBRACKET, TOKEN.LBRACE,
       TOKEN.TRUE_KW, TOKEN.FALSE_KW, TOKEN.NULL_KW,
     ].includes(token.type);
   }
@@ -4395,7 +4423,7 @@ function parseAsk() {
       // "done" from the block terminator), plus strings ("with space": 1) and numbers
       // ({ 3: "three" }) for data-shaped objects. A keyword is only accepted as a key when an
       // explicit colon follows, so block-terminator usage of "done" can never be misread here.
-      const keyIsWord = keyToken.type === TOKEN.IDENTIFIER || keyToken.type === TOKEN.STRING ||
+      const keyIsWord = keyToken.type === TOKEN.IDENTIFIER || keyToken.type === TOKEN.ESCAPED_IDENTIFIER || keyToken.type === TOKEN.STRING ||
         keyToken.type === TOKEN.NUMBER || keyToken.type === TOKEN.BACK;
       const keyIsColonKeyword = keyToken.type !== TOKEN.IDENTIFIER &&
         typeof keyToken.value === 'string' && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(keyToken.value) &&

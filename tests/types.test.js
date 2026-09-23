@@ -147,4 +147,62 @@ make read(user as optional User) returns text
   assert.deepStrictEqual(result.diagnostics, []);
 });
 
-console.log('11 tests: passed');
+test('async function calls require wait for when a resolved value is expected', () => {
+  const result = checkTypes(parse(tokenize(`make verify() returns text
+  wait for sleep(1)
+  give "verified"
+done
+remember result as verify()`)));
+  assert(result.diagnostics.some(item => item.code === 'PLN-ASYNC-MISSING-AWAIT' && /verify/.test(item.message)));
+});
+
+test('wait for unwraps async calls and propagates the resolved return type', () => {
+  const result = checkTypes(parse(tokenize(`make verify() returns text
+  wait for sleep(1)
+  give "verified"
+done
+make consume(value as text) returns text
+  give value
+done
+remember result as wait for verify()
+remember copied as consume(wait for verify())`)));
+  assert.deepStrictEqual(result.diagnostics, []);
+});
+
+test('async return contracts are represented as Promise of T', () => {
+  const ast = parse(tokenize(`make verify() returns Promise of text
+  give "verified"
+done`));
+  const result = checkTypes(ast);
+  assert.deepStrictEqual(result.diagnostics, []);
+  assert.strictEqual(ast.body[0].returnType.kind, 'promise');
+  assert.strictEqual(ast.body[0].returnType.value.name, 'text');
+});
+
+test('Promise values cannot be passed to synchronous typed parameters', () => {
+  const result = checkTypes(parse(tokenize(`make verify() returns text
+  wait for sleep(1)
+  give "verified"
+done
+make consume(value as text) returns text
+  give value
+done
+remember result as consume(verify())`)));
+  assert(result.diagnostics.some(item => item.code === 'PLN-ASYNC-MISSING-AWAIT'));
+});
+
+test('reserved words can be escaped as identifiers with backticks', () => {
+  const ast = parse(tokenize('remember `now` as 1\nshow `now`'));
+  assert.strictEqual(ast.body[0].name, 'now');
+  assert.strictEqual(ast.body[1].value.name, 'now');
+});
+
+test('ambiguous standard-library names produce namespace-aware diagnostics', () => {
+  const result = checkTypes(parse(tokenize('remember value as lower("Ada")')));
+  const diagnostic = result.diagnostics.find(item => item.code === 'PLN-NAMESPACE-UNKNOWN');
+  assert(diagnostic);
+  assert.strictEqual(diagnostic.category, 'namespace');
+  assert.strictEqual(diagnostic.suggestion, 'lowercase');
+});
+
+console.log('17 tests: passed');

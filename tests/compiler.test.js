@@ -1941,9 +1941,9 @@ test('plainscript version shows the compiler version (CLI)', () => {
   if (!out.includes(VERSION)) throw new Error(`Expected ${VERSION} but got: ${out}`);
 });
 
-test('plainscript help mentions v1.0 features', () => {
+test('plainscript help mentions v1.1 features', () => {
   const out = runCli(['help'], process.cwd());
-  if (!out.includes('1.0')) throw new Error('"1.0" missing from help');
+  if (!out.includes('1.1')) throw new Error('"1.1" missing from help');
 });
 
 test('plainscript help mentions v1.1 PlainScript Expressions', () => {
@@ -3198,7 +3198,22 @@ test('nullish: plain === comparisons are untouched', () => {
   const code = generate(parse(tokenize('if 1 is 1\n  show "y"\ndone')));
   if (!code.includes('1 === 1')) throw new Error('expected untouched ===: ' + code);
 });
-
+test('comparison aliases normalize to the same JavaScript operators', () => {
+  const more = generate(parse(tokenize('if age is more than or equal to 18\n  show "adult"\ndone')));
+  const fewer = generate(parse(tokenize('if age is fewer than 3\n  show "small"\ndone')));
+  if (!more.includes('age >= 18')) throw new Error('expected more-than-or-equal emission: ' + more);
+  if (!fewer.includes('age < 3')) throw new Error('expected fewer-than emission: ' + fewer);
+});
+test('reserved words can be escaped in generated bindings', () => {
+  const code = generate(parse(tokenize('remember `now` as 1\nshow `now`')));
+  if (!code.includes('let now = 1')) throw new Error('expected escaped binding to compile: ' + code);
+});
+test('escaped identifiers work in functions, parameters, fields, and members', () => {
+  const code = compile('make `prompt`(`now` as number) returns number\n  give `now`\ndone\nremember record as { `now`: 1 }\nshow record.`now`');
+  if (!code.includes('function prompt(now)')) throw new Error('escaped function/parameter failed: ' + code);
+  if (!code.includes('"now": 1')) throw new Error('escaped field failed: ' + code);
+  if (!code.includes('record.now')) throw new Error('escaped member failed: ' + code);
+});
 Promise.all(pendingPluginTests).then(() => {
   console.log(`\n${passed + failed} tests: ${passed} passed, ${failed} failed`);
   if (failed > 0) process.exit(1);

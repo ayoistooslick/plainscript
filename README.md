@@ -131,7 +131,7 @@ done
 </tr>
 </table>
 
-**Current version:** `v1.1.0`  -  the `plainscript-lang` npm package, with a TypeScript-style production build (`plainscript build` → `dist/`, source names and structure preserved).
+**Current version:** `v1.1.1`  -  the `plainscript-lang` npm package, with a TypeScript-style production build (`plainscript build` → `dist/`, source names and structure preserved).
 
 ---
 
@@ -261,7 +261,7 @@ For projects that need custom output or source directories, add a `plainscript.c
     "build": "plainscript build",
     "prepare": "plainscript build"
   },
-  "devDependencies": { "plainscript-lang": "^1.1.0" }
+  "devDependencies": { "plainscript-lang": "^1.1.1" }
 }
 ```
 
@@ -365,9 +365,11 @@ All comparison operators:
 | `is not` | `!==` |
 | `different from` | `!==` |
 | `is greater than` / `is above` | `>` |
-| `more than` | `>` |
+| `more than` / `is more than` | `>` |
 | `is less than` / `is below` | `<` |
-| `fewer than` | `<` |
+| `fewer than` / `is fewer than` | `<` |
+| `greater than or equal to` / `is more than or equal to` | `>=` |
+| `less than or equal to` | `<=` |
 | `is at least` | `>=` |
 | `is at most` | `<=` |
 | `is empty` | `.length === 0` |

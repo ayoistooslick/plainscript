@@ -7,8 +7,21 @@
 const { lowerToIR } = require('./ir');
 
 const PRIMITIVES = new Set(['any', 'number', 'text', 'boolean', 'null', 'object', 'list', 'dictionary']);
+const ASYNC_CALLS = new Set([
+  'fetch', 'fetchJson', 'fetchBytes', 'sleep', 'sleepAsync', 'waitFor',
+  'http', 'request', 'query', 'insert', 'update', 'delete', 'execute',
+  'Promise.resolve', 'Promise.reject', 'Promise.all', 'Promise.allSettled',
+  'Promise.race', 'Promise.any',
+]);
+const AUTO_AWAIT_CALLS = new Set(['fetchJson', 'fetchBytes']);
+const STANDARD_LIBRARY_ALIASES = new Map([
+  ['lower', 'lowercase'],
+  ['upper', 'uppercase'],
+  ['to_lower', 'lowercase'],
+  ['to_upper', 'uppercase'],
+]);
 
-function diagnostic(message, node, code = 'PLN-TYPE') {
+function diagnostic(message, node, code = 'PLN-TYPE', details = {}) {
   const line = node && node.line ? node.line : 1;
   const column = node && node.col ? node.col : 1;
   return {
@@ -16,6 +29,7 @@ function diagnostic(message, node, code = 'PLN-TYPE') {
     source: 'plainscript',
     code,
     message,
+    ...details,
     ...(node && node.sourceFile ? { file: node.sourceFile } : {}),
     range: {
       start: { line: line - 1, character: column - 1 },
@@ -31,6 +45,7 @@ function typeName(spec) {
   if (spec.kind === 'optional') return `optional ${typeName(spec.value)}`;
   if (spec.kind === 'list') return `list of ${typeName(spec.value)}`;
   if (spec.kind === 'dictionary') return `dictionary of ${typeName(spec.value)}`;
+  if (spec.kind === 'promise') return `Promise of ${typeName(spec.value)}`;
   if (spec.kind === 'union') return spec.values.map(typeName).join(' or ');
   return 'any';
 }
@@ -38,6 +53,7 @@ function typeName(spec) {
 function nameSpec(name) { return { kind: 'name', name }; }
 function listSpec(value = 'any') { return { kind: 'list', value }; }
 function dictionarySpec(value = 'any') { return { kind: 'dictionary', value }; }
+function promiseSpec(value = 'any') { return { kind: 'promise', value }; }
 
 function isNullSpec(spec) {
   return spec && ((spec.kind === 'name' && spec.name === 'null') || spec === 'null');
@@ -45,6 +61,10 @@ function isNullSpec(spec) {
 
 function isOptionalSpec(spec) {
   return spec && (spec.kind === 'optional' || (spec.kind === 'union' && spec.values.some(isNullSpec)));
+}
+
+function isPromiseSpec(spec) {
+  return Boolean(spec && spec.kind === 'promise');
 }
 
 function withoutNull(spec) {
@@ -60,6 +80,7 @@ function withoutNull(spec) {
 function specMatches(actual, expected, schemas) {
   if (!expected || expected === 'any' || (expected.kind === 'name' && expected.name === 'any') || !actual || actual === 'any') return true;
   if (expected.kind === 'optional') return isNullSpec(actual) || specMatches(actual, expected.value, schemas);
+  if (expected.kind === 'promise') return isPromiseSpec(actual) && specMatches(actual.value, expected.value, schemas);
   if (expected.kind === 'union') return expected.values.some(item => specMatches(actual, item, schemas));
   if (expected.kind === 'name') {
     if (expected.name === 'any') return true;
@@ -79,6 +100,9 @@ function specMatches(actual, expected, schemas) {
     if (actual === 'dictionary' || actual === 'object') return true;
     if (!actual || actual.kind !== 'dictionary') return false;
     return specMatches(actual.value, expected.value, schemas);
+  }
+  if (expected.kind === 'promise') {
+    return isPromiseSpec(actual) && specMatches(actual.value, expected.value, schemas);
   }
   return true;
 }
@@ -111,7 +135,7 @@ function checkTypes(ast, options = {}) {
       if (!PRIMITIVES.has(spec.name) && !schemas.has(spec.name)) {
         diagnostics.push(diagnostic(`Unknown type "${spec.name}". Declare it with type ${spec.name} ... done.`, node, 'PLN-TYPE-UNKNOWN'));
       }
-    } else if (spec.kind === 'optional' || spec.kind === 'list' || spec.kind === 'dictionary') {
+    } else if (spec.kind === 'optional' || spec.kind === 'list' || spec.kind === 'dictionary' || spec.kind === 'promise') {
       addTypeSpecErrors(spec.value, node);
     } else if (spec.kind === 'union') {
       spec.values.forEach(value => addTypeSpecErrors(value, node));
@@ -146,6 +170,44 @@ function checkTypes(ast, options = {}) {
     const schema = schemas.get(schemaName);
     const field = schema && (schema.fields || []).find(item => item.key === fieldName);
     return field ? field.type : null;
+  }
+
+  function containsAsync(node, seen = new Set()) {
+    if (!node || typeof node !== 'object' || seen.has(node)) return false;
+    seen.add(node);
+    if (node.type === 'AwaitExpression') return true;
+    if (node.type === 'CallExpression' && (ASYNC_CALLS.has(node.name) ||
+        (node.callee && node.callee.type === 'MemberExpression' &&
+          ASYNC_CALLS.has(`${node.callee.object.name}.${node.callee.property}`)))) return true;
+    return Object.values(node).some(value => Array.isArray(value)
+      ? value.some(item => containsAsync(item, seen))
+      : value && typeof value === 'object' && containsAsync(value, seen));
+  }
+
+  function functionReturnType(fn) {
+    const declared = fn && fn.returnType ? fn.returnType : 'any';
+    if (isPromiseSpec(declared)) return declared;
+    return containsAsync(fn && fn.body) ? promiseSpec(declared) : declared;
+  }
+
+  function isPromiseProducing(node, env) {
+    return isPromiseSpec(infer(node, env, node));
+  }
+
+  function isAutoAwaitedCall(node) {
+    return node && node.type === 'CallExpression' && AUTO_AWAIT_CALLS.has(node.name);
+  }
+
+  function reportMissingAwait(node, env, expected, label) {
+    if (!node || node.type === 'AwaitExpression' || !isPromiseProducing(node, env) || isAutoAwaitedCall(node)) return false;
+    if (expected && (isPromiseSpec(expected) || typeName(expected) === 'any')) return false;
+    const producer = node.type === 'CallExpression' ? node.name : 'async expression';
+    diagnostics.push(diagnostic(
+      `${label} receives a Promise from "${producer}". Use "wait for" to resolve it.\nExample: remember result as wait for ${producer}(...).`,
+      node,
+      'PLN-ASYNC-MISSING-AWAIT'
+    ));
+    return true;
   }
 
   function infer(node, env, origin = node) {
@@ -184,7 +246,15 @@ function checkTypes(ast, options = {}) {
     }
     if (node.type === 'CallExpression') {
       const fn = functions.get(node.name);
-      return fn && fn.returnType ? fn.returnType : 'any';
+      if (fn) return functionReturnType(fn);
+      if (ASYNC_CALLS.has(node.name)) return promiseSpec('any');
+      if (node.callee && node.callee.type === 'MemberExpression' &&
+          ASYNC_CALLS.has(`${node.callee.object.name}.${node.callee.property}`)) return promiseSpec('any');
+      return 'any';
+    }
+    if (node.type === 'AwaitExpression') {
+      const awaited = infer(node.value, env, origin);
+      return isPromiseSpec(awaited) ? awaited.value : awaited;
     }
     if (node.type === 'BinaryExpression') {
       if (['===', '!==', '>', '<', '>=', '<=', 'in'].includes(node.operator)) return 'boolean';
@@ -304,10 +374,22 @@ function checkTypes(ast, options = {}) {
         }
         node.args.forEach((arg, index) => {
           const param = params[index];
-          if (param && param.typeAnnotation) expectedMatchesNode(arg, param.typeAnnotation, env, origin, `Argument ${index + 1} of "${node.name}"`);
+          const missingAwait = param && param.typeAnnotation && reportMissingAwait(
+            arg, env, param.typeAnnotation, `Argument ${index + 1} of "${node.name}"`
+          );
+          if (param && param.typeAnnotation && !missingAwait) expectedMatchesNode(arg, param.typeAnnotation, env, origin, `Argument ${index + 1} of "${node.name}"`);
           checkExpression(arg, env, origin);
         });
       } else {
+        if (STANDARD_LIBRARY_ALIASES.has(node.name)) {
+          const canonical = STANDARD_LIBRARY_ALIASES.get(node.name);
+          diagnostics.push(diagnostic(
+            `Unknown PlainScript function "${node.name}". It is not a standard-library function. Use "${canonical}(...)" or, for a JavaScript member method, "value.toLowerCase()" / "value.toUpperCase()".`,
+            origin,
+            'PLN-NAMESPACE-UNKNOWN',
+            { category: 'namespace', explanation: `The canonical standard-library name is ${canonical}.`, suggestion: canonical }
+          ));
+        }
         node.args.forEach(arg => checkExpression(arg, env, origin));
       }
       return;
@@ -352,7 +434,8 @@ function checkTypes(ast, options = {}) {
     for (const node of statements || []) {
       if (!node) continue;
       if (node.type === 'RememberStatement' && typeof node.name === 'string') {
-        if (node.typeAnnotation) expectedMatchesNode(node.value, node.typeAnnotation, env, node, `Variable "${node.name}"`);
+        const missingAwait = reportMissingAwait(node.value, env, node.typeAnnotation, `Variable "${node.name}"`);
+        if (node.typeAnnotation && !missingAwait) expectedMatchesNode(node.value, node.typeAnnotation, env, node, `Variable "${node.name}"`);
         const inferred = node.typeAnnotation || infer(node.value, env, node);
         env.set(node.name, { type: inferred || 'any', node });
         symbols.set(node.name, { kind: 'variable', node, type: inferred || 'any' });
@@ -380,7 +463,9 @@ function checkTypes(ast, options = {}) {
         checkExpression(node.value, env, node);
         if (returnType && node.value) {
           const start = diagnostics.length;
-          expectedMatchesNode(node.value, returnType, env, node, `Function "${functionName}" return`);
+          const resolvedReturnType = isPromiseSpec(returnType) ? returnType.value : returnType;
+          const missingAwait = reportMissingAwait(node.value, env, resolvedReturnType, `Function "${functionName}" return`);
+          if (!missingAwait) expectedMatchesNode(node.value, resolvedReturnType, env, node, `Function "${functionName}" return`);
           for (let index = start; index < diagnostics.length; index += 1) {
             const item = diagnostics[index];
             if (item.code === 'PLN-TYPE-ARG' || item.code === 'PLN-TYPE-ELEMENT' || item.code === 'PLN-TYPE-COLLECTION') item.code = 'PLN-TYPE-RETURN';
