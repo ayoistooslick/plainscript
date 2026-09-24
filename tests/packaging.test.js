@@ -132,6 +132,32 @@ test('package.json: better-sqlite3 is optional, never a mandatory dependency', (
     'no install/postinstall/preinstall hook may build native addons');
 });
 
+test('package.json: npm metadata links back to the source project', () => {
+  const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
+  assert(pkg.author && pkg.author.email === 'davidayodele847@gmail.com',
+    'package author email must identify the project maintainer');
+  assert(pkg.repository && pkg.repository.type === 'git',
+    'package repository type must be declared');
+  assert(pkg.repository.url === 'https://github.com/ayoistooslick/plainscript.git',
+    'package repository URL must point to the PlainScript source repository');
+  assert(pkg.homepage === 'https://github.com/ayoistooslick/plainscript#readme',
+    'package homepage must point to the project README');
+  assert(pkg.bugs && pkg.bugs.url === 'https://github.com/ayoistooslick/plainscript/issues',
+    'package issue tracker must point to GitHub issues');
+});
+
+test('package-lock.json: CLI binaries stay aligned with package.json', () => {
+  const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
+  const lock = JSON.parse(fs.readFileSync(path.join(ROOT, 'package-lock.json'), 'utf8'));
+  const normalizeBin = (bin) => Object.fromEntries(
+    Object.entries(bin || {}).map(([name, file]) => [name, String(file).replace(/^\.\//, '')])
+  );
+  const packageBin = JSON.stringify(normalizeBin(pkg.bin));
+  const lockBin = JSON.stringify(normalizeBin(lock.packages && lock.packages[''] && lock.packages[''].bin));
+  assert(lockBin === packageBin,
+    `package-lock CLI binaries must match package.json: ${lockBin} vs ${packageBin}`);
+});
+
 // ── The compiler and plain programs never touch the optional engines ────────
 
 testAsync('a plain program runs with no SQLite engines available at all', async () => {

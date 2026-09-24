@@ -2,6 +2,18 @@
   "name": "plainscript-lang",
   "version": "1.1.1",
   "description": "PlainScript  -  an Intent-Oriented Programming Language. When even a simple sentence can be code.",
+  "author": {
+    "name": "Ayodele Ayokunle David",
+    "email": "davidayodele847@gmail.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ayoistooslick/plainscript.git"
+  },
+  "homepage": "https://github.com/ayoistooslick/plainscript#readme",
+  "bugs": {
+    "url": "https://github.com/ayoistooslick/plainscript/issues"
+  },
   "main": "compiler/cli.js",
   "bin": {
     "plainscript": "./compiler/cli.js",
