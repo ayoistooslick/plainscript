@@ -152,6 +152,7 @@ const TOKEN = {
   PERCENT_ASSIGN: 'PERCENT_ASSIGN',           // %=
   // Literals & identifiers
   IDENTIFIER:  'IDENTIFIER',
+  ESCAPED_IDENTIFIER: 'ESCAPED_IDENTIFIER', // `now`, `prompt`, `list`, etc.
   STRING:      'STRING',
   NUMBER:      'NUMBER',
   TRUE_KW:     'TRUE_KW',   // v2.1.1  -  boolean literal true
@@ -422,7 +423,14 @@ function tokenize(source) {
         );
       }
       i++; // skip closing backtick
-      tokens.push({ type: TOKEN.TEMPLATE_STRING, value: content, line: tokenLine, col: tokenCol });
+      const escapedIdentifier = /^[A-Za-z_][A-Za-z0-9_]*$/.test(content) &&
+        Object.prototype.hasOwnProperty.call(KEYWORDS, content);
+      tokens.push({
+        type: escapedIdentifier ? TOKEN.ESCAPED_IDENTIFIER : TOKEN.TEMPLATE_STRING,
+        value: content,
+        line: tokenLine,
+        col: tokenCol,
+      });
       continue;
     }
 

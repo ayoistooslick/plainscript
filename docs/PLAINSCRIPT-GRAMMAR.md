@@ -4,7 +4,7 @@ This document is the single source of truth for the PlainScript language
 surface. Compiler behavior (`compiler/lexer.js`, `compiler/parser.js`,
 `compiler/generator.js`) overrides any prose in this or other docs.
 
-Version: 1.0.363
+Version: 1.1.1
 
 ---
 
@@ -62,6 +62,14 @@ Line 1, Column 10: Expected a variable name after "remember".
 Pick a different name (see docs/PLAINSCRIPT-GRAMMAR.md).
 ```
 
+Reserved words may be used deliberately by enclosing the word in backticks. The
+escaped form is an identifier, not a template string:
+
+```plainscript
+remember `now` as 1
+show `now`
+```
+
 ### Operators
 
 | Token | Meaning |
@@ -73,6 +81,11 @@ Pick a different name (see docs/PLAINSCRIPT-GRAMMAR.md).
 | `.` `?.` `??` | member access, optional chain, nullish coalesce |
 | `...` | spread |
 | `(` `)` `[` `]` `{` `}` `,` `:` | grouping, literals, comma, object colon |
+
+Natural-language comparisons normalize to the same binary operators. Supported
+forms include `is greater than` / `is more than` (`>`), `is less than` / `is
+fewer than` (`<`), `is greater than or equal to` / `is more than or equal to`
+(`>=`), `is less than or equal to` (`<=`), and `is at least` / `is at most`.
 
 ### Assignment operators
 
@@ -219,6 +232,27 @@ checker also validates literal arguments, typed bindings, return contracts,
 collection elements, nested fields, and known member access. It remains
 conservative for expressions whose types are unknown.
 
+### Async values and Promise contracts
+
+Calls to asynchronous functions are tracked as `Promise of T` values. A
+function body containing `wait for` is therefore asynchronous even when its
+resolved return contract is written as `returns text`. Use `wait for` when a
+resolved value is required:
+
+```plainscript
+make verify() returns text
+    wait for sleep(10)
+    give "verified"
+done
+
+remember result as wait for verify()
+```
+
+The checker reports `PLN-ASYNC-MISSING-AWAIT` when a Promise is assigned,
+passed to a typed synchronous parameter, or returned where a resolved value is
+required. Explicit raw contracts may use `returns Promise of text`; the body
+is still checked against the resolved `text` value.
+
 ## 5. Statements and blocks
 
 Blocks open with a keyword line and close with `done` **or** `end`. They are
@@ -237,18 +271,73 @@ equivalent; `end` maps to the same terminator as `done` in the lexer.
 | `switch <value> against` | `->` cases | `done` |
 | `try` | body with `recover as <err>` / `finally` clauses | `done` |
 | `web app` / `route <method> "<path>"` / `when someone visits "<path>"` / `listen on <port>` blocks | body | `done` |
-| `database "file.db"` SQL blocks (`query`, `insert`, `update`, `delete`, `execute`) | raw SQL | `done` (or `end`) |
+| `database "file.db"` SQL blocks (`query`, `insert`, `update`, `delete`, `execute`) | raw SQL with `{name}` bound parameters | `done` (or `end`) |
 | `run in parallel` | concurrent statements (each statement's value is awaited and resolved with `Promise.all`, collected in body order) | `done as <name>` |
 | `when "<event>" happens` | body | `done` |
 | `every <interval>` / `schedule "<cron>"` | body | `done` |
 | `websocket server`, `bot`, `whatsapp bot`, `mail transport` | body | `done` |
 | `stream "<file>" as <line>` | body | `done` |
-| `test "<name>"` | `check` / `equals` / `raises` | `done` |
+| `test "<name>"` | `check` / `equals` / `raises` / `has field` | `done` |
 
 A `make` body that contains `yield` compiles to a generator function
-(`function*`). SQL block text is passed through verbatim to SQLite.
+(`function*`). SQL block text is passed through to the selected database driver,
+except for safe PlainScript parameter placeholders.
 
-## 6. Expressions
+Native tests can assert the shape of JSON-like records with
+`check data of response has field "status"`. The assertion checks for an own
+property and fails when the value is null or the field is absent.
+
+### SQL interpolation
+
+SQL placeholders use a PlainScript value expression inside braces. The compiler
+replaces `{name}` or `{imageHash(image)}` with a driver parameter marker and
+passes the resulting value separately to the prepared statement; values are
+never concatenated into SQL text.
+
+```plainscript
+remember email as request.body.email
+remember rows as query
+    SELECT receipt_id FROM receipts WHERE email = {email}
+done
+```
+
+Expressions are parsed as PlainScript before compilation. Malformed or raw
+statement text is rejected at compile time; for example, this is invalid:
+
+```text
+{imageHash(image); DROP TABLE receipts}
+```
+
+For complex expressions, binding first is still recommended because it makes
+the source and inferred value easier to read:
+
+```plainscript
+remember receiptHash as imageHash(image)
+remember rows as query
+    SELECT receipt_id FROM receipts WHERE hash = {receiptHash}
+done
+```
+
+The same binding rule applies to `query`, `insert`, `update`, `delete`, and
+`execute`. SQL injection attempts supplied as values remain data because the
+prepared statement receives them as parameters.
+
+## 6. Module and npm imports
+
+Selective imports may rename an exported symbol with `as`:
+
+```plainscript
+import { createHash as hash, randomUUID } from "crypto"
+```
+
+For npm packages, the compiler emits a CommonJS `require` and destructures the
+requested exports. The example creates local bindings named `hash` and
+`randomUUID`, while the package exports remain `createHash` and `randomUUID`.
+The same syntax works for local `.pln` modules; the bundler creates the alias
+after resolving the dependency. A plain `import { name } from ...` keeps the
+exported name unchanged.
+
+## 7. Expressions
 
 Recursive-descent parsing with precedence. Member access uses `of`:
 

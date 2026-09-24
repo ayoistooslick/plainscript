@@ -3298,7 +3298,9 @@ function generate(ast, contextOrOptions = createGenerationContext(), options = {
     const runner = [
       `const __tests = [];`,
       `function __check(op, a, b) {`,
-      `  const ok = op === 'contains'`,
+      `  const ok = op === 'has-field'`,
+      `    ? a != null && Object.prototype.hasOwnProperty.call(Object(a), b)`,
+      `    : op === 'contains'`,
       `    ? (a instanceof Set ? a.has(b) : String(a).includes(String(b)))`,
       `    : op === 'is'`,
       `      ? a === b`,
@@ -3555,6 +3557,7 @@ function generateStatement(node, indent = '', context = createGenerationContext(
     }
 
     // v1.0.1  -  assertion `check <a> (equals|is|contains|raises) <b>`.
+    // v1.1.1  -  `check <object> has field "name"` checks JSON/object shape.
     // For `raises`, `a` is wrapped in a thunk so the expression is evaluated
     // inside the runner's try/catch (its thrown error is the subject).
     case 'CheckStatement': {
@@ -3653,9 +3656,12 @@ function generateStatement(node, indent = '', context = createGenerationContext(
         }
         if (node.names && node.names.length > 0) {
           const reqName = node.path.replace(/[^a-zA-Z0-9_$]/g, '_');
-          emitRequire(context, node.path, `__pkg_${reqName}`);
-          const destructuring = `const { ${node.names.join(', ')} } = __pkg_${reqName};`;
-          return `${indent}${destructuring}`;
+          const requireLine = emitRequire(context, node.path, `__pkg_${reqName}`);
+          const bindings = (node.namedImports && node.namedImports.length > 0)
+            ? node.namedImports.map(({ imported, local }) => imported === local ? imported : `${imported}: ${local}`)
+            : node.names;
+          const destructuring = `const { ${bindings.join(', ')} } = __pkg_${reqName};`;
+          return [requireLine, `${indent}${destructuring}`].filter(Boolean).join('\n');
         }
         const pkg = emitRequire(context, node.path, null);
         return pkg ? `${indent}${pkg}` : '';
@@ -3674,7 +3680,13 @@ function generateStatement(node, indent = '', context = createGenerationContext(
         }
         const modVar = node.path.replace(/[^a-zA-Z0-9_$]/g, '_');
         return `${indent}const ${node.namespace} = typeof __module_${modVar} !== 'undefined' ? __module_${modVar} : require(${JSON.stringify(node.path)});`;
- }
+      }
+      if (node.namedImports && node.namedImports.some(({ imported, local }) => imported !== local)) {
+        return node.namedImports
+          .filter(({ imported, local }) => imported !== local)
+          .map(({ imported, local }) => `${indent}const ${local} = ${imported};`)
+          .join('\n');
+      }
       return '';
     }
 

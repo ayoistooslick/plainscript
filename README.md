@@ -131,7 +131,7 @@ done
 </tr>
 </table>
 
-**Current version:** `v1.1.0`  -  the `plainscript-lang` npm package, with a TypeScript-style production build (`plainscript build` → `dist/`, source names and structure preserved).
+**Current version:** `v1.1.1`  -  the `plainscript-lang` npm package, with a TypeScript-style production build (`plainscript build` → `dist/`, source names and structure preserved).
 
 ---
 
@@ -261,7 +261,7 @@ For projects that need custom output or source directories, add a `plainscript.c
     "build": "plainscript build",
     "prepare": "plainscript build"
   },
-  "devDependencies": { "plainscript-lang": "^1.1.0" }
+  "devDependencies": { "plainscript-lang": "^1.1.1" }
 }
 ```
 
@@ -365,9 +365,11 @@ All comparison operators:
 | `is not` | `!==` |
 | `different from` | `!==` |
 | `is greater than` / `is above` | `>` |
-| `more than` | `>` |
+| `more than` / `is more than` | `>` |
 | `is less than` / `is below` | `<` |
-| `fewer than` | `<` |
+| `fewer than` / `is fewer than` | `<` |
+| `greater than or equal to` / `is more than or equal to` | `>=` |
+| `less than or equal to` | `<=` |
 | `is at least` | `>=` |
 | `is at most` | `<=` |
 | `is empty` | `.length === 0` |
@@ -770,7 +772,7 @@ PlainScript 1.0.2 closes most of the gap with TypeScript-class languages using i
 | Streams | `writeLine`, `appendLine` |
 | Collections | `keyMap/mapSet/mapGet/mapHas/mapDelete`, `newSet/addToSet` |
 | Dynamic modules | `loadModule("./m")` |
-| Native tests | `test "name" ... end` with `check a equals b`, `check a contains b`, `check a is b`, `check <expr> raises "msg"`; run files with `plainscript test` |
+| Native tests | `test "name" ... end` with `check a equals b`, `check a contains b`, `check a is b`, `check object has field "name"`, and `check <expr> raises "msg"`; run files with `plainscript test` |
 | Exports | `export <name>` |
 
 </details>
@@ -833,6 +835,28 @@ database "app.db" using "wasm"     // hard requirement: sql.js
 ```
 
 The WebAssembly engine persists the whole database to disk after every write, so data survives restarts either way.
+
+SQL blocks use bound PlainScript value placeholders. `{name}` or
+`{imageHash(image)}` becomes a prepared statement parameter; the resulting value
+is never concatenated into SQL text:
+
+```plainscript
+remember email as request.body.email
+remember rows as query
+    SELECT receipt_id FROM receipts WHERE email = {email}
+done
+```
+
+Placeholders are parsed as PlainScript expressions, while raw statement text or
+malformed expressions are rejected at compile time. For complex expressions,
+bind the expression first:
+
+```plainscript
+remember receiptHash as imageHash(image)
+remember rows as query
+    SELECT receipt_id FROM receipts WHERE hash = {receiptHash}
+done
+```
 
 ### HTTP Client
 
@@ -1358,6 +1382,21 @@ export circleArea
 ```
 
 Imports are bundled per entry: `plainscript build` gives every source file its own standalone output under `dist/`, with imported code inlined. Functions, lambdas, records, and modules together are how you build your own vocabulary on top of the core verbs  -  a new reader puzzle (`validate(body, fields)`) is a one-line call, not a loop.
+
+### npm and JavaScript imports
+
+Named package exports may be given an explicit PlainScript local name:
+
+```plainscript
+import { createHash as hash, randomUUID } from "crypto"
+show hash
+```
+
+The compiler emits a CommonJS `require` followed by destructuring, so
+`createHash as hash` becomes the JavaScript binding `{ createHash: hash }`.
+Unaliased named imports retain their exported name. The same brace syntax is
+accepted for local PlainScript modules; aliased names become local bindings in
+the bundled output.
 
 ---
 

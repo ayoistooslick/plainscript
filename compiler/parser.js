@@ -53,13 +53,44 @@ const TIME_UNITS = {
 
 // v2.1.0  -  split raw SQL into placeholder-free text and ordered parameter
 // names. "{name}" marks a bound parameter; the generator renders "?" for
-// SQLite or "$1…" for PostgreSQL.
+// SQLite or "$1…" for PostgreSQL. A value expression is also accepted after
+// parsing it as PlainScript, but its result remains a bound parameter and is
+// never inserted into the SQL text.
 function extractSqlParams(rawSql) {
   const params = [];
-  const sql = String(rawSql).replace(/\{([A-Za-z_][A-Za-z0-9_]*)\}/g, (_match, name) => {
+  const source = String(rawSql);
+  const sql = source.replace(/\{([^{}]*)\}/g, (_match, content) => {
+    const name = String(content).trim();
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
+      if (/[;{}]/.test(name)) {
+        throw new Error(
+          'SQL placeholders must contain a PlainScript value expression, not raw statement text.\n\n' +
+          `Found "{${content}}". Bind the expression before the query, for example:\n` +
+          '  remember receiptHash as imageHash(image)\n' +
+          '  query\n    SELECT * FROM receipts WHERE hash = {receiptHash}\n  done'
+        );
+      }
+      try {
+        const expressionAst = parse(tokenize(`remember __sqlParameter as ${name}`));
+        if (!expressionAst || expressionAst.body.length !== 1 || expressionAst.body[0].type !== 'RememberStatement') throw new Error('invalid expression');
+      } catch (_) {
+        throw new Error(
+          'SQL placeholders must contain a valid PlainScript value expression.\n\n' +
+          `Found "{${content}}". Bind the expression before the query, for example:\n` +
+          '  remember receiptHash as imageHash(image)\n' +
+          '  query\n    SELECT * FROM receipts WHERE hash = {receiptHash}\n  done'
+        );
+      }
+    }
     params.push(name);
     return '?';
   });
+  if (/[{}]/.test(sql)) {
+    throw new Error(
+      'SQL interpolation contains an unmatched "{" or "}".\n\n' +
+      'Use {name} for a bound PlainScript value; SQL text must not contain raw interpolated expressions.'
+    );
+  }
   return { sql, params };
 }
 
@@ -148,6 +179,9 @@ function parse(tokens) {
   function peek()         { return tokens[pos]; }
   function peekAt(offset) { return tokens[pos + offset] || { type: TOKEN.EOF }; }
   function advance()      { return tokens[pos++]; }
+  function isIdentifierToken(token) {
+    return token && (token.type === TOKEN.IDENTIFIER || token.type === TOKEN.ESCAPED_IDENTIFIER);
+  }
   // v1.0.363  -  at a block terminator? A done/together followed by "of" is a
   // FIELD read ("done of item" - the README todo example), so it never closes a
   // block. Every statement-bearing body loop must ask this instead of comparing
@@ -529,13 +563,29 @@ function parse(tokens) {
       return { type: 'BinaryCondition', left, op: '===', right };
     }
 
-    // is more than <expr>
+    // is more than [or equal to] <expr>
     if (peek().type === TOKEN.IDENTIFIER && peek().value === 'more' &&
         (peekAt(1).type === TOKEN.THAN || (peekAt(1).type === TOKEN.IDENTIFIER && peekAt(1).value === 'than'))) {
       advance(); // more
       advance(); // than
+      if (peek().type === TOKEN.OR && peekAt(1).type === TOKEN.IDENTIFIER && peekAt(1).value === 'equal') {
+        advance();
+        advance();
+        if (peek().type === TOKEN.TO || (peek().type === TOKEN.IDENTIFIER && peek().value === 'to')) advance();
+        const right = parseBooleanAtom();
+        return { type: 'BinaryCondition', left, op: '>=', right };
+      }
       const right = parseBooleanAtom();
       return { type: 'BinaryCondition', left, op: '>', right };
+    }
+
+    // is fewer than <expr> (natural-language alias for less than)
+    if (peek().type === TOKEN.IDENTIFIER && peek().value === 'fewer' &&
+        (peekAt(1).type === TOKEN.THAN || (peekAt(1).type === TOKEN.IDENTIFIER && peekAt(1).value === 'than'))) {
+      advance();
+      advance();
+      const right = parseBooleanAtom();
+      return { type: 'BinaryCondition', left, op: '<', right };
     }
 
     // is above  (alias: >)
@@ -1391,7 +1441,7 @@ function parse(tokens) {
       // Allow contextual keywords as variable names in remember declarations
       let nameToken = peek();
       const REMEMBER_KEYWORDS = new Set([TOKEN.BACK, TOKEN.TOTAL, TOKEN.REPLY, TOKEN.RESPOND, TOKEN.SEND_BACK, TOKEN.FILE_KW]);
-      if (REMEMBER_KEYWORDS.has(nameToken.type) || isSqlWordIdentifier(nameToken)) {
+      if (isIdentifierToken(nameToken) || REMEMBER_KEYWORDS.has(nameToken.type) || isSqlWordIdentifier(nameToken)) {
         advance();
         target = nameToken.value;
       } else {
@@ -1593,7 +1643,7 @@ function parseAsk() {
     const keyword = isDefine ? 'define' : isFunction ? 'function' : 'make';
     // Allow "load" as a function name (it's also a keyword for "load env file")
     const nameToken = peek();
-    if (nameToken.type !== TOKEN.IDENTIFIER && nameToken.type !== TOKEN.LOAD) {
+    if (!isIdentifierToken(nameToken) && nameToken.type !== TOKEN.LOAD) {
       throw new Error(makeError(
         `Expected a function name after "${keyword}".${reservedWordHint(nameToken)}\n\nExample:\n  ${keyword} greet()\n    show "Hello"\n  done`,
         nameToken
@@ -1614,7 +1664,9 @@ function parseAsk() {
 
   function parseIntentDeclaration() {
     advance(); // intend
-    const nameToken = consume(TOKEN.IDENTIFIER, 'Expected an intent name after "intend".');
+    const nameToken = peek();
+    if (!isIdentifierToken(nameToken)) throw new Error(makeError('Expected an intent name after "intend".', nameToken));
+    advance();
     const name = nameToken.value;
     consume(TOKEN.LPAREN, `Expected "(" after intent name "${name}".`);
     const params = parseParamList();
@@ -1643,6 +1695,11 @@ function parseAsk() {
   }
   function parseTypeAtom() {
     const token = peek();
+    if (token.type === TOKEN.IDENTIFIER && (token.value === 'Promise' || token.value === 'promise')) {
+      advance();
+      if (peek().type === TOKEN.IDENTIFIER && peek().value === 'of') advance();
+      return { kind: 'promise', value: parseTypeSpec() };
+    }
     if (token.type === TOKEN.IDENTIFIER && token.value === 'optional') {
       advance();
       return { kind: 'optional', value: parseTypeSpec() };
@@ -2137,7 +2194,9 @@ function parseAsk() {
       // Rest parameter: ...args
       if (peek().type === TOKEN.SPREAD) {
         advance();
-        const name = consume(TOKEN.IDENTIFIER, 'Expected a parameter name after "...".').value;
+        const restToken = peek();
+        if (!isIdentifierToken(restToken)) throw new Error(makeError('Expected a parameter name after "...".', restToken));
+        const name = advance().value;
         return { type: 'RestElement', name };
       }
       // Destructuring: [a, b] or {x, y}
@@ -2166,7 +2225,7 @@ function parseAsk() {
       // identifier names when used as a parameter, mirroring `remember`.
       const PARAM_KEYWORDS = new Set([TOKEN.BACK, TOKEN.REPLY, TOKEN.RESPOND, TOKEN.SEND_BACK, TOKEN.FILE_KW]);
       let name;
-      if (PARAM_KEYWORDS.has(peek().type)) {
+      if (isIdentifierToken(peek()) || PARAM_KEYWORDS.has(peek().type)) {
         name = advance().value;
       } else {
         name = consume(TOKEN.IDENTIFIER, 'Expected a parameter name.').value;
@@ -2335,6 +2394,14 @@ function parseAsk() {
     // fold `a contains b` into a comparison here.
     const a = parseNullish();
     const opToken = peek();
+    if (opToken.value === 'has' && peekAt(1).type === TOKEN.IDENTIFIER && peekAt(1).value === 'field') {
+      advance(); // has
+      advance(); // field
+      const field = consume(TOKEN.STRING,
+        'Expected a field name string after "has field".\n\nExample:\n  check data of response has field "status"'
+      ).value;
+      return { type: 'CheckStatement', a, op: 'has-field', b: { type: 'StringLiteral', value: field } };
+    }
     if (!['equals', 'is', 'contains', 'raises'].includes(opToken.value)) {
       throw new Error(makeError(
         'Expected "equals", "is", "contains" or "raises" after the value in a "check".\n\nExample:\n  check score equals 42',
@@ -2476,11 +2543,19 @@ function parseAsk() {
     if (peek().type === TOKEN.LBRACE) {
       advance(); // {
       const names = [];
+      const namedImports = [];
       while (true) {
-        names.push(consume(
+        const imported = consume(
           TOKEN.IDENTIFIER,
           'Expected an exported name inside the import braces.\n\nExample:\n  import { helper } from "./util.pln"'
-        ).value);
+        ).value;
+        let local = imported;
+        if (peek().type === TOKEN.AS) {
+          advance();
+          local = consume(TOKEN.IDENTIFIER, 'Expected a local name after "as" in the import braces.').value;
+        }
+        names.push(imported);
+        namedImports.push({ imported, local });
         if (peek().type === TOKEN.COMMA) { advance(); continue; }
         break;
       }
@@ -2492,7 +2567,7 @@ function parseAsk() {
         TOKEN.STRING,
         'Expected a file path string after the import.\n\nExample:\n  import { helper } from "./util.pln"'
       ).value;
-      return { type: 'ImportStatement', path: filePath, names };
+      return { type: 'ImportStatement', path: filePath, names, namedImports };
     }
 
     // Form 2: bring all from "path" as math / import all as math from "path" / import * as math from "path"
@@ -4242,7 +4317,7 @@ function parseAsk() {
       advance();
       return { type: 'Identifier', name: token.value };
     }
-    if (token.type === TOKEN.IDENTIFIER || IDENTIFIER_KEYWORDS.has(token.type) || isSqlWordIdentifier(token)) {
+    if (isIdentifierToken(token) || IDENTIFIER_KEYWORDS.has(token.type) || isSqlWordIdentifier(token)) {
       if (peekAt(1).type === TOKEN.USES || peekAt(1).type === TOKEN.FILLS) {
         const callee = { type: 'Identifier', name: token.value };
         advance();
@@ -4304,7 +4379,7 @@ function parseAsk() {
   function tokenStartsValue(token) {
     return [
       TOKEN.STRING, TOKEN.TEMPLATE_STRING, TOKEN.NUMBER,
-      TOKEN.IDENTIFIER, TOKEN.LBRACKET, TOKEN.LBRACE,
+      TOKEN.IDENTIFIER, TOKEN.ESCAPED_IDENTIFIER, TOKEN.LBRACKET, TOKEN.LBRACE,
       TOKEN.TRUE_KW, TOKEN.FALSE_KW, TOKEN.NULL_KW,
     ].includes(token.type);
   }
@@ -4395,7 +4470,7 @@ function parseAsk() {
       // "done" from the block terminator), plus strings ("with space": 1) and numbers
       // ({ 3: "three" }) for data-shaped objects. A keyword is only accepted as a key when an
       // explicit colon follows, so block-terminator usage of "done" can never be misread here.
-      const keyIsWord = keyToken.type === TOKEN.IDENTIFIER || keyToken.type === TOKEN.STRING ||
+      const keyIsWord = keyToken.type === TOKEN.IDENTIFIER || keyToken.type === TOKEN.ESCAPED_IDENTIFIER || keyToken.type === TOKEN.STRING ||
         keyToken.type === TOKEN.NUMBER || keyToken.type === TOKEN.BACK;
       const keyIsColonKeyword = keyToken.type !== TOKEN.IDENTIFIER &&
         typeof keyToken.value === 'string' && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(keyToken.value) &&
