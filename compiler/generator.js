@@ -3298,7 +3298,9 @@ function generate(ast, contextOrOptions = createGenerationContext(), options = {
     const runner = [
       `const __tests = [];`,
       `function __check(op, a, b) {`,
-      `  const ok = op === 'contains'`,
+      `  const ok = op === 'has-field'`,
+      `    ? a != null && Object.prototype.hasOwnProperty.call(Object(a), b)`,
+      `    : op === 'contains'`,
       `    ? (a instanceof Set ? a.has(b) : String(a).includes(String(b)))`,
       `    : op === 'is'`,
       `      ? a === b`,
@@ -3555,6 +3557,7 @@ function generateStatement(node, indent = '', context = createGenerationContext(
     }
 
     // v1.0.1  -  assertion `check <a> (equals|is|contains|raises) <b>`.
+    // v1.1.1  -  `check <object> has field "name"` checks JSON/object shape.
     // For `raises`, `a` is wrapped in a thunk so the expression is evaluated
     // inside the runner's try/catch (its thrown error is the subject).
     case 'CheckStatement': {

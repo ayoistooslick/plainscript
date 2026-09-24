@@ -2394,6 +2394,14 @@ function parseAsk() {
     // fold `a contains b` into a comparison here.
     const a = parseNullish();
     const opToken = peek();
+    if (opToken.value === 'has' && peekAt(1).type === TOKEN.IDENTIFIER && peekAt(1).value === 'field') {
+      advance(); // has
+      advance(); // field
+      const field = consume(TOKEN.STRING,
+        'Expected a field name string after "has field".\n\nExample:\n  check data of response has field "status"'
+      ).value;
+      return { type: 'CheckStatement', a, op: 'has-field', b: { type: 'StringLiteral', value: field } };
+    }
     if (!['equals', 'is', 'contains', 'raises'].includes(opToken.value)) {
       throw new Error(makeError(
         'Expected "equals", "is", "contains" or "raises" after the value in a "check".\n\nExample:\n  check score equals 42',

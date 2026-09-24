@@ -772,7 +772,7 @@ PlainScript 1.0.2 closes most of the gap with TypeScript-class languages using i
 | Streams | `writeLine`, `appendLine` |
 | Collections | `keyMap/mapSet/mapGet/mapHas/mapDelete`, `newSet/addToSet` |
 | Dynamic modules | `loadModule("./m")` |
-| Native tests | `test "name" ... end` with `check a equals b`, `check a contains b`, `check a is b`, `check <expr> raises "msg"`; run files with `plainscript test` |
+| Native tests | `test "name" ... end` with `check a equals b`, `check a contains b`, `check a is b`, `check object has field "name"`, and `check <expr> raises "msg"`; run files with `plainscript test` |
 | Exports | `export <name>` |
 
 </details>

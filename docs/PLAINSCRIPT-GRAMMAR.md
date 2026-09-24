@@ -277,11 +277,15 @@ equivalent; `end` maps to the same terminator as `done` in the lexer.
 | `every <interval>` / `schedule "<cron>"` | body | `done` |
 | `websocket server`, `bot`, `whatsapp bot`, `mail transport` | body | `done` |
 | `stream "<file>" as <line>` | body | `done` |
-| `test "<name>"` | `check` / `equals` / `raises` | `done` |
+| `test "<name>"` | `check` / `equals` / `raises` / `has field` | `done` |
 
 A `make` body that contains `yield` compiles to a generator function
 (`function*`). SQL block text is passed through to the selected database driver,
 except for safe PlainScript parameter placeholders.
+
+Native tests can assert the shape of JSON-like records with
+`check data of response has field "status"`. The assertion checks for an own
+property and fails when the value is null or the field is absent.
 
 ### SQL interpolation
 

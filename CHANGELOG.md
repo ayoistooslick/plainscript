@@ -25,14 +25,16 @@ All notable changes to PlainScript are documented here.
 - Named npm and local-module imports support explicit aliases such as
   `import { createHash as hash } from "crypto"` with deterministic CommonJS
   destructuring output.
+- Native test blocks support `has field` assertions for checking JSON/object
+  response shapes without falling back to JavaScript.
 
 ### Documentation and validation
 
 - Updated the grammar reference with the v1.1.1 keyword escaping, comparison,
   and async/Promise behavior.
 - Added focused regressions for async calls, nested Promise use, escaped names,
-  comparison compatibility, namespace diagnostics, SQL parameterization, and
-  named import aliases.
+  comparison compatibility, namespace diagnostics, SQL parameterization, named
+  import aliases, and native response-shape assertions.
 
 ## [1.1.0]  -  2026-09-20
 

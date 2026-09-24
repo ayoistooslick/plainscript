@@ -376,6 +376,19 @@ test('a passing test suite exits 0 and prints PASS', () => {
   assert(r.code, 0);
 });
 
+test('native tests can assert JSON/object fields for HTTP responses', () => {
+  const r = run([
+    'remember response as { status: 200, data: { status: "ok" } }',
+    'test "health response"',
+    '  check status of response equals 200',
+    '  check data of response has field "status"',
+    'done',
+  ].join('\n'));
+  assertIncludes(r.stdout, 'health response');
+  assertIncludes(r.stdout, '1 passed, 0 failed');
+  assert(r.code, 0);
+});
+
 test('a failing assertion prints FAIL and sets exit code 1', () => {
   const r = run('test "wrong"\n  check 2 + 2 equals 5\ndone');
   assertIncludes(r.stdout + r.stderr, 'FAIL');
