@@ -147,6 +147,34 @@ make read(user as optional User) returns text
   assert.deepStrictEqual(result.diagnostics, []);
 });
 
+test('known standard-library calls propagate their return types', () => {
+  const valid = checkTypes(parse(tokenize(`make read() returns text
+  give lowercase("ADA")
+done
+make count() returns number
+  give length([1, 2, 3])
+done`)));
+  assert.deepStrictEqual(valid.diagnostics, []);
+
+  const invalid = checkTypes(parse(tokenize(`make bad() returns number
+  give lowercase("ADA")
+done`)));
+  assert(invalid.diagnostics.some(item => item.code === 'PLN-TYPE-RETURN' && /text/.test(item.message)));
+});
+
+test('member methods propagate text, boolean, and collection result types', () => {
+  const result = checkTypes(parse(tokenize(`make textValue() returns text
+  give " Ada ".trim().toLowerCase()
+done
+make found() returns boolean
+  give "Ada".includes("d")
+done
+make items() returns list of text
+  give "a,b".split(",")
+done`)));
+  assert.deepStrictEqual(result.diagnostics, []);
+});
+
 test('async function calls require wait for when a resolved value is expected', () => {
   const result = checkTypes(parse(tokenize(`make verify() returns text
   wait for sleep(1)

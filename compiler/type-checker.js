@@ -190,6 +190,39 @@ function checkTypes(ast, options = {}) {
     return containsAsync(fn && fn.body) ? promiseSpec(declared) : declared;
   }
 
+  // v1.1.2  -  stable return types for the deterministic standard library.
+  // Unknown JavaScript/npm calls remain `any` rather than being guessed.
+  const BUILTIN_RETURN_TYPES = new Map([
+    ...['abs', 'min', 'max', 'sqrt', 'pow', 'floor', 'ceil', 'round', 'trunc',
+      'sign', 'random', 'randomInt', 'clamp', 'lerp', 'ln2', 'ln10', 'log2e',
+      'log10e', 'sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'atan2', 'sinh',
+      'cosh', 'tanh', 'exp', 'expm1', 'log', 'log1p', 'log2', 'log10', 'hypot',
+      'cbrt', 'fileSize', 'charCodeAt', 'codePointAt', 'indexOf', 'lastIndexOf',
+      'search', 'findIndex', 'findLastIndex'].map(name => [name, 'number']),
+    ...['lowercase', 'uppercase', 'trim', 'trimStart', 'trimEnd', 'toUpperCase', 'toLowerCase', 'slice',
+      'substring', 'substr', 'replaceAll', 'toString', 'stringValueOf', 'join',
+      'baseName', 'folderOf', 'extensionOf', 'fileType'].map(name => [name, 'text']),
+    ['length', 'number'],
+    ['charAt', 'text'], ['includes', 'boolean'], ['startsWith', 'boolean'],
+    ['endsWith', 'boolean'], ['split', listSpec('text')], ['matchAll', listSpec('any')],
+    ['walkFolder', listSpec('text')],
+  ]);
+
+  const MEMBER_RETURN_TYPES = {
+    text: new Map([
+      ['toLowerCase', 'text'], ['toUpperCase', 'text'], ['trim', 'text'],
+      ['trimStart', 'text'], ['trimEnd', 'text'], ['slice', 'text'],
+      ['substring', 'text'], ['substr', 'text'], ['replaceAll', 'text'],
+      ['charAt', 'text'], ['toString', 'text'], ['includes', 'boolean'],
+      ['startsWith', 'boolean'], ['endsWith', 'boolean'], ['indexOf', 'number'],
+      ['lastIndexOf', 'number'], ['search', 'number'],
+    ]),
+    list: new Map([
+      ['includes', 'boolean'], ['indexOf', 'number'], ['lastIndexOf', 'number'],
+      ['join', 'text'], ['slice', 'list'],
+    ]),
+  };
+
   function isPromiseProducing(node, env) {
     return isPromiseSpec(infer(node, env, node));
   }
@@ -239,6 +272,11 @@ function checkTypes(ast, options = {}) {
       if (objectType && objectType.kind === 'dictionary') return objectType.value;
       return 'any';
     }
+    if (node.type === 'OptionalChainExpression') {
+      const objectType = withoutNull(infer(node.object, env, origin));
+      const methods = MEMBER_RETURN_TYPES[typeName(objectType)];
+      return methods && methods.get(node.property) ? methods.get(node.property) : 'any';
+    }
     if (node.type === 'IndexExpression') {
       const objectType = infer(node.object, env, origin);
       if (objectType && (objectType.kind === 'list' || objectType.kind === 'dictionary')) return objectType.value;
@@ -247,6 +285,12 @@ function checkTypes(ast, options = {}) {
     if (node.type === 'CallExpression') {
       const fn = functions.get(node.name);
       if (fn) return functionReturnType(fn);
+      if (node.name && BUILTIN_RETURN_TYPES.has(node.name)) return BUILTIN_RETURN_TYPES.get(node.name);
+      if (node.callee && node.callee.type === 'MemberExpression') {
+        const receiver = withoutNull(infer(node.callee.object, env, origin));
+        const methods = MEMBER_RETURN_TYPES[typeName(receiver)];
+        if (methods && methods.has(node.callee.property)) return methods.get(node.callee.property);
+      }
       if (ASYNC_CALLS.has(node.name)) return promiseSpec('any');
       if (node.callee && node.callee.type === 'MemberExpression' &&
           ASYNC_CALLS.has(`${node.callee.object.name}.${node.callee.property}`)) return promiseSpec('any');
