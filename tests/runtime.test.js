@@ -235,19 +235,21 @@ test('retry grammar validates its clauses', () => {
   if (!threw) throw new Error('expected "time" (singular) to fail');
 });
 
-testAsync('retry exhausts all attempts then continues the program', async () => {
-  const logs = await runProgram(compileProgram([
-    'remember calls as 0',
-    'retry 3 times every 0 seconds',
-    'calls becomes calls + 1',
-    'remember broken as jsonDecode("{oops")',
-    'done',
-    'show "calls: " + text(calls)',
-  ].join('\n')));
-  if (logs.filter(l => l.startsWith('[err]')).length !== 1) {
-    throw new Error('expected exactly one logged error from the final attempt, got: ' + JSON.stringify(logs));
+testAsync('retry exhausts all attempts and propagates the final failure', async () => {
+  let error = null;
+  try {
+    await runProgram(compileProgram([
+      'remember calls as 0',
+      'retry 3 times every 0 seconds',
+      'calls becomes calls + 1',
+      'remember broken as jsonDecode("{oops")',
+      'done',
+      'show "calls: " + text(calls)',
+    ].join('\n')));
+  } catch (caught) {
+    error = caught;
   }
-  assert(logs[logs.length - 1], 'calls: 3');
+  if (!error) throw new Error('expected retry exhaustion to reject the program');
 });
 
 testAsync('http client parses JSON responses into a record', async () => {

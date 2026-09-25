@@ -4172,7 +4172,7 @@ function generateStatement(node, indent = '', context = createGenerationContext(
         body,
         `${indent}    break;`,
         `${indent}  } catch (__plainRetryError) {`,
-        `${indent}    if (__plainAttempt >= ${node.attempts}) console.error(__plainRetryError);`,
+        `${indent}    if (__plainAttempt >= ${node.attempts}) throw __plainRetryError;`,
         `${indent}    else await __retrySleep(${Math.round(node.delaySeconds * 1000)});`,
         `${indent}  }`,
         `${indent}}`,
