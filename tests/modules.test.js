@@ -236,5 +236,20 @@ test('static checker reports an unknown imported symbol deterministically', () =
   }
 });
 
+test('bundler rejects named imports outside an explicit export surface', () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pln-module-visibility-'));
+  const modelFile = path.join(tmpDir, 'model.pln');
+  const mainFile = path.join(tmpDir, 'main.pln');
+  fs.writeFileSync(modelFile, 'make hidden()\n  give 1\ndone\nmake visible()\n  give 2\ndone\nexport visible');
+  fs.writeFileSync(mainFile, 'bring hidden from "./model.pln"\nshow hidden()');
+  try {
+    let message = '';
+    try { bundle(mainFile); } catch (error) { message = error.message; }
+    assert(/does not export "hidden"/.test(message), true, 'unexported imports should fail during bundling');
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

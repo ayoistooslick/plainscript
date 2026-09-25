@@ -128,6 +128,32 @@ function getExportNames(ast) {
   return names;
 }
 
+function getModuleSurface(ast) {
+  const explicit = getExportNames(ast);
+  if (ast.body.some(node => node.type === 'ExportStatement')) return new Set(explicit);
+  return new Set(ast.body
+    .filter(node => ['FunctionDeclaration', 'IntentDeclaration', 'TypeDeclaration'].includes(node.type) && node.name)
+    .map(node => node.name));
+}
+
+function validateImportSurfaces(files) {
+  const astByAbs = new Map(files.map(file => [file.absPath, file.ast]));
+  for (const { absPath, ast } of files) {
+    for (const node of ast.body) {
+      if (node.type !== 'ImportStatement' || !node.path || !isLocalImportPath(node.path) || node.namespace) continue;
+      const dependency = astByAbs.get(resolveImportPath(path.dirname(absPath), node.path));
+      if (!dependency) continue;
+      const surface = getModuleSurface(dependency);
+      const imported = node.namedImports || (node.names || []).map(name => ({ imported: name, local: name }));
+      for (const item of imported) {
+        if (!surface.has(item.imported)) {
+          throw new Error(`Module "${node.path}" does not export "${item.imported}".\n\nExport it from the module or remove it from the import.`);
+        }
+      }
+    }
+  }
+}
+
 // Builds the export surface map for a resolved dependency graph:
 // local import path (as written) -> exported names of that module. Used by
 // namespace imports ("bring all from X as ns") which need the export surface
@@ -186,6 +212,7 @@ function buildSurfaces(files) {
 // bundled programs behave identically no matter which command produced them.
 function generateBundle(entryPath, options = {}) {
   const files = resolveDependencies(entryPath);
+  validateImportSurfaces(files);
   const context = createGenerationContext(options);
   context.bundled = true;
   context.importSurfaces = buildSurfaces(files);
@@ -229,4 +256,4 @@ function bundle(entryPath, options = {}) {
   return js;
 }
 
-module.exports = { bundle, generateBundle, buildSurfaces, resolveDependencies };
+module.exports = { bundle, generateBundle, buildSurfaces, resolveDependencies, validateImportSurfaces };
