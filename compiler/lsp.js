@@ -35,6 +35,29 @@ function uriPath(uri) {
   return uri;
 }
 
+function offsetAt(text, position) {
+  const lines = String(text).split(/\r?\n/);
+  const line = Math.max(0, Math.min(position && position.line || 0, lines.length - 1));
+  const character = Math.max(0, Math.min(position && position.character || 0, lines[line].length));
+  let offset = 0;
+  for (let index = 0; index < line; index += 1) offset += lines[index].length + 1;
+  return offset + character;
+}
+
+function applyContentChanges(text, changes) {
+  let next = text;
+  for (const change of changes || []) {
+    if (!change.range) {
+      next = change.text;
+      continue;
+    }
+    const start = offsetAt(next, change.range.start);
+    const end = offsetAt(next, change.range.end);
+    next = next.slice(0, start) + change.text + next.slice(end);
+  }
+  return next;
+}
+
 class LspService {
   constructor() {
     this.documents = new Map();
@@ -202,7 +225,7 @@ class LspService {
     switch (method) {
       case 'initialize':
         return { capabilities: {
-          textDocumentSync: { openClose: true, change: 1 },
+          textDocumentSync: { openClose: true, change: 2 },
           hoverProvider: true,
           completionProvider: { triggerCharacters: ['.', ' '] },
           definitionProvider: true,
@@ -235,9 +258,7 @@ class LspService {
     if (method === 'textDocument/didChange') {
       const changes = params.contentChanges || [];
       const current = this.document(params.textDocument.uri);
-      const text = changes.length === 1 && !changes[0].range
-        ? changes[0].text
-        : (current ? current.text : '');
+      const text = applyContentChanges(current ? current.text : '', changes);
       this.setDocument(params.textDocument.uri, text, params.textDocument.version);
       return this.publishDiagnostics(params.textDocument.uri);
     }

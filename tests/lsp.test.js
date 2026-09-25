@@ -94,4 +94,21 @@ test('LSP returns signature help for typed functions', () => {
   assert.strictEqual(help.activeParameter, 1);
 });
 
-console.log('7 tests: passed');
+test('LSP applies ranged document changes and advertises incremental sync', () => {
+  const service = new LspService();
+  const uri = 'file:///tmp/plain-lsp-change.pln';
+  service.notification('textDocument/didOpen', { textDocument: {
+    uri,
+    version: 1,
+    text: 'remember foo as 1\nshow foo',
+  }});
+  const init = service.request('initialize');
+  assert.strictEqual(init.capabilities.textDocumentSync.change, 2);
+  service.notification('textDocument/didChange', { textDocument: { uri, version: 2 }, contentChanges: [{
+    range: { start: { line: 0, character: 16 }, end: { line: 0, character: 17 } },
+    text: '2',
+  }] });
+  assert.strictEqual(service.document(uri).text, 'remember foo as 2\nshow foo');
+});
+
+console.log('8 tests: passed');
