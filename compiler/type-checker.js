@@ -78,7 +78,11 @@ function withoutNull(spec) {
 }
 
 function specMatches(actual, expected, schemas) {
-  if (!expected || expected === 'any' || (expected.kind === 'name' && expected.name === 'any') || !actual || actual === 'any') return true;
+  if (!expected || expected === 'any' || (expected.kind === 'name' && expected.name === 'any') || !actual) return true;
+  if (actual === 'any' || (actual.kind === 'name' && actual.name === 'any')) return true;
+  if (actual.kind === 'union' && expected.kind !== 'union') {
+    return actual.values.length > 0 && actual.values.every(value => specMatches(value, expected, schemas));
+  }
   if (expected.kind === 'optional') return isNullSpec(actual) || specMatches(actual, expected.value, schemas);
   if (expected.kind === 'promise') return isPromiseSpec(actual) && specMatches(actual.value, expected.value, schemas);
   if (expected.kind === 'union') return expected.values.some(item => specMatches(actual, item, schemas));
@@ -253,7 +257,12 @@ function checkTypes(ast, options = {}) {
     if (literal === 'list') {
       const elements = (node.elements || []).filter(item => item && item.type !== 'SpreadElement').map(item => infer(item, env, origin));
       const first = elements[0] || 'any';
-      return listSpec(elements.every(item => specMatches(item, first, schemas)) ? first : 'any');
+      if (elements.every(item => specMatches(item, first, schemas)) && elements.every(item => specMatches(first, item, schemas))) {
+        return listSpec(first);
+      }
+      const values = [];
+      for (const item of elements) if (!values.some(value => typeName(value) === typeName(item))) values.push(item);
+      return listSpec(values.length > 1 ? { kind: 'union', values } : (values[0] || 'any'));
     }
     if (literal === 'object') return node.type === 'ObjectLiteral' ? dictionarySpec('any') : 'object';
     if (literal) return literal;
@@ -405,6 +414,16 @@ function checkTypes(ast, options = {}) {
     if (!node || typeof node !== 'object') return;
     if (node.type === 'MemberExpression' || node.type === 'IndexExpression') {
       infer(node, env, origin);
+      if (node.type === 'IndexExpression') {
+        const objectType = infer(node.object, env, origin);
+        const indexType = infer(node.index, env, origin);
+        if (objectType && objectType.kind === 'list' && typeName(indexType) !== 'number' && typeName(indexType) !== 'any') {
+          diagnostics.push(diagnostic(`List indexes must be number values, received ${typeName(indexType)}.`, origin, 'PLN-TYPE-INDEX'));
+        }
+        if (objectType && objectType.kind === 'dictionary' && typeName(indexType) !== 'text' && typeName(indexType) !== 'any') {
+          diagnostics.push(diagnostic(`Dictionary indexes must be text values, received ${typeName(indexType)}.`, origin, 'PLN-TYPE-INDEX'));
+        }
+      }
       checkExpression(node.object, env, origin);
       if (node.index) checkExpression(node.index, env, origin);
       return;
@@ -481,7 +500,7 @@ function checkTypes(ast, options = {}) {
         const missingAwait = reportMissingAwait(node.value, env, node.typeAnnotation, `Variable "${node.name}"`);
         if (node.typeAnnotation && !missingAwait) expectedMatchesNode(node.value, node.typeAnnotation, env, node, `Variable "${node.name}"`);
         const inferred = node.typeAnnotation || infer(node.value, env, node);
-        env.set(node.name, { type: inferred || 'any', node });
+        env.set(node.name, { type: inferred || 'any', node, declared: Boolean(node.typeAnnotation) });
         symbols.set(node.name, { kind: 'variable', node, type: inferred || 'any' });
         checkExpression(node.value, env, node);
       } else if (node.type === 'FunctionDeclaration' || node.type === 'IntentDeclaration') {
@@ -493,6 +512,15 @@ function checkTypes(ast, options = {}) {
         checkExpression(node.condition, env, node);
         checkStatements(node.consequent, narrowEnvironment(env, node.condition, true), returnType, functionName);
         if (node.alternate) checkStatements(node.alternate, narrowEnvironment(env, node.condition, false), returnType, functionName);
+      } else if (['ForEachStatement', 'ForIndexStatement', 'WhileStatement', 'RepeatTimesStatement',
+        'EveryStatement', 'EveryFrameStatement', 'AfterStatement', 'RetryStatement', 'RouteStatement',
+        'ListenStatement', 'StreamStatement', 'RunParallelStatement', 'GatherStatement', 'TotalStatement',
+        'WhenTargetedStatement', 'WhenHappensStatement', 'TelegramCommandStatement', 'TelegramCallbackStatement',
+        'SocketMessageStatement', 'SocketConnectStatement', 'SocketDisconnectStatement'].includes(node.type)) {
+        for (const key of ['collection', 'count', 'start', 'end', 'over', 'condition', 'delay', 'port']) {
+          if (node[key]) checkExpression(node[key], env, node);
+        }
+        checkStatements(node.body || [], new Map(env), returnType, functionName);
       } else if (node.type === 'BecomeStatement') {
         checkExpression(node.value, env, node);
         const actual = infer(node.value, env, node);
@@ -501,7 +529,7 @@ function checkTypes(ast, options = {}) {
           if (entry && entry.type && !specMatches(actual, entry.type, schemas)) {
             diagnostics.push(diagnostic(`Assignment to "${node.target.name}" expects ${typeName(entry.type)}, received ${typeName(actual)}.`, node, 'PLN-TYPE-ASSIGN'));
           }
-          if (entry && node.op === '=') env.set(node.target.name, { ...entry, type: actual });
+          if (entry && node.op === '=' && !entry.declared) env.set(node.target.name, { ...entry, type: actual });
         }
       } else if (node.type === 'GiveStatement' || node.type === 'ReturnStatement') {
         checkExpression(node.value, env, node);
@@ -515,6 +543,10 @@ function checkTypes(ast, options = {}) {
             if (item.code === 'PLN-TYPE-ARG' || item.code === 'PLN-TYPE-ELEMENT' || item.code === 'PLN-TYPE-COLLECTION') item.code = 'PLN-TYPE-RETURN';
           }
         }
+      } else if (node.type === 'TryStatement') {
+        checkStatements(node.body || [], new Map(env), returnType, functionName);
+        for (const handler of node.catches || []) checkStatements(handler.body || [], new Map(env), returnType, functionName);
+        checkStatements(node.finallyBody || [], new Map(env), returnType, functionName);
       } else {
         for (const value of Object.values(node)) {
           if (value && typeof value === 'object') {
@@ -563,7 +595,12 @@ function checkTypes(ast, options = {}) {
   }
 
   checkStatements(ast.body, new Map());
-  return { diagnostics, ir };
+  const uniqueDiagnostics = diagnostics.filter((item, index, all) => index === all.findIndex(other =>
+    other.code === item.code && other.message === item.message &&
+    other.range.start.line === item.range.start.line &&
+    other.range.start.character === item.range.start.character
+  ));
+  return { diagnostics: uniqueDiagnostics, ir };
 }
 
 module.exports = { checkTypes, typeName, specMatches };

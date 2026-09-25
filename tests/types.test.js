@@ -233,4 +233,40 @@ test('ambiguous standard-library names produce namespace-aware diagnostics', () 
   assert.strictEqual(diagnostic.suggestion, 'lowercase');
 });
 
-console.log('17 tests: passed');
+test('heterogeneous inferred lists do not satisfy a homogeneous collection contract', () => {
+  const result = checkTypes(parse(tokenize(`make consume(values as list of number) returns number
+  give values[0]
+done
+remember result as consume([1, "wrong"])`)));
+  assert(result.diagnostics.some(item => item.code === 'PLN-TYPE-COLLECTION' || item.code === 'PLN-TYPE-ARG'));
+});
+
+test('index expressions validate list and dictionary index types', () => {
+  const result = checkTypes(parse(tokenize(`let numbers as list of number is [1, 2]
+remember badListValue as numbers["first"]
+let names as dictionary of text is { first: "Ada" }
+remember badDictionaryValue as names[1]`)));
+  assert.strictEqual(result.diagnostics.filter(item => item.code === 'PLN-TYPE-INDEX').length, 2);
+});
+
+test('declared bindings retain their contract after assignment', () => {
+  const result = checkTypes(parse(tokenize(`let count as number is 1
+count becomes 2
+count becomes "wrong"
+make read() returns number
+  give count
+	done`)));
+  assert(result.diagnostics.some(item => item.code === 'PLN-TYPE-ASSIGN'));
+  assert(!result.diagnostics.some(item => item.code === 'PLN-TYPE-RETURN'));
+});
+
+test('return contracts are checked inside loop bodies', () => {
+  const result = checkTypes(parse(tokenize(`make read() returns number
+  while true
+    give "wrong"
+  done
+done`)));
+  assert(result.diagnostics.some(item => item.code === 'PLN-TYPE-RETURN'));
+});
+
+console.log('21 tests: passed');
