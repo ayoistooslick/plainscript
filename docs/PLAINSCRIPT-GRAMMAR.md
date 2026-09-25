@@ -4,7 +4,7 @@ This document is the single source of truth for the PlainScript language
 surface. Compiler behavior (`compiler/lexer.js`, `compiler/parser.js`,
 `compiler/generator.js`) overrides any prose in this or other docs.
 
-Version: 1.1.1
+Version: 1.1.2
 
 ---
 
@@ -229,8 +229,12 @@ done
 
 The generated function validates `user` before entering its body. The static
 checker also validates literal arguments, typed bindings, return contracts,
-collection elements, nested fields, and known member access. It remains
-conservative for expressions whose types are unknown.
+collection elements, nested fields, and known member access. Since v1.1.2,
+canonical standard-library calls and common text/list methods propagate their
+known return types through expressions, for example
+`"Ada".toLowerCase().includes("a")` is known to be boolean and
+`"a,b".split(",")` is known to be a list of text. It remains conservative for
+unknown JavaScript/npm calls and treats them as `any`.
 
 ### Async values and Promise contracts
 

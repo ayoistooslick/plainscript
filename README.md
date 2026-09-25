@@ -131,7 +131,7 @@ done
 </tr>
 </table>
 
-**Current version:** `v1.1.1`  -  the `plainscript-lang` npm package, with a TypeScript-style production build (`plainscript build` → `dist/`, source names and structure preserved).
+**Current version:** `v1.1.2`  -  the `plainscript-lang` npm package, with a TypeScript-style production build (`plainscript build` → `dist/`, source names and structure preserved).
 
 ---
 
@@ -261,7 +261,7 @@ For projects that need custom output or source directories, add a `plainscript.c
     "build": "plainscript build",
     "prepare": "plainscript build"
   },
-  "devDependencies": { "plainscript-lang": "^1.1.1" }
+  "devDependencies": { "plainscript-lang": "^1.1.2" }
 }
 ```
 
@@ -448,11 +448,27 @@ let usersById as dictionary of User is { first: { id: 1, name: "Ada" } }
 ```
 
 List elements, dictionary values, and nested record fields are checked
-recursively. Optional and union element types are supported. The static checker
-reports unknown fields, missing required fields, incompatible literal values,
-unknown contract names, arity errors, invalid assignments, unsafe optional
-member access, and invalid member access to editor tooling. Whole-program
-inference and exhaustiveness checking remain future work.
+recursively. Optional and union element types are supported. The v1.1.2
+checker also propagates known expression results through canonical standard
+library calls and common text/list methods:
+
+```plainscript
+make normalized() returns text
+    give " Ada ".trim().toLowerCase()
+done
+
+make words() returns list of text
+    give "ada,grace".split(",")
+done
+```
+
+Known math helpers, text conversions, collection operations, and member methods
+now contribute their return types to argument and return-contract checking.
+Unknown JavaScript/npm calls remain `any` rather than being guessed. The static
+checker reports unknown fields, missing required fields, incompatible literal
+values, unknown contract names, arity errors, invalid assignments, unsafe
+optional member access, and invalid member access to editor tooling.
+Exhaustiveness checking and whole-program inference remain future work.
 
 ### Language-server tooling
 

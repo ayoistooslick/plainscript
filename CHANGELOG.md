@@ -4,6 +4,21 @@ All notable changes to PlainScript are documented here.
 
 ---
 
+## [1.1.2]  -  2026-09-25
+
+### Expression type propagation
+
+- Known standard-library calls now contribute stable return types to static
+  checking, including numeric helpers, text operations, collection helpers,
+  and path/file helpers.
+- Common text and list member methods propagate their result types through
+  chained expressions such as `"Ada".trim().toLowerCase()` and
+  `"a,b".split(",")`.
+- Unknown JavaScript/npm calls remain `any`, preserving the checker's
+  conservative behavior at interoperability boundaries.
+- Added regression coverage for valid and invalid return contracts driven by
+  propagated expression types.
+
 ## [1.1.1]  -  2026-09-23
 
 ### Predictable compiler behavior
