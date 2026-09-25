@@ -209,7 +209,7 @@ class LspService {
           referencesProvider: true,
           renameProvider: true,
           signatureHelpProvider: { triggerCharacters: ['(', ','] },
-        }, serverInfo: { name: 'plainscript-lsp', version: '1.0.0' } };
+        }, serverInfo: { name: 'plainscript-lsp', version: require('./version').VERSION } };
       case 'shutdown': this.shutdownRequested = true; return null;
       case 'textDocument/hover': return this.hover(params.textDocument.uri, params.position);
       case 'textDocument/completion': return this.completion(params.textDocument.uri);

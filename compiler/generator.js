@@ -3460,9 +3460,7 @@ function generateStatement(node, indent = '', context = createGenerationContext(
     case 'RememberStatement': {
       // Handle destructuring: remember [a, b] as arr / remember {x, y} as obj
       if (node.name && typeof node.name === 'object' && (node.name.type === 'ArrayPattern' || node.name.type === 'ObjectPattern')) {
-        const pattern = node.name.type === 'ArrayPattern'
-          ? `[${node.name.elements.map(e => generateLValue(e, context)).join(', ')}]`
-          : `{ ${node.name.properties.map(p => p.key).join(', ')} }`;
+        const pattern = generatePattern(node.name, context);
         return `${indent}let ${pattern} = ${generateExpr(node.value, context)};`;
       }
       // v1.0.363  -  uninitialized declaration ("let undef") binds undefined.
@@ -3481,9 +3479,7 @@ function generateStatement(node, indent = '', context = createGenerationContext(
     case 'BecomeStatement': {
       // Handle destructuring: [a, b] = arr / {x, y} = obj
       if (node.target && typeof node.target === 'object' && (node.target.type === 'ArrayPattern' || node.target.type === 'ObjectPattern')) {
-        const pattern = node.target.type === 'ArrayPattern'
-          ? `[${node.target.elements.map(e => generateLValue(e, context)).join(', ')}]`
-          : `{ ${node.target.properties.map(p => generateLValue(p, context)).join(', ')} }`;
+        const pattern = generatePattern(node.target, context);
         return `${indent}let ${pattern} = ${generateExpr(node.value, context)};`;
       }
       const target = generateLValue(node.target, context);
@@ -3733,9 +3729,7 @@ function generateStatement(node, indent = '', context = createGenerationContext(
         }
         // Destructuring: [a, b] or {x, y}
         if (p && (p.type === 'ArrayPattern' || p.type === 'ObjectPattern')) {
-          const pattern = p.type === 'ArrayPattern'
-            ? `[${p.elements.map(e => generateLValue(e, context)).join(', ')}]`
-            : `{ ${p.properties.map(prop => generateLValue(prop, context)).join(', ')} }`;
+          const pattern = generatePattern(p, context);
           if (p.defaultValue) {
             return `${pattern} = ${generateExpr(p.defaultValue, context)}`;
           }
@@ -4677,6 +4671,24 @@ function generateStatement(node, indent = '', context = createGenerationContext(
   }
 }
 
+function generatePattern(node, context) {
+  if (node.type === 'ArrayPattern') {
+    return `[${(node.elements || []).map(element => {
+      if (!element) return '';
+      if (element.type === 'SpreadElement') return `...${generateLValue(element.argument, context)}`;
+      return generateLValue(element, context);
+    }).join(', ')}]`;
+  }
+  if (node.type === 'ObjectPattern') {
+    return `{ ${(node.properties || []).map(property => {
+      if (property.type === 'SpreadProperty') return `...${generateLValue(property.argument, context)}`;
+      if (!property.value) return property.key;
+      return `${JSON.stringify(property.key)}: ${generateLValue(property.value, context)}`;
+    }).join(', ')} }`;
+  }
+  return generateLValue(node, context);
+}
+
 // Generates a valid JS assignment target (left-hand side of =).
 function generateLValue(node, context) {
   if (node.type === 'Identifier')       return node.name;
@@ -4687,8 +4699,7 @@ function generateLValue(node, context) {
   if (node.type === 'NumberedItem')     return `${generateExpr(node.collection, context)}[${node.index}]`;
   if (node.type === 'LastItem')         return `${generateExpr(node.collection, context)}[${generateExpr(node.collection, context)}.length - 1]`;
   // Destructuring patterns
-  if (node.type === 'ArrayPattern')     return `[${node.elements.map(e => generateLValue(e, context)).join(', ')}]`;
-  if (node.type === 'ObjectPattern')    return `{ ${node.properties.map(p => p.key).join(', ')} }`;
+  if (node.type === 'ArrayPattern' || node.type === 'ObjectPattern') return generatePattern(node, context);
   throw new Error(`Invalid assignment target "${node.type}".`);
 }
 

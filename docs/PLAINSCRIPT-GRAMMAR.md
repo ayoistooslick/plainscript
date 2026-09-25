@@ -4,7 +4,7 @@ This document is the single source of truth for the PlainScript language
 surface. Compiler behavior (`compiler/lexer.js`, `compiler/parser.js`,
 `compiler/generator.js`) overrides any prose in this or other docs.
 
-Version: 1.1.2
+Version: 1.1.5
 
 ---
 

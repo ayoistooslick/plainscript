@@ -4,6 +4,17 @@ All notable changes to PlainScript are documented here.
 
 ---
 
+## [1.1.5]  -  2026-09-26
+
+### Trustworthiness foundation
+
+- Added the v1.1.5 gap analysis and implementation contract.
+- Hardened inferred collection assignability, collection index checking,
+  declared-binding reassignment, nested-loop return checking, and duplicate
+  diagnostic suppression.
+- Synchronized the compiler, LSP, grammar, package, and VS Code release
+  metadata to `1.1.5`.
+
 ## [1.1.2]  -  2026-09-25
 
 ### Expression type propagation

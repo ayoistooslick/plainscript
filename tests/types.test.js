@@ -269,4 +269,20 @@ done`)));
   assert(result.diagnostics.some(item => item.code === 'PLN-TYPE-RETURN'));
 });
 
-console.log('21 tests: passed');
+test('array destructuring supports rest elements at runtime', () => {
+  const result = run(`remember [first, ...rest] as [1, 2, 3]
+show first
+show rest.length`);
+  assert.strictEqual(result.status, 0, result.stderr);
+  assert.strictEqual(result.stdout.trim(), '1\n2');
+});
+
+test('object destructuring supports aliases and rest elements at runtime', () => {
+  const result = run(`remember { name: alias, ...rest } as { name: "Ada", age: 37 }
+show alias
+show rest.age`);
+  assert.strictEqual(result.status, 0, result.stderr);
+  assert.strictEqual(result.stdout.trim(), 'Ada\n37');
+});
+
+console.log('23 tests: passed');
