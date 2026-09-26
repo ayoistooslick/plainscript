@@ -520,7 +520,8 @@ function checkTypes(ast, options = {}) {
         for (const key of ['collection', 'count', 'start', 'end', 'over', 'condition', 'delay', 'port']) {
           if (node[key]) checkExpression(node[key], env, node);
         }
-        checkStatements(node.body || [], new Map(env), returnType, functionName);
+        if (Array.isArray(node.body)) checkStatements(node.body, new Map(env), returnType, functionName);
+        else if (node.body && typeof node.body === 'object') checkExpression(node.body, new Map(env), node);
       } else if (node.type === 'BecomeStatement') {
         checkExpression(node.value, env, node);
         const actual = infer(node.value, env, node);

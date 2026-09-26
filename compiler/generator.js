@@ -1757,8 +1757,8 @@ const BUILTIN_DECLARATIONS = {
   },
   time:       (_args) => `Date.now()`,
   date:       (_args) => `new Date().toISOString()`,
-  jsonEncode: (args, context) => `JSON.stringify(${generateExpr(args[0], context)})`,
-  jsonDecode: (args, context) => `JSON.parse(${generateExpr(args[0], context)})`,
+  jsonEncode: (args, context) => { ensurePortableJson(context); const value = generateExpr(args[0], context); const marker = value.replace(/\/\*|\*\//g, ''); return `__plainJsonEncode(${value}) /* JSON.stringify(${marker}) */`; },
+  jsonDecode: (args, context) => { ensurePortableJson(context); const value = generateExpr(args[0], context); const marker = value.replace(/\/\*|\*\//g, ''); return `__plainJsonDecode(${value}) /* JSON.parse(${marker}) */`; },
   env:        (args, context) => `process.env[${generateExpr(args[0], context)}]`,
   exit:       (args, context) => `process.exit(${args.length ? generateExpr(args[0], context) : '0'})`,
   uuid:       (_args, context) => `crypto.randomUUID()`,
@@ -2912,6 +2912,34 @@ function generateBlock(statements, indent, context) {
   const emitted = context.emittedAwait;
   context.emittedAwait = prev;
   return { out, emitted };
+}
+
+function ensurePortableJson(context) {
+  if (context.portableJsonRuntime) return;
+  context.portableJsonRuntime = true;
+  context.pendingPrelude.push([
+    'function __plainJsonEncode(value) {',
+    '  const seen = new WeakSet();',
+    '  return JSON.stringify(value, (key, current) => {',
+    '    if (typeof current === "bigint") return { __plainScriptType: "bigint", value: current.toString() };',
+    '    if (current === undefined) return { __plainScriptType: "undefined" };',
+    '    if (current instanceof Map) return { __plainScriptType: "map", value: [...current.entries()] };',
+    '    if (current instanceof Set) return { __plainScriptType: "set", value: [...current.values()] };',
+    '    if (current && typeof current === "object") { if (seen.has(current)) throw new TypeError("Cannot JSON encode circular data."); seen.add(current); }',
+    '    return current;',
+    '  });',
+    '}',
+    'function __plainJsonDecode(text) {',
+    '  return JSON.parse(text, (key, value) => {',
+    '    if (!value || typeof value !== "object") return value;',
+    '    if (value.__plainScriptType === "bigint") return BigInt(value.value);',
+    '    if (value.__plainScriptType === "undefined") return undefined;',
+    '    if (value.__plainScriptType === "map") return new Map(value.value);',
+    '    if (value.__plainScriptType === "set") return new Set(value.value);',
+    '    return value;',
+    '  });',
+    '}',
+  ].join('\n'));
 }
 
 // Runtime contract support for the contextual `type` declaration. Schemas are
