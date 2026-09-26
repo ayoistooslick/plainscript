@@ -229,7 +229,7 @@ done
 
 The generated function validates `user` before entering its body. The static
 checker also validates literal arguments, typed bindings, return contracts,
-collection elements, nested fields, and known member access. Since v1.1.2,
+collection elements, nested fields, and known member access. Since v1.1.5,
 canonical standard-library calls and common text/list methods propagate their
 known return types through expressions, for example
 `"Ada".toLowerCase().includes("a")` is known to be boolean and

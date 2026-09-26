@@ -131,7 +131,7 @@ done
 </tr>
 </table>
 
-**Current version:** `v1.1.2`  -  the `plainscript-lang` npm package, with a TypeScript-style production build (`plainscript build` → `dist/`, source names and structure preserved).
+**Current version:** `v1.1.5`  -  the `plainscript-lang` npm package, with a TypeScript-style production build (`plainscript build` → `dist/`, source names and structure preserved).
 
 ---
 
@@ -261,7 +261,7 @@ For projects that need custom output or source directories, add a `plainscript.c
     "build": "plainscript build",
     "prepare": "plainscript build"
   },
-  "devDependencies": { "plainscript-lang": "^1.1.2" }
+  "devDependencies": { "plainscript-lang": "^1.1.5" }
 }
 ```
 
@@ -448,7 +448,7 @@ let usersById as dictionary of User is { first: { id: 1, name: "Ada" } }
 ```
 
 List elements, dictionary values, and nested record fields are checked
-recursively. Optional and union element types are supported. The v1.1.2
+recursively. Optional and union element types are supported. The v1.1.5
 checker also propagates known expression results through canonical standard
 library calls and common text/list methods:
 
@@ -468,7 +468,46 @@ Unknown JavaScript/npm calls remain `any` rather than being guessed. The static
 checker reports unknown fields, missing required fields, incompatible literal
 values, unknown contract names, arity errors, invalid assignments, unsafe
 optional member access, and invalid member access to editor tooling.
-Exhaustiveness checking and whole-program inference remain future work.
+### Generic functions and aliases
+
+Generic function parameters use angle brackets. The checker infers a concrete
+type from each call and validates the result; generic parameters are erased
+from runtime assertions because JavaScript cannot observe them directly.
+
+```plainscript
+type UserId is number
+
+make id<T>(value as T) returns T
+    give value
+done
+
+let userId as UserId is id(42)
+show userId
+```
+
+Aliases are checked wherever the aliased type is used, including across local
+imports. Runtime checks still validate the underlying concrete type.
+
+The checker narrows nullable values after guards such as `if value is not null`
+and `if value is null`; optional member access remains available when a value
+has not been narrowed. Structural pattern exhaustiveness is not yet enforced.
+
+### Cancellation and disposal
+
+The standard library provides explicit cancellation tokens and deterministic
+cleanup helpers:
+
+```plainscript
+let token is cancellationToken()
+remember ignored as cancel(token)
+if isCancelled(token)
+    show "cancelled"
+done
+```
+
+`dispose(resource)` can be used by a `using` scope to clean up resources. These
+semantics are cooperative: an operation must inspect its token or call a
+standard-library operation that accepts one.
 
 ### Language-server tooling
 

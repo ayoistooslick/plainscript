@@ -176,6 +176,7 @@ function parse(tokens) {
   let pos = 0;
   let _inRepeatCount = false;
   const declaredTypeNames = new Set(['any', 'number', 'text', 'boolean', 'null', 'object']);
+  let activeGenericNames = new Set();
   function peek()         { return tokens[pos]; }
   function peekAt(offset) { return tokens[pos + offset] || { type: TOKEN.EOF }; }
   function advance()      { return tokens[pos++]; }
@@ -1650,6 +1651,20 @@ function parseAsk() {
       ));
     }
     const name = advance().value;
+    const genericParams = [];
+    if (peek().type === TOKEN.LESS_THAN) {
+      advance();
+      while (peek().type !== TOKEN.GREATER_THAN) {
+        const param = consume(TOKEN.IDENTIFIER, 'Expected a generic type parameter name.');
+        if (genericParams.includes(param.value)) throw new Error(makeError(`Generic parameter "${param.value}" is declared more than once.`, param));
+        genericParams.push(param.value);
+        if (peek().type !== TOKEN.COMMA) break;
+        advance();
+      }
+      consume(TOKEN.GREATER_THAN, 'Expected ">" after generic type parameters.');
+    }
+    const previousGenericNames = activeGenericNames;
+    activeGenericNames = new Set(genericParams);
     consume(TOKEN.LPAREN, `Expected "(" after function name "${name}".`);
     const params = parseParamList();
     consume(TOKEN.RPAREN, 'Expected ")" to close the parameter list.');
@@ -1659,7 +1674,8 @@ function parseAsk() {
       returnType = parseTypeSpec();
     }
     const body = parseBody(`function "${name}"`);
-    return { type: 'FunctionDeclaration', name, params, returnType, body };
+    activeGenericNames = previousGenericNames;
+    return { type: 'FunctionDeclaration', name, params, returnType, body, genericParams };
   }
 
   function parseIntentDeclaration() {
@@ -1690,7 +1706,7 @@ function parseAsk() {
   const primitiveTypeNames = new Set(['any', 'number', 'text', 'boolean', 'null', 'object']);
   function isTypeNameStart(token) {
     return token && token.type === TOKEN.IDENTIFIER &&
-      (declaredTypeNames.has(token.value) || primitiveTypeNames.has(token.value) ||
+      (declaredTypeNames.has(token.value) || activeGenericNames.has(token.value) || primitiveTypeNames.has(token.value) ||
        ['optional', 'list', 'dictionary'].includes(token.value) || /^[A-Z]/.test(token.value));
   }
   function parseTypeAtom() {
@@ -1713,6 +1729,7 @@ function parseAsk() {
       throw new Error(makeError('Expected a type name (number, text, boolean, object, or a declared type).', token));
     }
     advance();
+    if (activeGenericNames.has(token.value)) return { kind: 'typeParam', name: token.value };
     return { kind: 'name', name: token.value };
   }
   function parseTypeSpec() {
@@ -1732,6 +1749,10 @@ function parseAsk() {
       throw new Error(makeError(`Type "${name}" is already declared.`, nameToken));
     }
     declaredTypeNames.add(name);
+    if (peek().type === TOKEN.IS || peek().type === TOKEN.BE) {
+      advance();
+      return { type: 'TypeAlias', name, target: parseTypeSpec() };
+    }
     const fields = [];
     while (!atBlockEnd()) {
       if (peek().type === TOKEN.EOF) {

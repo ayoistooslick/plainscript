@@ -412,6 +412,17 @@ const BUILTIN_DECLARATIONS = {
     `    Promise.resolve(promise).then(v => { clearTimeout(timer); resolve(v); }, e => { clearTimeout(timer); reject(e); });`,
     `  });`,
     `}`,
+    `function __plainCancelToken() { return new AbortController(); }`,
+    `function __plainCancel(token, reason) { if (!token) throw new Error('cancel() requires a cancellation token.'); if (typeof token.abort === 'function') token.abort(reason || new Error('Operation cancelled.')); else if (token.controller) token.controller.abort(reason); return undefined; }`,
+    `function __plainIsCancelled(token) { return !!(token && ((token.signal && token.signal.aborted) || token.aborted)); }`,
+    `function __plainWithCancellation(promise, token) {`,
+    `  if (!token) return Promise.resolve(promise);`,
+    `  const signal = token.signal || token;`,
+    `  if (signal.aborted) return Promise.reject(signal.reason || new Error('Operation cancelled.'));`,
+    `  return new Promise((resolve, reject) => { const abort = () => reject(signal.reason || new Error('Operation cancelled.')); signal.addEventListener('abort', abort, { once: true }); Promise.resolve(promise).then(v => { signal.removeEventListener('abort', abort); resolve(v); }, e => { signal.removeEventListener('abort', abort); reject(e); }); });`,
+    `}`,
+    `async function __plainDispose(resource) { if (resource == null) return; const fn = resource[Symbol.asyncDispose] || resource[Symbol.dispose] || resource.close || resource.destroy; if (typeof fn === 'function') await fn.call(resource); }`,
+    `async function __plainUsing(resource, action) { try { return await action(resource); } finally { await __plainDispose(resource); } }`,
   ].join('\n'),
   // v1.0.363  -  dependency-free SVG images and visualizations.
   // The image value is an SVG string, so it can be saved, embedded, or returned
@@ -2230,6 +2241,12 @@ const BUILTIN_DECLARATIONS = {
     const ms = args[1] != null ? `, ${generateExpr(args[1], context)}` : '';
     return `(await __withTimeout(${generateExpr(args[0], context)}${ms}))`;
   },
+  cancellationToken: (_args, context) => { ensureBuiltin(context, 'core'); return `__plainCancelToken()`; },
+  cancel: (args, context) => { ensureBuiltin(context, 'core'); return `__plainCancel(${generateExpr(args[0], context)}${args[1] ? `, ${generateExpr(args[1], context)}` : ''})`; },
+  isCancelled: (args, context) => { ensureBuiltin(context, 'core'); return `__plainIsCancelled(${generateExpr(args[0], context)})`; },
+  withCancellation: (args, context) => { ensureBuiltin(context, 'core'); markAsync(context); return `(await __plainWithCancellation(${generateExpr(args[0], context)}, ${generateExpr(args[1], context)}))`; },
+  dispose: (args, context) => { ensureBuiltin(context, 'core'); markAsync(context); return `(await __plainDispose(${generateExpr(args[0], context)}))`; },
+  using: (args, context) => { ensureBuiltin(context, 'core'); markAsync(context); return `(await __plainUsing(${generateExpr(args[0], context)}, ${generateExpr(args[1], context)}))`; },
 
   // ── v1.0.363  -  interactive CLI / terminal ───────────────────────────────
   // confirm "Delete this file?"  ->  boolean (y/n prompt)
@@ -3741,6 +3758,8 @@ function generateStatement(node, indent = '', context = createGenerationContext(
       const schema = JSON.stringify(node.fields || []);
       return `${indent}__plainTypes[${JSON.stringify(node.name)}] = { fields: ${schema} };`;
     }
+    case 'TypeAlias':
+      return '';
 
     case 'FunctionDeclaration':
     case 'IntentDeclaration': {
@@ -3771,7 +3790,7 @@ function generateStatement(node, indent = '', context = createGenerationContext(
         return p;
       }).join(', ');
       const checks = node.params
-        .filter(p => p && p.typeAnnotation && p.name)
+        .filter(p => p && p.typeAnnotation && p.name && !JSON.stringify(p.typeAnnotation).includes('"kind":"typeParam"'))
         .map(p => `${indent}  __plainAssertType(${JSON.stringify(p.typeAnnotation)}, ${p.name}, ${JSON.stringify(`${node.name}.${p.name}`)});`)
         .join('\n');
       if (checks) ensureTypeRuntime(context);

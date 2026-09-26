@@ -132,7 +132,7 @@ function getModuleSurface(ast) {
   const explicit = getExportNames(ast);
   if (ast.body.some(node => node.type === 'ExportStatement')) return new Set(explicit);
   return new Set(ast.body
-    .filter(node => ['FunctionDeclaration', 'IntentDeclaration', 'TypeDeclaration'].includes(node.type) && node.name)
+    .filter(node => ['FunctionDeclaration', 'IntentDeclaration', 'TypeDeclaration', 'TypeAlias'].includes(node.type) && node.name)
     .map(node => node.name));
 }
 
@@ -172,7 +172,7 @@ function buildSurfaces(files) {
           // Union of explicit exports plus auto-exported function declarations
           const explicit = getExportNames(depAst);
           const funcs = depAst.body
-            .filter(n => n.type === 'FunctionDeclaration' && n.name)
+            .filter(n => ['FunctionDeclaration', 'IntentDeclaration', 'TypeDeclaration', 'TypeAlias'].includes(n.type) && n.name)
             .map(n => n.name);
           const hasExplicit = depAst.body.some(n => n.type === 'ExportStatement');
           const surface = hasExplicit ? explicit : [...new Set([...explicit, ...funcs])];

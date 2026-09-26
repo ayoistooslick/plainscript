@@ -500,7 +500,7 @@ function checkResolvedGraph(files) {
   for (const file of files) {
     const sourceFile = path.relative(process.cwd(), file.absPath) || file.absPath;
     for (const node of file.ast.body || []) {
-      if (!node.name || !['RememberStatement', 'FunctionDeclaration', 'IntentDeclaration', 'TypeDeclaration'].includes(node.type)) continue;
+      if (!node.name || !['RememberStatement', 'FunctionDeclaration', 'IntentDeclaration', 'TypeDeclaration', 'TypeAlias'].includes(node.type)) continue;
       const owners = declarations.get(node.name) || [];
       owners.push(sourceFile);
       declarations.set(node.name, owners);

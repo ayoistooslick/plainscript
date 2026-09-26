@@ -132,6 +132,8 @@ const TOKEN = {
   RBRACKET:    'RBRACKET',
   COMMA:       'COMMA',
   DOT:         'DOT',
+  LESS_THAN:   'LESS_THAN',
+  GREATER_THAN: 'GREATER_THAN',
   OPTIONAL_CHAIN: 'OPTIONAL_CHAIN', // ?.  -  optional chaining
   NULLISH_COALESCE: 'NULLISH_COALESCE', // ??  -  nullish coalescing
   POWER:       'POWER',    // **  -  exponentiation
@@ -547,6 +549,8 @@ function tokenize(source) {
     if (source[i] === '[') { tokens.push({ type: TOKEN.LBRACKET, value: '[', line: tokenLine, col: tokenCol }); i++; continue; }
     if (source[i] === ']') { tokens.push({ type: TOKEN.RBRACKET, value: ']', line: tokenLine, col: tokenCol }); i++; continue; }
     if (source[i] === ',') { tokens.push({ type: TOKEN.COMMA,    value: ',', line: tokenLine, col: tokenCol }); i++; continue; }
+    if (source[i] === '<') { tokens.push({ type: TOKEN.LESS_THAN, value: '<', line: tokenLine, col: tokenCol }); i++; continue; }
+    if (source[i] === '>') { tokens.push({ type: TOKEN.GREATER_THAN, value: '>', line: tokenLine, col: tokenCol }); i++; continue; }
     if (source[i] === '?' && source[i + 1] === '.') { tokens.push({ type: TOKEN.OPTIONAL_CHAIN, value: '?.', line: tokenLine, col: tokenCol }); i += 2; continue; }
     if (source[i] === '?' && source[i + 1] === '?' && source[i + 2] === '=') { tokens.push({ type: TOKEN.NULLISH_ASSIGN, value: '??=', line: tokenLine, col: tokenCol }); i += 3; continue; }
     if (source[i] === '?' && source[i + 1] === '?') { tokens.push({ type: TOKEN.NULLISH_COALESCE, value: '??', line: tokenLine, col: tokenCol }); i += 2; continue; }

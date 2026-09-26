@@ -12,6 +12,7 @@ const ASYNC_CALLS = new Set([
   'http', 'request', 'query', 'insert', 'update', 'delete', 'execute',
   'Promise.resolve', 'Promise.reject', 'Promise.all', 'Promise.allSettled',
   'Promise.race', 'Promise.any',
+  'withCancellation', 'dispose', 'using',
 ]);
 const AUTO_AWAIT_CALLS = new Set(['fetchJson', 'fetchBytes']);
 const STANDARD_LIBRARY_ALIASES = new Map([
@@ -93,6 +94,8 @@ function specMatches(actual, expected, schemas) {
     if (expected.name === 'list' || expected.name === 'dictionary') return typeName(actual) === expected.name || actual.kind === expected.name;
     if (typeof actual === 'string') return expected.name === actual;
     if (actual.kind === 'name') return expected.name === actual.name;
+    const alias = schemas.get(expected.name);
+    if (alias && alias.type === 'TypeAlias') return specMatches(actual, alias.target, schemas);
     return schemas.has(expected.name) && (typeName(actual) === 'object' || actual.kind === 'name');
   }
   if (expected.kind === 'list') {
@@ -135,6 +138,7 @@ function checkTypes(ast, options = {}) {
 
   function addTypeSpecErrors(spec, node) {
     if (!spec) return;
+    if (spec.kind === 'typeParam') return;
     if (spec.kind === 'name') {
       if (!PRIMITIVES.has(spec.name) && !schemas.has(spec.name)) {
         diagnostics.push(diagnostic(`Unknown type "${spec.name}". Declare it with type ${spec.name} ... done.`, node, 'PLN-TYPE-UNKNOWN'));
@@ -152,6 +156,11 @@ function checkTypes(ast, options = {}) {
       schemas.set(node.name, node);
       symbols.set(node.name, { kind: 'type', node, type: nameSpec(node.name) });
     }
+    if (node.type === 'TypeAlias') {
+      if (schemas.has(node.name)) diagnostics.push(diagnostic(`Type "${node.name}" is declared more than once.`, node, 'PLN-TYPE-DUPLICATE'));
+      schemas.set(node.name, node);
+      symbols.set(node.name, { kind: 'type', node, type: node.target });
+    }
     if (node.type === 'FunctionDeclaration' || node.type === 'IntentDeclaration') {
       functions.set(node.name, node);
       symbols.set(node.name, { kind: node.type === 'IntentDeclaration' ? 'intent' : 'function', node, type: node.returnType || 'any' });
@@ -163,6 +172,7 @@ function checkTypes(ast, options = {}) {
     if (node.type === 'TypeDeclaration') {
       for (const field of node.fields || []) addTypeSpecErrors(field.type, field);
     }
+    if (node.type === 'TypeAlias') addTypeSpecErrors(node.target, node);
     if (node.type === 'FunctionDeclaration' || node.type === 'IntentDeclaration') {
       for (const param of node.params || []) if (param.typeAnnotation) addTypeSpecErrors(param.typeAnnotation, param);
       if (node.returnType) addTypeSpecErrors(node.returnType, node);
@@ -193,6 +203,28 @@ function checkTypes(ast, options = {}) {
     if (isPromiseSpec(declared)) return declared;
     return containsAsync(fn && fn.body) ? promiseSpec(declared) : declared;
   }
+  function substituteGeneric(spec, bindings) {
+    if (!spec || typeof spec !== 'object') return spec;
+    if (spec.kind === 'typeParam') return bindings.get(spec.name) || 'any';
+    if (spec.kind === 'union') return { kind: 'union', values: spec.values.map(value => substituteGeneric(value, bindings)) };
+    if (['optional', 'list', 'dictionary', 'promise'].includes(spec.kind)) return { ...spec, value: substituteGeneric(spec.value, bindings) };
+    return spec;
+  }
+  function bindGeneric(pattern, actual, bindings) {
+    if (!pattern || !actual) return;
+    if (pattern.kind === 'typeParam') { if (!bindings.has(pattern.name) || typeName(bindings.get(pattern.name)) === 'any') bindings.set(pattern.name, actual); return; }
+    if (pattern.kind === actual.kind && ['list', 'dictionary', 'optional', 'promise'].includes(pattern.kind)) bindGeneric(pattern.value, actual.value, bindings);
+    else if (pattern.kind === 'union') for (const option of pattern.values) if (option.kind === 'typeParam' || option.kind === actual.kind) { bindGeneric(option, actual, bindings); break; }
+  }
+  function genericBindings(fn, args, env) {
+    const bindings = new Map();
+    if (!fn.genericParams || fn.genericParams.length === 0) return bindings;
+    for (let index = 0; index < Math.min(args.length, (fn.params || []).length); index += 1) {
+      const param = fn.params[index];
+      if (param.typeAnnotation) bindGeneric(param.typeAnnotation, infer(args[index], env, args[index]), bindings);
+    }
+    return bindings;
+  }
 
   // v1.1.2  -  stable return types for the deterministic standard library.
   // Unknown JavaScript/npm calls remain `any` rather than being guessed.
@@ -210,6 +242,8 @@ function checkTypes(ast, options = {}) {
     ['charAt', 'text'], ['includes', 'boolean'], ['startsWith', 'boolean'],
     ['endsWith', 'boolean'], ['split', listSpec('text')], ['matchAll', listSpec('any')],
     ['walkFolder', listSpec('text')],
+    ['cancellationToken', 'object'], ['cancel', 'any'], ['isCancelled', 'boolean'],
+    ['withCancellation', 'any'], ['dispose', 'any'], ['using', 'any'],
   ]);
 
   const MEMBER_RETURN_TYPES = {
@@ -293,7 +327,7 @@ function checkTypes(ast, options = {}) {
     }
     if (node.type === 'CallExpression') {
       const fn = functions.get(node.name);
-      if (fn) return functionReturnType(fn);
+      if (fn) return substituteGeneric(functionReturnType(fn), genericBindings(fn, node.args || [], env));
       if (node.name && BUILTIN_RETURN_TYPES.has(node.name)) return BUILTIN_RETURN_TYPES.get(node.name);
       if (node.callee && node.callee.type === 'MemberExpression') {
         const receiver = withoutNull(infer(node.callee.object, env, origin));
@@ -431,6 +465,7 @@ function checkTypes(ast, options = {}) {
     if (node.type === 'CallExpression') {
       const fn = functions.get(node.name);
       if (fn) {
+        const bindings = genericBindings(fn, node.args || [], env);
         const params = (fn.params || []).filter(param => param.name);
         if (node.args.length !== params.length && !params.some(param => param.type === 'RestElement')) {
           diagnostics.push(diagnostic(`Intent/function "${node.name}" expects ${params.length} argument(s), received ${node.args.length}.`, origin, 'PLN-TYPE-ARITY'));
@@ -440,7 +475,7 @@ function checkTypes(ast, options = {}) {
           const missingAwait = param && param.typeAnnotation && reportMissingAwait(
             arg, env, param.typeAnnotation, `Argument ${index + 1} of "${node.name}"`
           );
-          if (param && param.typeAnnotation && !missingAwait) expectedMatchesNode(arg, param.typeAnnotation, env, origin, `Argument ${index + 1} of "${node.name}"`);
+          if (param && param.typeAnnotation && !missingAwait) expectedMatchesNode(arg, substituteGeneric(param.typeAnnotation, bindings), env, origin, `Argument ${index + 1} of "${node.name}"`);
           checkExpression(arg, env, origin);
         });
       } else {
