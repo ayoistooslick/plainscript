@@ -1,3 +1,17 @@
+# Release 1.1.5  -  Completeness Foundations
+
+**Release date:** 2026-09-26
+
+---
+
+- Generic functions infer concrete argument types and substitute them into return contracts.
+- Named aliases resolve through assignments, returns, collections, and local module surfaces.
+- Typed `set`, `map`, and fixed-size `tuple` contracts are checked statically and at runtime.
+- Boolean match blocks report duplicate cases and missing exhaustive arms.
+- Cancellation tokens and deterministic disposal helpers are available through the standard library.
+
+---
+
 # Release 1.1.0  -  Release Notes
 
 **Release date:** 2026-09-20

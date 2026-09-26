@@ -421,7 +421,7 @@ PlainScript supports contextual `type` declarations for records and typed
 function parameters. The compiler records the contract in the AST and emitted
 programs validate typed arguments at runtime with clear field-level errors.
 Primitive types are `number`, `text`, `boolean`, `object`, and `null`; contracts
-also support `optional`, `list of`, `dictionary of`, and `or` unions.
+also support `optional`, `list of`, `dictionary of`, `set of`, `map of K to V`, fixed-size `tuple of A, B`, and `or` unions. Named aliases are substituted across assignments, returns, and local imports.
 
 ```plainscript
 type User

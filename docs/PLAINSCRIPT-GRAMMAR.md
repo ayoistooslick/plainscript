@@ -233,7 +233,7 @@ collection elements, nested fields, and known member access. Since v1.1.5,
 canonical standard-library calls and common text/list methods propagate their
 known return types through expressions, for example
 `"Ada".toLowerCase().includes("a")` is known to be boolean and
-`"a,b".split(",")` is known to be a list of text. It remains conservative for
+`"a,b".split(",")` is known to be a list of text. Typed `set of T`, `map of K to V`, and fixed-size `tuple of A, B` contracts are checked recursively. It remains conservative for
 unknown JavaScript/npm calls and treats them as `any`.
 
 ### Async values and Promise contracts

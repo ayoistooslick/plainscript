@@ -28,3 +28,26 @@ remember value as first([1, 2])`));
 assert.strictEqual(typed.diagnostics.length, 0);
 
 console.log('Completeness foundations: 3 tests passed');
+
+const aliasAndCollections = ast(`type UserId is number
+type Pair is tuple of number, text
+type Scores is map of text to number
+make getId() returns UserId
+  give 42
+done
+remember id as getId()
+remember scores as { "ada": 10 }
+remember pair as tuple with 1, "one" done`);
+assert.strictEqual(checkTypes(aliasAndCollections).diagnostics.length, 0);
+const invalidMatch = checkTypes(ast(`remember flag as true
+match flag against
+  true -> show "yes"
+done`));
+assert(invalidMatch.diagnostics.some(item => item.code === 'PLN-MATCH-NONEXHAUSTIVE'));
+const duplicateMatch = checkTypes(ast(`remember flag as true
+match flag against
+  true -> show "a"
+  true -> show "b"
+  false -> show "c"
+done`));
+assert(duplicateMatch.diagnostics.some(item => item.code === 'PLN-MATCH-DUPLICATE'));

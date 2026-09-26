@@ -1707,7 +1707,7 @@ function parseAsk() {
   function isTypeNameStart(token) {
     return token && token.type === TOKEN.IDENTIFIER &&
       (declaredTypeNames.has(token.value) || activeGenericNames.has(token.value) || primitiveTypeNames.has(token.value) ||
-       ['optional', 'list', 'dictionary'].includes(token.value) || /^[A-Z]/.test(token.value));
+       ['optional', 'list', 'dictionary', 'map', 'set', 'tuple'].includes(token.value) || /^[A-Z]/.test(token.value));
   }
   function parseTypeAtom() {
     const token = peek();
@@ -1720,10 +1720,24 @@ function parseAsk() {
       advance();
       return { kind: 'optional', value: parseTypeSpec() };
     }
-    if (token.type === TOKEN.IDENTIFIER && (token.value === 'list' || token.value === 'dictionary')) {
+    if (token.type === TOKEN.IDENTIFIER && (token.value === 'list' || token.value === 'dictionary' || token.value === 'set')) {
       const kind = advance().value;
       if (peek().type === TOKEN.IDENTIFIER && peek().value === 'of') advance();
       return { kind, value: parseTypeSpec() };
+    }
+    if (token.type === TOKEN.IDENTIFIER && token.value === 'map') {
+      advance();
+      if (peek().type === TOKEN.IDENTIFIER && peek().value === 'of') advance();
+      const key = parseTypeAtom();
+      if (peek().type === TOKEN.TO || peek().type === TOKEN.IDENTIFIER && (peek().value === 'to' || peek().value === 'of')) advance();
+      return { kind: 'map', key, value: parseTypeSpec() };
+    }
+    if (token.type === TOKEN.IDENTIFIER && token.value === 'tuple') {
+      advance();
+      if (peek().type === TOKEN.IDENTIFIER && peek().value === 'of') advance();
+      const values = [parseTypeAtom()];
+      while (peek().type === TOKEN.COMMA) { advance(); values.push(parseTypeAtom()); }
+      return { kind: 'tuple', values };
     }
     if (!isTypeNameStart(token) && token.type !== TOKEN.NULL_KW) {
       throw new Error(makeError('Expected a type name (number, text, boolean, object, or a declared type).', token));

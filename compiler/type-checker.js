@@ -6,7 +6,7 @@
 
 const { lowerToIR } = require('./ir');
 
-const PRIMITIVES = new Set(['any', 'number', 'text', 'boolean', 'null', 'object', 'list', 'dictionary']);
+const PRIMITIVES = new Set(['any', 'number', 'text', 'boolean', 'null', 'object', 'list', 'dictionary', 'map', 'set', 'tuple']);
 const ASYNC_CALLS = new Set([
   'fetch', 'fetchJson', 'fetchBytes', 'sleep', 'sleepAsync', 'waitFor',
   'http', 'request', 'query', 'insert', 'update', 'delete', 'execute',
@@ -46,6 +46,9 @@ function typeName(spec) {
   if (spec.kind === 'optional') return `optional ${typeName(spec.value)}`;
   if (spec.kind === 'list') return `list of ${typeName(spec.value)}`;
   if (spec.kind === 'dictionary') return `dictionary of ${typeName(spec.value)}`;
+  if (spec.kind === 'map') return `map of ${typeName(spec.key)} to ${typeName(spec.value)}`;
+  if (spec.kind === 'set') return `set of ${typeName(spec.value)}`;
+  if (spec.kind === 'tuple') return `tuple of ${(spec.values || []).map(typeName).join(', ')}`;
   if (spec.kind === 'promise') return `Promise of ${typeName(spec.value)}`;
   if (spec.kind === 'union') return spec.values.map(typeName).join(' or ');
   return 'any';
@@ -55,6 +58,9 @@ function nameSpec(name) { return { kind: 'name', name }; }
 function listSpec(value = 'any') { return { kind: 'list', value }; }
 function dictionarySpec(value = 'any') { return { kind: 'dictionary', value }; }
 function promiseSpec(value = 'any') { return { kind: 'promise', value }; }
+function mapSpec(key = 'any', value = 'any') { return { kind: 'map', key, value }; }
+function setSpec(value = 'any') { return { kind: 'set', value }; }
+function tupleSpec(values = []) { return { kind: 'tuple', values }; }
 
 function isNullSpec(spec) {
   return spec && ((spec.kind === 'name' && spec.name === 'null') || spec === 'null');
@@ -92,10 +98,14 @@ function specMatches(actual, expected, schemas) {
     if (expected.name === 'null') return isNullSpec(actual);
     if (expected.name === 'object') return typeName(actual) === 'object' || typeName(actual) === 'dictionary';
     if (expected.name === 'list' || expected.name === 'dictionary') return typeName(actual) === expected.name || actual.kind === expected.name;
-    if (typeof actual === 'string') return expected.name === actual;
-    if (actual.kind === 'name') return expected.name === actual.name;
     const alias = schemas.get(expected.name);
     if (alias && alias.type === 'TypeAlias') return specMatches(actual, alias.target, schemas);
+    if (typeof actual === 'string') return expected.name === actual;
+    if (actual.kind === 'name') {
+      if (expected.name === actual.name) return true;
+      const actualAlias = schemas.get(actual.name);
+      return actualAlias && actualAlias.type === 'TypeAlias' ? specMatches(actualAlias.target, expected, schemas) : false;
+    }
     return schemas.has(expected.name) && (typeName(actual) === 'object' || actual.kind === 'name');
   }
   if (expected.kind === 'list') {
@@ -111,6 +121,11 @@ function specMatches(actual, expected, schemas) {
   if (expected.kind === 'promise') {
     return isPromiseSpec(actual) && specMatches(actual.value, expected.value, schemas);
   }
+  if (expected.kind === 'map') {
+    return Boolean(actual && actual.kind === 'map') && specMatches(actual.key, expected.key, schemas) && specMatches(actual.value, expected.value, schemas);
+  }
+  if (expected.kind === 'set') return Boolean(actual && actual.kind === 'set') && specMatches(actual.value, expected.value, schemas);
+  if (expected.kind === 'tuple') return Boolean(actual && actual.kind === 'tuple') && actual.values.length === expected.values.length && expected.values.every((value, index) => specMatches(actual.values[index], value, schemas));
   return true;
 }
 
@@ -124,7 +139,11 @@ function literalType(node) {
     case 'NullLiteral': return 'null';
     case 'ArrayLiteral': return 'list';
     case 'InlineObjectLiteral':
-    case 'ObjectLiteral': return 'object';
+    case 'ObjectLiteral':
+    case 'DictionaryLiteral':
+    case 'SetLiteral':
+    case 'SetFromExpression':
+    case 'TupleLiteral': return 'object';
     default: return null;
   }
 }
@@ -143,8 +162,13 @@ function checkTypes(ast, options = {}) {
       if (!PRIMITIVES.has(spec.name) && !schemas.has(spec.name)) {
         diagnostics.push(diagnostic(`Unknown type "${spec.name}". Declare it with type ${spec.name} ... done.`, node, 'PLN-TYPE-UNKNOWN'));
       }
-    } else if (spec.kind === 'optional' || spec.kind === 'list' || spec.kind === 'dictionary' || spec.kind === 'promise') {
+    } else if (spec.kind === 'optional' || spec.kind === 'list' || spec.kind === 'dictionary' || spec.kind === 'set' || spec.kind === 'promise') {
       addTypeSpecErrors(spec.value, node);
+    } else if (spec.kind === 'map') {
+      addTypeSpecErrors(spec.key, node);
+      addTypeSpecErrors(spec.value, node);
+    } else if (spec.kind === 'tuple') {
+      (spec.values || []).forEach(value => addTypeSpecErrors(value, node));
     } else if (spec.kind === 'union') {
       spec.values.forEach(value => addTypeSpecErrors(value, node));
     }
@@ -207,7 +231,9 @@ function checkTypes(ast, options = {}) {
     if (!spec || typeof spec !== 'object') return spec;
     if (spec.kind === 'typeParam') return bindings.get(spec.name) || 'any';
     if (spec.kind === 'union') return { kind: 'union', values: spec.values.map(value => substituteGeneric(value, bindings)) };
-    if (['optional', 'list', 'dictionary', 'promise'].includes(spec.kind)) return { ...spec, value: substituteGeneric(spec.value, bindings) };
+    if (['optional', 'list', 'dictionary', 'set', 'promise'].includes(spec.kind)) return { ...spec, value: substituteGeneric(spec.value, bindings) };
+    if (spec.kind === 'map') return { ...spec, key: substituteGeneric(spec.key, bindings), value: substituteGeneric(spec.value, bindings) };
+    if (spec.kind === 'tuple') return { ...spec, values: spec.values.map(value => substituteGeneric(value, bindings)) };
     return spec;
   }
   function bindGeneric(pattern, actual, bindings) {
@@ -298,7 +324,12 @@ function checkTypes(ast, options = {}) {
       for (const item of elements) if (!values.some(value => typeName(value) === typeName(item))) values.push(item);
       return listSpec(values.length > 1 ? { kind: 'union', values } : (values[0] || 'any'));
     }
-    if (literal === 'object') return node.type === 'ObjectLiteral' ? dictionarySpec('any') : 'object';
+    if (literal === 'object') {
+      if (node.type === 'DictionaryLiteral') return mapSpec();
+      if (node.type === 'SetLiteral' || node.type === 'SetFromExpression') return setSpec();
+      if (node.type === 'TupleLiteral') return tupleSpec((node.elements || []).map(item => infer(item, env, origin)));
+      return node.type === 'ObjectLiteral' ? dictionarySpec('any') : 'object';
+    }
     if (literal) return literal;
     if (node.type === 'MemberExpression') {
       let objectType = infer(node.object, env, origin);
@@ -322,7 +353,8 @@ function checkTypes(ast, options = {}) {
     }
     if (node.type === 'IndexExpression') {
       const objectType = infer(node.object, env, origin);
-      if (objectType && (objectType.kind === 'list' || objectType.kind === 'dictionary')) return objectType.value;
+      if (objectType && (objectType.kind === 'list' || objectType.kind === 'dictionary' || objectType.kind === 'set')) return objectType.value;
+      if (objectType && objectType.kind === 'map') return objectType.value;
       return 'any';
     }
     if (node.type === 'CallExpression') {
@@ -528,6 +560,28 @@ function checkTypes(ast, options = {}) {
     return next;
   }
 
+  function checkMatchStatement(node, env) {
+    checkExpression(node.value, env, node);
+    const seen = new Set();
+    let hasTrue = false;
+    let hasFalse = false;
+    for (const item of node.cases || []) {
+      checkExpression(item.test, env, node);
+      const key = item.test && item.test.type === 'StringLiteral' ? `text:${item.test.value}`
+        : item.test && item.test.type === 'NumberLiteral' ? `number:${item.test.value}`
+          : item.test && item.test.type === 'BooleanLiteral' ? `boolean:${item.test.value}` : null;
+      if (key && seen.has(key)) diagnostics.push(diagnostic(`Duplicate match case ${key}.`, item.test, 'PLN-MATCH-DUPLICATE'));
+      if (key) seen.add(key);
+      if (item.test && item.test.type === 'BooleanLiteral') { if (item.test.value) hasTrue = true; else hasFalse = true; }
+      checkStatements(item.body || [], new Map(env));
+    }
+    if (node.defaultCase) checkStatements(node.defaultCase, new Map(env));
+    const valueType = infer(node.value, env, node);
+    if (typeName(valueType) === 'boolean' && !node.defaultCase && !(hasTrue && hasFalse)) {
+      diagnostics.push(diagnostic('Boolean match is not exhaustive; add cases for true and false or provide otherwise.', node, 'PLN-MATCH-NONEXHAUSTIVE'));
+    }
+  }
+
   function checkStatements(statements, env, returnType = null, functionName = null) {
     for (const node of statements || []) {
       if (!node) continue;
@@ -543,6 +597,8 @@ function checkTypes(ast, options = {}) {
         for (const param of node.params || []) if (param.name) nested.set(param.name, { type: param.typeAnnotation || 'any', node: param });
         checkStatements(node.body, nested, node.returnType || null, node.name);
         checkFunctionReturns(node, nested);
+      } else if (node.type === 'MatchStatement') {
+        checkMatchStatement(node, env);
       } else if (node.type === 'IfStatement') {
         checkExpression(node.condition, env, node);
         checkStatements(node.consequent, narrowEnvironment(env, node.condition, true), returnType, functionName);
