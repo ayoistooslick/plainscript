@@ -1,0 +1,9 @@
+// CLI args + env torture (self-asserting)
+remember argv as args()
+show join(argv, "|")
+remember mode as env("TORTURE_MODE") or "unset"
+show mode
+if env("DEFINITELY_NOT_SET_9182") is null
+    show "missing env is null"
+done
+show "cliargs ok"

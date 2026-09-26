@@ -1,0 +1,4 @@
+// PlainScript 1.0.363: collection filtering.
+remember values as list with 1, 2, 3
+remember found as first item from values
+show found

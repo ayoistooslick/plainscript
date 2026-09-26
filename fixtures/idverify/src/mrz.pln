@@ -1,0 +1,22 @@
+// PlainScript 1.0.363: MRZ parsing for machine-readable travel documents.
+//
+// Depends on the `mrz` npm package, invoked through a method call (mrz.parse).
+// `use mrz` is resolved by the dependency detector as an npm dependency and
+// compiled to `require("mrz")`.
+
+use mrz
+
+make parseMrz(lines)
+    if length(lines) is 0
+        throw "empty MRZ line list"
+    done
+    give mrz.parse(lines)
+done
+
+make documentType(lines)
+    remember parsed as parseMrz(lines)
+    give parsed.fields.documentType
+done
+
+export parseMrz
+export documentType

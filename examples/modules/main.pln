@@ -1,0 +1,4 @@
+// PlainScript 1.0.363: named imports.
+
+import { circleArea } from "./math.pln"
+show circleArea(2)

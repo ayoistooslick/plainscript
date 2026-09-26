@@ -1,0 +1,5 @@
+// PlainScript 1.0.363: functions.
+make double(value)
+    give value + value
+done
+show double(21)

@@ -1,0 +1,5 @@
+// PlainScript 1.0.363: functions.
+make greet(name)
+    give `Hello, ${name}!`
+done
+show greet("Ada")

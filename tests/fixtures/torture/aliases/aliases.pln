@@ -1,0 +1,31 @@
+// Syntax-flexibility torture: aliases and shorthand forms
+remember x as 1
+if x is 1
+    show "end works"
+end
+
+x becomes x + 1
+x += 10
+x set to 50
+x change to 60
+x is now 70
+if x is 70
+    show "alias forms ok"
+done
+
+show env("NOPE_9182") or "fallback"
+
+remember val as null
+val nullish becomes "dflt"
+if val is "dflt"
+    show "nullish becomes ok"
+done
+
+match pattern "^a" in "abc" as m1
+if m1 is not null
+    show "match pattern ok"
+done
+match pattern "z" in "abc" as m2
+if m2 is null
+    show "no match is null"
+done

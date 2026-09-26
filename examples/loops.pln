@@ -1,0 +1,18 @@
+// PlainScript 1.0.363: collection and numeric loops.
+
+remember colors as list with "red", "green", "blue"
+
+for each color in colors
+    show color
+done
+
+for index position from 0 to 2
+    show position
+    show colors at position 1
+done
+
+remember count as 0
+while count is less than 3
+    show count
+    count becomes count + 1
+done

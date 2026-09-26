@@ -1,0 +1,5 @@
+// PlainScript 1.0.363: lists and object access.
+remember names as list with "Ada", "Grace", "Lin"
+show names at position 1
+remember profile as record with name "Ada" and active true done
+show profile.name

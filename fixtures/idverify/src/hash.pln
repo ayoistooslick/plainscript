@@ -1,0 +1,33 @@
+// PlainScript 1.0.363: cryptographic helpers for the ID-verification SDK.
+//
+// This module uses only Node built-ins (crypto) plus PlainScript's stdlib
+// helpers (sha256, textToBytes, bytesToText, base64Encode, base64Decode), so it
+// runs anywhere Node does. It is imported by verify.pln.
+
+use crypto
+
+make sha256Hex(data)
+    give crypto.createHash("sha256").update(text(data)).digest("hex")
+done
+
+make sha256Buffer(bytes)
+    give sha256Hex(bytesToText(bytes))
+done
+
+make fingerprint(doc)
+    give sha256Hex(jsonEncode(doc))
+done
+
+make base64Bytes(bytes)
+    give base64Encode(bytesToText(bytes))
+done
+
+make bytesFromBase64(textVal)
+    give textToBytes(base64Decode(textVal))
+done
+
+export sha256Hex
+export sha256Buffer
+export fingerprint
+export base64Bytes
+export bytesFromBase64

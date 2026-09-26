@@ -1,0 +1,2 @@
+ask "Name?" as name
+show name

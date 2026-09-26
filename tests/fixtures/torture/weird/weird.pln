@@ -1,0 +1,73 @@
+// The deliberately strange program: many unrelated features combined
+remember raw as "{\"users\": [{\"name\": \"ada\", \"score\": 91}, {\"name\": \"bo\", \"score\": 74}, {\"name\": \"cy\", \"score\": 88}]}"
+remember data as jsonDecode(raw)
+// gather each rebinds its collection variable, so capture the mapped result
+// from the variable it rebinding: one variable per projection.
+remember scoreSource as users of data
+gather each u in scoreSource giving score of u
+remember scores as scoreSource
+remember ranked as sort(scores)
+remember nameSource as users of data
+gather each u in nameSource giving name of u
+remember names as nameSource
+if names[0] is not "ada"
+    exit(1)
+done
+if ranked[2] is not 91
+    exit(1)
+done
+
+make pipeline(seed)
+    remember state as {count: seed, trail: []}
+    make step(n)
+        remember current as count of state
+        state becomes {count: current + n, trail: add(`step ${n}` to trail of state)}
+        give state
+    done
+    give step
+done
+let pipe as pipeline(10)
+remember firstState as pipe(5)
+// the closure carries its state across calls: the next step continues from 15
+remember afterTwo as pipe(2)
+if count of afterTwo is not 17
+    exit(1)
+done
+if length of trail of afterTwo is not 2
+    exit(1)
+done
+
+match pattern "^(\\d+)-([a-z]+)$" in "42-bravo" as m
+remember store as keyMap()
+put "digits" as m[1] in store
+put "word" as m[2] in store
+if mapGet(store, "digits") is not "42"
+    exit(1)
+done
+
+make fetch(n)
+    wait for sleep(n * 5)
+    if n is 9
+        raise "bad nine"
+    done
+    give n * n
+done
+try
+    remember squares as all of ([fetch(2), fetch(3), fetch(4)])
+    if join(squares, "+") is not "4+9+16"
+        exit(1)
+    done
+recover as e
+    show `unexpected: ${message of e}`
+    exit(1)
+done
+
+run in parallel
+    fetch(1)
+    fetch(5)
+done as pair
+if count of pair is not 2
+    exit(1)
+done
+
+show "weird ok"

@@ -1,0 +1,112 @@
+{
+  "Remember variable": {
+    "prefix": "remember",
+    "body": ["remember ${1:name} as ${2:value}"],
+    "description": "Declare a PlainScript value"
+  },
+  "Let variable": {
+    "prefix": "let",
+    "body": ["let ${1:name} be ${2:value}"],
+    "description": "Declare a value with the let alias"
+  },
+  "Assignment": {
+    "prefix": "becomes",
+    "body": ["${1:name} becomes ${2:value}"],
+    "description": "Update a value"
+  },
+  "Show": {
+    "prefix": "show",
+    "body": ["show ${1:value}"],
+    "description": "Print a value"
+  },
+  "If block": {
+    "prefix": "if",
+    "body": ["if ${1:condition}", "    ${2:show \"yes\"}", "otherwise", "    ${3:show \"no\"}", "done"],
+    "description": "Conditional block"
+  },
+  "Function": {
+    "prefix": "make",
+    "body": ["make ${1:name}(${2:arg})", "    ${3:give ${2:arg}}", "done"],
+    "description": "Define a function"
+  },
+  "For each loop": {
+    "prefix": "foreach",
+    "body": ["for each ${1:item} in ${2:items}", "    show ${1:item}", "done"],
+    "description": "Iterate a collection"
+  },
+  "For index loop": {
+    "prefix": "forindex",
+    "body": ["for index ${1:i} from 0 to ${2:10}", "    show ${1:i}", "done"],
+    "description": "Iterate a numeric range"
+  },
+  "While loop": {
+    "prefix": "while",
+    "body": ["while ${1:count} is less than ${2:10}", "    ${1:count} becomes ${1:count} + 1", "done"],
+    "description": "Repeat while a condition is true"
+  },
+  "List": {
+    "prefix": "list",
+    "body": ["list with ${1:\"one\"}, ${2:\"two\"}"],
+    "description": "Create a readable list"
+  },
+  "Record": {
+    "prefix": "record",
+    "body": ["record with ${1:name} ${2:\"Ada\"} and ${3:active} ${4:true} done"],
+    "description": "Create a record value"
+  },
+  "Record kind": {
+    "prefix": "kind",
+    "body": ["define a kind called \"${1:Person}\" with", "    ${2:name} is ${3:\"\"}", "done", "", "remember ${4:person} as create a ${1:Person} with ${2:name} ${5:\"Ada\"}"],
+    "description": "Define and construct a record kind"
+  },
+  "Web app": {
+    "prefix": "webapp",
+    "body": ["web app", "    route get \"${1:/health}\"", "        reply json", "            ok is true", "        done", "    done", "start ${2:3000}"],
+    "description": "Create a web application"
+  },
+  "Route": {
+    "prefix": "route",
+    "body": ["route ${1:get} \"${2:/path}\"", "    reply ${3:\"ok\"}", "done"],
+    "description": "Create an HTTP route"
+  },
+  "SQLite database": {
+    "prefix": "database",
+    "body": ["database \"${1:app.db}\" using \"wasm\"", "execute", "    ${2:CREATE TABLE items (name TEXT)}", "done"],
+    "description": "Open SQLite"
+  },
+  "SQL query": {
+    "prefix": "query",
+    "body": ["remember ${1:rows} as query", "    SELECT * FROM ${2:items}", "done"],
+    "description": "Run a SQL query"
+  },
+  "Try recover": {
+    "prefix": "try",
+    "body": ["try", "    ${1:show \"work\"}", "recover as ${2:error}", "    show message of ${2:error}", "finally", "    show \"finished\""],
+    "description": "Recover from an error"
+  },
+  "HTTP request": {
+    "prefix": "get",
+    "body": ["remember ${1:response} as get \"${2:https://example.com}\" timeout ${3:5000}"],
+    "description": "Make an HTTP request"
+  },
+  "AI chat": {
+    "prefix": "chat",
+    "body": ["remember ${1:answer} as chatWith(\"${2:groq}\", \"${3:llama-3.3-70b-versatile}\", ${4:\"Hello\"})"],
+    "description": "Call an OpenAI-compatible AI provider"
+  },
+  "Telegram bot": {
+    "prefix": "telegram",
+    "body": ["bot env(\"TELEGRAM_BOT_TOKEN\")", "", "when someone sends \"${1:/start}\"", "    reply ${2:\"Welcome\"}", "done", "", "start telegram bot"],
+    "description": "Create a polling Telegram bot"
+  },
+  "Test": {
+    "prefix": "test",
+    "body": ["test \"${1:works}\"", "    check ${2:add(2, 3)} equals ${3:5}", "done"],
+    "description": "Define a native test"
+  },
+  "Import": {
+    "prefix": "import",
+    "body": ["import { ${1:name} } from \"${2:./module.pln}\""],
+    "description": "Import a module"
+  }
+}

@@ -1,0 +1,38 @@
+bring welcomeMessage from "./messages.pln"
+
+websocket server on 3001
+    when socket connects
+        send socket welcomeMessage()
+    done
+    when socket sends message
+        broadcast message
+    done
+done
+
+web app
+database "chat.db" using "wasm"
+execute
+    CREATE TABLE IF NOT EXISTS messages (body TEXT)
+done
+
+route post "/messages"
+    remember message as body("message")
+    insert
+        INSERT INTO messages (body) VALUES ({message})
+    done
+    status 201
+    reply json
+        saved is true
+    done
+done
+
+route get "/messages"
+    remember rows as query
+        SELECT body FROM messages ORDER BY rowid
+    done
+    reply json
+        messages is rows
+    done
+done
+
+start 3000

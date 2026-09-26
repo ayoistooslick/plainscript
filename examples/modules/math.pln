@@ -1,0 +1,9 @@
+// PlainScript 1.0.363: an imported module.
+
+remember PI as 3.14159
+
+make circleArea(radius)
+    give PI * radius * radius
+done
+
+export circleArea

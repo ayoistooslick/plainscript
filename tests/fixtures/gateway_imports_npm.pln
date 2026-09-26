@@ -1,0 +1,3 @@
+import "./uses_npm.pln"
+use node-fetch
+show "gateway loaded"

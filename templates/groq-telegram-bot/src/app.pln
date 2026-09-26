@@ -1,0 +1,22 @@
+bring answerQuestion from "./ai.pln"
+
+bot env("TELEGRAM_BOT_TOKEN")
+
+when someone sends "/start"
+    reply "Welcome. Use /help for commands or /ask <question> for an AI answer."
+done
+
+when someone sends "/help"
+    reply "/start for a welcome, /status for a fixed answer, or /ask <question> for Groq."
+done
+
+when someone sends "/status"
+    reply "All systems are operational."
+done
+
+when someone sends matching "/ask (.+)"
+    remember answer as answerQuestion(message)
+    reply answer
+done
+
+start telegram bot

@@ -1,0 +1,22 @@
+// PlainScript 1.0.363: conditions and string predicates.
+
+remember score as 87
+remember label as "PlainScript"
+
+if score is at least 90
+    show "excellent"
+otherwise
+    if score more than 70
+        show "good"
+    otherwise
+        show "keep practicing"
+    done
+done
+
+if label contains "Script" and label starts with "Plain"
+    show "language found"
+done
+
+if label ends as "Script"
+    show "suffix matched"
+done

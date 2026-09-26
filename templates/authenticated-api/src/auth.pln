@@ -1,0 +1,5 @@
+make issueToken(user, secret)
+    give createToken(user, secret)
+done
+
+export issueToken

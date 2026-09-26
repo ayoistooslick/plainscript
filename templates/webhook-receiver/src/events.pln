@@ -1,0 +1,6 @@
+make persistEvent(event)
+    writeFile("last-webhook.json", jsonEncode(event))
+    give true
+done
+
+export persistEvent

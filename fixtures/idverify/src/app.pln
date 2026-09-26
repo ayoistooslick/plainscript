@@ -1,0 +1,27 @@
+// PlainScript 1.0.363: HTTP entry point for the ID-verification SDK.
+//
+// A `web app` (Express) with a verification route. Demonstrates the HTTP
+// surface plus imports from the sibling modules. Run with: plainscript run src/app.pln
+
+import "./hash.pln"
+import "./mrz.pln"
+
+web app
+
+route post "/verify"
+    remember line as "P<UTOLOVELACE<ADA<<<<<<<<<<<<<<<"
+    if length(line) is 0
+        status 400
+        reply json
+            error is "empty document"
+        done
+    otherwise
+        remember digest as sha256Hex(line)
+        reply json
+            verified is true
+            fingerprint is digest
+        done
+    done
+done
+
+start 0

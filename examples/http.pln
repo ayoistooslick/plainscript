@@ -1,0 +1,11 @@
+// PlainScript 1.0.363: HTTP client requests.
+
+remember response as get "https://example.com/api/items" timeout 5000
+if response.ok is true
+    show response.data
+otherwise
+    show response.status
+done
+
+remember created as post "https://example.com/api/items" with {name: "Ada"} headers {contentType: "application/json"}
+show created.status

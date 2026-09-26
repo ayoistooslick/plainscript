@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PlainScript Dodge</title>
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      background: #0d1117;
+      color: #e6edf3;
+      font-family: system-ui, "Segoe UI", sans-serif;
+    }
+    h1 { font-size: 22px; margin: 0; }
+    p { margin: 0; font-size: 14px; color: #8b949e; }
+    canvas {
+      border: 2px solid #30363d;
+      border-radius: 8px;
+      background: #0d1117;
+      display: block;
+    }
+    button {
+      padding: 10px 22px;
+      font-size: 15px;
+      font-weight: 600;
+      color: #0d1117;
+      background: #40c463;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    button:hover { filter: brightness(1.1); }
+  </style>
+</head>
+<body>
+  <h1>PlainScript Dodge</h1>
+  <p>Use WASD or arrow keys to dodge the falling blocks.</p>
+  <canvas id="game" width="640" height="480"></canvas>
+  <button id="restart" type="button">Restart</button>
+  <script src="game.js"></script>
+</body>
+</html>

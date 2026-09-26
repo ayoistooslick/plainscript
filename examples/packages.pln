@@ -1,0 +1,6 @@
+// PlainScript 1.0.363: importing npm packages.
+
+use express
+
+remember app as express()
+show typeOf(app)

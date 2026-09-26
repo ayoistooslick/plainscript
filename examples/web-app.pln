@@ -1,0 +1,8 @@
+// PlainScript 1.0.363: web application.
+web app
+route get "/health"
+    reply json
+        ok is true
+    done
+done
+start 3000

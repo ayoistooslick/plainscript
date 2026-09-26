@@ -1,0 +1,32 @@
+// PlainScript 1.0.363 — randomness without repeats and weighted picks.
+// Usage:
+//   plainscript run examples/random-cli.pln
+//   plainscript run examples/random-cli.pln 20
+
+make rollDice(sides)
+    give randomInteger(1, sides)
+done
+
+make main()
+    remember argv as args()
+    remember rolls as 6
+    if count of argv is at least 1
+        rolls becomes parseInt(argv at position 0, 10)
+    done
+    show "rolling a d6 " + rolls + " times:"
+    remember i as 0
+    remember sum as 0
+    while i is less than rolls
+        sum += rollDice(6)
+        i += 1
+    done
+    show "sum of rolls: " + sum
+    show "one die: " + rollDice(6)
+    show "coin: " + randomChoice(["heads", "tails"])
+    show "lucky card: " + randomChoice(["Ace", "King", "Queen", "Jack"])
+    show "weighted loot: " + weightedChoice(["common", "rare", "legendary"], [0.7, 0.25, 0.05])
+    show "shuffled deck: " + join(shuffle(["A", "2", "3", "4", "5"]), " ")
+    show "three of ten: " + join(sample([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 3), " ")
+done
+
+main()

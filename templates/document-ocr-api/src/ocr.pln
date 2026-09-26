@@ -1,0 +1,6 @@
+make scanDocument(document)
+    ocr path of document as text
+    give text
+done
+
+export scanDocument

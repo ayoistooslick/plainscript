@@ -1,0 +1,18 @@
+// PlainScript 1.0.363: parallel operations and timeouts.
+
+make firstJob()
+    wait for sleep(10)
+    give "first"
+done
+
+make secondJob()
+    wait for sleep(20)
+    give "second"
+done
+
+remember results as all of [firstJob(), secondJob()]
+show results
+
+remember quick as withTimeout(firstJob(), 1000)
+show quick
+run background secondJob()

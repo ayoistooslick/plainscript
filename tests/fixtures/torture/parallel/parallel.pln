@@ -1,0 +1,46 @@
+// Parallel workload torture: run in parallel, error propagation, settled
+make job(n)
+    wait for sleep(n * 10)
+    if n is 3
+        raise "job 3 exploded"
+    done
+    give n * 100
+done
+
+run in parallel
+    job(1)
+    job(2)
+    job(4)
+done as results
+if count of results is not 3
+    exit(1)
+done
+
+try
+    run in parallel
+        job(3)
+    done as bad
+    show "should have raised"
+    exit(1)
+recover as e
+    if message of e is not "job 3 exploded"
+        exit(1)
+    done
+done
+
+try
+    remember outcomes as all of ([job(5), job(3), job(6)])
+    show "should have rejected"
+    exit(1)
+recover as e
+    if message of e is not "job 3 exploded"
+        exit(1)
+    done
+done
+
+remember states as settled of ([job(7), job(3)])
+if count of states is not 2
+    exit(1)
+done
+
+show "parallel ok"

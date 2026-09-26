@@ -1,0 +1,11 @@
+// PlainScript 1.0.363: JSON values and transformations.
+
+remember person as record with name "Ada" and role "engineer" done
+
+remember encoded as jsonEncode(person)
+remember decoded as jsonDecode(encoded)
+show decoded.name
+show decoded.role
+
+remember payload as {ok: true, count: 2}
+show jsonEncode(payload)

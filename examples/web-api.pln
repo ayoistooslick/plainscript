@@ -1,0 +1,27 @@
+// PlainScript 1.0.363: web apps, routes, JSON, and status codes.
+
+web app
+allow cors
+
+route get "/health"
+    reply json
+        ok is true
+        service is "plain-script"
+    done
+done
+
+route post "/echo"
+    remember incoming as body of request
+    reply json
+        received is incoming
+    done
+done
+
+when nothing matches
+    status 404
+    reply json
+        error is "not found"
+    done
+done
+
+start 0

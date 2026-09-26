@@ -1,0 +1,10 @@
+{
+  "name": "idverify",
+  "version": "1.0.363",
+  "private": true,
+  "type": "commonjs",
+  "description": "A real-world ID-verification SDK authored in PlainScript.",
+  "scripts": {
+    "build": "plainscript build src/verify.pln -o build/verify.js"
+  }
+}

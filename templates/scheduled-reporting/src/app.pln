@@ -1,0 +1,16 @@
+bring createReport from "./reports.pln"
+
+remember latest as "No report has run yet"
+
+schedule "0 * * * *"
+    latest becomes createReport(latest)
+done
+
+web app
+route get "/reports/latest"
+    reply json
+        report is latest
+    done
+done
+
+start 3000

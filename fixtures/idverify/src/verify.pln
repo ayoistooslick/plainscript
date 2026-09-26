@@ -1,0 +1,50 @@
+// PlainScript 1.0.363: ID-verification SDK entry point.
+//
+// Converted from a real Node.js verification service. This entry path runs on
+// Node built-ins alone (fs, path, crypto)  -  no npm install required  -  while the
+// sibling modules (mrz.pln, vision.pln) depend on npm packages. It exercises
+// async combinators (all of), typed error handling (try/recover/throw), binary
+// data (bytes, base64, sha256) and object literals.
+
+use fs
+use path
+use crypto
+
+import "./hash.pln"
+
+make readSource(file)
+    if fs.existsSync(file) is false
+        throw "source file not found: " + file
+    done
+    give fs.readFileSync(file)
+done
+
+make digestOf(file)
+    give sha256Buffer(readSource(file))
+done
+
+make buildCandidate(nameFile, frontDigest, backDigest)
+    remember holder as readSource(nameFile)
+    remember candidate as
+        holder is bytesToText(holder)
+        ok is true
+        front is frontDigest
+        back is backDigest
+    done
+    give candidate
+done
+
+// Hash the front and back sources in parallel.
+remember front as readSource("src/front.txt")
+remember back as readSource("src/back.txt")
+remember digests as all of [ sha256Buffer(front), sha256Buffer(back) ]
+
+try
+    remember digest as digestOf("src/front.txt")
+    remember candidate as buildCandidate("src/name.txt", digests[0], digests[1])
+    show jsonEncode(candidate)
+recover as err
+    show "verification failed: " + message of err
+done
+
+export buildCandidate

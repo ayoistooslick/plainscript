@@ -1,0 +1,4 @@
+// PlainScript 1.0.363: native test block.
+test "values add"
+    check 2 + 3 equals 5
+done

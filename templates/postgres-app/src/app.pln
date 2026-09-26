@@ -1,0 +1,45 @@
+bring normalizeName from "./users.pln"
+
+web app
+use pg
+postgres env("DATABASE_URL")
+
+execute
+    CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        email TEXT NOT NULL UNIQUE
+    )
+done
+
+route get "/health"
+    reply json
+        ok is true
+        service is "postgres-app"
+    done
+done
+
+route get "/users"
+    remember rows as query
+        SELECT id, name, email FROM users ORDER BY id
+    done
+    reply json
+        users is rows
+    done
+done
+
+route post "/users"
+    remember rawName as body("name")
+    remember name as normalizeName(rawName)
+    remember email as body("email")
+    insert
+        INSERT INTO users (name, email) VALUES ({name}, {email})
+    done
+    status 201
+    reply json
+        added is name
+        email is email
+    done
+done
+
+start 3000

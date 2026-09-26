@@ -1,0 +1,8 @@
+// PlainScript 1.0.363: sessions and cookies.
+web app
+enable sessions "session-secret"
+route get "/"
+    set cookie "theme" to "dark" expires in 7 days
+    reply "ready"
+done
+start 3000

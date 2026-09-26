@@ -1,0 +1,32 @@
+// PlainScript 1.0.363: API keys, sessions, cookies, and auth helpers.
+
+web app
+enable sessions "development-only-session-secret"
+require api key from "demo-key"
+limit requests to 60 per minute
+
+route post "/login"
+    remember passwordOk as checkPassword(password of body of request, hashPassword("secret"))
+    if passwordOk is true
+        user of session of request becomes "ada"
+        set cookie "theme" to "dark" expires in 7 days
+        reply json
+            authenticated is true
+            token is createToken("ada", "token-secret")
+        done
+    otherwise
+        status 401
+        reply json
+            authenticated is false
+        done
+    done
+done
+
+route get "/me"
+    reply json
+        user is user of session of request
+        theme is cookie("theme")
+    done
+done
+
+start 0

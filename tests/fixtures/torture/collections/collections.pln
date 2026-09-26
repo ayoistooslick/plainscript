@@ -1,0 +1,21 @@
+// Collections torture: add/remove as expressions (regression), sort, ranking
+remember xs as []
+xs becomes add(1 to xs)
+xs becomes add(2 to xs)
+xs becomes add(3 to xs)
+if count of xs is not 3
+    exit(1)
+done
+show join(xs, ",")
+remember kept as remove(2 from xs)
+if kept[1] is not 3
+    exit(1)
+done
+show join(kept, ",")
+remember scores as [91, 74, 88]
+remember ranked as sort(scores)
+show join(ranked, ",")
+remember words as ["pear", "fig", "apple"]
+show join(sort(words), ",")
+
+show "collections ok"

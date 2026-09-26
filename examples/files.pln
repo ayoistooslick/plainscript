@@ -1,0 +1,12 @@
+// PlainScript 1.0.363: file and path operations.
+
+remember report as readFile("README.md")
+show length(report)
+
+remember outputPath as joinPath("tmp", "report.txt")
+writeFile(outputPath, "PlainScript report")
+appendFile(outputPath, "\nready")
+show fileExists(outputPath)
+
+remember parts as split(outputPath, "/")
+show parts

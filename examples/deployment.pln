@@ -1,0 +1,6 @@
+// PlainScript 1.0.363: production-shaped web entry point.
+web app
+route get "/health"
+    reply "ok"
+done
+start 3000

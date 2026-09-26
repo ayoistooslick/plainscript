@@ -1,0 +1,22 @@
+bring scanDocument from "./ocr.pln"
+
+web app
+accept uploads limit "8 MB" allow list with "image/png", "image/jpeg" folder "uploads"
+
+route post "/documents/scan"
+    remember files as uploads("document")
+    if length(files) is 0
+        status 400
+        reply json
+            error is "document is required"
+        done
+    otherwise
+        remember document as upload("document")
+        remember text as scanDocument(document)
+        reply json
+            text is text
+        done
+    done
+done
+
+start 3000

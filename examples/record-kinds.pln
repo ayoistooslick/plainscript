@@ -1,0 +1,7 @@
+// PlainScript 1.0.363: record kind construction.
+define a kind called "Player" with
+    name is ""
+    goals is 0
+done
+remember player as create a Player with name "Ada" and goals 4
+show player.name

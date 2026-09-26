@@ -1,0 +1,53 @@
+{
+    "name": "plainscript-language",
+    "displayName": "PlainScript Language",
+    "description": "Syntax highlighting and language support for the PlainScript programming language (.pln files)",
+    "version": "1.1.5",
+    "main": "./extension.js",
+    "activationEvents": ["onLanguage:plainscript"],
+    "publisher": "ayoistooslick",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/ayoistooslick/plainscript.git"
+    },
+    "engines": {
+        "vscode": "^1.70.0"
+    },
+    "categories": [
+        "Programming Languages"
+    ],
+    "contributes": {
+        "languages": [
+            {
+                "id": "plainscript",
+                "aliases": ["PlainScript", "plainscript"],
+                "extensions": [".pln"],
+                "configuration": "./language-configuration.json",
+                "icon": {
+                    "light": "./icons/plainscript-file.svg",
+                    "dark": "./icons/plainscript-file.svg"
+                }
+            }
+        ],
+        "grammars": [
+            {
+                "language": "plainscript",
+                "scopeName": "source.plainscript",
+                "path": "./syntaxes/plainscript.tmLanguage.json"
+            }
+        ],
+        "snippets": [
+            {
+                "language": "plainscript",
+                "path": "./snippets/plainscript.code-snippets"
+            }
+        ]
+    },
+    "scripts": {
+        "vscode:prepublish": "echo 'No build step required'"
+    },
+    "dependencies": {
+        "vscode-languageclient": "^9.0.1"
+    },
+    "license": "MIT"
+}

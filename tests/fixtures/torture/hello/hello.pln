@@ -1,0 +1,11 @@
+// Hello-world torture: strings, templates, of-expressions, builtins
+remember name as "PlainScript"
+show `hello, ${name}`
+remember who as "torture"
+show `hello again, ${uppercase(who)}`
+show length("héllo ünïcode ✓")
+show "abc" starts with "ab"
+show "report.pdf" ends with ".pdf"
+show join(["a", "b", "c"], "-")
+
+show "hello ok"

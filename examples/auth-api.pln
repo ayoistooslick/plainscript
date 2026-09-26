@@ -1,0 +1,9 @@
+// PlainScript 1.0.363: protected API route.
+web app
+require api key from env("API_KEY")
+route get "/private"
+    reply json
+        ok is true
+    done
+done
+start 3000

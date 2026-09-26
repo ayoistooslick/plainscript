@@ -1,0 +1,13 @@
+// PlainScript 1.0.363: the native test DSL.
+
+make add(a, b)
+    give a + b
+done
+
+test "addition works"
+    check add(2, 3) equals 5
+done
+
+test "text contains a word"
+    check "PlainScript" contains "Script"
+done

@@ -1,0 +1,2 @@
+import "./diamond_shared.pln"
+show "right"

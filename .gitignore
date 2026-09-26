@@ -1,0 +1,30 @@
+# Secrets - never commit
+.env
+.env.*
+!.env.example
+
+# Node
+node_modules/
+
+# Plain AI translation cache (RFC-0020 §15, §44)
+.plain/ai-cache/
+ai-cache/
+
+# Build output
+_plain_out.js
+*.js.map
+dist/
+
+# Logs
+*.log
+log.txt
+
+# Scratch / ad-hoc test artifacts
+data
+out.bin
+output.txt
+
+# Agent memory and local dev config
+.agents/memory/MEMORY.md
+.replit
+.aider*

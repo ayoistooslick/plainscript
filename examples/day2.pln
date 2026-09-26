@@ -1,0 +1,7 @@
+// PlainScript 1.0.363: conditional blocks.
+remember age as 21
+if age is at least 18
+    show "adult"
+otherwise
+    show "minor"
+done

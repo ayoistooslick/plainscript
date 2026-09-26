@@ -1,0 +1,36 @@
+bring normalizeProductName from "./products.pln"
+
+database "inventory.db" using "wasm"
+
+execute
+    CREATE TABLE IF NOT EXISTS products (
+        id INTEGER PRIMARY KEY,
+        name TEXT NOT NULL,
+        quantity INTEGER NOT NULL
+    )
+done
+
+web app
+
+route get "/products"
+    remember products as query
+        SELECT id, name, quantity FROM products ORDER BY name
+    done
+    reply json
+        products is products
+    done
+done
+
+route post "/products"
+    remember name as normalizeProductName(body("name"))
+    insert
+        INSERT INTO products (name, quantity)
+        VALUES ({name}, {body("quantity")})
+    done
+    status 201
+    reply json
+        created is true
+    done
+done
+
+start 3000

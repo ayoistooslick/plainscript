@@ -1,0 +1,7 @@
+// PlainScript 1.0.363: readable conditions.
+remember score as 87
+if score is at least 80
+    show "pass"
+otherwise
+    show "review"
+done

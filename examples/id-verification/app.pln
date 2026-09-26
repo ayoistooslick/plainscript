@@ -1,0 +1,30 @@
+// PlainScript 1.0.363: upload and OCR verification service.
+
+web app
+accept uploads limit "5 MB" allow list with "image/png", "image/jpeg" folder "uploads"
+
+route post "/verify"
+    remember found as uploads("id")
+    if length(found) is 0
+        status 400
+        reply json
+            error is "Attach the ID image in the id field"
+        done
+    otherwise
+        remember file as upload("id")
+        ocr path of file as scanned
+        if scanned contains "ADA LOVELACE"
+            reply json
+                verified is true
+                holder is "Ada Lovelace"
+            done
+        otherwise
+            reply json
+                verified is false
+                holder is "unknown"
+            done
+        done
+    done
+done
+
+start 0

@@ -1,0 +1,6 @@
+// PlainScript 1.0.363: files and environment configuration.
+remember filename as env("CONFIG_FILE")
+if filename is null
+    remember filename as "config.json"
+done
+show fileExists(filename)

@@ -1,0 +1,31 @@
+// PlainScript 1.0.363 — memoization and the new statistics/vector primitives.
+
+make slowSquare(n)
+    give n * n
+done
+
+remember fastSquare as memoize(slowSquare)
+show fastSquare(9)
+show fastSquare(9)
+
+// A memoized recursive function still uses `make` + `yield`-free bodies:
+make expensiveSum(n)
+    if n is at most 0
+        give 0
+    done
+    give n + expensiveSum(n - 1)
+done
+show expensiveSum(10)
+
+// Vector primitives.
+remember a as [1, 2, 3]
+remember b as [4, 5, 6]
+show "dot: " + dotProduct(a, b)
+show "length of a: " + magnitude(a)
+show "unit of a: " + join(normalize(a), ", ")
+
+remember data as [2, 4, 4, 4, 5, 5, 7, 9]
+show "mean: " + mean(data)
+show "median: " + median(data)
+show "variance: " + round(variance(data) * 100) / 100
+show "deviation: " + round(deviation(data) * 100) / 100

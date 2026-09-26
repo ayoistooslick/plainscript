@@ -1,0 +1,23 @@
+// PlainScript 1.0.363: SQLite, SQL blocks, parameters, and transactions.
+
+database "plain-script-demo.db" using "wasm"
+remember personName as "Ada"
+
+execute
+    CREATE TABLE IF NOT EXISTS people (name TEXT, age INTEGER)
+done
+
+insert
+    INSERT INTO people (name, age) VALUES ({personName}, 36)
+done
+
+remember people as query
+    SELECT name, age FROM people ORDER BY name
+done
+show people
+
+transaction
+    update
+        UPDATE people SET age = 37 WHERE name = {personName}
+    done
+done

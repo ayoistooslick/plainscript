@@ -1,0 +1,8 @@
+// PlainScript 1.0.363: SQLite database.
+database "app.db" using "wasm"
+execute
+    CREATE TABLE IF NOT EXISTS notes (body TEXT)
+done
+remember notes as query
+    SELECT body FROM notes
+done

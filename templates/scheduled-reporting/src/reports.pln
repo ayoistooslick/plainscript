@@ -1,0 +1,7 @@
+make createReport(current)
+    remember report as `report created at ${date()}`
+    writeFile("latest-report.txt", report)
+    give report
+done
+
+export createReport

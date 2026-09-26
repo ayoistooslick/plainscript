@@ -1,0 +1,91 @@
+bring broadcastMsg from "./realtime.pln"
+
+database "messaging.db" using "wasm"
+
+execute
+    CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, name TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY AUTOINCREMENT, sender TEXT NOT NULL, receiver TEXT NOT NULL, content TEXT NOT NULL)
+done
+
+remember connections as []
+
+web app
+require api key from env("API_KEY")
+allow cors
+
+route post "/register"
+    remember name as body("name")
+    remember userId as uuid()
+    insert
+        INSERT INTO users (id, name) VALUES ({userId}, {name})
+    done
+    status 201
+    reply json
+        id is userId
+        name is name
+    done
+done
+
+route post "/login"
+    remember rows as query
+        SELECT id, name FROM users WHERE id = {body("id")}
+    done
+    if length(rows) is 0
+        status 404
+        reply json
+            error is "user not found"
+        done
+    otherwise
+        reply json
+            user is rows[0]
+        done
+    done
+done
+
+route post "/messages"
+    remember senderId as body("sender")
+    remember receiverId as body("receiver")
+    remember content as body("content")
+    remember msg as { sender: senderId, receiver: receiverId, text: content, timestamp: time() }
+    insert
+        INSERT INTO messages (sender, receiver, content) VALUES ({senderId}, {receiverId}, {content})
+    done
+    broadcastMsg(msg, connections)
+    status 201
+    reply json
+        message is msg
+    done
+done
+
+route get "/messages/:userId"
+    remember rows as query
+        SELECT * FROM messages WHERE sender = {param("userId")} OR receiver = {param("userId")} ORDER BY id
+    done
+    reply json
+        messages is rows
+    done
+done
+
+start 3000
+
+websocket server on 3001
+
+when socket connects
+    connections becomes connections + [{ socket: socket, userId: "" }]
+done
+
+when socket sends message
+    remember parsed as jsonDecode(message)
+    remember userId as userId of parsed
+    for each connection in connections
+        if connection.socket is socket
+            connection.userId becomes userId
+        done
+    done
+done
+
+when socket disconnects
+    filter each connection in connections when connection.socket is not socket
+done
+
+done

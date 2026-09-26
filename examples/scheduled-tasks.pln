@@ -1,0 +1,4 @@
+// PlainScript 1.0.363: recurring task.
+schedule "0 * * * *"
+    show "hourly task"
+done

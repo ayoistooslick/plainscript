@@ -1,0 +1,51 @@
+// PlainScript 1.0.363 — a small file manager CLI.
+// Usage:
+//   plainscript run examples/file-manager-cli.pln list
+//   plainscript run examples/file-manager-cli.pln copy readme.md readme-backup.md
+//   plainscript run examples/file-manager-cli.pln remove readme-backup.md
+//   plainscript run examples/file-manager-cli.pln archive old-logs
+
+make showHelp()
+    show "file-manager-cli.pln <list|copy|remove|archive> <path...>"
+done
+
+make main()
+    remember argv as args()
+    if count of argv is 0
+        showHelp()
+        exit(0)
+    done
+    remember command as argv at position 0
+    if command is "list"
+        show listFolder(".")
+    otherwise if command is "copy"
+        if count of argv is at least 3
+            copyFile(argv at position 1, argv at position 2)
+            show "copied " + argv at position 1 + " to " + argv at position 2
+        otherwise
+            show "usage: ... copy <from> <to>"
+        done
+    otherwise if command is "remove"
+        if count of argv is at least 2
+            deleteFile(argv at position 1)
+            show "removed " + argv at position 1
+        otherwise
+            show "usage: ... remove <file>"
+        done
+    otherwise if command is "archive"
+        if count of argv is at least 2
+            archiveEntry(argv at position 1)
+        otherwise
+            show "usage: ... archive <path>"
+        done
+    otherwise
+        showHelp()
+    done
+done
+
+make archiveEntry(path)
+    moveFile(path, path + "-archive")
+    show "archived " + path + " as " + path + "-archive"
+done
+
+main()

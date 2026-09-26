@@ -1,0 +1,10 @@
+// PlainScript 1.0.363: upload route.
+web app
+accept uploads limit "5 MB" allow list with "image/png" folder "uploads"
+route post "/upload"
+    remember image as upload("file")
+    reply json
+        uploaded is image
+    done
+done
+start 3000

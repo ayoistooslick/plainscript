@@ -1,0 +1,13 @@
+// PlainScript 1.0.363: WebSocket server handlers.
+
+websocket server on 8080
+    when socket connects
+        send socket "connected"
+    done
+    when socket sends message
+        broadcast message
+    done
+    when socket disconnects
+        show "socket closed"
+    done
+done

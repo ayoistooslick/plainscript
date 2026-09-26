@@ -1,0 +1,35 @@
+// Performance sanity: moderate-scale loops, arrays, string building
+// (range(1, N) yields 1..N-1, so big holds 1..199999)
+remember big as range(1, 200000)
+if count of big is not 199999
+    exit(1)
+done
+if big[199998] is not 199999
+    exit(1)
+done
+
+make addOne(n)
+    give n + 1
+done
+
+let acc as 0
+for index i from 1 to 100000
+    acc becomes acc + addOne(i)
+done
+if acc is not 5000150000
+    exit(1)
+done
+
+remember t0 as time()
+remember parts as range(1, 100001)
+gather each i in parts giving "ab"
+remember s as join(parts, "")
+if length of s is not 200000
+    exit(1)
+done
+if time() - t0 is above 10000
+    show "PERF REGRESSION: string build took too long"
+    exit(1)
+done
+
+show "perf ok"

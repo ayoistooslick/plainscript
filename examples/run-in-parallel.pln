@@ -1,0 +1,25 @@
+// PlainScript 1.0.363 — Promise.all-style concurrency with a named result.
+// `run in parallel ... done as <name>` starts every call at once and collects
+// the value of each statement into the named list, preserving order.
+
+make square(n)
+    give n * n
+done
+
+make cube(n)
+    give n * n * n
+done
+
+run in parallel
+    square(3)
+    cube(3)
+    square(4)
+done as results
+
+show "results: " + join(results, ", ")
+
+remember acc as 0
+for each value in results
+    acc += value
+done
+show "sum: " + acc

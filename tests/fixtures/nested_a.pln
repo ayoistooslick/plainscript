@@ -1,0 +1,2 @@
+import "./nested_b.pln"
+show "a loaded"

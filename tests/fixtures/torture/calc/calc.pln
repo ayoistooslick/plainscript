@@ -1,0 +1,12 @@
+// Calculator torture: precedence, negatives, decimals, modulo, powers
+show 2 + 3 * 4
+show (2 + 3) * 4
+show 10 % 3
+show 2 ** 10
+show 0 - 5
+show 1.5 + 1.5
+show 7 / 2
+show abs(0 - 9)
+show round(2.6)
+
+show "calc ok"

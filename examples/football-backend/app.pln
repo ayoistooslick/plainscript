@@ -1,0 +1,91 @@
+// PlainScript 1.0.363: a complete authenticated SQLite API.
+
+web app
+database ":memory:" using "wasm"
+enable sessions "touchline-session-secret"
+remember coachHash as hashPassword("touchline")
+
+execute
+    CREATE TABLE teams (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        played INTEGER DEFAULT 0,
+        won INTEGER DEFAULT 0,
+        drawn INTEGER DEFAULT 0,
+        lost INTEGER DEFAULT 0
+    )
+done
+
+insert
+    INSERT INTO teams (name, played, won, drawn, lost) VALUES
+    ("Thunder FC", 3, 2, 1, 0),
+    ("Harbor City", 3, 1, 1, 1),
+    ("Old Dock", 3, 0, 2, 1)
+done
+
+route post "/login"
+    remember valid as checkPassword(password of body of request, coachHash)
+    if valid is true
+        user of session of request becomes username of body of request
+        reply json
+            token is createToken(username of body of request, "touchline-secret")
+            user is username of body of request
+        done
+    otherwise
+        status 401
+        reply json
+            error is "Wrong password"
+        done
+    done
+done
+
+route get "/me"
+    reply json
+        user is user of session of request
+    done
+done
+
+require api key from "coach-key-42"
+
+route get "/teams"
+    remember rows as query
+        SELECT id, name, played, won, drawn, lost FROM teams ORDER BY name
+    done
+    reply json
+        teams is rows
+    done
+done
+
+route post "/teams"
+    remember missing as validate(body of request, list with "name")
+    if length(missing) more than 0
+        status 400
+        reply missing
+    otherwise
+        remember teamName as name of body of request
+        insert
+            INSERT INTO teams (name, played, won, drawn, lost) VALUES ({teamName}, 0, 0, 0, 0)
+        done
+        reply json
+            added is teamName
+        done
+    done
+done
+
+route get "/standings"
+    remember rows as query
+        SELECT name, won, drawn, lost FROM teams ORDER BY won DESC, name
+    done
+    reply json
+        standings is rows
+    done
+done
+
+when nothing matches
+    status 404
+    reply json
+        error is "No such endpoint"
+    done
+done
+
+start 0

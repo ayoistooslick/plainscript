@@ -1,0 +1,9 @@
+make missingTitle(payload)
+    give validate("title", payload)
+done
+
+make newTicket(title)
+    give { title: title, state: "open" }
+done
+
+export missingTitle and newTicket

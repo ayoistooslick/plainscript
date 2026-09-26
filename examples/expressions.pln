@@ -1,0 +1,7 @@
+// PlainScript 1.0.363: expression operators.
+remember sumValue as (2 + 3) * 4
+if sumValue is 20
+    show "exact"
+otherwise
+    show "other"
+done

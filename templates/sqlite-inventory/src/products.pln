@@ -1,0 +1,6 @@
+make normalizeProductName(value)
+    trim value
+    give value
+done
+
+export normalizeProductName

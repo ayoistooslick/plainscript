@@ -1,0 +1,6 @@
+// PlainScript 1.0.363: Telegram bot.
+bot env("TELEGRAM_BOT_TOKEN")
+when someone sends "/start"
+    reply "Welcome"
+done
+start telegram bot

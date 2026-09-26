@@ -1,0 +1,37 @@
+bring missingTitle and newTicket from "./tickets.pln"
+
+web app
+remember tickets as []
+
+route get "/health"
+    reply json
+        ok is true
+        service is "ticket-api"
+    done
+done
+
+route get "/tickets"
+    reply json
+        tickets is tickets
+    done
+done
+
+route post "/tickets"
+    remember missing as missingTitle(body())
+    if length(missing) is greater than 0
+        status 400
+        reply json
+            error is "title is required"
+            missing is missing
+        done
+    otherwise
+        remember ticket as newTicket(body("title"))
+        tickets becomes tickets plus [ticket]
+        status 201
+        reply json
+            ticket is ticket
+        done
+    done
+done
+
+start 3000

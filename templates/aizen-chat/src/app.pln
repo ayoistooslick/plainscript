@@ -1,0 +1,68 @@
+bring modelName and systemPersona from "./persona.pln"
+
+remember mongoUri as env("MONGO_URI")
+mongo mongoUri db "aizen"
+
+web app
+allow cors
+
+remember MODEL as modelName()
+remember PERSONA as systemPersona()
+
+route get "/"
+    reply file "public/chat.html"
+done
+
+route post "/api/history"
+    remember user as body("username") ?? "guest"
+
+    remember rows as query
+        SELECT * FROM messages WHERE username = {user}
+    done
+
+    reply json
+        history is rows
+    done
+done
+
+route post "/api/chat"
+    remember msg as body("message")
+    remember user as body("username") ?? "guest"
+
+    if msg is ""
+        reply json
+            error is "You said nothing. Surely even you can do better than that."
+        done
+    otherwise
+        remember rows as query
+            SELECT * FROM messages WHERE username = {user}
+        done
+
+        remember personaMsg as record with role "system" and content PERSONA done
+        remember messages as []
+        push(messages, personaMsg)
+
+        for each row in rows
+            remember m as record with role row.role and content row.content done
+            push(messages, m)
+        done
+
+        remember userMsg as record with role "user" and content msg done
+        push(messages, userMsg)
+
+        remember reply as chatWith("groq", MODEL, messages)
+
+        insert
+            INSERT INTO messages (username, role, content) VALUES ({user}, "user", {msg})
+        done
+        insert
+            INSERT INTO messages (username, role, content) VALUES ({user}, "assistant", {reply})
+        done
+
+        reply json
+            response is reply
+        done
+    done
+done
+
+start 3000

@@ -1,0 +1,7 @@
+make answerQuestion(question)
+    give chatWith("groq", "llama-3.3-70b-versatile", question, {
+        temperature: 0.2
+    })
+done
+
+export answerQuestion

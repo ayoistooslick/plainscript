@@ -1,0 +1,21 @@
+// PlainScript 1.0.363: image normalisation for the ID-verification SDK.
+//
+// Depends on the `sharp` npm package plus Node built-ins fs and path. It shows
+// chained method calls (sharp(...).resize(w).toFile(...)) and member access on
+// path. `use sharp` is flagged as an npm dependency; fs and path are built-ins.
+
+use sharp
+use fs
+use path
+
+make normalizeImage(dir, outPath, width)
+    remember image as sharp(path.join(dir, "front.jpg"))
+    give image.resize(width).toFile(outPath)
+done
+
+make scanExists(dir)
+    give fs.existsSync(path.join(dir, "scan.jpg"))
+done
+
+export normalizeImage
+export scanExists

@@ -1,0 +1,7 @@
+// PlainScript 1.0.363: cache and background work.
+cache env("REDIS_URL")
+cacheSet("status", "ready", 60)
+remember status as cacheGet("status")
+every 5 minutes
+    show status
+done

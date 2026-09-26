@@ -1,0 +1,19 @@
+// PlainScript 1.0.363: fixed and provider-backed Telegram replies.
+
+bot env("TELEGRAM_BOT_TOKEN")
+
+when someone sends "/start"
+    reply "Welcome. Use /status or /ask <question>."
+done
+
+when someone sends "/status"
+    reply "All systems are operational."
+done
+
+when someone sends matching "/ask (.+)"
+    telegramCall("sendChatAction", {chat_id: chatId, action: "typing"})
+    remember answer as chatWith("groq", "llama-3.3-70b-versatile", message)
+    reply answer
+done
+
+start telegram bot

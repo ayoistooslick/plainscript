@@ -1,0 +1,8 @@
+// PlainScript 1.0.363: recovery and cleanup.
+try
+    show "work"
+recover as error
+    show message of error
+finally
+    show "finished"
+done

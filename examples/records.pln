@@ -1,0 +1,15 @@
+// PlainScript 1.0.363: record kinds and record values.
+
+define a kind called "Player" with
+    name is ""
+    goals is 0
+done
+
+remember player as create a Player with name "Ada" and goals 4
+show player.name
+if player has field "goals"
+    show "goals are present"
+done
+
+remember team as record with name "Harbor City" and founded 2020 done
+show team.name

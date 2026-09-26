@@ -1,0 +1,77 @@
+// require MT >= 2.16.0
+{
+    name: ["PlainScript", ".pln"]
+    hide: false
+    ignoreCase: false
+    styles: [
+        "keyword", #C678DD, #C678DD, @B
+        "declaration", #C678DD, #C678DD, @BI
+        "comparison", #56B6C2, #56B6C2
+        "assignment", #E06C75, #E06C75
+        "string", #98C379, #98C379
+        "template", #98C379, #56B6C2
+        "number", #D19E66, #D19E66
+        "comment", #5C6370, #5C6370, @I
+        "function", #61AFEF, #61AFEF, @B
+        "builtin", #E5C07B, #E5C07B
+        "constant", #D19E66, #D19E66, @B
+        "operator", #56B6C2, #56B6C2
+        "web", #E06C75, #E06C75, @B
+        "database", #E5C07B, #E5C07B, @B
+        "error", #E06C75, #E06C75, @U
+        "test", #98C379, #98C379, @B
+    ]
+    comment: {startsWith: "//"}
+    bracketPairs: ["{}", "[]", "()"]
+    defines: [
+        "comment": {match: /\/\/.*$/, 0: "comment"}
+
+        "string": {
+            start: {match: /"/, 0: "string"}
+            end: {match: /"/, 0: "string"}
+            style: "string"
+            contains: [{match: /\\./, 0: "string"}]
+        }
+
+        "template": {
+            start: {match: /`/, 0: "template"}
+            end: {match: /`/, 0: "template"}
+            style: "template"
+        }
+
+        "number": {match: /\b\d+(\.\d+)?n?\b/, 0: "number"}
+        "constant": {match: /\b(true|false|null|undefined)\b/, 0: "constant"}
+        "operator": {match: /\?\?|\?\.|\*\*|->|[+\-*\/%]/, 0: "operator"}
+        "function": {match: /\b[A-Za-z_][A-Za-z0-9_]*(?=\s*\()/, 0: "function"}
+
+        "declaration": {
+            match: /\b(remember|let|make|define|function|use|import|export|database|postgres|record|list|create|websocket|bot|whatsapp|ocr)\b/
+            0: "declaration"
+        }
+
+        "web": {
+            match: /\b(web|route|start|listen|reply|respond|serve|allow|cors|status|redirect|param|query|header|upload|uploads)\b/
+            0: "web"
+        }
+
+        "database": {
+            match: /\b(database|postgres|query|insert|update|delete|execute|transaction|native|wasm)\b/
+            0: "database"
+        }
+
+        "error": {
+            match: /\b(try|recover|finally|retry|throw|raise|raises|catch|catches)\b/
+            0: "error"
+        }
+
+        "test": {
+            match: /\b(test|check|equals|contains|raises)\b/
+            0: "test"
+        }
+
+        "keyword": {
+            match: /\b(if|otherwise|else|for|each|every|index|from|to|while|in|when|on|done|give|return|yield|break|continue|with|and|or|not|between|is|same|different|more|fewer|at|least|most|has|field|instanceof|use|import|export|show|print|display|accept|require|enable|limit|cache|schedule|background|socket|message|broadcast|send)\b/
+            0: "keyword"
+        }
+    ]
+}

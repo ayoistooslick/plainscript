@@ -1,0 +1,3 @@
+import "./uses_axios.pln"
+use axios
+show "gateway loaded"

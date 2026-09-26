@@ -1,0 +1,44 @@
+name: PlainScript CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Release metadata
+        run: npm run release:check
+      - name: Documentation compilation
+        run: npm run docs:check
+      - name: Full compiler and runtime matrix
+        run: npm test
+      - name: Clean tarball consumer
+        run: node tests/packaging.test.js
+
+  vscode:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: plainscript-vscode
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install extension dependencies
+        run: npm install --no-audit --no-fund
+      - name: Package extension
+        run: npx @vscode/vsce package

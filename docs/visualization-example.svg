@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="420" viewBox="0 0 720 420" role="img" aria-labelledby="title desc">
+  <title id="title">Monthly signups</title>
+  <desc id="desc">A bar chart showing signups increasing from January through April.</desc>
+  <rect width="720" height="420" fill="#071b10"/>
+  <text x="360" y="34" fill="#e6f1e7" font-family="Arial, sans-serif" font-size="20" text-anchor="middle" font-weight="700">Monthly signups</text>
+  <g stroke="#284734" stroke-width="1">
+    <line x1="62" y1="362" x2="696" y2="362"/>
+    <line x1="62" y1="288.5" x2="696" y2="288.5"/>
+    <line x1="62" y1="215" x2="696" y2="215"/>
+    <line x1="62" y1="141.5" x2="696" y2="141.5"/>
+    <line x1="62" y1="68" x2="696" y2="68"/>
+  </g>
+  <g fill="#8da99a" font-family="Arial, sans-serif" font-size="11" text-anchor="end">
+    <text x="52" y="366">0</text>
+    <text x="52" y="292.5">9</text>
+    <text x="52" y="219">18</text>
+    <text x="52" y="145.5">27</text>
+    <text x="52" y="72">36</text>
+  </g>
+  <g fill="#40c463">
+    <rect x="95.813" y="264" width="111.8" height="98" rx="5"/>
+    <rect x="254.313" y="215" width="111.8" height="147" rx="5"/>
+    <rect x="412.813" y="141.5" width="111.8" height="220.5" rx="5"/>
+    <rect x="571.313" y="76.167" width="111.8" height="285.833" rx="5"/>
+  </g>
+  <g fill="#8da99a" font-family="Arial, sans-serif" font-size="12" text-anchor="middle">
+    <text x="151.7" y="396">Jan</text>
+    <text x="310.2" y="396">Feb</text>
+    <text x="468.7" y="396">Mar</text>
+    <text x="627.2" y="396">Apr</text>
+  </g>
+</svg>

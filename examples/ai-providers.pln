@@ -1,0 +1,7 @@
+// PlainScript 1.0.363: provider-backed AI works in ordinary programs.
+
+remember answer as chatWith("groq", "llama-3.3-70b-versatile", "Explain PlainScript in one sentence")
+show answer
+
+remember embedding as embedWith("groq", "nomic-embed-text-v1.5", "PlainScript")
+show length(embedding)

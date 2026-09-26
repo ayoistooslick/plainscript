@@ -1,0 +1,22 @@
+// PlainScript 1.0.363: cache values and scheduled work.
+
+cache "redis://localhost:6379"
+
+make refresh()
+    remember value as `updated at ${time()}`
+    cacheSet("status", value, 60)
+    give value
+done
+
+every 5 minutes
+    run background refresh()
+done
+
+schedule "0 * * * *"
+    remember status as cacheGet("status")
+    if status is empty
+        refresh()
+    otherwise
+        show status
+    done
+done

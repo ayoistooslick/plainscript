@@ -1,0 +1,45 @@
+bring supportHours and supportPricing and supportContact from "./messages.pln"
+
+bot env("TELEGRAM_BOT_TOKEN")
+
+when someone sends "/start"
+    reply "Welcome. Choose /hours, /pricing, or /contact."
+done
+
+when someone sends "/hours"
+    reply supportHours()
+done
+
+when someone sends "/pricing"
+    reply supportPricing() + " Ask /contact for a person."
+done
+
+when someone sends "/contact"
+    reply supportContact()
+done
+
+when someone sends matching "/echo (.+)"
+    reply text
+done
+
+when someone sends "/menu"
+    reply "Choose a topic" with buttons
+        "Hours" -> "hours"
+        "Pricing" -> "pricing"
+        "Contact" -> "contact"
+    done
+done
+
+when someone clicks "hours"
+    reply supportHours()
+done
+
+when someone clicks "pricing"
+    reply supportPricing()
+done
+
+when someone clicks "contact"
+    reply supportContact()
+done
+
+start telegram bot

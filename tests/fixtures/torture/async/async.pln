@@ -1,0 +1,54 @@
+// Async torture: sleep is now truly async; all of / any of / settled of / withTimeout
+make slow(n, ms)
+    wait for sleep(ms)
+    give n * 10
+done
+
+remember t0 as time()
+remember results as all of ([slow(1, 40), slow(2, 30), slow(3, 20)])
+remember elapsed as time() - t0
+if elapsed is at least 120
+    show "FAIL: not concurrent"
+    exit(1)
+done
+
+remember first as any of ([slow(7, 20), slow(9, 200)])
+if first is not 70
+    exit(1)
+done
+
+make okAfter(ms, tag)
+    wait for sleep(ms)
+    give tag
+done
+make failAfter(ms, tag)
+    wait for sleep(ms)
+    raise tag
+done
+remember mixed as settled of ([okAfter(10, "ok-1"), failAfter(10, "boom"), okAfter(10, "ok-2")])
+if mixed[0].status is not "fulfilled"
+    exit(1)
+done
+if mixed[1].status is not "rejected"
+    exit(1)
+done
+
+try
+    remember never as withTimeout(slow(1, 5000), 50)
+    show "should have timed out"
+    exit(1)
+recover as e
+    show `timeout caught: ${message of e}`
+done
+
+try
+    remember doomed as all of ([failAfter(10, "inner-fail")])
+    show "should have rejected"
+    exit(1)
+recover as e
+    if message of e is not "inner-fail"
+        exit(1)
+    done
+done
+
+show "async ok"

@@ -1,0 +1,4 @@
+// PlainScript 1.0.363: object literals and member access.
+remember user as {name: "Ada", active: true}
+show user.name
+user.active becomes false

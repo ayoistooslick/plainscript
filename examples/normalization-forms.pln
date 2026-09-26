@@ -1,0 +1,22 @@
+// PlainScript 1.0.363 — the three declaration forms are one grammar.
+// `let x is ...`, `let x be ...`, and `remember x as ...` compile to the
+// same JavaScript; mix them freely and const/generalize them.
+// A `make function` body that uses `yield` compiles to a generator function.
+
+let a is 5
+let b be 6
+remember c as 7
+show a + b + c
+
+let celsius be 21
+remember fahrenheit as celsius * 9 / 5 + 32
+show "69.8 degrees computed: " + fahrenheit
+
+let tick be 1
+tick is now 2
+show tick
+
+let name be "ada"
+name becomes "ada lovelace"
+name change to "Ada Lovelace"
+show name
