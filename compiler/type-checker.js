@@ -84,48 +84,51 @@ function withoutNull(spec) {
   return spec;
 }
 
-function specMatches(actual, expected, schemas) {
+function specMatches(actual, expected, schemas, seen = new Set()) {
   if (!expected || expected === 'any' || (expected.kind === 'name' && expected.name === 'any') || !actual) return true;
   if (actual === 'any' || (actual.kind === 'name' && actual.name === 'any')) return true;
+  const pair = `${typeName(actual)}=>${typeName(expected)}`;
+  if (seen.has(pair)) return true;
+  seen.add(pair);
   if (actual.kind === 'union' && expected.kind !== 'union') {
-    return actual.values.length > 0 && actual.values.every(value => specMatches(value, expected, schemas));
+    return actual.values.length > 0 && actual.values.every(value => specMatches(value, expected, schemas, seen));
   }
-  if (expected.kind === 'optional') return isNullSpec(actual) || specMatches(actual, expected.value, schemas);
-  if (expected.kind === 'promise') return isPromiseSpec(actual) && specMatches(actual.value, expected.value, schemas);
-  if (expected.kind === 'union') return expected.values.some(item => specMatches(actual, item, schemas));
+  if (expected.kind === 'optional') return isNullSpec(actual) || specMatches(actual, expected.value, schemas, seen);
+  if (expected.kind === 'promise') return isPromiseSpec(actual) && specMatches(actual.value, expected.value, schemas, seen);
+  if (expected.kind === 'union') return expected.values.some(item => specMatches(actual, item, schemas, seen));
   if (expected.kind === 'name') {
     if (expected.name === 'any') return true;
     if (expected.name === 'null') return isNullSpec(actual);
     if (expected.name === 'object') return typeName(actual) === 'object' || typeName(actual) === 'dictionary';
     if (expected.name === 'list' || expected.name === 'dictionary') return typeName(actual) === expected.name || actual.kind === expected.name;
     const alias = schemas.get(expected.name);
-    if (alias && alias.type === 'TypeAlias') return specMatches(actual, alias.target, schemas);
+    if (alias && alias.type === 'TypeAlias') return specMatches(actual, alias.target, schemas, seen);
     if (typeof actual === 'string') return expected.name === actual;
     if (actual.kind === 'name') {
       if (expected.name === actual.name) return true;
       const actualAlias = schemas.get(actual.name);
-      return actualAlias && actualAlias.type === 'TypeAlias' ? specMatches(actualAlias.target, expected, schemas) : false;
+      return actualAlias && actualAlias.type === 'TypeAlias' ? specMatches(actualAlias.target, expected, schemas, seen) : false;
     }
     return schemas.has(expected.name) && (typeName(actual) === 'object' || actual.kind === 'name');
   }
   if (expected.kind === 'list') {
     if (actual === 'list') return true;
     if (!actual || actual.kind !== 'list') return false;
-    return specMatches(actual.value, expected.value, schemas);
+    return specMatches(actual.value, expected.value, schemas, seen);
   }
   if (expected.kind === 'dictionary') {
     if (actual === 'dictionary' || actual === 'object') return true;
     if (!actual || actual.kind !== 'dictionary') return false;
-    return specMatches(actual.value, expected.value, schemas);
+    return specMatches(actual.value, expected.value, schemas, seen);
   }
   if (expected.kind === 'promise') {
-    return isPromiseSpec(actual) && specMatches(actual.value, expected.value, schemas);
+    return isPromiseSpec(actual) && specMatches(actual.value, expected.value, schemas, seen);
   }
   if (expected.kind === 'map') {
-    return Boolean(actual && actual.kind === 'map') && specMatches(actual.key, expected.key, schemas) && specMatches(actual.value, expected.value, schemas);
+    return Boolean(actual && actual.kind === 'map') && specMatches(actual.key, expected.key, schemas, seen) && specMatches(actual.value, expected.value, schemas, seen);
   }
-  if (expected.kind === 'set') return Boolean(actual && actual.kind === 'set') && specMatches(actual.value, expected.value, schemas);
-  if (expected.kind === 'tuple') return Boolean(actual && actual.kind === 'tuple') && actual.values.length === expected.values.length && expected.values.every((value, index) => specMatches(actual.values[index], value, schemas));
+  if (expected.kind === 'set') return Boolean(actual && actual.kind === 'set') && specMatches(actual.value, expected.value, schemas, seen);
+  if (expected.kind === 'tuple') return Boolean(actual && actual.kind === 'tuple') && actual.values.length === expected.values.length && expected.values.every((value, index) => specMatches(actual.values[index], value, schemas, seen));
   return true;
 }
 
@@ -208,6 +211,18 @@ function checkTypes(ast, options = {}) {
     const schema = schemas.get(schemaName);
     const field = schema && (schema.fields || []).find(item => item.key === fieldName);
     return field ? field.type : null;
+  }
+
+  function unionMembers(spec, seen = new Set()) {
+    if (!spec) return [];
+    if (spec.kind === 'union') return spec.values.flatMap(value => unionMembers(value, seen));
+    if (spec.kind === 'name') {
+      if (seen.has(spec.name)) return [];
+      seen.add(spec.name);
+      const schema = schemas.get(spec.name);
+      if (schema && schema.type === 'TypeAlias') return unionMembers(schema.target, seen);
+    }
+    return [spec];
   }
 
   function containsAsync(node, seen = new Set()) {
@@ -338,10 +353,15 @@ function checkTypes(ast, options = {}) {
         objectType = withoutNull(objectType);
       }
       const schemaName = objectType && objectType.kind === 'name' ? objectType.name : objectType;
-      if (schemaName && schemas.has(schemaName)) {
+      if (schemaName && schemas.has(schemaName) && schemas.get(schemaName).type !== 'TypeAlias') {
         const field = fieldSpec(schemaName, node.property);
         if (!field) diagnostics.push(diagnostic(`Type "${schemaName}" has no field named "${node.property}".`, origin, 'PLN-TYPE-FIELD'));
         return field || 'any';
+      }
+      const members = unionMembers(objectType);
+      if (members.length > 1) {
+        const fields = members.map(member => member.kind === 'name' ? fieldSpec(member.name, node.property) : null).filter(Boolean);
+        if (fields.length) return fields.length === 1 ? fields[0] : { kind: 'union', values: fields };
       }
       if (objectType && objectType.kind === 'dictionary') return objectType.value;
       return 'any';
@@ -546,6 +566,21 @@ function checkTypes(ast, options = {}) {
   function narrowEnvironment(env, condition, truthy) {
     const next = new Map(env);
     function apply(left, operator, right) {
+      if (left && left.type === 'MemberExpression' && left.object && left.object.type === 'Identifier' &&
+          right && (right.type === 'StringLiteral' || right.type === 'NumberLiteral' || right.type === 'BooleanLiteral')) {
+        const entry = next.get(left.object.name);
+        if (!entry) return;
+        const members = unionMembers(entry.type);
+        const narrowed = members.filter(member => {
+          if (member.kind !== 'name') return false;
+          const field = fieldSpec(member.name, left.property);
+          return field && ((right.type === 'StringLiteral' && typeName(field) === 'text') ||
+            (right.type === 'NumberLiteral' && typeName(field) === 'number') ||
+            (right.type === 'BooleanLiteral' && typeName(field) === 'boolean'));
+        });
+        if (narrowed.length) next.set(left.object.name, { ...entry, type: narrowed.length === 1 ? narrowed[0] : { kind: 'union', values: narrowed } });
+        return;
+      }
       if (!left || left.type !== 'Identifier' || !right || right.type !== 'NullLiteral') return;
       const entry = next.get(left.name);
       if (!entry || !isOptionalSpec(entry.type)) return;

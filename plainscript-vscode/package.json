@@ -3,7 +3,13 @@
     "displayName": "PlainScript Language",
     "description": "Syntax highlighting and language support for the PlainScript programming language (.pln files)",
     "version": "1.1.5",
+    "main": "./extension.js",
+    "activationEvents": ["onLanguage:plainscript"],
     "publisher": "ayoistooslick",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/ayoistooslick/plainscript.git"
+    },
     "engines": {
         "vscode": "^1.70.0"
     },
@@ -39,6 +45,9 @@
     },
     "scripts": {
         "vscode:prepublish": "echo 'No build step required'"
+    },
+    "dependencies": {
+        "vscode-languageclient": "^9.0.1"
     },
     "license": "MIT"
 }

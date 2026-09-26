@@ -22,6 +22,14 @@ All notable changes to PlainScript are documented here.
   aggregate failure when every task rejects.
 - Formatter branch and cleanup clauses (`else`, `otherwise`, `recover`, and
   `finally`) now preserve valid block indentation.
+- Recursive aliases are cycle-safe during assignability checks, aliases that
+  resolve to structural unions expose their member fields, and branch-local
+  environments retain narrowed union members for safe access.
+- Date construction now treats the documented month argument as 1-based;
+  formatting supports millisecond tokens and deterministic UTC helpers.
+- The VS Code package now starts the real stdio language client with lifecycle
+  and shutdown handling, and CI gates the compiler matrix, docs, release
+  metadata, tarball consumer, and VSIX packaging.
 
 ## [1.1.2]  -  2026-09-25
 

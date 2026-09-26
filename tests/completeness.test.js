@@ -51,3 +51,30 @@ match flag against
   false -> show "c"
 done`));
 assert(duplicateMatch.diagnostics.some(item => item.code === 'PLN-MATCH-DUPLICATE'));
+
+const recursiveAlias = checkTypes(ast(`type Tree is number or list of Tree
+remember tree as [1, [2]]`));
+assert.deepStrictEqual(recursiveAlias.diagnostics, []);
+
+const recursiveAliasMismatch = checkTypes(ast(`type Tree is number or list of Tree
+make bad(value as Tree) returns text
+  give value
+done`));
+assert(recursiveAliasMismatch.diagnostics.some(item => item.code === 'PLN-TYPE-RETURN'));
+
+const structuralUnion = checkTypes(ast(`type Left
+  left is number
+done
+type Right
+  right is text
+done
+type Either is Left or Right
+make read(value as Either) returns number
+  give value.left
+done`));
+assert.deepStrictEqual(structuralUnion.diagnostics, []);
+
+const utc = generate(ast(`remember d as newDate(2026, 1, 2, 3, 4, 5, 6)
+show formatDateUTC(d, "YYYY-MM-DD HH:mm:ss SSS")`));
+assert(utc.includes('__formatDateUTC'));
+assert(utc.includes('(1 - 1)'));

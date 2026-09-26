@@ -316,7 +316,15 @@ const BUILTIN_DECLARATIONS = {
     `    mm: pad(d.getMinutes()),`,
     `    ss: pad(d.getSeconds()),`,
     `  };`,
-    `  return p.replace(/YYYY|MM|DD|HH|mm|ss/g, k => map[k]);`,
+    `  return p.replace(/YYYY|MM|DD|HH|mm|ss|SSS/g, k => map[k] || (k === 'SSS' ? pad(d.getMilliseconds(), 3) : k));`,
+    `}`,
+    `function __formatDateUTC(x, pattern) {`,
+    `  const p = pattern || 'YYYY-MM-DD HH:mm:ss';`,
+    `  const d = x instanceof Date ? x : new Date(x);`,
+    `  if (Number.isNaN(d.getTime())) return '';`,
+    `  const pad = (n, l) => String(n).padStart(l || 2, '0');`,
+    `  const map = { YYYY: String(d.getUTCFullYear()), MM: pad(d.getUTCMonth() + 1), DD: pad(d.getUTCDate()), HH: pad(d.getUTCHours()), mm: pad(d.getUTCMinutes()), ss: pad(d.getUTCSeconds()), SSS: pad(d.getUTCMilliseconds(), 3) };`,
+    `  return p.replace(/YYYY|MM|DD|HH|mm|ss|SSS/g, k => map[k]);`,
     `}`,
     `function __yamlStringify(v, indent) {`,
     `  const pad = ' '.repeat(indent || 0);`,
@@ -1972,6 +1980,12 @@ const BUILTIN_DECLARATIONS = {
     const pattern = args.length > 1 ? generateExpr(args[1], context) : '"YYYY-MM-DD HH:mm:ss"';
     return `__formatDate(${value}, ${pattern})`;
   },
+  formatDateUTC: (args, context) => {
+    ensureBuiltin(context, 'core');
+    const value = generateExpr(args[0], context);
+    const pattern = args.length > 1 ? generateExpr(args[1], context) : '"YYYY-MM-DD HH:mm:ss"';
+    return `__formatDateUTC(${value}, ${pattern})`;
+  },
 
   // ── v1.0.2  -  Native Date/DateTime/Regex support (IOPL-native, no JS gateway needed).
   // Create a new Date object. With no args: now. With 1 arg: parse ISO string or timestamp.
@@ -1979,7 +1993,8 @@ const BUILTIN_DECLARATIONS = {
   newDate: (args, context) => {
     if (!args || args.length === 0) return `new Date()`;
     if (args.length === 1) return `new Date(${generateExpr(args[0], context)})`;
-    return `new Date(${args.map(a => generateExpr(a, context)).join(', ')})`;
+    const values = args.map(a => generateExpr(a, context));
+    return `new Date(${values.slice(0, 1).concat(values.length > 1 ? [`(${values[1]} - 1)`] : []).concat(values.slice(2)).join(', ')})`;
   },
   // Current timestamp in milliseconds.
   now: (_args) => `Date.now()`,
@@ -2015,6 +2030,13 @@ const BUILTIN_DECLARATIONS = {
   milliseconds: (args, context) => `${generateExpr(args[0], context)}.getMilliseconds()`,
   // Get timezone offset in minutes.
   tzOffset: (args, context) => `${generateExpr(args[0], context)}.getTimezoneOffset()`,
+  yearUTC: (args, context) => `${generateExpr(args[0], context)}.getUTCFullYear()`,
+  monthUTC: (args, context) => `${generateExpr(args[0], context)}.getUTCMonth() + 1`,
+  dayUTC: (args, context) => `${generateExpr(args[0], context)}.getUTCDate()`,
+  dayOfWeekUTC: (args, context) => `${generateExpr(args[0], context)}.getUTCDay()`,
+  hoursUTC: (args, context) => `${generateExpr(args[0], context)}.getUTCHours()`,
+  minutesUTC: (args, context) => `${generateExpr(args[0], context)}.getUTCMinutes()`,
+  secondsUTC: (args, context) => `${generateExpr(args[0], context)}.getUTCSeconds()`,
   // Add time to a Date (returns new Date). Unit: ms, s, m, h, d, w, mo, y.
   addTime: (args, context) => {
     if (args.length < 3) throw new Error('addTime(date, amount, unit) requires 3 arguments');
