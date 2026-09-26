@@ -78,3 +78,28 @@ const utc = generate(ast(`remember d as newDate(2026, 1, 2, 3, 4, 5, 6)
 show formatDateUTC(d, "YYYY-MM-DD HH:mm:ss SSS")`));
 assert(utc.includes('__formatDateUTC'));
 assert(utc.includes('(1 - 1)'));
+
+const invalidCollections = checkTypes(ast(`type UserId is number
+let scores as map of text to number is dictionary with "ada" is "bad" done
+let tags as set of text is set with 1 done
+let pair as tuple of number, text is tuple with "bad", "ok" done
+let ids as map of UserId to text is dictionary with "wrong" is "Ada" done`));
+assert(invalidCollections.diagnostics.filter(item => item.code === 'PLN-TYPE-ARG').length >= 3);
+
+const validCollections = checkTypes(ast(`type UserId is number
+let scores as map of text to number is dictionary with "ada" is 10 done
+let tags as set of text is set with "a", "b" done
+let pair as tuple of number, text is tuple with 1, "ok" done
+let ids as map of UserId to text is dictionary with 1 is "Ada" done`));
+assert.strictEqual(validCollections.diagnostics.length, 0);
+
+const invalidPut = checkTypes(ast(`let scores as map of text to number is dictionary with "ada" is 10 done
+put 1 as "bad" in scores`));
+assert(invalidPut.diagnostics.some(item => item.code === 'PLN-TYPE-ASSIGN'));
+
+const aliasRuntime = generate(ast(`type UserId is number
+make id() returns UserId
+  give 42
+done
+show id()`));
+assert(aliasRuntime.includes('__plainTypes["UserId"]'));

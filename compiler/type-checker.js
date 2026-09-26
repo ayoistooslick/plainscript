@@ -254,7 +254,13 @@ function checkTypes(ast, options = {}) {
   function bindGeneric(pattern, actual, bindings) {
     if (!pattern || !actual) return;
     if (pattern.kind === 'typeParam') { if (!bindings.has(pattern.name) || typeName(bindings.get(pattern.name)) === 'any') bindings.set(pattern.name, actual); return; }
-    if (pattern.kind === actual.kind && ['list', 'dictionary', 'optional', 'promise'].includes(pattern.kind)) bindGeneric(pattern.value, actual.value, bindings);
+    if (pattern.kind === actual.kind && ['list', 'dictionary', 'set', 'optional', 'promise'].includes(pattern.kind)) bindGeneric(pattern.value, actual.value, bindings);
+    else if (pattern.kind === 'map' && actual.kind === 'map') {
+      bindGeneric(pattern.key, actual.key, bindings);
+      bindGeneric(pattern.value, actual.value, bindings);
+    } else if (pattern.kind === 'tuple' && actual.kind === 'tuple') {
+      for (let index = 0; index < Math.min(pattern.values.length, actual.values.length); index += 1) bindGeneric(pattern.values[index], actual.values[index], bindings);
+    }
     else if (pattern.kind === 'union') for (const option of pattern.values) if (option.kind === 'typeParam' || option.kind === actual.kind) { bindGeneric(option, actual, bindings); break; }
   }
   function genericBindings(fn, args, env) {
@@ -490,6 +496,48 @@ function checkTypes(ast, options = {}) {
       }
       return ok;
     }
+    if (expected.kind === 'map') {
+      const actual = infer(node, env, origin);
+      if (node.type !== 'DictionaryLiteral') {
+        const ok = specMatches(actual, expected, schemas);
+        if (!ok && emit) diagnostics.push(diagnostic(`${path ? `${path} ` : ''}expects ${typeName(expected)}, received ${typeName(actual)}.`, origin, 'PLN-TYPE-COLLECTION'));
+        return ok;
+      }
+      let ok = true;
+      for (const pair of node.pairs || []) {
+        if (!expectedMatchesNode(pair.key, expected.key, env, origin, `${path || 'Map'} key`, emit)) ok = false;
+        if (!expectedMatchesNode(pair.value, expected.value, env, origin, `${path || 'Map'} value`, emit)) ok = false;
+      }
+      return ok;
+    }
+    if (expected.kind === 'set') {
+      const actual = infer(node, env, origin);
+      if (node.type !== 'SetLiteral' && node.type !== 'SetFromExpression') {
+        const ok = specMatches(actual, expected, schemas);
+        if (!ok && emit) diagnostics.push(diagnostic(`${path ? `${path} ` : ''}expects ${typeName(expected)}, received ${typeName(actual)}.`, origin, 'PLN-TYPE-COLLECTION'));
+        return ok;
+      }
+      let ok = true;
+      for (const [index, element] of (node.elements || []).entries()) {
+        if (!expectedMatchesNode(element, expected.value, env, origin, `${path || 'Set'} element ${index + 1}`, emit)) ok = false;
+      }
+      return ok;
+    }
+    if (expected.kind === 'tuple') {
+      const actual = infer(node, env, origin);
+      const elements = node.type === 'TupleLiteral' ? node.elements || [] : null;
+      if (!elements) {
+        const ok = specMatches(actual, expected, schemas);
+        if (!ok && emit) diagnostics.push(diagnostic(`${path ? `${path} ` : ''}expects ${typeName(expected)}, received ${typeName(actual)}.`, origin, 'PLN-TYPE-COLLECTION'));
+        return ok;
+      }
+      let ok = elements.length === expected.values.length;
+      if (!ok && emit) diagnostics.push(diagnostic(`${path ? `${path} ` : ''}expects ${typeName(expected)}, received tuple of ${elements.length} value(s).`, origin, 'PLN-TYPE-COLLECTION'));
+      for (let index = 0; index < Math.min(elements.length, expected.values.length); index += 1) {
+        if (!expectedMatchesNode(elements[index], expected.values[index], env, origin, `${path || 'Tuple'} item ${index + 1}`, emit)) ok = false;
+      }
+      return ok;
+    }
     const actual = infer(node, env, origin);
     const ok = specMatches(actual, expected, schemas);
     if (!ok && emit) diagnostics.push(diagnostic(`${path ? `${path} ` : ''}expects ${typeName(expected)}, received ${typeName(actual)}.`, origin, 'PLN-TYPE-ARG'));
@@ -508,6 +556,15 @@ function checkTypes(ast, options = {}) {
         }
         if (objectType && objectType.kind === 'dictionary' && typeName(indexType) !== 'text' && typeName(indexType) !== 'any') {
           diagnostics.push(diagnostic(`Dictionary indexes must be text values, received ${typeName(indexType)}.`, origin, 'PLN-TYPE-INDEX'));
+        }
+        if (objectType && objectType.kind === 'map' && typeName(indexType) !== typeName(objectType.key) && typeName(indexType) !== 'any') {
+          diagnostics.push(diagnostic(`Map indexes must be ${typeName(objectType.key)} values, received ${typeName(indexType)}.`, origin, 'PLN-TYPE-INDEX'));
+        }
+        if (objectType && objectType.kind === 'tuple' && node.index && node.index.type === 'NumberLiteral') {
+          const index = Number(node.index.value);
+          if (!Number.isInteger(index) || index < 0 || index >= objectType.values.length) {
+            diagnostics.push(diagnostic(`Tuple index ${node.index.value} is outside the fixed tuple range 0..${objectType.values.length - 1}.`, origin, 'PLN-TYPE-INDEX'));
+          }
         }
       }
       checkExpression(node.object, env, origin);
@@ -657,6 +714,19 @@ function checkTypes(ast, options = {}) {
             diagnostics.push(diagnostic(`Assignment to "${node.target.name}" expects ${typeName(entry.type)}, received ${typeName(actual)}.`, node, 'PLN-TYPE-ASSIGN'));
           }
           if (entry && node.op === '=' && !entry.declared) env.set(node.target.name, { ...entry, type: actual });
+        }
+      } else if (node.type === 'PutStatement') {
+        checkExpression(node.key, env, node);
+        checkExpression(node.value, env, node);
+        checkExpression(node.mapVar, env, node);
+        const target = node.mapVar && node.mapVar.type === 'Identifier' ? env.get(node.mapVar.name) : null;
+        if (target && target.type && target.type.kind === 'map') {
+          if (!specMatches(infer(node.key, env, node), target.type.key, schemas)) {
+            diagnostics.push(diagnostic(`Map key expects ${typeName(target.type.key)}, received ${typeName(infer(node.key, env, node))}.`, node.key, 'PLN-TYPE-ASSIGN'));
+          }
+          if (!specMatches(infer(node.value, env, node), target.type.value, schemas)) {
+            diagnostics.push(diagnostic(`Map value expects ${typeName(target.type.value)}, received ${typeName(infer(node.value, env, node))}.`, node.value, 'PLN-TYPE-ASSIGN'));
+          }
         }
       } else if (node.type === 'GiveStatement' || node.type === 'ReturnStatement') {
         checkExpression(node.value, env, node);

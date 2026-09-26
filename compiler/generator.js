@@ -527,11 +527,17 @@ const BUILTIN_DECLARATIONS = {
   // v1.0.1  -  process execution (child processes).
   process: [
     `const { execFile } = require('child_process');`,
-    `function __runCommand(command, args) {`,
-    `  return new Promise((resolve) => {`,
-    `    execFile(command, args || [], { maxBuffer: 16 * 1024 * 1024 }, (error, stdout, stderr) => {`,
-    `      resolve({ ok: !error, code: error ? (error.code == null ? -1 : error.code) : 0, stdout: String(stdout), stderr: String(stderr) });`,
+    `function __runCommand(command, args, options = {}) {`,
+    `  return new Promise((resolve, reject) => {`,
+    `    const child = execFile(command, args || [], { maxBuffer: options.maxBuffer || 16 * 1024 * 1024, cwd: options.cwd, env: options.env ? { ...process.env, ...options.env } : process.env, windowsHide: true }, (error, stdout, stderr) => {`,
+    `      if (options.reject && error) return reject(error);`,
+    `      resolve({ ok: !error, code: error ? (error.code == null ? -1 : error.code) : 0, signal: error && error.signal || null, stdout: String(stdout), stderr: String(stderr) });`,
     `    });`,
+    `    let timer;`,
+    `    if (options.timeoutMs != null) timer = setTimeout(() => child.kill(options.signal || 'SIGTERM'), Number(options.timeoutMs));`,
+    `    const token = options.token && (options.token.signal || options.token);`,
+    `    if (token) { if (token.aborted) child.kill(options.signal || 'SIGTERM'); else token.addEventListener('abort', () => child.kill(options.signal || 'SIGTERM'), { once: true }); }`,
+    `    child.once('close', () => { if (timer) clearTimeout(timer); });`,
     `  });`,
     `}`,
   ].join('\n'),
@@ -1396,7 +1402,7 @@ const BUILTIN_DECLARATIONS = {
     `    if (mode === 'native') {`,
     `      throw new Error('Database: the native SQLite engine is not usable on this machine (' + __sqliteNativeReason + ').\\nFix the better-sqlite3 build, or run anywhere with:\\n  database "' + file + '" using "wasm"');`,
     `    }`,
-    `    console.error('PlainScript: native SQLite unavailable (' + __sqliteNativeReason + '); using the WebAssembly engine instead.');`,
+    `    if (process.env.PLAINSCRIPT_SQLITE_VERBOSE === '1') console.error('PlainScript: native SQLite unavailable (' + __sqliteNativeReason + '); using the WebAssembly engine instead.');`,
     `  }`,
     `  let initSqlJs;`,
     `  try {`,
@@ -1854,6 +1860,17 @@ const BUILTIN_DECLARATIONS = {
   makeFolder: (args, context) => { ensureBuiltin(context, 'fs'); return `__fs.mkdirSync(${generateExpr(args[0], context)}, { recursive: true })`; },
   deleteFolder: (args, context) => { ensureBuiltin(context, 'fs'); return `__fs.rmSync(${generateExpr(args[0], context)}, { recursive: true, force: true })`; },
   listFolder: (args, context) => { ensureBuiltin(context, 'fs'); return `__fs.readdirSync(${generateExpr(args[0], context)})`; },
+  readFileAsync: (args, context) => { ensureBuiltin(context, 'fs'); markAsync(context); return `(await __fs.promises.readFile(${generateExpr(args[0], context)}, 'utf8'))`; },
+  listFolderAsync: (args, context) => { ensureBuiltin(context, 'fs'); markAsync(context); return `(await __fs.promises.readdir(${generateExpr(args[0], context)}))`; },
+  appendFileAsync: (args, context) => { ensureBuiltin(context, 'fs'); markAsync(context); return `(await __fs.promises.appendFile(${generateExpr(args[0], context)}, ${generateExpr(args[1], context)}, 'utf8'))`; },
+  writeFileAsync: (args, context) => { ensureBuiltin(context, 'fs'); markAsync(context); return `(await __fs.promises.writeFile(${generateExpr(args[0], context)}, ${generateExpr(args[1], context)}, 'utf8'))`; },
+  writeFileAtomic: (args, context) => {
+    ensureBuiltin(context, 'fs');
+    markAsync(context);
+    const file = generateExpr(args[0], context);
+    const value = generateExpr(args[1], context);
+    return `(await (async () => { const __target = ${file}; const __tmp = __target + '.tmp-' + process.pid + '-' + Math.random().toString(16).slice(2); await __fs.promises.writeFile(__tmp, ${value}, 'utf8'); await __fs.promises.rename(__tmp, __target); return __target; })())`;
+  },
   appendFile: (args, context) => {
     ensureBuiltin(context, 'fs');
     return `__fs.appendFileSync(${generateExpr(args[0], context)}, ${generateExpr(args[1], context)}, 'utf8')`;
@@ -2253,8 +2270,11 @@ const BUILTIN_DECLARATIONS = {
     ensureBuiltin(context, 'process');
     markAsync(context);
     const bin = args[0] != null ? generateExpr(args[0], context) : 'undefined';
-    const rest = args.slice(1).map(a => generateExpr(a, context));
-    const call = `__runCommand(${bin}${rest.length ? ', [' + rest.join(', ') + ']' : ''})`;
+    const hasStructuredArgs = args[1] && args[1].type === 'ArrayLiteral';
+    const hasOptions = hasStructuredArgs && args[2] && ['InlineObjectLiteral', 'ObjectLiteral', 'Identifier'].includes(args[2].type);
+    const argv = hasStructuredArgs ? generateExpr(args[1], context) : `[${args.slice(1).map(a => generateExpr(a, context)).join(', ')}]`;
+    const options = hasOptions ? `, ${generateExpr(args[2], context)}` : '';
+    const call = `__runCommand(${bin}, ${argv}${options})`;
     return `(await ${call})`;
   },
   withTimeout: (args, context) => {
@@ -3003,11 +3023,13 @@ function ensureTypeRuntime(context) {
     '  if (spec.name === "boolean") return typeof value === "boolean";',
     '  if (spec.name === "null") return value === null;',
     '  if (spec.name === "object") return value !== null && typeof value === "object";',
+    '  if (__plainTypes[spec.name] && __plainTypes[spec.name].alias) return __plainMatchesType(value, __plainTypes[spec.name].alias, path);',
     '  try { __plainValidateType(spec.name, value, path); return true; } catch (_) { return false; }',
     '}',
     'function __plainValidateType(name, value, path = name) {',
     '  const schema = __plainTypes[name];',
     '  if (!schema) throw new Error(`Unknown PlainScript type "${name}".`);',
+    '  if (schema.alias) { if (!__plainMatchesType(value, schema.alias, path)) throw new Error(`${path} does not match type ${name}.`); return true; }',
     '  if (value == null || typeof value !== "object" || Array.isArray(value)) throw new Error(`${path} must be an object matching type ${name}.`);',
     '  for (const field of schema.fields) {',
     '    const fieldPath = `${path}.${field.key}`;',
@@ -3783,8 +3805,10 @@ function generateStatement(node, indent = '', context = createGenerationContext(
       const schema = JSON.stringify(node.fields || []);
       return `${indent}__plainTypes[${JSON.stringify(node.name)}] = { fields: ${schema} };`;
     }
-    case 'TypeAlias':
-      return '';
+    case 'TypeAlias': {
+      ensureTypeRuntime(context);
+      return `${indent}__plainTypes[${JSON.stringify(node.name)}] = { alias: ${JSON.stringify(node.target)} };`;
+    }
 
     case 'FunctionDeclaration':
     case 'IntentDeclaration': {
