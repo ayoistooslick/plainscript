@@ -170,13 +170,27 @@ testAsync('all of: awaits every job and preserves input order', async () => {
   assertEqual(logs.join(' | '), '40,50');
 });
 
-testAsync('any of: resolves with the first settling job', async () => {
+testAsync('any of: resolves with the first fulfilled job after an early rejection', async () => {
   const logs = await runProgram(
-    'make jobA()\n  wait for sleepAsync(50)\n  give 40\ndone\n' +
+    'make jobA()\n  wait for sleepAsync(1)\n  throw "early failure"\ndone\n' +
     'make jobB()\n  wait for sleepAsync(2)\n  give 50\ndone\n' +
     'remember r as any of [jobA(), jobB()]\nshow r'
   );
   assertEqual(logs.join(' | '), '50');
+});
+
+testAsync('any of: rejects with an aggregate failure when all jobs reject', async () => {
+  let caught = false;
+  try {
+    await runProgram(
+      'make jobA()\n  wait for sleepAsync(1)\n  throw "a"\ndone\n' +
+      'make jobB()\n  wait for sleepAsync(2)\n  throw "b"\ndone\n' +
+      'remember r as any of [jobA(), jobB()]\nshow r'
+    );
+  } catch (_) {
+    caught = true;
+  }
+  assertEqual(caught, true);
 });
 
 testAsync('settled of: returns status records in input order', async () => {

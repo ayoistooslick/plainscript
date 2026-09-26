@@ -401,6 +401,7 @@ function compile(filePath, options = {}) {
   stage('Resolving imports', () => {
     files = resolveDependencies(absPath);
   });
+  stage('Checking module graph', () => checkResolvedGraph(files));
   stage('Building dependency graph', () => files);
   stage('Checking runtime dependencies', () => ensureDependencies(files, true));
   // Shared bundle pipeline: one context across the whole dependency graph so
@@ -492,6 +493,31 @@ function compile(filePath, options = {}) {
   }
 
   return js;
+}
+
+function checkResolvedGraph(files) {
+  const declarations = new Map();
+  for (const file of files) {
+    const sourceFile = path.relative(process.cwd(), file.absPath) || file.absPath;
+    for (const node of file.ast.body || []) {
+      if (!node.name || !['RememberStatement', 'FunctionDeclaration', 'IntentDeclaration', 'TypeDeclaration'].includes(node.type)) continue;
+      const owners = declarations.get(node.name) || [];
+      owners.push(sourceFile);
+      declarations.set(node.name, owners);
+      node.sourceFile = sourceFile;
+    }
+  }
+  const collisions = [...declarations.entries()].filter(([, owners]) => new Set(owners).size > 1);
+  if (collisions.length) {
+    throw new Error(`Module graph contains colliding top-level declarations:\n${collisions.map(([name, owners]) => `  ${name}: ${owners.join(', ')}`).join('\n')}\n\nRename the declarations or import them through an isolated module boundary.`);
+  }
+  const result = checkTypes({ type: 'Program', body: files.flatMap(file => file.ast.body || []) });
+  if (result.diagnostics.length) {
+    const details = result.diagnostics.map(item =>
+      `${item.file || '<source>'}:${item.range.start.line + 1}:${item.range.start.character + 1} ${item.code} ${item.message}`
+    ).join('\n');
+    throw new Error(`Static type checking failed:\n${details}`);
+  }
 }
 
 // ── Commands ─────────────────────────────────────────────────────────────────

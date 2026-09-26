@@ -5011,7 +5011,7 @@ function generateExpr(node, context = createGenerationContext()) {
     case 'ConcurrencyExpression': {
       markAsync(context);
       const rhs = generateExpr(node.items, context);
-      if (node.combo === 'any') return `(await Promise.race(${rhs}))`;
+      if (node.combo === 'any') return `(await Promise.any(${rhs}))`;
       if (node.combo === 'settled') return `(await Promise.allSettled(${rhs}))`;
       return `(await Promise.all(${rhs}))`;
     }

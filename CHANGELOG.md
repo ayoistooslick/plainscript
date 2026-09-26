@@ -8,12 +8,20 @@ All notable changes to PlainScript are documented here.
 
 ### Trustworthiness foundation
 
+- The v1.1.5 plan is explicitly a completeness milestone: mainstream language
+  capabilities are part of this release, not deferred to v1.2.x.
 - Added the v1.1.5 gap analysis and implementation contract.
 - Hardened inferred collection assignability, collection index checking,
   declared-binding reassignment, nested-loop return checking, and duplicate
   diagnostic suppression.
 - Synchronized the compiler, LSP, grammar, package, and VS Code release
   metadata to `1.1.5`.
+- Normal compile/build now performs graph-wide static checking before code
+  generation, with deterministic collision diagnostics for flattened modules.
+- `any of` now uses first-fulfillment semantics (`Promise.any`) and reports
+  aggregate failure when every task rejects.
+- Formatter branch and cleanup clauses (`else`, `otherwise`, `recover`, and
+  `finally`) now preserve valid block indentation.
 
 ## [1.1.2]  -  2026-09-25
 

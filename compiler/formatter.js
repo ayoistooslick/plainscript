@@ -10,7 +10,7 @@
 const INDENT = '    '; // 4 spaces
 
 // Keywords whose line CLOSES a block (printed at depth - 1).
-const DEDENT_WORDS = new Set(['done', 'end', 'otherwise', 'recover']);
+const DEDENT_WORDS = new Set(['done', 'end', 'otherwise', 'else', 'recover', 'finally']);
 
 // Patterns whose line OPENS a new block (next line indented).
 const INDENT_STARTERS = [
@@ -18,6 +18,7 @@ const INDENT_STARTERS = [
   /^to\s+\S+/,                 // to add a and b together ...
   /^if\s+/,                    // if ...
   /^otherwise\b/,              // otherwise
+  /^else\b/,                   // else
   /^for\s+each\s+/,           // for each ...
   /^for\s+every\s+/,          // for every ... in ...
   /^for\s+index\s+/,          // for index i from ... to ...
@@ -40,6 +41,7 @@ const INDENT_STARTERS = [
   /^transaction\s*$/,          // transaction       (v2.1 atomic DB block)
   /^try\s*$/,                  // try               (v2.1.1 error handling)
   /^recover\b/,                // recover [as name] (v2.1.1 error handling)
+  /^finally\s*$/,              // finally           (v2.1.1 error handling)
   /^retry\s+\d+\s+times\b/,    // retry N times ... (v2.1.1 retries)
   /^every\s+\d+\s+(seconds?|minutes?|hours?|days?)\b/, // every 5 minutes (v2.1)
   /^every\s+N\s+(seconds?|minutes?|hours?|days?)\b/, // every N seconds (variable)
@@ -148,7 +150,8 @@ function format(source) {
     // (e.g. make, if, for each) when prior content exists.
     // Simple statements like remember/show/becomes are NOT block openers and
     // do NOT get a blank line inserted before them.
-    if (depth === 0 && opensBlock(content) && output.length > 0) {
+    const isContinuation = ['else', 'finally', 'otherwise'].includes(firstWord);
+    if (depth === 0 && opensBlock(content) && !isContinuation && output.length > 0) {
       let lastNonEmpty = output.length - 1;
       while (lastNonEmpty >= 0 && output[lastNonEmpty] === '') lastNonEmpty--;
 
