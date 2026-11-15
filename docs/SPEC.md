@@ -316,17 +316,17 @@ Nominal typing is not used. Two records with the same fields are the same type.
 Facts are derived from conditions and applied inside their branches:
 
 ```plainscript
-when value is text                       # value: text in this branch
-when value is nothing                    # optional becomes nothing
-when value is not nothing                # optional loses nothing
-when shape is Circle                     # variant narrowed to Circle
-when shape is Circle and shape.radius > 1
-when item.done                           # boolean field fact
-when x == "yes"                          # literal equality narrows unions
+if value is text                          # value: text in this branch
+if value is nothing                       # optional becomes nothing
+if value is not nothing                   # optional loses nothing
+if shape is Circle                        # variant narrowed to Circle
+if shape is Circle and shape.radius > 1
+if item.done                              # boolean field fact
+if x == "yes"                             # literal equality narrows unions
 ```
 
 Narrowing understands `and`, `or`, `not`, `is`, `is not`, `==`, `!=`, member paths and
-`otherwise` (the negation of all preceding branches). Reading a `T?` without narrowing is
+`else` (the negation of all preceding branches). Reading a `T?` without narrowing is
 `PS3350`; reading a field that only some union members have is `PS3351`.
 
 `is` tests are runtime checks for primitives, lists, maps and variant tags; other type
@@ -416,17 +416,18 @@ Targets are names, fields and indexes. Assigning to a `const` or function name i
 ### 7.1 Conditions
 
 ```plainscript
-when condition
+if condition
     ...
-otherwise when other
+else if other
     ...
-otherwise
+else
     ...
 end
 ```
 
-Conditions must be `boolean` (`PS3318`). `when` is a statement, not an expression; use a
-function or `match` when a value is needed.
+Conditions must be `boolean` (`PS3318`). `if` is a statement, not an expression; use a
+function or `match` when a value is needed. `else if` and `else` are optional, and the
+whole conditional ends with `end`.
 
 ### 7.2 Loops
 
@@ -451,13 +452,13 @@ end
 
 ```plainscript
 match shape
-    case Circle(radius) when radius > 0
+    case Circle(radius) if radius > 0
         ...
     case Rectangle(width, height)
         ...
     case Point
         ...
-    otherwise
+    case _
         ...
 end
 ```
@@ -476,8 +477,9 @@ Patterns:
 | `(a, b)` | tuple/record pair |
 | `{ name, age }` | record fields by name |
 
-A `when` guard may follow a `case`. Matching is exhaustive when every variant is covered
-or an `otherwise`/binding pattern is present (`PS3345`). Duplicate cases are `PS3306`.
+A guard introduced by `if` may follow a `case` pattern. Matching is exhaustive when every
+variant is covered or a wildcard/binding pattern is present (`PS3345`). Duplicate cases
+are `PS3306`.
 A binding pattern makes later cases unreachable, which the checker reports.
 
 ### 7.4 Errors
@@ -623,7 +625,7 @@ source .pln
 ## 12. Scope rules
 
 - A module has one top-level scope. Function declarations are hoisted within their block.
-- `when`, `for`, `while`, `match` arms, `try`/`catch`/`finally` and function bodies create
+- `if`, `for`, `while`, `match` arms, `try`/`catch`/`finally` and function bodies create
   child scopes.
 - Closures capture the enclosing scope; nested functions see the local variables around
   them.
@@ -651,13 +653,15 @@ source .pln
 
 ```
 and        as         async      await      break      case       catch
-const      continue   declare    do         element    end        export
-false      finally    for        from       function   if         import
-in         is         let        match      new        nothing    not
-or         otherwise  render     return     throw      to         true
-try        type       when       while      with
+const      continue   declare    do         element    else       end
+export     false      finally    for        from       function   if
+import     in         is         let        match      new        nothing
+not        or         otherwise  render     return     throw      to
+true       try        type       when       while      with
 ```
 
 Reserved words cannot be identifiers, including function, parameter, variable and type
-names. They may be used as fields after `.`, as element property names, and as record
+names. `when` and `otherwise` are retained as reserved words only so source using their
+retired branch syntax receives a parser error; they are not accepted as branch introducers.
+Reserved words may be used as fields after `.`, as element property names, and as record
 literal keys.

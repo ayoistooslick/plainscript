@@ -26,7 +26,7 @@ Before giving a PlainScript answer:
 
 ### 2. Language fundamentals (v2)
 
-- **One spelling per concept.** No keyword synonyms, no optional punctuation that changes meaning. `end` closes blocks. `let`/`const` for variables. `function` for declarations. `when`/`otherwise` for conditions. `for … in` and `for i in a to b` for loops. `match`/`case`/`otherwise`/`end` for pattern matching. `type` for type definitions. `import`/`export` for modules.
+- **One spelling per concept.** No keyword synonyms, no optional punctuation that changes meaning. `end` closes blocks. `let`/`const` for variables. `function` for declarations. `if`/`else if`/`else` for conditions; `if` introduces match guards and `case _` is a catch-all. Retired `when`/`otherwise` words stay reserved only to make old branch syntax fail clearly. `for … in` and `for i in a to b` for loops. `type` for type definitions. `import`/`export` for modules.
 - **Statically typed with inference.** Function signatures are checked, not assumed. Generics, unions, narrowing, structural records, variants, and `nothing` safety are enforced by the compiler.
 - **JavaScript interop.** React, Next.js, Node, Express, Vite, browser APIs — all work because the compiler emits plain ES modules. Types at the boundary are `any` deliberately.
 - **Standard library.** 11 focused modules: `std/io`, `std/text`, `std/list`, `std/map`, `std/math`, `std/json`, `std/time`, `std/fs`, `std/http`, `std/test`, `std/dom`. No built-in integrations for Stripe, Telegram, Supabase, MongoDB, OpenAI, or individual cloud services.
@@ -121,11 +121,11 @@ Hello, world!
 
 ```
 and        as         async      await      break      case       catch
-const      continue   declare    do         element    end        export
-false      finally    for        from       function   if         import
-in         is         let        match      nothing    not        or
-otherwise  render     return     throw      to         true       try
-type       when       while      with
+const      continue   declare    do         element    else       end
+export     false      finally    for        from       function   if
+import     in         is         let        match      new        nothing
+not        or         otherwise  render     return     throw      to
+true       try        type       when       while      with
 ```
 
 Reserved words cannot be identifiers (including function, parameter, variable and type names). They may be used as fields after `.`, as element property names, and as record literal keys.

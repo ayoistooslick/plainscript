@@ -10,8 +10,8 @@ Status vocabulary used below (no issue is "fixed" without every step):
 - **Still unresolved** — known, not done.
 - **Intentionally unsupported** — design decision, documented in `docs/SPEC.md`.
 
-Last verified: full suite `npm test` → **165 tests, 165 pass, 0 fail**; every `.pln` in
-`demos/` and `templates/` passes `plainscript check`.
+Last verified: full suite `npm test` → **167 tests, 167 pass, 0 fail**; all 13 active `.pln` files in
+`demos/` and `templates/` pass `plainscript check`.
 
 ---
 
@@ -635,3 +635,30 @@ No existing test was modified, skipped, or weakened.
 7. **Compiler performance.** No incremental compilation or module-graph cache; no
    measurement of large-project build time.
 8. **Documentation website** still needs to mirror the SPEC/CLI changes above.
+
+---
+
+## 21. Conditional vocabulary aligned with familiar control flow
+
+**Design:** Adopt `if` / `else if` / `else` for conditionals and `if` for match guards.
+Keep `end` as the explicit block terminator. This is a hard source-syntax change, not a
+dual-keyword alias period; the reasons and comparison examples are in
+[`docs/SYNTAX_DESIGN.md`](SYNTAX_DESIGN.md).
+
+**Implementation:** `src/lexer.js` reserves the new words and keeps retired `when` and
+`otherwise` reserved solely so stale source fails as syntax. `src/parser.js` maps new
+conditional and match-guard spellings to the existing AST nodes, so checker narrowing,
+scope, return analysis, HIR and generated JavaScript retain their prior semantics.
+`src/formatter.js`, tests, active demos/templates, README, SPEC, migration guide and
+decision notes were updated. The stale `match ... otherwise` spec example was replaced
+with the implemented wildcard arm `case _`.
+
+**Verified:** `npm test` → **167/167 pass**. Every active `.pln` file in `demos/` and
+`templates/` → `plainscript check` passed (13 files). Tests cover new keyword tokens,
+nested `else if` formatting, match guards, old-syntax rejection, checker behavior and
+runtime execution. `npm pack --dry-run` includes the design document and completes without
+publishing.
+
+**Compatibility/release note:** Existing programs using `when` / `otherwise` as branches
+must be migrated. The package version remains `2.0.0`; selecting a release number for this
+breaking syntax update is still required before any npm release. No package was published.

@@ -2,6 +2,26 @@
 
 PlainScript 2.0 is a ground-up rebuild. This guide documents the changes from v1 to v2 and what you need to update in your v1 code to make it work with v2.
 
+## Conditional syntax update after the 2.0.0 snapshot
+
+The current source grammar replaces the earlier 2.0.0 conditional spellings with one
+canonical form. This is a breaking source change; it is not an alias period and must not be
+published as a patch-compatible release. A release number for it has not been selected.
+
+| Earlier form | Current form |
+| --- | --- |
+| `when condition … end` | `if condition … end` |
+| `otherwise when condition …` | `else if condition …` |
+| `otherwise …` | `else …` |
+| `case pattern when guard …` | `case pattern if guard …` |
+| match catch-all `otherwise` (shown in an old spec example, not implemented) | `case _` |
+
+The checker, narrowing rules, scope behavior, and generated JavaScript do not change. The
+compiler no longer accepts the old forms as branch syntax. `when` and `otherwise` remain
+reserved only so old source is rejected clearly instead of reinterpreted as identifiers.
+Archived `legacy/v1/` material remains unchanged. See
+[`SYNTAX_DESIGN.md`](SYNTAX_DESIGN.md) for rationale and examples.
+
 ## Core Language Changes
 
 ### Keyword aliases removed
@@ -20,7 +40,7 @@ All v1 keyword synonyms have been removed. Use the one correct spelling:
 | `bot` | removed (service construct) |
 | `ocr` | removed (service construct) |
 | `try` | use `try`/`catch` (same spelling, different semantics) |
-| `recover` | `otherwise` |
+| `recover` | `else` |
 | `retry` | (no longer needed) |
 | `done` | `end` |
 | `together` | `end` |

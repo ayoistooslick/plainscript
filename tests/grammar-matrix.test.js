@@ -35,11 +35,11 @@ const NESTED_PROGRAM = `type Size
 end
 
 function classify(value: number) -> text
-    when value < 0
+    if value < 0
         return "negative"
-    otherwise when value == 0
+    else if value == 0
         return "zero"
-    otherwise
+    else
         return "positive"
     end
 end
@@ -47,7 +47,7 @@ end
 function sum(values: list of number) -> number
     let total = 0
     for value in values
-        when value > 0
+        if value > 0
             total += value
         end
     end
@@ -56,12 +56,12 @@ end
 
 function safeDivide(a: number, b: number) -> number or nothing
     try
-        when b == 0
+        if b == 0
             throw "division by zero"
         end
         return a / b
     catch failure
-        when failure is text
+        if failure is text
             return nothing
         end
         return nothing
@@ -78,7 +78,7 @@ function describe(values: list of number) -> text
         return classify(first)
     case [first, ...rest]
         for value in rest
-            when value < first
+            if value < first
                 return "unsorted"
             end
         end
@@ -88,7 +88,7 @@ end
 
 function outer(value: number) -> number
     function inner(candidate: number) -> number
-        when candidate > 10
+        if candidate > 10
             return 10
         end
         return candidate
@@ -100,8 +100,8 @@ function nestedLoops(values: list of number) -> number
     let hits = 0
     for outerValue in values
         for innerValue in values
-            when outerValue == innerValue
-                when innerValue > 0
+            if outerValue == innerValue
+                if innerValue > 0
                     hits += 1
                 end
             end
@@ -248,7 +248,7 @@ print(once())
 test('a default exported function can call itself', () => {
   const project = runProject({
     'lib/sum.pln': `export default function sumTo(n: number) -> number
-    when n <= 0
+    if n <= 0
         return 0
     end
     return n + sumTo(n - 1)
@@ -318,7 +318,7 @@ end
 
 function risky(value: number) -> number or nothing
     try
-        when value < 0
+        if value < 0
             throw "negative"
         end
         return value
@@ -334,7 +334,7 @@ async function main() -> nothing
     let doubled = await work(21)
     print("doubled {doubled}")
     let safe = risky(-1)
-    when safe == nothing
+    if safe == nothing
         print("safe nothing")
     end
 end

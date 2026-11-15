@@ -56,21 +56,21 @@ test('return type mismatches are reported', () => {
 });
 
 test('functions that can fall through are reported', () => {
-  assert.ok(codesOf('function f(flag: boolean) -> number\n    when flag\n        return 1\n    end\nend').includes('PS3401'));
+  assert.ok(codesOf('function f(flag: boolean) -> number\n    if flag\n        return 1\n    end\nend').includes('PS3401'));
 });
 
 test('fully returning branches satisfy the checker', () => {
   assert.deepStrictEqual(codesOf(`function f(flag: boolean) -> number
-    when flag
+    if flag
         return 1
-    otherwise
+    else
         return 2
     end
 end`), []);
 });
 
 test('generic functions infer their result type', () => {
-  const result = check('function firstOf<T>(items: list of T) -> T?\n    when items is list of text\n        return items[0]\n    end\n    return nothing\nend\nlet value = firstOf(["a"])');
+  const result = check('function firstOf<T>(items: list of T) -> T?\n    if items is list of text\n        return items[0]\n    end\n    return nothing\nend\nlet value = firstOf(["a"])');
   assert.deepStrictEqual(result.diagnostics, []);
   assert.strictEqual(showType(result.checker.global.lookup('value').type), 'text or nothing');
 });
@@ -109,7 +109,7 @@ test('optional fields narrow after a guard', () => {
     email?: text
 end
 function read(user: User) -> text
-    when user.email is text
+    if user.email is text
         return user.email
     end
     return ""
@@ -118,7 +118,7 @@ end`), []);
 
 test('narrowing with is removes nothing', () => {
   const result = check(`function read(value: text?) -> text
-    when value is text
+    if value is text
         return value
     end
     return ""
@@ -161,7 +161,7 @@ end`), []);
 });
 
 test('conditions must be boolean', () => {
-  assert.ok(codesOf('when "yes"\n    let x = 1\nend').includes('PS3318'));
+  assert.ok(codesOf('if "yes"\n    let x = 1\nend').includes('PS3318'));
 });
 
 test('arithmetic rejects text operands and points at interpolation', () => {

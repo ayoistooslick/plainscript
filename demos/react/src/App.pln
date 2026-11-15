@@ -19,7 +19,7 @@ export function App() -> any
     let (draft, setDraft) = useState("")
 
     function add() -> nothing
-        when draft != ""
+        if draft != ""
             setItems(append(items, { id: Date.now(), title: draft, done: false }))
             setDraft("")
         end
@@ -28,9 +28,9 @@ export function App() -> any
     function toggle(id: number) -> nothing
         let next: list of Item = []
         for item in items
-            when item.id == id
+            if item.id == id
                 next = append(next, { id: item.id, title: item.title, done: not item.done })
-            otherwise
+            else
                 next = append(next, item)
             end
         end
@@ -82,7 +82,7 @@ export function App() -> any
 end
 
 function stateLabel(item: Item) -> text
-    when item.done
+    if item.done
         return "done"
     end
     return "open"

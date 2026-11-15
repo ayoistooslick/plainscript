@@ -23,30 +23,30 @@ let nextId = 3
 async function handler(request: any) -> any
     let url = urlOf(request)
 
-    when url.pathname == "/"
+    if url.pathname == "/"
         return html(readText("public/index.html"))
     end
 
-    when url.pathname == "/app.js"
+    if url.pathname == "/app.js"
         return javascript(readText("dist/client.js"))
     end
 
-    when url.pathname == "/std/dom.js"
+    if url.pathname == "/std/dom.js"
         return javascript(readText("public/std/dom.js"))
     end
 
-    when url.pathname == "/std/list.js"
+    if url.pathname == "/std/list.js"
         return javascript(readText("public/std/list.js"))
     end
 
-    when request.method == "GET" and url.pathname == "/todos"
+    if request.method == "GET" and url.pathname == "/todos"
         return json(todos)
     end
 
-    when request.method == "POST" and url.pathname == "/todos"
+    if request.method == "POST" and url.pathname == "/todos"
         let body = await requestJson(request)
-        when body is map of text to any
-            when body.title is text
+        if body is map of text to any
+            if body.title is text
                 let todo: Todo = { id: nextId, title: body.title, done: false }
                 nextId += 1
                 todos = append(todos, todo)

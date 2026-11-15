@@ -82,7 +82,7 @@ test('match parses patterns, bindings, rest and guards', () => {
             return 1
         case { name, age: years }
             return 2
-        case Circle(r) when r > 0
+        case Circle(r) if r > 0
             return 3
         case _
             return 0
@@ -99,16 +99,22 @@ end`);
 });
 
 test('conditional branches parse without eating the final end', () => {
-  const program = parseSource(`when a
+  const program = parseSource(`if a
     let x = 1
-otherwise when b
+else if b
     let y = 2
-otherwise
+else
     let z = 3
 end`);
   const conditional = program.body[0];
   assert.strictEqual(conditional.branches.length, 2);
   assert.strictEqual(conditional.otherwise.length, 1);
+});
+
+test('legacy conditional spellings are no longer statement syntax', () => {
+  assert.ok(codes('when flag\n    return 1\nend').some((code) => code.startsWith('PS2')));
+  assert.ok(codes('otherwise\n    return 1\nend').some((code) => code.startsWith('PS2')));
+  assert.ok(codes('match value\n    case item when item.ok\n        return item\nend').some((code) => code.startsWith('PS2')));
 });
 
 test('try/catch/finally parse', () => {

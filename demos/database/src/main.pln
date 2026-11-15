@@ -47,7 +47,7 @@ end
 function filteredTasks(done: boolean or nothing, limit: number, offset: number) -> list of Task
     let sql = "select id, title, done from tasks"
     let params: list of any = []
-    when done != nothing
+    if done != nothing
         sql = "{sql} where done = ?"
         params = append(params, flagOf(done))
     end
@@ -83,9 +83,9 @@ end
 # ---------------------------------------------------------------- request input
 
 function textField(body: any, name: text) -> text
-    when body is map of text to any
+    if body is map of text to any
         let value = body[name]
-        when value is text
+        if value is text
             return value
         end
     end
@@ -93,9 +93,9 @@ function textField(body: any, name: text) -> text
 end
 
 function boolField(body: any, name: text, fallback: boolean) -> boolean
-    when body is map of text to any
+    if body is map of text to any
         let value = body[name]
-        when value is boolean
+        if value is boolean
             return value
         end
     end
@@ -104,10 +104,10 @@ end
 
 function doneFrom(search: any) -> boolean or nothing
     let raw = search.get("done")
-    when raw == "true"
+    if raw == "true"
         return true
     end
-    when raw == "false"
+    if raw == "false"
         return false
     end
     return nothing
@@ -115,9 +115,9 @@ end
 
 function numberFrom(search: any, name: text, fallback: number) -> number
     let raw = search.get(name)
-    when raw != nothing
+    if raw != nothing
         let parsed = parseNumber(raw as text, -1)
-        when parsed >= 0
+        if parsed >= 0
             return parsed
         end
     end
@@ -125,7 +125,7 @@ function numberFrom(search: any, name: text, fallback: number) -> number
 end
 
 function flagOf(value: boolean) -> number
-    when value
+    if value
         return 1
     end
     return 0
@@ -134,16 +134,16 @@ end
 # /tasks/<id> has exactly three segments: "", "tasks", "<id>".
 function idFrom(path: text) -> number or nothing
     let parts = split(path, "/")
-    when count(parts) != 3
+    if count(parts) != 3
         return nothing
     end
     let second = parts[1]
-    when second != nothing
-        when second == "tasks"
+    if second != nothing
+        if second == "tasks"
             let raw = parts[2]
-            when raw != nothing
+            if raw != nothing
                 let parsed = parseNumber(raw, -1)
-                when parsed >= 0
+                if parsed >= 0
                     return parsed
                 end
             end
@@ -159,27 +159,27 @@ async function handler(request: any) -> any
     let method = request.method
     let path = url.pathname as text
 
-    when method == "GET" and path == "/health"
+    if method == "GET" and path == "/health"
         return json({ status: "ok", tasks: taskCount() })
     end
 
-    when method == "GET" and path == "/tasks"
+    if method == "GET" and path == "/tasks"
         let done = doneFrom(url.searchParams)
         let limit = numberFrom(url.searchParams, "limit", 50)
         let offset = numberFrom(url.searchParams, "offset", 0)
         return json(filteredTasks(done, limit, offset))
     end
 
-    when method == "POST" and path == "/tasks"
+    if method == "POST" and path == "/tasks"
         let body = await requestJson(request)
         let title = textField(body, "title")
-        when title == ""
+        if title == ""
             return json({ error: "title is required" }, 400)
         end
         let done = boolField(body, "done", false)
         let result = insertTask.run(title, flagOf(done))
         let created = findTask(result.lastInsertRowid as number)
-        when created != nothing
+        if created != nothing
             return json(created, 201)
         end
         return json({ error: "task was not created" }, 500)
@@ -187,35 +187,35 @@ async function handler(request: any) -> any
 
     let id = idFrom(path)
 
-    when method == "GET" and id != nothing
+    if method == "GET" and id != nothing
         let task = findTask(id)
-        when task != nothing
+        if task != nothing
             return json(task)
         end
         return json({ error: "task not found" }, 404)
     end
 
-    when method == "PUT" and id != nothing
+    if method == "PUT" and id != nothing
         let body = await requestJson(request)
         let title = textField(body, "title")
-        when title == ""
+        if title == ""
             return json({ error: "title is required" }, 400)
         end
         let existing = findTask(id)
-        when existing != nothing
+        if existing != nothing
             let done = boolField(body, "done", existing.done)
             updateOne.run(title, flagOf(done), id)
             let updated = findTask(id)
-            when updated != nothing
+            if updated != nothing
                 return json(updated)
             end
         end
         return json({ error: "task not found" }, 404)
     end
 
-    when method == "DELETE" and id != nothing
+    if method == "DELETE" and id != nothing
         let existing = findTask(id)
-        when existing == nothing
+        if existing == nothing
             return json({ error: "task not found" }, 404)
         end
         deleteOne.run(id)

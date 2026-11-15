@@ -7,8 +7,8 @@ const { Span, error } = require('./diagnostics');
 // outside it can introduce a block.
 const KEYWORDS = new Set([
   'and', 'as', 'async', 'await', 'break', 'case', 'catch', 'const',
-  'continue', 'declare', 'default', 'do', 'element', 'end', 'export', 'finally',
-  'for', 'from', 'function', 'import', 'in', 'is', 'let', 'match', 'not',
+  'continue', 'declare', 'default', 'do', 'element', 'else', 'end', 'export', 'finally',
+  'for', 'from', 'function', 'if', 'import', 'in', 'is', 'let', 'match', 'not',
   'new', 'nothing', 'of', 'or', 'otherwise', 'render', 'return', 'throw', 'to',
   'true', 'throw', 'try', 'type', 'when', 'while', 'with', 'false',
 ]);

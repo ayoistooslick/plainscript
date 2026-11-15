@@ -90,7 +90,7 @@ function describe(value: any) -> text
             return "user {name}"
         case [first, ...rest]
             return "list starting {first} with {count(rest)}"
-        case n when n > 10
+        case n if n > 10
             return "big number"
         case "hello"
             return "a greeting"
@@ -149,10 +149,10 @@ test('loops support ranges, break and continue', () => {
   const result = runSource(`import { print } from "std/io"
 let seen = ""
 for i in 0 to 5
-    when i == 1
+    if i == 1
         continue
     end
-    when i == 4
+    if i == 4
         break
     end
     seen = "{seen}{i}"
@@ -241,7 +241,7 @@ import { count } from "std/list"
 
 function createElement(tag: any, props: any, ...children: list of any) -> any
     let label = tag
-    when props is map of text to any
+    if props is map of text to any
         label = "{tag}[{props.kind ?? 'none'}]"
     end
     return "<{label}>{count(children)}"
