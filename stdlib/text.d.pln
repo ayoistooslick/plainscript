@@ -1,0 +1,23 @@
+# Declarations for std/text.
+
+export declare function split(text: text, separator: text) -> list of text
+export declare function join(parts: list of text, separator?: text) -> text
+export declare function trim(text: text) -> text
+export declare function trimStart(text: text) -> text
+export declare function trimEnd(text: text) -> text
+export declare function upper(text: text) -> text
+export declare function lower(text: text) -> text
+export declare function replace(text: text, search: text, replacement: text) -> text
+export declare function contains(text: text, part: text) -> boolean
+export declare function startsWith(text: text, prefix: text) -> boolean
+export declare function endsWith(text: text, suffix: text) -> boolean
+export declare function slice(text: text, start: number, stop?: number) -> text
+export declare function length(text: text) -> number
+export declare function chars(text: text) -> list of text
+export declare function words(text: text) -> list of text
+export declare function repeat(text: text, times: number) -> text
+export declare function padStart(text: text, width: number, fill?: text) -> text
+export declare function padEnd(text: text, width: number, fill?: text) -> text
+export declare function indexOf(text: text, part: text) -> number
+export declare function lines(text: text) -> list of text
+export declare function parseNumber(text: text, fallback?: number) -> number
