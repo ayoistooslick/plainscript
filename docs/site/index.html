@@ -1,0 +1,169 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="A typed language that compiles to JavaScript."><title>PlainScript · PlainScript</title><link rel="stylesheet" href="style.css"></head><body><div class="site-shell"><aside class="sidebar"><a class="brand" href="index.html"><span class="brand-mark">PS</span><span><span class="brand-name">PlainScript</span><span class="brand-meta">Language docs · 2.0</span></span></a><div class="nav-group"><div class="nav-label">Start here</div><a class="nav-link active" href="index.html">PlainScript</a><a class="nav-link " href="cli.html">CLI reference</a><a class="nav-link " href="templates.html">Application templates</a></div><div class="nav-group"><div class="nav-label">Language</div><a class="nav-link " href="spec.html">Language specification</a><a class="nav-link " href="syntax-design.html">Syntax design</a></div><div class="nav-group"><div class="nav-label">Compiler</div><a class="nav-link " href="architecture.html">Compiler architecture</a><a class="nav-link " href="interop.html">JavaScript interoperability</a></div><div class="nav-group"><div class="nav-label">Guides</div><a class="nav-link " href="migration.html">Migration guide</a></div><div class="nav-group"><div class="nav-label">Project</div><a class="nav-link " href="progress.html">Engineering progress</a><a class="nav-link " href="audit.html">Audit</a><a class="nav-link " href="decisions.html">Decisions</a></div><div class="sidebar-footer">Open source under MIT.<br><a href="https://github.com/ayoistooslick/Plainscript">View on GitHub ↗</a></div></aside><main class="main"><header class="topbar"><div class="search-wrap"><label class="search" aria-label="Search documentation"><span>⌕</span><input id="doc-search" type="search" placeholder="Search the docs…" autocomplete="off"><kbd>/</kbd></label><div id="search-results" class="search-results" role="listbox"></div></div><nav class="top-links"><a href="index.html">Docs</a><a href="https://github.com/ayoistooslick/Plainscript">GitHub ↗</a></nav></header><div class="content"><section class="hero"><div><div class="eyebrow">A language for serious JavaScript software</div><h1>Make the machine readable.</h1><p>PlainScript is a statically typed language that compiles to ordinary JavaScript modules. Learn the syntax, understand the compiler, and build full-stack applications without leaving the ecosystem.</p></div><aside class="hero-aside"><strong>Start with the shape of the language.</strong><p>Read the quick tour, then move into the specification when you need exact semantics. The docs are organized for both paths.</p><code>plainscript new my-app</code></aside></section><section class="quick-grid"><a class="quick-card" href="cli.html"><span class="number">01 / BUILD</span><h2>Install and run</h2><p>Use the CLI to check, build, format, test, and scaffold a project.</p></a><a class="quick-card" href="spec.html"><span class="number">02 / LEARN</span><h2>Learn the language</h2><p>Follow the language model from modules and types to async code and rendering.</p></a><a class="quick-card" href="architecture.html"><span class="number">03 / UNDERSTAND</span><h2>Explore the compiler</h2><p>Trace source through lexer, parser, checker, HIR, and JavaScript emission.</p></a></section><article class="page-layout"><div class="prose"><h1 id="plainscript-2-0">PlainScript 2.0</h1>
+<p>PlainScript is a statically typed programming language with plain-language syntax that compiles to JavaScript. It is designed to be readable without hiding the machine: every program is type-checked before it runs, lowered through an explicit intermediate representation, and emitted as ordinary ES modules that interoperate with the JavaScript ecosystem.</p>
+<p>Version 2.0 is a ground-up rebuild of the language, compiler, runtime interface and standard library. It is a breaking release; see <a href="https://github.com/ayoistooslick/Plainscript/blob/main/CHANGELOG.md">CHANGELOG.md</a> and <a href="migration.html">docs/MIGRATION.md</a>.</p>
+<p>Created by <strong>Ayodele Ayokunle David</strong>. PlainScript is MIT licensed.</p>
+<p>---</p>
+<h2 id="what-plainscript-is">What PlainScript is</h2>
+<ul>
+<li><strong>A language with its own semantics.</strong> Blocks close with <code>end</code>. There is exactly one</li>
+<p>spelling for each concept: <code>let</code>/<code>const</code>, <code>function</code>, <code>if</code>/<code>else</code>, <code>match</code>/<code>case</code>, <code>for … in</code>, <code>type</code>, <code>import</code>/<code>export</code>. There are no synonyms such as <code>done</code>/<code>end</code> or <code>show</code>/<code>print</code>/<code>log</code>.</p>
+<li><strong>Statically typed, with inference.</strong> Function signatures are checked, not assumed.</li>
+<p>Generics, unions, narrowing, structural records, variants, exhaustiveness and <code>nothing</code> safety are enforced by the compiler.</p>
+<li><strong>A real compiler.</strong> Lexer → parser → type checker → typed HIR → JavaScript emitter with</li>
+<p>source maps. Types are erased at runtime, so the checker is the enforcer, and JavaScript boundaries are typed <code>any</code> deliberately rather than accidentally.</p>
+<li><strong>Interoperable first.</strong> React, Next.js, Vite, Node, npm packages, browser APIs and the</li>
+<p>Web <code>Request</code>/<code>Response</code> model are supported by emitting plain modules, not by wrapping frameworks.</p>
+<li><strong>Small and honest.</strong> The standard library covers fundamentals (<code>text</code>, <code>list</code>, <code>map</code>,</li>
+<p><code>math</code>, <code>json</code>, <code>time</code>, <code>fs</code>, <code>http</code>, <code>io</code>, <code>dom</code>, <code>test</code>) and nothing else. Stripe, Telegram, OpenAI, databases and auth are packages, not keywords.</p>
+</ul>
+<h2 id="what-plainscript-is-not">What PlainScript is not</h2>
+<ul>
+<li>Not JavaScript with renamed keywords. The syntax, type system, module graph, pattern</li>
+<p>matching and diagnostics are implemented in this repository.</p>
+<li>Not a framework generator or a catalogue of service integrations; its bundled templates are</li>
+<p>complete PlainScript application slices intended to stress the language and its interop.</p>
+<li>Not a TypeScript superset. It compiles to JavaScript, not to TypeScript.</li>
+</ul>
+<p>---</p>
+<h2 id="quick-start">Quick start</h2>
+<p>PlainScript needs Node.js 20 or newer and has no runtime dependencies. From a clone:</p>
+<pre><code>node src/cli.js run hello.pln</code></pre>
+<pre><code># hello.pln
+import { print } from &quot;std/io&quot;
+
+function greet(name: text) -&gt; text
+    return &quot;Hello, {name}!&quot;
+end
+
+print(greet(&quot;world&quot;))</code></pre>
+<pre><code>$ node src/cli.js run hello.pln
+Hello, world!</code></pre>
+<p>Check types without running, emit ES modules, or open a project:</p>
+<pre><code>node src/cli.js check hello.pln      # type-check, print diagnostics
+node src/cli.js build                # compile src/**.pln into dist/
+node src/cli.js new my-app           # scaffold package.json + src/main.pln
+node src/cli.js new my-project --template project-management
+node src/cli.js new my-store --template ecommerce
+node src/cli.js new my-chat --template realtime-chat
+node src/cli.js run                  # compile and run src/main.pln</code></pre>
+<p>Once installed as a package, the same commands are available as <code>plainscript</code>.</p>
+<p>---</p>
+<h2 id="a-short-tour">A short tour</h2>
+<pre><code>import { print } from &quot;std/io&quot;
+import { map, filter, sum } from &quot;std/list&quot;
+import { upper } from &quot;std/text&quot;
+
+# Records are structural types.
+type Person
+    name: text
+    age: number
+end
+
+# Variants are discriminated unions; unit variants are plain strings.
+type Shape = Circle(radius: number) or Rectangle(width: number, height: number) or Point
+
+function area(shape: Shape) -&gt; number
+    match shape
+        case Circle(radius)
+            return 3.14159 * radius * radius
+        case Rectangle(width, height)
+            return width * height
+        case Point
+            return 0
+    end
+end
+
+let people: list of Person = [
+    { name: &quot;ada&quot;, age: 36 },
+    { name: &quot;grace&quot;, age: 45 },
+]
+
+let adults = people
+    |&gt; filter((person: Person) =&gt; person.age &gt;= 18)
+    |&gt; map((person: Person) =&gt; upper(person.name))
+
+print(adults)                       # [&quot;ADA&quot;, &quot;GRACE&quot;]
+print(area(Rectangle(3, 4)))        # 12
+
+# Optional values use T? and are narrowed with `is nothing`.
+function findAge(name: text) -&gt; number?
+    for person in people
+        if person.name == name
+            return person.age
+        end
+    end
+    return nothing
+end
+
+if findAge(&quot;ada&quot;) is number
+    print(&quot;found&quot;)
+end</code></pre>
+<p>See <a href="spec.html">docs/SPEC.md</a> for the complete language definition and <a href="syntax-design.html">docs/SYNTAX_DESIGN.md</a> for the syntax rationale and migration notes. Run <code>node src/cli.js ir file.pln</code> to see the typed intermediate representation the backend consumes.</p>
+<p>---</p>
+<h2 id="tooling">Tooling</h2>
+<table><thead><tr><th>Command</th><th>Purpose</th></tr></thead><tbody>
+<tr><td><code>plainscript run [file]</code></td><td>Compile and execute a program (default <code>src/main.pln</code>).</td></tr>
+<tr><td><code>plainscript build [files…]</code></td><td>Type-check the module graph and emit <code>.js</code> + <code>.js.map</code> into <code>dist/</code>. With <code>--declarations</code>, also write <code>&lt;name&gt;.d.pln</code> so another PlainScript project can compile against the built library without its sources.</td></tr>
+<tr><td><code>plainscript check [files…]</code></td><td>Type-check only; exits non-zero on diagnostics.</td></tr>
+<tr><td><code>plainscript fmt [files…]</code></td><td>Normalise indentation and block layout without changing tokens.</td></tr>
+<tr><td><code>plainscript test [files…]</code></td><td>Run <code>std/test</code> files and report pass/fail.</td></tr>
+<tr><td><code>plainscript new &lt;dir&gt;</code></td><td>Scaffold a project.</td></tr>
+<tr><td><code>plainscript ir &lt;file&gt;</code></td><td>Print the typed HIR that code generation consumes.</td></tr>
+<tr><td><code>plainscript version</code></td><td>Print the compiler version.</td></tr>
+</tbody></table>
+<p>Details, including <code>--check</code>, <code>--std-base</code> and project configuration, are in <a href="cli.html">docs/CLI.md</a>.</p>
+<p>---</p>
+<h2 id="javascript-ecosystem">JavaScript ecosystem</h2>
+<p>The backend emits one ES module per source file. Imports of npm packages, Node built-ins, React and browser globals work because the output is plain JavaScript with no runtime library:</p>
+<pre><code>import { createElement, useState } from &quot;react&quot;
+import express from &quot;express&quot;
+import { readFile } from &quot;node:fs/promises&quot;
+
+declare const document: any</code></pre>
+<p><code>render</code> blocks lower to <code>createElement</code> calls resolved from the module scope, so a component written in PlainScript is a normal React component, usable in Vite, Next.js or any other React toolchain — no plugin, no JSX runtime, no custom bundler.</p>
+<p>Verified in this repository:</p>
+<table><thead><tr><th>Demo</th><th>What was actually run</th></tr></thead><tbody>
+<tr><td><a href="https://github.com/ayoistooslick/Plainscript/tree/main/demos/cli"><code>demos/cli</code></a></td><td>Add/list/complete tasks with persistence; executed.</td></tr>
+<tr><td><a href="https://github.com/ayoistooslick/Plainscript/tree/main/demos/api"><code>demos/api</code></a></td><td>JSON HTTP API; exercised with <code>curl</code> (GET, POST, 404).</td></tr>
+<tr><td><a href="https://github.com/ayoistooslick/Plainscript/tree/main/demos/fullstack"><code>demos/fullstack</code></a></td><td>Shared types, API + browser client; loaded in a browser, list rendered, POST round-tripped.</td></tr>
+<tr><td><a href="https://github.com/ayoistooslick/Plainscript/tree/main/demos/react"><code>demos/react</code></a></td><td>React + Vite; built, loaded in a browser, add/toggle interactions verified.</td></tr>
+<tr><td><a href="https://github.com/ayoistooslick/Plainscript/tree/main/demos/next"><code>demos/next</code></a></td><td>Next.js App Router; <code>next build</code> compiled and prerendered the PlainScript server component.</td></tr>
+<tr><td><a href="https://github.com/ayoistooslick/Plainscript/tree/main/demos/database"><code>demos/database</code></a></td><td>SQLite CRUD API (<code>node:sqlite</code>, prepared statements); curl matrix incl. <code>201</code>/<code>400</code>/<code>404</code>, and rows still present after restarting the process.</td></tr>
+<tr><td><a href="https://github.com/ayoistooslick/Plainscript/tree/main/demos/realtime"><code>demos/realtime</code></a></td><td>Server-Sent Events; <code>curl -N /events</code> captured <code>hello</code>, <code>presence</code>, per-second <code>tick</code> frames and a published message.</td></tr>
+</tbody></table>
+<p>See <a href="interop.html">docs/INTEROP.md</a> for the integration recipes; each demo&#39;s source header carries the exact commands, and <a href="progress.html">docs/PROGRESS.md</a> records the observed output for the database and real-time applications.</p>
+<p>---</p>
+<h2 id="repository-layout">Repository layout</h2>
+<pre><code>src/        lexer, parser, checker, typed HIR, codegen, modules, formatter, CLI
+stdlib/     JavaScript runtime modules plus .d.pln declaration files
+templates/  project-management, ecommerce, and realtime-chat application templates
+tests/      lexer, parser, checker, compiler, runtime, CLI, interop, formatter, packaging
+demos/      cli, api, database, fullstack, react, realtime, next
+docs/       specification, architecture, audit, decisions, migration, syntax design, CLI, interop
+plainscript-vscode/  syntax highlighting and snippets for .pln files
+legacy/v1/  the complete v1 compiler, tests and docs, archived for reference</code></pre>
+<h2 id="tests">Tests</h2>
+<pre><code>npm test</code></pre>
+<p>The suite covers lexing, parsing, type checking, inference, narrowing, exhaustiveness, code generation, runtime behaviour, module resolution, async, error handling, CLI behaviour, formatter invariants, npm/Node interop and packaging. Demo applications are built and run separately; see <a href="interop.html">docs/DEMOS.md</a>.</p>
+<h2 id="limitations">Limitations</h2>
+<p>These are known and deliberate for 2.0.0, not oversights:</p>
+<ul>
+<li><strong>One backend.</strong> JavaScript/ESM only. The IR and emitter are separated so another target</li>
+<p>is possible, but none exists.</p>
+<li><strong>No bundler.</strong> <code>build</code> emits one module per file. Browser projects use Vite, webpack or</li>
+<p>Next to bundle, as the demos do. Importing the standard library in a browser requires <code>--std-base</code> plus serving those module URLs (see the full-stack demo).</p>
+<li><strong>No language server.</strong> The VS Code extension provides syntax highlighting, snippets and</li>
+<p>bracket configuration only. There is no completion or go-to-definition yet.</p>
+<li><strong><code>render</code> blocks are not JSX.</strong> Attributes are <code>with name: value</code>, children are</li>
+<p>statements, and dynamic child lists are built with <code>element</code> expressions. There are no fragments, context shorthand or automatic key inference.</p>
+<li><strong>Types are erased.</strong> No runtime reflection beyond <code>is</code> checks on primitives, lists,</li>
+<p>maps and variant tags. <code>as</code> is unchecked at runtime.</p>
+<li><strong>No exceptions typing.</strong> <code>catch</code> binds <code>any</code>.</li>
+<li><strong>No concurrency primitives.</strong> Async/await only; no worker or thread syntax.</li>
+<li><strong>Not published yet.</strong> npm still serves 1.1.5. Publishing 2.0.0 is a separate, explicit</li>
+<p>release step.</p>
+</ul>
+<h2 id="contributing">Contributing</h2>
+<p>See <a href="https://github.com/ayoistooslick/Plainscript/blob/main/CONTRIBUTION.md">CONTRIBUTION.md</a>. Architectural decisions and their reasoning are recorded in <a href="decisions.html">docs/DECISIONS.md</a>; the v1 audit that motivated the rebuild is in <a href="audit.html">docs/AUDIT.md</a>.</p>
+<h2 id="license">License</h2>
+<p>MIT. PlainScript was created by Ayodele Ayokunle David.</p></div><aside class="toc"><div class="toc-title">On this page</div><a class="toc-h2" href="#what-plainscript-is">What PlainScript is</a><a class="toc-h2" href="#what-plainscript-is-not">What PlainScript is not</a><a class="toc-h2" href="#quick-start">Quick start</a><a class="toc-h2" href="#a-short-tour">A short tour</a><a class="toc-h2" href="#tooling">Tooling</a><a class="toc-h2" href="#javascript-ecosystem">JavaScript ecosystem</a><a class="toc-h2" href="#repository-layout">Repository layout</a><a class="toc-h2" href="#tests">Tests</a><a class="toc-h2" href="#limitations">Limitations</a><a class="toc-h2" href="#contributing">Contributing</a><a class="toc-h2" href="#license">License</a></aside></article><footer class="page-footer"><span>PlainScript 2.0 documentation</span><a href="https://github.com/ayoistooslick/Plainscript/issues">Report a documentation issue ↗</a></footer></div></main></div><script src="app.js"></script></body></html>

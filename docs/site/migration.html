@@ -1,0 +1,120 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Migration guide — PlainScript documentation."><title>Migration guide · PlainScript</title><link rel="stylesheet" href="style.css"></head><body><div class="site-shell"><aside class="sidebar"><a class="brand" href="index.html"><span class="brand-mark">PS</span><span><span class="brand-name">PlainScript</span><span class="brand-meta">Language docs · 2.0</span></span></a><div class="nav-group"><div class="nav-label">Start here</div><a class="nav-link " href="index.html">PlainScript</a><a class="nav-link " href="cli.html">CLI reference</a><a class="nav-link " href="templates.html">Application templates</a></div><div class="nav-group"><div class="nav-label">Language</div><a class="nav-link " href="spec.html">Language specification</a><a class="nav-link " href="syntax-design.html">Syntax design</a></div><div class="nav-group"><div class="nav-label">Compiler</div><a class="nav-link " href="architecture.html">Compiler architecture</a><a class="nav-link " href="interop.html">JavaScript interoperability</a></div><div class="nav-group"><div class="nav-label">Guides</div><a class="nav-link active" href="migration.html">Migration guide</a></div><div class="nav-group"><div class="nav-label">Project</div><a class="nav-link " href="progress.html">Engineering progress</a><a class="nav-link " href="audit.html">Audit</a><a class="nav-link " href="decisions.html">Decisions</a></div><div class="sidebar-footer">Open source under MIT.<br><a href="https://github.com/ayoistooslick/Plainscript">View on GitHub ↗</a></div></aside><main class="main"><header class="topbar"><div class="search-wrap"><label class="search" aria-label="Search documentation"><span>⌕</span><input id="doc-search" type="search" placeholder="Search the docs…" autocomplete="off"><kbd>/</kbd></label><div id="search-results" class="search-results" role="listbox"></div></div><nav class="top-links"><a href="index.html">Docs</a><a href="https://github.com/ayoistooslick/Plainscript">GitHub ↗</a></nav></header><div class="content"><article class="page-layout"><div class="prose"><h1 id="migration-from-plainscript-v1-to-v2">Migration from PlainScript v1 to v2</h1>
+<p>PlainScript 2.0 is a ground-up rebuild. This guide documents the changes from v1 to v2 and what you need to update in your v1 code to make it work with v2.</p>
+<h2 id="conditional-syntax-update-after-the-2-0-0-snapshot">Conditional syntax update after the 2.0.0 snapshot</h2>
+<p>The current source grammar replaces the earlier 2.0.0 conditional spellings with one canonical form. This is a breaking source change; it is not an alias period and must not be published as a patch-compatible release. A release number for it has not been selected.</p>
+<table><thead><tr><th>Earlier form</th><th>Current form</th></tr></thead><tbody>
+<tr><td><code>when condition … end</code></td><td><code>if condition … end</code></td></tr>
+<tr><td><code>otherwise when condition …</code></td><td><code>else if condition …</code></td></tr>
+<tr><td><code>otherwise …</code></td><td><code>else …</code></td></tr>
+<tr><td><code>case pattern when guard …</code></td><td><code>case pattern if guard …</code></td></tr>
+<tr><td>match catch-all <code>otherwise</code> (shown in an old spec example, not implemented)</td><td><code>case _</code></td></tr>
+</tbody></table>
+<p>The checker, narrowing rules, scope behavior, and generated JavaScript do not change. The compiler no longer accepts the old forms as branch syntax. <code>when</code> and <code>otherwise</code> remain reserved only so old source is rejected clearly instead of reinterpreted as identifiers. Archived <code>legacy/v1/</code> material remains unchanged. See <a href="syntax-design.html"><code>SYNTAX_DESIGN.md</code></a> for rationale and examples.</p>
+<h2 id="core-language-changes">Core Language Changes</h2>
+<h3 id="keyword-aliases-removed">Keyword aliases removed</h3>
+<p>All v1 keyword synonyms have been removed. Use the one correct spelling:</p>
+<table><thead><tr><th>v1 alias</th><th>v2 spelling</th></tr></thead><tbody>
+<tr><td><code>remember</code></td><td>(no longer needed)</td></tr>
+<tr><td><code>show</code></td><td><code>print</code> from <code>std/io</code></td></tr>
+<tr><td><code>display</code></td><td><code>print</code> from <code>std/io</code></td></tr>
+<tr><td><code>log</code></td><td><code>print</code> from <code>std/io</code></td></tr>
+<tr><td><code>make</code></td><td>use literal syntax</td></tr>
+<tr><td><code>give</code></td><td>(no longer needed)</td></tr>
+<tr><td><code>intend</code></td><td>(no longer needed)</td></tr>
+<tr><td><code>ask</code></td><td>(no longer needed)</td></tr>
+<tr><td><code>bot</code></td><td>removed (service construct)</td></tr>
+<tr><td><code>ocr</code></td><td>removed (service construct)</td></tr>
+<tr><td><code>try</code></td><td>use <code>try</code>/<code>catch</code> (same spelling, different semantics)</td></tr>
+<tr><td><code>recover</code></td><td><code>else</code></td></tr>
+<tr><td><code>retry</code></td><td>(no longer needed)</td></tr>
+<tr><td><code>done</code></td><td><code>end</code></td></tr>
+<tr><td><code>together</code></td><td><code>end</code></td></tr>
+</tbody></table>
+<h3 id="block-closers">Block closers</h3>
+<ul>
+<li><code>done</code> → <code>end</code></li>
+<li><code>together</code> → <code>end</code></li>
+<li><code>end</code> remains <code>end</code> (only closer in v2)</li>
+</ul>
+<h3 id="service-constructs-removed">Service constructs removed</h3>
+<p>The following v1 service-related constructs are removed and must be replaced with JavaScript packages or external services:</p>
+<ul>
+<li>SQL queries → use a database driver (e.g., <code>pg</code>, <code>mysql2</code>) directly</li>
+<li>WhatsApp integration → use the Twilio API or WhatsApp Business API</li>
+<li>OCR integration → use an OCR service like Tesseract via an HTTP wrapper</li>
+<li>Telegram integration → use the <code>node-telegram-bot-api</code> package</li>
+<li>Sessions/OAuth → use standard auth libraries (e.g., <code>passport</code>, <code>next-auth</code>)</li>
+</ul>
+<h3 id="type-system-changes">Type system changes</h3>
+<ul>
+<li>The type checker is now fully enforcing; previously accepted programs may now reject</li>
+<li><code>std/text.format</code> removed: use <code>&quot;{expr}&quot;</code> string interpolation instead</li>
+<li><code>ListPattern</code> no longer uses <code>.length</code>; use <code>count</code> instead</li>
+<li><code>Json</code> values need explicit casting or map member access</li>
+<li>Variant unit names compile to their name; variants with fields compile to <code>{ $kind: &quot;Name&quot;, fields }</code></li>
+<li><code>nothing</code> is now a proper type; <code>return nothing</code> exits early</li>
+</ul>
+<h3 id="module-resolution">Module resolution</h3>
+<ul>
+<li><code>std/&lt;name&gt;</code> now resolves to bundled <code>.d.pln</code> declarations</li>
+<li>Relative imports use <code>.js</code> extension</li>
+<li>No implicit global builtins; import what you need from <code>std/</code></li>
+</ul>
+<h3 id="render-element-blocks"><code>render</code>/<code>element</code> blocks</h3>
+<ul>
+<li>Lower to <code>createElement</code> calls from module scope (no JSX transform)</li>
+<li>No custom runtime plugin</li>
+<li>Import React (or another library) if you use render blocks</li>
+</ul>
+<h2 id="standard-library-changes">Standard Library Changes</h2>
+<p>The v2 standard library has 11 explicit modules:</p>
+<table><thead><tr><th>Module</th><th>Replaces v1 equivalent</th></tr></thead><tbody>
+<tr><td><code>std/io</code></td><td><code>print</code>, <code>read</code>, <code>readFile</code>, <code>write</code>, <code>writeFile</code></td></tr>
+<tr><td><code>std/text</code></td><td>String operations, interpolation <code>&quot;{expr}&quot;</code></td></tr>
+<tr><td><code>std/list</code></td><td>List operations: <code>cons</code>, <code>count</code>, <code>append</code>, <code>filter</code>, <code>map</code>, <code>reduce</code></td></tr>
+<tr><td><code>std/map</code></td><td>Map operations: <code>get</code>, <code>set</code>, <code>has</code>, <code>keys</code>, <code>values</code>, <code>delete</code></td></tr>
+<tr><td><code>std/math</code></td><td>Math operations: <code>min</code>, <code>max</code>, <code>abs</code>, <code>clamp</code>, <code>lerp</code>, <code>deg2rad</code>, <code>rad2deg</code></td></tr>
+<tr><td><code>std/json</code></td><td><code>parse</code>, <code>stringify</code></td></tr>
+<tr><td><code>std/time</code></td><td><code>now</code>, <code>format</code>, <code>parse</code>, <code>add</code>, <code>diff</code></td></tr>
+<tr><td><code>std/fs</code></td><td><code>mkdir</code>, <code>mkDir</code>, <code>readDir</code>, <code>readFile</code>, <code>writeFile</code>, <code>appendFile</code>, <code>exists</code></td></tr>
+<tr><td><code>std/http</code></td><td>Server creation, routing, request/response helpers</td></tr>
+<tr><td><code>std/test</code></td><td><code>assert</code>, <code>describe</code>, <code>it</code>, <code>beforeEach</code>, <code>afterEach</code></td></tr>
+<tr><td><code>std/dom</code></td><td>DOM utilities for browser environments</td></tr>
+</tbody></table>
+<p>v1 modules like <code>std/date</code> are consolidated into <code>std/time</code>.</p>
+<h2 id="cli-changes">CLI Changes</h2>
+<table><thead><tr><th>v1 command</th><th>v2 equivalent</th></tr></thead><tbody>
+<tr><td><code>plainscript</code></td><td>same (rebranded)</td></tr>
+<tr><td><code>plainscript run</code></td><td>same</td></tr>
+<tr><td><code>plainscript check</code></td><td>same</td></tr>
+<tr><td><code>plainscript build</code></td><td>same</td></tr>
+<tr><td><code>plainscript fmt</code></td><td>same</td></tr>
+<tr><td><code>plainscript new</code></td><td>same</td></tr>
+<tr><td><code>plainscript ir</code></td><td>same</td></tr>
+<tr><td><code>plainscript version</code></td><td>same</td></tr>
+<tr><td><code>plainscript help</code></td><td>same</td></tr>
+</tbody></table>
+<p>Options updated: <code>--quiet/--verbose/--check/--std-base</code>.</p>
+<h2 id="migration-checklist">Migration Checklist</h2>
+<ul>
+<li>[ ] Remove all keyword alias usage; use the one correct spelling</li>
+<li>[ ] Replace <code>done</code>/<code>together</code> with <code>end</code> to close blocks</li>
+<li>[ ] Replace <code>show</code>/<code>display</code>/<code>log</code> with <code>print</code> from <code>std/io</code></li>
+<li>[ ] Replace service constructs (SQL, WhatsApp, OCR, Telegram) with JS packages</li>
+<li>[ ] Update type annotations; the v2 checker is more strict</li>
+<li>[ ] Replace <code>std/text.format(...)</code> with <code>&quot;{expr}&quot;</code> interpolation</li>
+<li>[ ] Update <code>ListPattern</code> to use <code>count</code> instead of <code>.length</code></li>
+<li>[ ] Update <code>render</code>/<code>element</code> blocks to lower to <code>createElement</code> calls</li>
+<li>[ ] Update module imports: <code>std/&lt;name&gt;</code> resolves to declarations</li>
+<li>[ ] Run <code>npm test</code> to verify no regressions</li>
+<li>[ ] Consult <code>docs/SPEC.md</code> for the complete v2 language specification</li>
+</ul>
+<h2 id="where-to-find-help">Where to find help</h2>
+<ul>
+<li><code>docs/SPEC.md</code> — complete language specification</li>
+<li><code>docs/ARCHITECTURE.md</code> — compiler architecture and design decisions</li>
+<li><code>docs/AUDIT.md</code> — audit of v1 that motivated the rebuild</li>
+<li><code>docs/CLI.md</code> — CLI reference</li>
+<li><code>docs/INTEROP.md</code> — JavaScript ecosystem interop guide</li>
+<li>Run <code>plainscript check path/to/file.pln</code> to diagnose specific issues</li>
+</ul></div><aside class="toc"><div class="toc-title">On this page</div><a class="toc-h2" href="#conditional-syntax-update-after-the-2-0-0-snapshot">Conditional syntax update after the 2.0.0 snapshot</a><a class="toc-h2" href="#core-language-changes">Core Language Changes</a><a class="toc-h3" href="#keyword-aliases-removed">Keyword aliases removed</a><a class="toc-h3" href="#block-closers">Block closers</a><a class="toc-h3" href="#service-constructs-removed">Service constructs removed</a><a class="toc-h3" href="#type-system-changes">Type system changes</a><a class="toc-h3" href="#module-resolution">Module resolution</a><a class="toc-h3" href="#render-element-blocks">`render`/`element` blocks</a><a class="toc-h2" href="#standard-library-changes">Standard Library Changes</a><a class="toc-h2" href="#cli-changes">CLI Changes</a><a class="toc-h2" href="#migration-checklist">Migration Checklist</a><a class="toc-h2" href="#where-to-find-help">Where to find help</a></aside></article><footer class="page-footer"><span>PlainScript 2.0 documentation</span><a href="https://github.com/ayoistooslick/Plainscript/issues">Report a documentation issue ↗</a></footer></div></main></div><script src="app.js"></script></body></html>

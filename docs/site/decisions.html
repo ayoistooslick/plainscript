@@ -1,0 +1,95 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Decisions — PlainScript documentation."><title>Decisions · PlainScript</title><link rel="stylesheet" href="style.css"></head><body><div class="site-shell"><aside class="sidebar"><a class="brand" href="index.html"><span class="brand-mark">PS</span><span><span class="brand-name">PlainScript</span><span class="brand-meta">Language docs · 2.0</span></span></a><div class="nav-group"><div class="nav-label">Start here</div><a class="nav-link " href="index.html">PlainScript</a><a class="nav-link " href="cli.html">CLI reference</a><a class="nav-link " href="templates.html">Application templates</a></div><div class="nav-group"><div class="nav-label">Language</div><a class="nav-link " href="spec.html">Language specification</a><a class="nav-link " href="syntax-design.html">Syntax design</a></div><div class="nav-group"><div class="nav-label">Compiler</div><a class="nav-link " href="architecture.html">Compiler architecture</a><a class="nav-link " href="interop.html">JavaScript interoperability</a></div><div class="nav-group"><div class="nav-label">Guides</div><a class="nav-link " href="migration.html">Migration guide</a></div><div class="nav-group"><div class="nav-label">Project</div><a class="nav-link " href="progress.html">Engineering progress</a><a class="nav-link " href="audit.html">Audit</a><a class="nav-link active" href="decisions.html">Decisions</a></div><div class="sidebar-footer">Open source under MIT.<br><a href="https://github.com/ayoistooslick/Plainscript">View on GitHub ↗</a></div></aside><main class="main"><header class="topbar"><div class="search-wrap"><label class="search" aria-label="Search documentation"><span>⌕</span><input id="doc-search" type="search" placeholder="Search the docs…" autocomplete="off"><kbd>/</kbd></label><div id="search-results" class="search-results" role="listbox"></div></div><nav class="top-links"><a href="index.html">Docs</a><a href="https://github.com/ayoistooslick/Plainscript">GitHub ↗</a></nav></header><div class="content"><article class="page-layout"><div class="prose"><h1 id="architectural-decisions-plainscript-2-0">Architectural Decisions — PlainScript 2.0</h1>
+<p>This document captures the key design decisions behind the PlainScript 2.0 rebuild. It is intended to explain the &quot;why&quot; behind the language changes, not just the &quot;what&quot;.</p>
+<h2 id="1-breaking-release-not-incremental">1. Breaking release, not incremental</h2>
+<p><strong>Decision:</strong> PlainScript 2.0 is a ground-up rebuild with incompatible changes, not a v1.x increment.</p>
+<p><strong>Rationale:</strong> The v1 compiler had accumulated technical debt, inconsistent semantics, and an &quot;alias soup&quot; of keyword synonyms. A breaking release allows a clean-slate design with one spelling per concept, a consistent type system, and a well-defined compilation pipeline. The audit (docs/AUDIT.md) documents the v1 issues that motivated this decision.</p>
+<h2 id="2-one-spelling-per-concept">2. One spelling per concept</h2>
+<p><strong>Decision:</strong> Every language concept has exactly one spelling/construct. No synonyms, no optional syntax that changes meaning.</p>
+<p><strong>Examples:</strong></p>
+<ul>
+<li>Block closers: only <code>end</code>, no <code>done</code>, <code>together</code>, or combinations</li>
+<li>Variables: <code>let</code> for mutable, <code>const</code> for immutable (no <code>var</code>, no <code>set</code>)</li>
+<li>Conditions: <code>if</code>/<code>else if</code>/<code>else</code>; match guards also use <code>if</code></li>
+<li>Loops: <code>for … in</code> and <code>for i in a to b</code> (no <code>while</code> as a primary construct; <code>while</code> exists but is limited)</li>
+</ul>
+<p><strong>Rationale:</strong> Multiple spellings for the same concept cause confusion, bloat the compiler, and make the language harder to learn and teach. One spelling means one mental model, one parser rule, one codegen path.</p>
+<p><strong>Syntax update:</strong> The initial 2.0.0 grammar used <code>when</code>/<code>otherwise</code>. The current source tree replaces those branch introducers with the more familiar <code>if</code>/<code>else</code> vocabulary; <code>when</code> is also replaced by <code>if</code> in match guards. This is a hard source-syntax migration, not a permanent alias. The semantic AST and generated behavior are unchanged. See <code>docs/SYNTAX_DESIGN.md</code>; choose a new release version before publishing this breaking change.</p>
+<h2 id="3-javascript-as-the-compilation-target-not-typescript">3. JavaScript as the compilation target, not TypeScript</h2>
+<p><strong>Decision:</strong> The compiler emits plain ES modules for the JavaScript runtime. Types are erased at runtime.</p>
+<p><strong>Rationale:</strong></p>
+<ul>
+<li>The target audience is JavaScript developers and ecosystems.</li>
+<li>Emitting TypeScript would add a build step and dependency that most projects don&#39;t need.</li>
+<li>Source maps allow debugging in the original PlainScript source.</li>
+<li>Runtime type tests (<code>is</code>) and casts (<code>as</code>) exist where needed but types don&#39;t persist.</li>
+</ul>
+<h2 id="4-standard-library-as-explicit-focused-modules">4. Standard library as explicit, focused modules</h2>
+<p><strong>Decision:</strong> The standard library consists of 11 small, focused modules (<code>std/io</code>, <code>std/text</code>, <code>std/list</code>, <code>std/map</code>, <code>std/math</code>, <code>std/json</code>, <code>std/time</code>, <code>std/fs</code>, <code>std/http</code>, <code>std/test</code>, <code>std/dom</code>).</p>
+<p><strong>Rationale:</strong></p>
+<ul>
+<li>Each module does one thing well, following the Unix philosophy.</li>
+<li>No &quot;kitchen sink&quot; modules that try to do everything.</li>
+<li>Easy to audit, test, and individually replace.</li>
+<li>No hidden runtime magic — everything is explicit imports.</li>
+</ul>
+<h2 id="5-types-erased-at-runtime-except-is-and-as">5. Types erased at runtime, except <code>is</code> and <code>as</code></h2>
+<p><strong>Decision:</strong> Type information is used for compile-time checking and source map generation, but is erased before JavaScript emission. The <code>is</code> operator and <code>as</code> cast erode to runtime checks.</p>
+<p><strong>Rationale:</strong></p>
+<ul>
+<li>Keeps the generated JavaScript lean and compatible with any runtime.</li>
+<li>Avoids the performance overhead of reified types.</li>
+<li><code>is</code> provides controlled nominal checking where needed; other type checks rely on structural compatibility.</li>
+</ul>
+<h2 id="6-render-element-blocks-lower-to-createelement-not-jsx">6. <code>render</code>/<code>element</code> blocks lower to <code>createElement</code>, not JSX</h2>
+<p><strong>Decision:</strong> <code>render</code> blocks compile to <code>createElement(&quot;tag&quot;, {prop: value}, ...)</code> calls from module scope. No JSX transform, no custom runtime.</p>
+<p><strong>Rationale:</strong></p>
+<ul>
+<li>Avoids the complexity of a JSX pragma/runtime.</li>
+<li>The generated JavaScript is plain and debuggable via source maps.</li>
+<li>Users import React (or their UI library) and use the <code>createElement</code> API directly.</li>
+<li>The <code>render</code> keyword is reserved but only meaningful inside <code>render ... end</code> blocks.</li>
+</ul>
+<h2 id="7-one-es-module-per-source-file">7. One ES module per source file</h2>
+<p><strong>Decision:</strong> <code>build</code> emits a single <code>.js</code> file per <code>.pln</code> source file. No bundling, no combined output.</p>
+<p><strong>Rationale:</strong></p>
+<ul>
+<li>Simplifies the compiler (no dependency resolution or code deduplication in the emitter).</li>
+<li>Leverages the host bundler (Vite, webpack, Rollup, Next.js) for production builds.</li>
+<li>Makes source mapping straightforward: one source file → one output file.</li>
+<li>Developers can use <code>importmap</code>, ES module interop, or their bundler of choice.</li>
+</ul>
+<h2 id="8-no-intrinsic-methods-on-primitives-collections">8. No intrinsic methods on primitives/collections</h2>
+<p><strong>Decision:</strong> Functions like <code>list.map</code>, <code>map.reduce</code>, <code>text.format</code> are in the standard library, not on the values themselves.</p>
+<p><strong>Rationale:</strong></p>
+<ul>
+<li>Keeps the language runtime minimal.</li>
+<li>Enables pipeline (<code>|&gt;</code>) composition: <code>list |&gt; std/list/map ...</code> or <code>text |&gt; std/text/transform ...</code>.</li>
+<li>Matches the intent-oriented design: you describe <em>what</em> you want, not <em>how</em> to traverse a data structure.</li>
+</ul>
+<h2 id="9-async-async-function-declared-return-type-is-resolved-value">9. Async: <code>async function</code>, declared return type is resolved value</h2>
+<p><strong>Decision:</strong> <code>async function name&lt;T&gt;(a: T) -&gt; R ... end</code> — the declared return type <code>R</code> is the type of the resolved value. <code>await</code> inside functions suspends computation.</p>
+<p><strong>Rationale:</strong></p>
+<ul>
+<li>Clear separation between the suspension point (<code>await</code>) and the resolved type.</li>
+<li>The type system tracks the async flow through the HIR and emits proper async/await in the JavaScript output.</li>
+<li>Top-level <code>await</code> is allowed for module-level initialization.</li>
+</ul>
+<h2 id="10-diagnostics-code-range-ps1001-ps5001">10. Diagnostics code range: PS1001-PS5001</h2>
+<p><strong>Decision:</strong> Compiler diagnostic codes follow a structured range:</p>
+<ul>
+<li>PS1xxx: lexer</li>
+<li>PS2xxx: parser</li>
+<li>PS3xxx: types, names, control flow</li>
+<li>PS4xxx: modules, imports, cycles</li>
+<li>PS5xxx: internal, standard library</li>
+</ul>
+<p><strong>Rationale:</strong> Predictable diagnostic codes make it easier for tooling (LSP, IDE, formatter) to categorize and suppress specific warnings.</p>
+<p>---</p>
+<h2 id="related-documents">Related documents</h2>
+<ul>
+<li><code>docs/SPEC.md</code> — complete language specification</li>
+<li><code>docs/AUDIT.md</code> — v1 audit that motivated these decisions</li>
+<li><code>docs/ARCHITECTURE.md</code> — compiler architecture overview</li>
+<li><code>docs/CLI.md</code> — CLI command reference</li>
+<li><code>docs/INTEROP.md</code> — JavaScript interop guide</li>
+</ul></div><aside class="toc"><div class="toc-title">On this page</div><a class="toc-h2" href="#1-breaking-release-not-incremental">1. Breaking release, not incremental</a><a class="toc-h2" href="#2-one-spelling-per-concept">2. One spelling per concept</a><a class="toc-h2" href="#3-javascript-as-the-compilation-target-not-typescript">3. JavaScript as the compilation target, not TypeScript</a><a class="toc-h2" href="#4-standard-library-as-explicit-focused-modules">4. Standard library as explicit, focused modules</a><a class="toc-h2" href="#5-types-erased-at-runtime-except-is-and-as">5. Types erased at runtime, except `is` and `as`</a><a class="toc-h2" href="#6-render-element-blocks-lower-to-createelement-not-jsx">6. `render`/`element` blocks lower to `createElement`, not JSX</a><a class="toc-h2" href="#7-one-es-module-per-source-file">7. One ES module per source file</a><a class="toc-h2" href="#8-no-intrinsic-methods-on-primitives-collections">8. No intrinsic methods on primitives/collections</a><a class="toc-h2" href="#9-async-async-function-declared-return-type-is-resolved-value">9. Async: `async function`, declared return type is resolved value</a><a class="toc-h2" href="#10-diagnostics-code-range-ps1001-ps5001">10. Diagnostics code range: PS1001-PS5001</a><a class="toc-h2" href="#related-documents">Related documents</a></aside></article><footer class="page-footer"><span>PlainScript 2.0 documentation</span><a href="https://github.com/ayoistooslick/Plainscript/issues">Report a documentation issue ↗</a></footer></div></main></div><script src="app.js"></script></body></html>

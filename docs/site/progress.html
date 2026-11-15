@@ -1,0 +1,342 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Engineering progress — PlainScript documentation."><title>Engineering progress · PlainScript</title><link rel="stylesheet" href="style.css"></head><body><div class="site-shell"><aside class="sidebar"><a class="brand" href="index.html"><span class="brand-mark">PS</span><span><span class="brand-name">PlainScript</span><span class="brand-meta">Language docs · 2.0</span></span></a><div class="nav-group"><div class="nav-label">Start here</div><a class="nav-link " href="index.html">PlainScript</a><a class="nav-link " href="cli.html">CLI reference</a><a class="nav-link " href="templates.html">Application templates</a></div><div class="nav-group"><div class="nav-label">Language</div><a class="nav-link " href="spec.html">Language specification</a><a class="nav-link " href="syntax-design.html">Syntax design</a></div><div class="nav-group"><div class="nav-label">Compiler</div><a class="nav-link " href="architecture.html">Compiler architecture</a><a class="nav-link " href="interop.html">JavaScript interoperability</a></div><div class="nav-group"><div class="nav-label">Guides</div><a class="nav-link " href="migration.html">Migration guide</a></div><div class="nav-group"><div class="nav-label">Project</div><a class="nav-link active" href="progress.html">Engineering progress</a><a class="nav-link " href="audit.html">Audit</a><a class="nav-link " href="decisions.html">Decisions</a></div><div class="sidebar-footer">Open source under MIT.<br><a href="https://github.com/ayoistooslick/Plainscript">View on GitHub ↗</a></div></aside><main class="main"><header class="topbar"><div class="search-wrap"><label class="search" aria-label="Search documentation"><span>⌕</span><input id="doc-search" type="search" placeholder="Search the docs…" autocomplete="off"><kbd>/</kbd></label><div id="search-results" class="search-results" role="listbox"></div></div><nav class="top-links"><a href="index.html">Docs</a><a href="https://github.com/ayoistooslick/Plainscript">GitHub ↗</a></nav></header><div class="content"><article class="page-layout"><div class="prose"><h1 id="plainscript-2-0-engineering-progress">PlainScript 2.0 — Engineering Progress</h1>
+<p>Status vocabulary used below (no issue is &quot;fixed&quot; without every step):</p>
+<ul>
+<li><strong>Verified working</strong> — exercised by an automated test or a recorded command.</li>
+<li><strong>Reproduced defect</strong> — a failing case exists and is described.</li>
+<li><strong>Fix implemented</strong> — code changed and the case passes.</li>
+<li><strong>Regression tested</strong> — a test covers the case and the whole suite passes.</li>
+<li><strong>Integration verified</strong> — a real program (template/demo) compiles and runs.</li>
+<li><strong>Still unresolved</strong> — known, not done.</li>
+<li><strong>Intentionally unsupported</strong> — design decision, documented in <code>docs/SPEC.md</code>.</li>
+</ul>
+<p>Last verified: full suite <code>npm test</code> → <strong>167 tests, 167 pass, 0 fail</strong>; all 13 active <code>.pln</code> files in <code>demos/</code> and <code>templates/</code> pass <code>plainscript check</code>.</p>
+<p>---</p>
+<h2 id="1-symbolic-were-accepted-but-undefined-producing-false-ps3347">1. Symbolic <code>&amp;&amp;</code> / <code>||</code> were accepted but undefined, producing false <code>PS3347</code></h2>
+<p><strong>Class:</strong> parser/lexer defect (undocumented surface) + checker hole.</p>
+<p><strong>Reproduction:</strong></p>
+<pre><code>when true &amp;&amp; false
+    print(&quot;x&quot;)
+end</code></pre>
+<p>Before the fix this parsed (operator <code>&amp;&amp;</code>) and the checker reported <code>PS3347 Unknown operator &quot;&amp;&amp;&quot;</code> — a false diagnostic for syntax the parser accepted.</p>
+<table><thead><tr><th></th></tr></thead><tbody>
+<p><code>Parser.orExpression</code>/<code>andExpression</code> accepted both the keyword and punctuation spellings. <code>Checker.binaryType</code> only implemented <code>&#39;and&#39;</code>/<code>&#39;or&#39;</code>, so the punctuation form fell through to the <code>default</code> branch. <code>docs/SPEC.md</code> defines exactly two logical operators (<code>and</code>, <code>or</code>) and deliberately has one spelling per concept (<code>docs/DECISIONS.md</code> §2).</p>
+</tbody></table>
+<p><strong>Decision:</strong> remove the undocumented spelling rather than teach a second spelling to the checker/hir/codegen. Symbolic forms now fail in the lexer with <code>PS1001 Unexpected character</code>, which is honest: the syntax is not part of the language.</p>
+<p><strong>Changed:</strong> <code>src/lexer.js</code> (<code>OPERATORS</code>), <code>src/parser.js</code> (<code>orExpression</code>, <code>andExpression</code>).</p>
+<p><strong>Tests:</strong> <code>tests/grammar-matrix.test.js</code> → <code>symbolic logical operators are rejected: and/or are the only spellings</code>.</p>
+<p><strong>Status:</strong> Fix implemented, regression tested.</p>
+<p>---</p>
+<h2 id="2-ps3327-await-needs-a-promise-contract-confirmed-nothing-to-fix-there">2. <code>PS3327 &quot;await needs a Promise&quot;</code> — contract confirmed, nothing to fix there</h2>
+<p><strong>Class:</strong> expected behaviour (not a defect).</p>
+<p><code>docs/SPEC.md</code> §&quot;Async&quot; states: <em><code>await</code> requires a <code>Promise</code> operand (<code>PS3327</code>)</em>. <code>Checker.typeOf</code> case <code>Await</code> implements exactly that: a <code>promise</code> yields its value, <code>any</code> yields <code>any</code>, anything else reports <code>PS3327</code>.</p>
+<p>The earlier report of &quot;async type checking is broken&quot; came from probes that awaited a literal (<code>await 1</code>), which the language intentionally rejects, and from a genuine but different defect (issue 3).</p>
+<p><strong>Verified behaviours (all covered):</strong></p>
+<table><thead><tr><th>Case</th><th>Result</th></tr></thead><tbody>
+<tr><td><code>await</code> an async function call</td><td><code>Promise of number</code> → <code>number</code>, no diagnostic</td></tr>
+<tr><td><code>await</code> a declared <code>Promise of text</code></td><td><code>text</code>, no diagnostic</td></tr>
+<tr><td><code>await</code> a non-Promise inside <code>async</code></td><td><code>PS3327</code></td></tr>
+<tr><td><code>await</code> outside any async function</td><td><code>PS3406</code></td></tr>
+<tr><td>async function call type</td><td><code>Promise of</code> the declared/inferred result</td></tr>
+<tr><td>top-level <code>await</code></td><td>allowed (output is an ES module)</td></tr>
+</tbody></table>
+<p><strong>Tests:</strong> <code>tests/grammar-matrix.test.js</code> → the four <code>await</code>/Promise tests.</p>
+<p><strong>Status:</strong> Verified working; intentional rejection documented.</p>
+<p>---</p>
+<h2 id="3-async-lambdas-were-typed-as-non-async-and-returned-the-awaited-value">3. Async lambdas were typed as non-async and returned the awaited value</h2>
+<p><strong>Class:</strong> checker defect (HIR/codegen were already correct).</p>
+<p><strong>Reproduction (spec §4.3 promises this works):</strong></p>
+<pre><code>let later = async (value: number) =&gt; await work(value)</code></pre>
+<p>Before the fix:</p>
+<ol>
+<li><code>Checker.functionExpressionType</code> pushed a frame with <code>async: false</code> regardless of</li>
+<p><code>node.async</code>, so <code>await</code> inside an <code>async</code> lambda reported <code>PS3406</code>.</p>
+<li>The lambda&#39;s result type was the awaited value, not <code>Promise of</code> it, so the value</li>
+<p>did not satisfy <code>Promise of number</code> and did not type as a promise at call sites.</p>
+<li>An expression-bodied lambda pushed no frame at all, so <code>await</code> inside it was checked</li>
+<p>against the <em>enclosing</em> function.</p>
+</ol>
+<p><strong>Fix:</strong> <code>functionExpressionType</code> now always pushes its own frame with <code>async: Boolean(node.async)</code>, maintains <code>asyncDepth</code>, and wraps a non-<code>promise</code> result in <code>T.promiseOf</code> for async lambdas. <code>hir.js</code> already emitted <code>async</code> for lambdas containing <code>await</code>, so no codegen change was needed.</p>
+<p><strong>Tests:</strong> <code>tests/grammar-matrix.test.js</code> → <code>async lambdas may await, and their type is a Promise of the result</code>, <code>await inside a non-async lambda belongs to the lambda</code>, plus the runtime test that executes an async lambda and prints the awaited value.</p>
+<p><strong>Status:</strong> Fix implemented, regression tested, integration verified.</p>
+<p>---</p>
+<h2 id="4-parameter-annotations-the-earlier-regression-had-a-single-boring-cause">4. Parameter annotations — the earlier regression had a single, boring cause</h2>
+<p><strong>Class:</strong> not a language defect; an editing defect in the previous session, plus a diagnostic-quality observation.</p>
+<p>The previous session repeatedly tried to make parameter annotations optional and broke the suite. Root cause of <em>that</em> regression: the replacement removed <code>this.expectPunct(&#39;:&#39;)</code> but still called <code>this.typeExpression()</code> while positioned <strong>on</strong> the colon, so every typed parameter (<code>f(a: number)</code>) failed with <code>PS2008 Expected a type but found &quot;:&quot;</code>. It was never a deep design conflict.</p>
+<p><strong>Design answer (from the spec, not from TypeScript):</strong></p>
+<ul>
+<li>Function <strong>declarations</strong> require a parameter type (<code>docs/SPEC.md</code> §4.2, every example).</li>
+<p>There is no contextual type at a declaration, so an omitted annotation would silently become <code>any</code> and weaken the checker&#39;s contract.</p>
+<li><strong>Lambdas</strong> may omit annotations when an expected function type supplies them</li>
+<p>(<code>docs/SPEC.md</code> §4.3). <code>tryLambda</code> already parsed this, and <code>functionExpressionType</code> already applied contextual typing.</p>
+</ul>
+<p>Therefore the language was not changed. The requirement is now stated explicitly in <code>docs/SPEC.md</code>, and both sides of the rule are covered by tests:</p>
+<ul>
+<li><code>function identity(value) -&gt; number ... end</code> → <code>PS2001</code> (requires annotation).</li>
+<li><code>apply((value) =&gt; value * 2)</code> against <code>(number) -&gt; number</code> → no diagnostics.</li>
+</ul>
+<p><strong>Tests:</strong> <code>tests/grammar-matrix.test.js</code> → <code>function declaration parameters require a type annotation</code>, <code>lambda parameters may omit annotations when the expected type supplies them</code>.</p>
+<p><strong>Status:</strong> Verified working; intentionally unsupported case documented.</p>
+<p>---</p>
+<h2 id="5-nested-blocks-and-end-counts-parser-is-correct-earlier-failures-were-unbalanced-files">5. Nested blocks and <code>end</code> counts — parser is correct; earlier failures were unbalanced files</h2>
+<p><strong>Class:</strong> no defect found (after first-principles investigation).</p>
+<p>The parser rule is simple and was verified by reading <code>tryStatement</code>, <code>conditional</code>, <code>forLoop</code>, <code>matchStatement</code> and <code>blockBody</code>: every construct consumes exactly its own terminator, and <code>statementsUntil</code> stops <strong>without</strong> consuming the stopper. A top-level <code>end</code> is not a file terminator, so an extra <code>end</code> is correctly <code>PS2022</code>.</p>
+<p>The previous session&#39;s &quot;try/catch needs two <code>end</code>s&quot; and &quot;11 vs 2 ends&quot; reports were unbalanced samples: they contained one <code>end</code> more than constructs. The same mistake was present in the hand-written template client (<code>getCookie</code> had one <code>end</code> for a nested <code>when</code> <strong>and</strong> its <code>for</code>), which produced a cascading <code>PS2010 Unterminated function</code>. That was my file&#39;s bug, not the compiler&#39;s — the parser pointed at the right construct.</p>
+<p><strong>Regression matrix added (<code>tests/grammar-matrix.test.js</code>):</strong></p>
+<ul>
+<li>a function containing nested <code>when</code>, <code>otherwise when</code>, <code>otherwise</code>, <code>for</code>, nested</li>
+<p><code>for</code>, nested function, <code>match</code> with list patterns and a guard-free catch-all;</p>
+<li><code>try/catch/finally</code> inside a function, with an early <code>throw</code>;</li>
+<li>two sibling <code>try/catch</code> blocks followed by code that must still be checked;</li>
+<li>the composed program&#39;s runtime output.</li>
+</ul>
+<p><strong>Status:</strong> Verified working (constructs compose); no parser change required.</p>
+<p>---</p>
+<h2 id="6-template-files-were-written-against-syntax-the-language-never-had">6. Template files were written against syntax the language never had</h2>
+<p><strong>Class:</strong> documentation/template defect (not compiler).</p>
+<p><code>the former auth template/src/shared.pln</code> and <code>client.pln</code> contained invented syntax: <code>?User</code> (prefix optional), <code>createElement &quot;div&quot; with ...</code> (JSX-ish calls), backtick template literals, <code>element</code> used as a variable name (reserved keyword), <code>{ ... }</code> arrow bodies, and calls without parentheses. Result: 40+ parse errors; the module never compiled.</p>
+<p><strong>Fix:</strong> rewritten against the real grammar and the real stdlib declarations (<code>std/dom</code> exports only <code>createElement</code>/<code>mount</code>; text helpers live in <code>std/text</code>; <code>std/http</code> exports <code>fetch</code>). <code>shared.pln</code> now exports <code>PublicUser</code>/<code>AuthStatus</code> plus input/session types and uses postfix optional (<code>PublicUser?</code>).</p>
+<p><strong>Verified:</strong> <code>plainscript check</code> on <code>shared.pln</code>, <code>app.pln</code>, <code>client.pln</code> → all exit 0; <code>plainscript build</code> emits <code>client.js</code> with the type-only <code>./shared</code> import erased and no <code>passwordHash</code>/<code>salt</code>/<code>scrypt</code> identifiers.</p>
+<p><strong>Status:</strong> Fix implemented, integration verified (type-check + build; see limitation 3).</p>
+<p>---</p>
+<h2 id="7-authentication-backend-completed-and-exercised-end-to-end">7. Authentication backend completed and exercised end-to-end</h2>
+<p><strong>Class:</strong> application work (the stress test).</p>
+<p><code>the former auth template/src/app.pln</code> now implements:</p>
+<ul>
+<li><code>POST /api/auth/register</code> — validation (required fields, password ≥ 8), duplicate</li>
+<p>username/email → <code>409</code>, scrypt hash with a 16-byte random salt, session issued, <code>201</code>.</p>
+<li><code>POST /api/auth/login</code> — constant-time hash comparison (<code>timingSafeEqual</code>), generic</li>
+<p><code>401 invalid credentials</code> on either unknown user or wrong password.</p>
+<li><code>POST /api/auth/logout</code> — invalidates the session server-side.</li>
+<li><code>GET /api/auth/me</code> — resolves the session from the <code>session</code> cookie, <code>401</code> otherwise.</li>
+<li><code>GET /api/users</code> — public projection only (<code>id</code>, <code>username</code>, <code>email</code>).</li>
+<li><code>GET /health</code>, unknown routes <code>404</code>.</li>
+</ul>
+<p>Passwords are never stored or returned in plaintext; <code>StoredUser</code> is local to the server and the response projection is a separate <code>PublicUser</code> type.</p>
+<p><strong>Recorded curl run (server on port 3999):</strong></p>
+<table><thead><tr><th>Request</th><th>Result</th></tr></thead><tbody>
+<tr><td><code>GET /health</code></td><td><code>200 {&quot;status&quot;:&quot;ok&quot;,&quot;users&quot;:0}</code></td></tr>
+<tr><td><code>POST /api/auth/register</code> (ada)</td><td><code>201</code>, 48-hex session id, public user</td></tr>
+<tr><td><code>GET /api/auth/me</code> + cookie</td><td><code>200</code>, user object</td></tr>
+<tr><td>login, wrong password</td><td><code>401 invalid credentials</code></td></tr>
+<tr><td>login, correct password</td><td><code>200</code>, new session</td></tr>
+<tr><td>register duplicate username</td><td><code>409 username is already taken</code></td></tr>
+<tr><td>register 5-char password</td><td><code>400 password must be at least 8 characters</code></td></tr>
+<tr><td><code>GET /api/users</code></td><td><code>200</code>, no hash/salt fields</td></tr>
+<tr><td><code>POST /api/auth/logout</code> + cookie</td><td><code>200 {&quot;ok&quot;:true}</code></td></tr>
+<tr><td><code>GET /api/auth/me</code> with the old cookie</td><td><code>401 not authenticated</code></td></tr>
+<tr><td>unknown path</td><td><code>404</code></td></tr>
+</tbody></table>
+<p><strong>Status:</strong> Fix implemented, integration verified (HTTP flows).</p>
+<p>---</p>
+<h2 id="8-plainscript-new-template-integration">8. <code>plainscript new --template</code> integration</h2>
+<p><code>src/cli.js</code> now accepts <code>--template &lt;id&gt;</code> / <code>--template=&lt;id&gt;</code>, copies the bundled template tree (skipping <code>node_modules</code>, <code>dist</code>, <code>.plainscript</code>), rewrites <code>package.json</code> name/private/devDependency, and writes <code>.gitignore</code>. Unknown ids list what is available and exit <code>2</code>. <code>package.json</code> ships <code>templates/</code>; <code>docs/CLI.md</code> documents the flag.</p>
+<p><strong>Tests:</strong> <code>tests/cli.test.js</code> → <code>new --template scaffolds the bundled the former auth template project</code> (scaffolds, then runs <code>plainscript check</code> inside the new project), <code>new rejects an unknown template</code>.</p>
+<p><strong>Status:</strong> Fix implemented, regression tested.</p>
+<p>---</p>
+<h2 id="9-export-default-function-did-not-parse">9. <code>export default function</code> did not parse</h2>
+<p>Every JavaScript framework expects a default-exported function, and the language could not write one:</p>
+<pre><code>export default function handler(request: any) -&gt; any
+    ...
+end</code></pre>
+<p>It failed with <code>PS2001 Expected &quot;(&quot; but found &quot;handler&quot;</code>, because <code>exportDeclaration</code> parsed everything after <code>default</code> with <code>expression()</code>, where <code>function</code> is not an expression.</p>
+<p><strong>Fix:</strong> <code>exportDeclaration</code> routes <code>default function</code> and <code>default async function</code> to <code>functionDeclaration({ defaultExport: true })</code>. A default-exported function may omit its name; every other declaration still requires one (<code>PS2002</code>). The checker hoists the name when present, records the signature as <code>defaultExportType</code>, and exposes it through the import surface, so a PlainScript default import is fully typed. HIR carries <code>defaultExport</code>; codegen emits <code>export default function name(params) {}</code> (or <code>export default function (params) {}</code>), a real declaration rather than a lambda.</p>
+<p><strong>Verified:</strong> named default export imported from a second module, anonymous default export, and self-recursion (<code>sumTo(4)</code> → <code>10</code>).</p>
+<h2 id="10-new-was-missing-so-class-based-apis-were-unreachable">10. <code>new</code> was missing, so class-based APIs were unreachable</h2>
+<p><code>new Date()</code>, <code>new DatabaseSync(path)</code> and <code>new Response(stream, ...)</code> are how most npm APIs are constructed. <code>new</code> was not a reserved word: <code>new URL(...)</code> parsed as a call to an undefined name.</p>
+<p><strong>Fix:</strong> <code>new</code> is reserved; <code>unaryExpression</code> parses <code>new &lt;postfix expression&gt;</code> so the call and its arguments are kept, HIR has a <code>New</code> node, and codegen writes <code>new Callee(args)</code> / <code>new Callee()</code>. The checker checks the callee and types the result <code>any</code>, because constructor signatures belong to the JavaScript side.</p>
+<p><strong>Verified:</strong> <code>new URL(...).pathname</code>, <code>new DatabaseSync(&quot;:memory:&quot;)</code>, <code>new ReadableStream({ start: ... })</code>, <code>new Response(stream, { headers: ... })</code>.</p>
+<h2 id="11-std-http-buffered-every-response-so-streaming-was-impossible">11. <code>std/http</code> buffered every response, so streaming was impossible</h2>
+<p>The real-time application found a library defect rather than a language one: <code>serve</code> ran <code>await webResponse.arrayBuffer()</code> before <code>response.end(...)</code>. A response whose body stays open (Server-Sent Events) therefore never delivered a byte, and large responses were held entirely in memory.</p>
+<p><strong>Fix:</strong> <code>serve</code> writes and flushes the status/headers, then pumps <code>webResponse.body.getReader()</code> into the socket, finishing on <code>done</code>, on client disconnect (<code>response.on(&#39;close&#39;)</code> → <code>reader.cancel()</code>), or on a stream error. <code>HEAD</code> and bodyless responses still end immediately.</p>
+<p><strong>Verified:</strong> <code>curl -N /events</code> receives <code>hello</code>, <code>presence</code>, one <code>tick</code> per second, and a published <code>notice</code>. <code>tests/integration-apps.test.js</code> reports <code>TIMEOUT</code> if the stream is buffered again, so the fix cannot silently regress.</p>
+<h2 id="12-two-new-stress-applications">12. Two new stress applications</h2>
+<h3 id="demos-database-sqlite-backed-json-api"><code>demos/database</code> — SQLite-backed JSON API</h3>
+<p><code>node:sqlite</code> through <code>new DatabaseSync</code>, schema creation at startup, one prepared statement per operation with bound parameters (<code>?</code>) — there is no SQL string interpolation anywhere — and rows shaped into a <code>Task</code> record by <code>toTask</code> instead of leaking driver rows into the API.</p>
+<p>Observed with <code>curl</code> (port <code>4401</code>, <code>DB_PATH=/tmp/tasks.db</code>):</p>
+<table><thead><tr><th>Request</th><th>Observed</th></tr></thead><tbody>
+<tr><td><code>GET /health</code></td><td><code>{&quot;status&quot;:&quot;ok&quot;,&quot;tasks&quot;:0}</code> <code>200</code></td></tr>
+<tr><td><code>POST /tasks {&quot;title&quot;:&quot;first&quot;}</code></td><td><code>{&quot;id&quot;:1,&quot;title&quot;:&quot;first&quot;,&quot;done&quot;:false}</code> <code>201</code></td></tr>
+<tr><td><code>POST /tasks {&quot;title&quot;:&quot;second&quot;,&quot;done&quot;:true}</code></td><td><code>{&quot;id&quot;:2,...,&quot;done&quot;:true}</code> <code>201</code></td></tr>
+<tr><td><code>GET /tasks</code></td><td>both rows, ordered by id, <code>200</code></td></tr>
+<tr><td><code>GET /tasks/1</code></td><td><code>{&quot;id&quot;:1,&quot;title&quot;:&quot;first&quot;,&quot;done&quot;:false}</code> <code>200</code></td></tr>
+<tr><td><code>PUT /tasks/1</code></td><td><code>{&quot;id&quot;:1,&quot;title&quot;:&quot;first edited&quot;,&quot;done&quot;:true}</code> <code>200</code></td></tr>
+<tr><td><code>POST /tasks {}</code></td><td><code>{&quot;error&quot;:&quot;title is required&quot;}</code> <code>400</code></td></tr>
+<tr><td><code>GET /tasks/99</code></td><td><code>{&quot;error&quot;:&quot;task not found&quot;}</code> <code>404</code></td></tr>
+<tr><td>restart, <code>GET /tasks</code></td><td>both rows, including the edit — data persisted in the file</td></tr>
+<tr><td><code>DELETE /tasks/1</code></td><td><code>{&quot;deleted&quot;:true}</code> <code>200</code>; health count → <code>1</code></td></tr>
+</tbody></table>
+<p>Filtering and pagination use the same prepared-statement path: the WHERE/<code>limit</code>/<code>offset</code> shape is assembled, every value stays a bound parameter, and the parameters are spread into <code>statement.all(...params)</code> (second run, fresh file):</p>
+<table><thead><tr><th>Request</th><th>Observed</th></tr></thead><tbody>
+<tr><td><code>GET /tasks</code></td><td><code>alpha</code> (false), <code>beta</code> (true), <code>gamma</code> (false)</td></tr>
+<tr><td><code>GET /tasks?done=true</code></td><td><code>[{&quot;id&quot;:2,&quot;title&quot;:&quot;beta&quot;,&quot;done&quot;:true}]</code></td></tr>
+<tr><td><code>GET /tasks?done=false</code></td><td><code>alpha</code>, <code>gamma</code></td></tr>
+<tr><td><code>GET /tasks?limit=2&amp;offset=2</code></td><td><code>[{&quot;id&quot;:3,&quot;title&quot;:&quot;gamma&quot;,&quot;done&quot;:false}]</code></td></tr>
+<tr><td><code>GET /tasks?done=false&amp;limit=1&amp;offset=1</code></td><td><code>[{&quot;id&quot;:3,&quot;title&quot;:&quot;gamma&quot;,&quot;done&quot;:false}]</code></td></tr>
+</tbody></table>
+<h3 id="demos-realtime-server-sent-events-broadcast"><code>demos/realtime</code> — Server-Sent Events broadcast</h3>
+<p>A <code>ReadableStream</code> subscriber list, an <code>event: …\ndata: …\n\n</code> framing function, a per-second <code>setInterval</code> heartbeat, and <code>POST /publish?event=…&amp;data=…</code> to push to every open connection. Broadcasts survive closed connections: <code>enqueue</code> failures are caught and the dead controller is dropped instead of breaking the loop.</p>
+<p>Observed capture (3s subscription, one publish in the middle):</p>
+<pre><code>event: hello
+data: connected
+
+event: presence
+data: {&quot;subscribers&quot;:1}
+
+event: tick
+data: {&quot;tick&quot;:1,&quot;uptime&quot;:1002,&quot;subscribers&quot;:1}
+
+event: notice
+data: hello
+
+event: tick
+data: {&quot;tick&quot;:2,&quot;uptime&quot;:2002,&quot;subscribers&quot;:1}</code></pre>
+<h2 id="13-probe-matrix-what-else-was-checked-this-pass">13. Probe matrix — what else was checked this pass</h2>
+<p>Compiled <strong>and executed</strong> successfully: generic declarations and calls, <code>map</code> iteration, destructuring <code>for { id, title } in rows</code>, record/list spread, <code>?.</code> + <code>??</code>, match guards, union narrowing with <code>is</code>, <code>while</code>/<code>break</code>/<code>continue</code>, re-exports, <code>Promise.all</code>, async functions returning unions, <code>try</code>/<code>catch</code>, nested generics, function-type parameters, index assignment on maps, optional list elements, boolean <code>match</code>, recursive variant types (<code>type Tree = Leaf(value: number) or Node(left: Tree, right: Tree)</code> with recursive <code>total</code>), and per-iteration closure capture in <code>for</code> loops (<code>10, 11, 12</code>).</p>
+<p>Still unsupported, and now documented as deliberate in <code>docs/SPEC.md</code>: computed record keys <code>{ [k]: v }</code>, tuple types <code>(number, text)</code>, <code>readonly</code> field modifiers, <code>keyof</code>/<code>typeof</code> type queries.</p>
+<p>---</p>
+<h2 id="14-plainscript-run-leaked-the-program-it-started">14. <code>plainscript run</code> leaked the program it started</h2>
+<p>Found while running the framework demo: stopping the CLI (<code>kill &lt;pid&gt;</code>, Ctrl+C, a supervisor restart) left the compiled server child alive, still holding its port. Repeated test runs accumulated orphaned listeners on ports <code>4401</code>, <code>4403</code> and <code>4501</code>.</p>
+<p><strong>Cause:</strong> <code>commandRun</code> used <code>spawnSync</code>, which blocks the event loop, so no handler could forward a signal, and the runtime child is not in the CLI&#39;s process group.</p>
+<p><strong>Fix:</strong> <code>run</code> now starts the program with <code>spawn</code> and forwards <code>SIGINT</code>/<code>SIGTERM</code> to it, resolving with the child&#39;s exit status and removing the handlers afterwards. <code>test</code> awaits <code>run</code>, and the CLI entry point resolves a promise from <code>main</code> so asynchronous commands set <code>process.exitCode</code> correctly.</p>
+<p><strong>Verified:</strong> <code>tests/cli.test.js</code> — <code>run forwards termination to the program it started</code> starts a long-lived program through the CLI, sends <code>SIGTERM</code> to the CLI, and fails unless the program PID is gone.</p>
+<p>---</p>
+<h2 id="15-frontend-and-framework-integrations-re-verified">15. Frontend and framework integrations re-verified</h2>
+<p>After <code>export default function</code>, <code>new</code> and the CLI signal fix landed, the existing integration demos were rebuilt from clean dependency installs:</p>
+<table><thead><tr><th>Demo</th><th>Command</th><th>Result</th></tr></thead><tbody>
+<tr><td><code>demos/react</code> (React 19 + Vite 6)</td><td><code>npm ci &amp;&amp; npm run build</code></td><td><code>plainscript build</code> emitted <code>src/generated/App.js</code>; Vite transformed 25 modules into <code>dist/</code> (224 kB JS, 0.49 kB CSS).</td></tr>
+<tr><td><code>demos/next</code> (Next.js 15 App Router)</td><td><code>npm ci &amp;&amp; npm run build</code></td><td><code>Compiled successfully in 4.9s</code>; <code>/</code> prerendered as static content (123 B page, 103 kB first load).</td></tr>
+<tr><td><code>demos/express</code> (Express 4)</td><td><code>npm ci &amp;&amp; plainscript run src/main.pln</code></td><td><code>/</code> → <code>{&quot;ok&quot;:true,&quot;hits&quot;:2,&quot;framework&quot;:&quot;express&quot;}</code> <code>200</code> (counter increments per request), <code>/users/42</code> → <code>{&quot;id&quot;:&quot;42&quot;}</code> <code>200</code>, unknown path <code>404</code>.</td></tr>
+<tr><td><code>plainscript run</code> shutdown</td><td><code>kill &lt;cli pid&gt;</code> with the Express demo running</td><td>port <code>4501</code> released and the program process gone, confirming the signal fix live.</td></tr>
+</tbody></table>
+<p>Not exercised this pass: browser rendering of <code>demos/react</code> and <code>demos/fullstack</code> (no headless browser run), so the <code>render</code> output is verified by build and prerender, not by DOM assertions.</p>
+<p>---</p>
+<h2 id="16-libraries-could-not-describe-their-types-build-declarations">16. Libraries could not describe their types: <code>build --declarations</code></h2>
+<p>A PlainScript library could be compiled, but a consumer had no way to use it without the sources: <code>.d.pln</code> files existed only as hand-written stubs under <code>stdlib/</code>.</p>
+<p><strong>Fix:</strong> <code>plainscript build --declarations</code> now emits <code>&lt;name&gt;.d.pln</code> beside every <code>&lt;name&gt;.js</code> (<code>src/declarations.js</code>). The file is generated from the checked module, not from source text:</p>
+<ul>
+<li>exported type declarations keep their written form (<code>export type Task</code> with fields,</li>
+<p><code>export type Status = Draft or Published(views: number)</code>);</p>
+<li>every type declaration is emitted, but only exported ones carry <code>export</code>, so a private</li>
+<p>type used by a public signature (<code>type Entry = { task: Task }</code>) stays in scope without becoming API;</p>
+<li>exported functions become <code>export declare function name(params) -&gt; R</code>; the return type</li>
+<p>comes from the written annotation when there is one, otherwise from the checker&#39;s inferred type;</p>
+<li>exported values become <code>export declare const NAME: T</code>;</li>
+<li>re-exports and <code>export { local as public }</code> are preserved;</li>
+<li>only imports actually named by the emitted signatures are kept, so the declaration is</li>
+<p>self-contained.</p>
+</ul>
+<p>The resolver now understands the other half: a relative <code>./lib/x.js</code> import reads <code>./lib/x.d.pln</code> for its types and keeps the runtime specifier unchanged (<code>src/modules.js</code>, <code>PS4005</code> when a <code>.js</code> import has no declaration). Declaration modules are checked for their exports but never emitted or written.</p>
+<p><strong>Verified:</strong> <code>tests/declarations.test.js</code> builds a two-module library into <code>dist/</code>, then a consumer imports <code>./dist/store.js</code> and <code>./dist/models.js</code>, type-checks, and runs with output <code>published 3</code> / <code>draft</code> / <code>published 7</code> / <code>published 9</code>. A wrong argument or result type is rejected through the declaration (<code>PS3343</code>, <code>PS3311</code>), and <code>build</code> without the flag writes no <code>.d.pln</code>.</p>
+<h2 id="17-type-declarations-could-not-name-imported-types">17. Type declarations could not name imported types</h2>
+<p>The first declaration build failed on <code>type Entry = { task: Task }</code> with <code>PS3201 Unknown type &quot;Task&quot;</code>, even though <code>Task</code> was imported. <code>run()</code> resolved type declarations before <code>hoist()</code> registered imports, so only local types were visible during type resolution.</p>
+<p><strong>Fix:</strong> <code>collectTypes → hoist → resolveAllTypes → checkStatements</code>. Imports and function signatures are hoisted first; every other phase is unchanged, and the existing suite passes without modification.</p>
+<p><strong>Verified:</strong> <code>tests/declarations.test.js</code> — <code>type declarations may name types imported from another module</code>.</p>
+<h2 id="18-imported-variant-constructors-were-unknown-and-matching-them-was-wrong">18. Imported variant constructors were unknown, and matching them was wrong</h2>
+<p>The round-trip consumer exposed two runtime defects at once: <code>describe(publish(3))</code> returned <code>&quot;draft&quot;</code>.</p>
+<p>Emitted code showed why:</p>
+<pre><code>if (true) { const Draft = $match1; return &quot;draft&quot;; }        // unit arm matched everything
+const views = $match1[&quot;field0&quot;];                            // positional, not the field name</code></pre>
+<p>Variant metadata (unit vs fields, field names) lived only in the declaring module&#39;s <code>variantCtors</code>, so a module that imported the <em>type</em> matched it structurally and positionally.</p>
+<p><strong>Fix:</strong> importing a type that resolves to variants now registers those constructors in the importing module (<code>registerImportedVariants</code>). Construction (<code>Published(3)</code>), unit values (<code>Draft</code>), pattern field names (<code>views</code>) and unit-arm discrimination all use the same metadata as the declaring module, so the runtime representation is consistent across the boundary.</p>
+<p><strong>Verified:</strong> the consumer test calls <code>describe(publish(3))</code>, <code>describe(draft())</code> and <code>describe(Published(7))</code>; the last one constructs the variant in the consumer, not the library. Before the fix the first printed <code>draft</code> and the third did not compile.</p>
+<p>---</p>
+<h2 id="19-installed-packages-were-untyped-bare-imports-now-resolve-declarations">19. Installed packages were untyped: bare imports now resolve declarations</h2>
+<p>Declarations worked for relative imports of built JavaScript, but an installed library was reached through a bare specifier (<code>import { Task } from &quot;my-lib&quot;</code>), which went straight to the runtime and left every import <code>any</code>.</p>
+<p><strong>Fix:</strong> <code>Compiler.resolvePackageImport</code> finds the package the way Node does (walking up to <code>node_modules</code>, including scoped names and subpaths) and then locates the declaration:</p>
+<ol>
+<li>the <code>types</code> condition of the matching <code>exports</code> entry for that subpath;</li>
+<li>otherwise the package&#39;s <code>types</code> or <code>typings</code> field;</li>
+<li>otherwise <code>.d.pln</code> next to the resolved runtime entry (<code>main</code>, <code>module</code>, <code>exports.import</code></li>
+<p>or <code>index.js</code>).</p>
+</ol>
+<p>When a declaration is found, the module is checked from it and the emitted import keeps the bare specifier unchanged, so the host resolves the runtime exactly as before. A package of plain JavaScript with no declaration still imports untyped (no <code>PS4005</code>), which is what keeps <code>express</code> and friends working.</p>
+<p><strong>Verified:</strong> <code>tests/packages.test.js</code> — <code>exports</code> conditions with <code>types</code>, a package-level <code>types</code> field with <code>main</code>, a subpath export (<code>kit/extra</code>), a scoped package (<code>@acme/tools</code>), and an undeclared JavaScript package. The typed cases run and reject a wrong argument (<code>PS3343</code>); the untyped case runs but is not checked.</p>
+<p>---</p>
+<h2 id="20-publishing-still-needed-hand-written-package-metadata">20. Publishing still needed hand-written package metadata</h2>
+<p>Declarations and runtime were written, but an installed package would only resolve its <code>./dist/index.js</code> entry; <code>types</code> and an <code>exports</code> map had to be added by hand before <code>import { Task } from &quot;my-lib&quot;</code> was typed.</p>
+<p><strong>Fix:</strong> <code>build --declarations</code> now wires the package entry in <code>src/cli.js</code> (<code>wirePackageTypes</code>). It picks the entry the manifest already names, otherwise <code>dist/index.js</code>, otherwise the single module nothing else in the build imports, and sets:</p>
+<pre><code>&quot;types&quot;: &quot;./dist/index.d.pln&quot;,
+&quot;exports&quot;: { &quot;.&quot;: { &quot;types&quot;: &quot;./dist/index.d.pln&quot;, &quot;import&quot;: &quot;./dist/index.js&quot; } }</code></pre>
+<p>Existing <code>exports</code> entries and conditions are preserved (<code>.&quot;</code> is updated in place, other subpaths are copied through, a declared runtime path is kept). A build with several independent entry modules, or a project with no <code>package.json</code>, is left untouched instead of being guessed at.</p>
+<p><strong>Verified:</strong> <code>tests/package-wiring.test.js</code> — fresh manifest wiring, preservation of <code>./extra</code> and <code>./package.json</code> subpaths, an existing <code>&quot;.&quot;</code> entry keeping its runtime and <code>default</code> condition while gaining <code>types</code>, an ambiguous two-root build leaving <code>package.json</code> byte-identical, no manifest created for a plain directory, and an end-to-end consumer that installs the wired package through a <code>node_modules</code> symlink: <code>makeTask(&quot;wired&quot;)</code> runs and <code>makeTask(1)</code> is rejected with <code>PS3343</code>.</p>
+<p>---</p>
+<h2 id="test-inventory">Test inventory</h2>
+<table><thead><tr><th>Area</th><th>File</th><th>Count</th></tr></thead><tbody>
+<tr><td>Lexer</td><td><code>tests/lexer.test.js</code></td><td>existing</td></tr>
+<tr><td>Parser</td><td><code>tests/parser.test.js</code></td><td>existing</td></tr>
+<tr><td>Checker</td><td><code>tests/checker.test.js</code></td><td>existing</td></tr>
+<tr><td>Compiler/emitter/modules</td><td><code>tests/compiler.test.js</code></td><td>existing</td></tr>
+<tr><td>Runtime</td><td><code>tests/runtime.test.js</code></td><td>existing</td></tr>
+<tr><td>Formatter</td><td><code>tests/formatter.test.js</code></td><td>existing</td></tr>
+<tr><td>Interop</td><td><code>tests/interop.test.js</code></td><td>existing</td></tr>
+<tr><td>CLI</td><td><code>tests/cli.test.js</code></td><td>existing + 3 new</td></tr>
+<tr><td>Grammar matrix (new)</td><td><code>tests/grammar-matrix.test.js</code></td><td>17 new</td></tr>
+<tr><td>Application integration (new)</td><td><code>tests/integration-apps.test.js</code></td><td>2 new</td></tr>
+<tr><td>Declarations (new)</td><td><code>tests/declarations.test.js</code></td><td>5 new</td></tr>
+<tr><td>Packages (new)</td><td><code>tests/packages.test.js</code></td><td>5 new</td></tr>
+<tr><td>Package wiring (new)</td><td><code>tests/package-wiring.test.js</code></td><td>6 new</td></tr>
+<tr><td>Package</td><td><code>tests/package.test.js</code></td><td>existing</td></tr>
+<tr><td><strong>Total</strong></td><td></td><td><strong>165, all passing</strong></td></tr>
+</tbody></table>
+<p>No existing test was modified, skipped, or weakened.</p>
+<p>---</p>
+<h2 id="files-changed-in-this-pass">Files changed in this pass</h2>
+<ul>
+<li><code>src/lexer.js</code> — removed <code>&amp;&amp;</code>/<code>||</code> from <code>OPERATORS</code>; <code>new</code> is a keyword.</li>
+<li><code>src/parser.js</code> — <code>orExpression</code>/<code>andExpression</code> accept only <code>or</code>/<code>and</code>;</li>
+<p><code>export default function</code>; <code>new</code> expressions.</p>
+<li><code>src/hir.js</code> — <code>New</code> node; <code>defaultExport</code> on function declarations.</li>
+<li><code>src/codegen.js</code> — <code>new Callee(...)</code>; <code>export default function</code> declarations.</li>
+<li><code>stdlib/http.js</code> — stream response bodies instead of buffering them.</li>
+<li><code>src/cli.js</code> — <code>run</code> forwards <code>SIGINT</code>/<code>SIGTERM</code>; async plumbing; <code>build --declarations</code></li>
+<p>and package entry wiring.</p>
+<li><code>src/declarations.js</code> — <code>.d.pln</code> emitter (new).</li>
+<li><code>src/modules.js</code> — resolves <code>.d.pln</code> beside built <code>.js</code> and inside installed packages;</li>
+<p>never emits declaration modules.</p>
+<li><code>src/checker.js</code> — imports hoisted before type resolution; imported variant constructors;</li>
+<p><code>export default name</code> takes the named value&#39;s type.</p>
+<li><code>tests/declarations.test.js</code> — five declaration/round-trip tests (new).</li>
+<li><code>tests/packages.test.js</code> — five package-resolution tests (new).</li>
+<li><code>tests/package-wiring.test.js</code> — six wiring tests, including a symlinked consumer (new).</li>
+<li><code>demos/database/</code> — SQLite-backed CRUD API (new).</li>
+<li><code>demos/realtime/</code> — Server-Sent Events broadcast (new).</li>
+<li><code>tests/integration-apps.test.js</code> — SQLite and SSE regression tests (new).</li>
+<li><code>src/checker.js</code> — async lambda frame and <code>Promise of</code> result type.</li>
+<li><code>src/cli.js</code> — <code>--template</code> scaffolding, <code>copyTemplate</code>, help text.</li>
+<li><code>package.json</code> — <code>files</code> includes <code>templates</code>.</li>
+<li><code>the former auth template/src/app.pln</code> — real auth API.</li>
+<li><code>the former auth template/src/client.pln</code> — rewritten to valid PlainScript.</li>
+<li><code>the former auth template/src/shared.pln</code> — valid optional types, public projection.</li>
+<li><code>the former auth template/package.json</code> — publishable script/name shape.</li>
+<li><code>tests/grammar-matrix.test.js</code> — new matrix.</li>
+<li><code>tests/cli.test.js</code> — two template tests.</li>
+<li><code>docs/SPEC.md</code> — parameter annotations, async lambda type, <code>and</code>/<code>or</code> only,</li>
+<p><code>export default function</code>, <code>new</code>, reserved words, deliberate type omissions.</p>
+<li><code>docs/CLI.md</code> — <code>--template</code> documentation.</li>
+<li><code>docs/PROGRESS.md</code> — this file.</li>
+</ul>
+<p>---</p>
+<h2 id="remaining-work-known-not-claimed-done">Remaining work (known, not claimed done)</h2>
+<ol>
+<li><strong>Declaration documentation.</strong> Generated <code>.d.pln</code> files drop source comments, so a</li>
+<p>package&#39;s API documentation does not travel with its types. Multi-entry libraries also need their <code>exports</code> subpaths wired by hand; only the <code>&quot;.&quot;</code> entry is inferred.</p>
+<li><strong>Browser rendering not re-exercised.</strong> <code>demos/react</code> and <code>demos/next</code> build (and Next</li>
+<p>prerenders <code>/</code>), and <code>demos/express</code> answers real requests, but no headless browser ran against the rendered DOM this pass, and <code>demos/fullstack</code>&#39;s client flow was not re-run.</p>
+<li><strong>Advanced type system.</strong> Generic constraints, default type parameters,</li>
+<p>conditional/mapped types, <code>keyof</code>/<code>typeof</code> queries, and distinct tuple types are absent. The checker supports structural records, unions, generics with inference, narrowing and exhaustiveness only. Spec documents the current subset.</p>
+<li><strong>Browser client is type-checked and compiled, not executed.</strong> No headless browser</li>
+<p>run was performed against <code>client.pln</code>; only <code>check</code>/<code>build</code> and inspection of the emitted module. A DOM harness test is outstanding.</p>
+<li><strong>Auth template persistence.</strong> The store is in memory (documented in the file header);</li>
+<p>restarting the server drops users and sessions. <code>Session.expiresAt</code> exists as a type but session expiry is not enforced yet.</p>
+<li><strong>Language server / editor tooling.</strong> No LSP, go-to-definition, rename or hover. The</li>
+<p>VS Code package workflow was updated for v2 but there is no server implementation.</p>
+<li><strong>Compiler performance.</strong> No incremental compilation or module-graph cache; no</li>
+<p>measurement of large-project build time.</p>
+<li><strong>Documentation website</strong> still needs to mirror the SPEC/CLI changes above.</li>
+</ol>
+<p>---</p>
+<h2 id="21-conditional-vocabulary-aligned-with-familiar-control-flow">21. Conditional vocabulary aligned with familiar control flow</h2>
+<p><strong>Design:</strong> Adopt <code>if</code> / <code>else if</code> / <code>else</code> for conditionals and <code>if</code> for match guards. Keep <code>end</code> as the explicit block terminator. This is a hard source-syntax change, not a dual-keyword alias period; the reasons and comparison examples are in <a href="syntax-design.html"><code>docs/SYNTAX_DESIGN.md</code></a>.</p>
+<p><strong>Implementation:</strong> <code>src/lexer.js</code> reserves the new words and keeps retired <code>when</code> and <code>otherwise</code> reserved solely so stale source fails as syntax. <code>src/parser.js</code> maps new conditional and match-guard spellings to the existing AST nodes, so checker narrowing, scope, return analysis, HIR and generated JavaScript retain their prior semantics. <code>src/formatter.js</code>, tests, active demos/templates, README, SPEC, migration guide and decision notes were updated. The stale <code>match ... otherwise</code> spec example was replaced with the implemented wildcard arm <code>case _</code>.</p>
+<p><strong>Verified:</strong> <code>npm test</code> → <strong>167/167 pass</strong>. Every active <code>.pln</code> file in <code>demos/</code> and <code>templates/</code> → <code>plainscript check</code> passed (13 files). Tests cover new keyword tokens, nested <code>else if</code> formatting, match guards, old-syntax rejection, checker behavior and runtime execution. <code>npm pack --dry-run</code> includes the design document and completes without publishing.</p>
+<p><strong>Compatibility/release note:</strong> Existing programs using <code>when</code> / <code>otherwise</code> as branches must be migrated. The package version remains <code>2.0.0</code>; selecting a release number for this breaking syntax update is still required before any npm release. No package was published.</p></div><aside class="toc"><div class="toc-title">On this page</div><a class="toc-h2" href="#1-symbolic-were-accepted-but-undefined-producing-false-ps3347">1. Symbolic `&amp;&amp;` / `||` were accepted but undefined, producing false `PS3347`</a><a class="toc-h2" href="#2-ps3327-await-needs-a-promise-contract-confirmed-nothing-to-fix-there">2. `PS3327 &quot;await needs a Promise&quot;` — contract confirmed, nothing to fix there</a><a class="toc-h2" href="#3-async-lambdas-were-typed-as-non-async-and-returned-the-awaited-value">3. Async lambdas were typed as non-async and returned the awaited value</a><a class="toc-h2" href="#4-parameter-annotations-the-earlier-regression-had-a-single-boring-cause">4. Parameter annotations — the earlier regression had a single, boring cause</a><a class="toc-h2" href="#5-nested-blocks-and-end-counts-parser-is-correct-earlier-failures-were-unbalanced-files">5. Nested blocks and `end` counts — parser is correct; earlier failures were unbalanced files</a><a class="toc-h2" href="#6-template-files-were-written-against-syntax-the-language-never-had">6. Template files were written against syntax the language never had</a><a class="toc-h2" href="#7-authentication-backend-completed-and-exercised-end-to-end">7. Authentication backend completed and exercised end-to-end</a><a class="toc-h2" href="#8-plainscript-new-template-integration">8. `plainscript new --template` integration</a><a class="toc-h2" href="#9-export-default-function-did-not-parse">9. `export default function` did not parse</a><a class="toc-h2" href="#10-new-was-missing-so-class-based-apis-were-unreachable">10. `new` was missing, so class-based APIs were unreachable</a><a class="toc-h2" href="#11-std-http-buffered-every-response-so-streaming-was-impossible">11. `std/http` buffered every response, so streaming was impossible</a><a class="toc-h2" href="#12-two-new-stress-applications">12. Two new stress applications</a><a class="toc-h3" href="#demos-database-sqlite-backed-json-api">`demos/database` — SQLite-backed JSON API</a><a class="toc-h3" href="#demos-realtime-server-sent-events-broadcast">`demos/realtime` — Server-Sent Events broadcast</a><a class="toc-h2" href="#13-probe-matrix-what-else-was-checked-this-pass">13. Probe matrix — what else was checked this pass</a><a class="toc-h2" href="#14-plainscript-run-leaked-the-program-it-started">14. `plainscript run` leaked the program it started</a><a class="toc-h2" href="#15-frontend-and-framework-integrations-re-verified">15. Frontend and framework integrations re-verified</a><a class="toc-h2" href="#16-libraries-could-not-describe-their-types-build-declarations">16. Libraries could not describe their types: `build --declarations`</a><a class="toc-h2" href="#17-type-declarations-could-not-name-imported-types">17. Type declarations could not name imported types</a><a class="toc-h2" href="#18-imported-variant-constructors-were-unknown-and-matching-them-was-wrong">18. Imported variant constructors were unknown, and matching them was wrong</a><a class="toc-h2" href="#19-installed-packages-were-untyped-bare-imports-now-resolve-declarations">19. Installed packages were untyped: bare imports now resolve declarations</a><a class="toc-h2" href="#20-publishing-still-needed-hand-written-package-metadata">20. Publishing still needed hand-written package metadata</a><a class="toc-h2" href="#test-inventory">Test inventory</a><a class="toc-h2" href="#files-changed-in-this-pass">Files changed in this pass</a><a class="toc-h2" href="#remaining-work-known-not-claimed-done">Remaining work (known, not claimed done)</a><a class="toc-h2" href="#21-conditional-vocabulary-aligned-with-familiar-control-flow">21. Conditional vocabulary aligned with familiar control flow</a></aside></article><footer class="page-footer"><span>PlainScript 2.0 documentation</span><a href="https://github.com/ayoistooslick/Plainscript/issues">Report a documentation issue ↗</a></footer></div></main></div><script src="app.js"></script></body></html>

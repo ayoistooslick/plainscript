@@ -29,6 +29,7 @@
     "test": "node --test tests/*.test.js",
     "check": "node src/cli.js check",
     "fmt": "node src/cli.js fmt",
+    "docs:build": "node scripts/build-docs-site.js",
     "demo:cli": "node src/cli.js run demos/cli/src/main.pln",
     "demo:api": "node src/cli.js run demos/api/src/server.pln",
     "demo:database": "node src/cli.js run demos/database/src/main.pln",
@@ -39,6 +40,7 @@
     "stdlib",
     "templates",
     "docs",
+    "scripts",
     "README.md",
     "LICENSE"
   ],
