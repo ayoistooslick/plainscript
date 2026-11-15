@@ -1,0 +1,97 @@
+import { serve, json, html, javascript, notFound, urlOf, requestJson } from "std/http"
+import { print, env } from "std/io"
+import { parseNumber, split } from "std/text"
+import { count, append } from "std/list"
+import { encode } from "std/json"
+import { readText } from "std/fs"
+import { DatabaseSync } from "node:sqlite"
+
+declare const ReadableStream: any
+declare const Response: any
+declare const TextEncoder: any
+
+let db = new DatabaseSync(env("DB_PATH", "./chat.db"))
+db.exec("create table if not exists conversations (id integer primary key autoincrement, name text not null)")
+db.exec("create table if not exists messages (id integer primary key autoincrement, conversation_id integer not null, author text not null, body text not null, created_at text not null default current_timestamp)")
+let subscribers: list of any = []
+let encoder = new TextEncoder()
+
+function field(body: any, name: text) -> text
+    if body is map of text to any and body[name] is text
+        return body[name] as text
+    end
+    return ""
+end
+
+function frame(event: text, value: any) -> text
+    return "event: {event}\ndata: {encode(value)}\n\n"
+end
+
+function broadcast(event: text, value: any) -> nothing
+    let live: list of any = []
+    for controller in subscribers
+        try
+            controller.enqueue(encoder.encode(frame(event, value)))
+            live = append(live, controller)
+        catch failure
+            let ignored = 1
+        end
+    end
+    subscribers = live
+end
+
+function stream() -> any
+    let result = new ReadableStream({ start: (controller: any) => do
+        subscribers = append(subscribers, controller)
+        controller.enqueue(encoder.encode(frame("presence", { online: count(subscribers) })))
+    end })
+    return new Response(result, { headers: { "content-type": "text/event-stream", "cache-control": "no-cache", "connection": "keep-alive" } })
+end
+
+async function handler(request: any) -> any
+    let url = urlOf(request)
+    let path = url.pathname as text
+    if path == "/"
+        return html(readText("public/index.html"))
+    end
+    if path == "/client.js"
+        return javascript(readText("dist/client.js"))
+    end
+    if request.method == "GET" and path == "/events"
+        return stream()
+    end
+    if request.method == "GET" and path == "/api/conversations"
+        return json(db.prepare("select * from conversations order by id").all())
+    end
+    if request.method == "POST" and path == "/api/conversations"
+        let body = await requestJson(request)
+        let name = field(body, "name")
+        if name == ""
+            return json({ error: "conversation name is required" }, 400)
+        end
+        let result = db.prepare("insert into conversations (name) values (?)").run(name)
+        return json(db.prepare("select * from conversations where id = ?").get(result.lastInsertRowid), 201)
+    end
+    if request.method == "GET" and path == "/api/messages"
+        let conversationId = url.searchParams.get("conversationId") as text
+        return json(db.prepare("select * from messages where conversation_id = ? order by id").all(parseNumber(conversationId, 0)))
+    end
+    if request.method == "POST" and path == "/api/messages"
+        let body = await requestJson(request)
+        let author = field(body, "author")
+        let message = field(body, "body")
+        let conversationId = body.conversationId as number
+        if author == "" or message == ""
+            return json({ error: "author and body are required" }, 400)
+        end
+        let result = db.prepare("insert into messages (conversation_id, author, body) values (?, ?, ?)").run(conversationId, author, message)
+        let created = db.prepare("select * from messages where id = ?").get(result.lastInsertRowid)
+        broadcast("message", created)
+        return json(created, 201)
+    end
+    return notFound()
+end
+
+let port = parseNumber(env("PORT", "3000"))
+print("Realtime chat on http://localhost:{port}")
+await serve(port, handler)

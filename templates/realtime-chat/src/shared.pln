@@ -1,0 +1,12 @@
+export type Conversation
+    id: number
+    name: text
+end
+
+export type Message
+    id: number
+    conversationId: number
+    author: text
+    body: text
+    createdAt: text
+end

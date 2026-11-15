@@ -37,7 +37,8 @@ Created by **Ayodele Ayokunle David**. PlainScript is MIT licensed.
 
 - Not JavaScript with renamed keywords. The syntax, type system, module graph, pattern
   matching and diagnostics are implemented in this repository.
-- Not a framework generator or a catalogue of service integrations.
+- Not a framework generator or a catalogue of service integrations; its bundled templates are
+  complete PlainScript application slices intended to stress the language and its interop.
 - Not a TypeScript superset. It compiles to JavaScript, not to TypeScript.
 
 ---
@@ -72,6 +73,9 @@ Check types without running, emit ES modules, or open a project:
 node src/cli.js check hello.pln      # type-check, print diagnostics
 node src/cli.js build                # compile src/**.pln into dist/
 node src/cli.js new my-app           # scaffold package.json + src/main.pln
+node src/cli.js new my-project --template project-management
+node src/cli.js new my-store --template ecommerce
+node src/cli.js new my-chat --template realtime-chat
 node src/cli.js run                  # compile and run src/main.pln
 ```
 
@@ -199,6 +203,7 @@ observed output for the database and real-time applications.
 ```
 src/        lexer, parser, checker, typed HIR, codegen, modules, formatter, CLI
 stdlib/     JavaScript runtime modules plus .d.pln declaration files
+templates/  project-management, ecommerce, and realtime-chat application templates
 tests/      lexer, parser, checker, compiler, runtime, CLI, interop, formatter, packaging
 demos/      cli, api, database, fullstack, react, realtime, next
 docs/       specification, architecture, audit, decisions, migration, syntax design, CLI, interop

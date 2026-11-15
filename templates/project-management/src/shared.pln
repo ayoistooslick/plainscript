@@ -1,0 +1,15 @@
+export type Project
+    id: number
+    name: text
+    description: text
+end
+
+export type Task
+    id: number
+    projectId: number
+    title: text
+    status: text
+    priority: text
+    assignee: text
+    dueDate: text
+end

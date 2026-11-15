@@ -98,9 +98,14 @@ command. Async test bodies are awaited.
 Creates `<name>/` with `package.json`, `.gitignore` and `src/app.pln`, then prints the
 commands to install and run. Refuses to write into a non-empty directory.
 
-`--template <id>` (or `--template=<id>`) copies a bundled template instead of the default
-starter. `plainscript new my-auth --template fullstack-auth` scaffolds the typed auth
-project (scrypt password hashing, sessions, browser client). An unknown id lists the
+`--template <id>` (or `--template=<id>`) copies a bundled application instead of the default
+starter. The available templates are:
+
+- `project-management` — SQLite-backed projects, tasks, comments-ready domain model, dashboard API, and browser client.
+- `ecommerce` — SQLite-backed catalogue, inventory-safe simulated checkout, orders, and browser client.
+- `realtime-chat` — SQLite-backed conversations/messages and live Server-Sent Events delivery.
+
+For example: `plainscript new my-store --template ecommerce`. An unknown id lists the
 available templates and exits with the usage code.
 
 ### `plainscript ir <file.pln>`

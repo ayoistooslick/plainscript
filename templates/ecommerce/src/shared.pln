@@ -1,0 +1,14 @@
+export type Product
+    id: number
+    name: text
+    price: number
+    stock: number
+    category: text
+end
+
+export type Order
+    id: number
+    customerId: text
+    total: number
+    paymentStatus: text
+end
