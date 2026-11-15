@@ -1,0 +1,12 @@
+{
+  "name": "plainscript-express-demo",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node ../../src/cli.js run src/main.pln"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}

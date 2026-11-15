@@ -1,0 +1,16 @@
+{
+  "name": "plainscript-next-demo",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "build:plain": "node ../../src/cli.js build",
+    "build": "npm run build:plain && next build",
+    "dev": "npm run build:plain && next dev"
+  },
+  "dependencies": {
+    "next": "^15.1.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  }
+}

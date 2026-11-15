@@ -1,0 +1,8 @@
+:root { color-scheme: light dark; }
+body { font-family: ui-sans-serif, system-ui, sans-serif; margin: 0; }
+.page { max-width: 46rem; margin: 4rem auto; padding: 0 1rem; }
+.lead { color: #6b7280; }
+.grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); list-style: none; padding: 0; }
+.card { border: 1px solid rgba(127,127,127,.3); border-radius: 10px; padding: 1rem; }
+.card h2 { font-size: 1rem; margin: 0 0 .4rem; }
+.card p { margin: 0; color: #6b7280; font-size: .9rem; }

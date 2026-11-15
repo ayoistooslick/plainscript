@@ -1,0 +1,94 @@
+# PlainScript demo: a task list that persists to JSON.
+#
+#   plainscript run demos/cli/src/main.pln add "write the docs"
+#   plainscript run demos/cli/src/main.pln list
+#   plainscript run demos/cli/src/main.pln done 1
+#
+import { print, args, exit } from "std/io"
+import { readText, writeText, exists } from "std/fs"
+import { encode, decode } from "std/json"
+import { count, append, find } from "std/list"
+import { parseNumber } from "std/text"
+
+type Task
+    id: number
+    title: text
+    done: boolean
+end
+
+const FILE = ".plainscript-tasks.json"
+
+function load() -> list of Task
+    when exists(FILE)
+        return decode(readText(FILE)) as list of Task
+    end
+    return []
+end
+
+function save(tasks: list of Task) -> nothing
+    writeText(FILE, encode(tasks))
+end
+
+function showTasks(tasks: list of Task) -> nothing
+    when count(tasks) == 0
+        print("No tasks yet. Add one with: add \"...\"")
+        return nothing
+    end
+    for task in tasks
+        let mark = " "
+        when task.done
+            mark = "x"
+        end
+        print("[{mark}] {task.id}. {task.title}")
+    end
+end
+
+function nextId(tasks: list of Task) -> number
+    let highest = 0
+    for task in tasks
+        when task.id > highest
+            highest = task.id
+        end
+    end
+    return highest + 1
+end
+
+let commands = args()
+let action = commands[0] ?? "list"
+let tasks = load()
+
+when action == "list"
+    showTasks(tasks)
+otherwise when action == "add"
+    let title = commands[1] ?? ""
+    when title == ""
+        print("Usage: add \"task title\"")
+        exit(1)
+    end
+    let task: Task = { id: nextId(tasks), title: title, done: false }
+    save(append(tasks, task))
+    print("Added task {task.id}: {task.title}")
+otherwise when action == "done"
+    let raw = commands[1] ?? ""
+    let id = 0
+    when raw != ""
+        id = parseNumber(raw)
+    end
+    when find(tasks, (item: Task) => item.id == id) is nothing
+        print("No task with id {id}")
+        exit(1)
+    end
+    let updated: list of Task = []
+    for task in tasks
+        when task.id == id
+            updated = append(updated, { id: task.id, title: task.title, done: true })
+        otherwise
+            updated = append(updated, task)
+        end
+    end
+    save(updated)
+    print("Completed task {id}")
+otherwise
+    print("Unknown command \"{action}\". Try: list, add, done")
+    exit(1)
+end

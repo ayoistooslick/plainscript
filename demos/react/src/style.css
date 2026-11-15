@@ -1,0 +1,9 @@
+:root { color-scheme: light dark; }
+body { font-family: ui-sans-serif, system-ui, sans-serif; margin: 0; }
+.app { max-width: 34rem; margin: 3rem auto; padding: 0 1rem; line-height: 1.5; }
+.muted { color: #6b7280; font-size: 0.9rem; }
+.row { display: flex; justify-content: space-between; gap: 1rem; padding: 0.4rem 0; border-bottom: 1px solid rgba(127,127,127,.25); cursor: pointer; }
+.state { color: #6b7280; font-size: 0.85rem; }
+input { padding: 0.45rem 0.6rem; margin-right: 0.5rem; }
+button { padding: 0.45rem 0.9rem; cursor: pointer; }
+ul { list-style: none; padding: 0; }

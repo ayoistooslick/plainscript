@@ -1,0 +1,104 @@
+# PlainScript demo: real-time events over Server-Sent Events.
+#
+#   plainscript run demos/realtime/src/main.pln
+#   curl -N localhost:4500/events
+#   curl -X POST "localhost:4500/publish?event=notice&data=hello"
+#
+# Every subscriber gets a heartbeat tick once a second and any message posted
+# to /publish. Connections that close are dropped on the next broadcast instead
+# of breaking the loop.
+
+import { serve, json, notFound, urlOf } from "std/http"
+import { print, env } from "std/io"
+import { parseNumber } from "std/text"
+import { count, append } from "std/list"
+import { encode } from "std/json"
+import { now } from "std/time"
+import { setInterval } from "node:timers"
+import { randomBytes } from "node:crypto"
+
+declare const ReadableStream: any
+declare const Response: any
+declare const TextEncoder: any
+
+let subscribers: list of any = []
+let encoder = new TextEncoder()
+let startedAt = now()
+let ticks = 0
+let channel = randomBytes(4).toString("hex") as text
+
+# ------------------------------------------------------------------ broadcast
+
+function frame(event: text, data: text) -> text
+    return "event: {event}\ndata: {data}\n\n"
+end
+
+function broadcast(event: text, data: text) -> nothing
+    let payload = encoder.encode(frame(event, data))
+    let live: list of any = []
+    for subscriber in subscribers
+        try
+            subscriber.enqueue(payload)
+            live = append(live, subscriber)
+        catch problem
+            # A closed stream rejects enqueue; keep the remaining subscribers.
+            let closed = 1
+        end
+    end
+    subscribers = live
+end
+
+# --------------------------------------------------------------------- stream
+
+function eventStream() -> any
+    let stream = new ReadableStream({
+        start: (controller: any) => do
+            subscribers = append(subscribers, controller)
+            controller.enqueue(encoder.encode(frame("hello", "connected")))
+            broadcast("presence", encode({ subscribers: count(subscribers) }))
+        end,
+    })
+    return new Response(stream, {
+        headers: {
+            "content-type": "text/event-stream",
+            "cache-control": "no-cache",
+            "connection": "keep-alive",
+        },
+    })
+end
+
+# ---------------------------------------------------------------- background
+
+setInterval(() => do
+    ticks += 1
+    broadcast("tick", encode({ tick: ticks, uptime: now() - startedAt, subscribers: count(subscribers) }))
+end, 1000)
+
+# --------------------------------------------------------------------- routes
+
+async function handler(request: any) -> any
+    let url = urlOf(request)
+    let method = request.method
+    let path = url.pathname as text
+
+    when method == "GET" and path == "/"
+        return json({ channel: channel, subscribers: count(subscribers), ticks: ticks })
+    end
+
+    when method == "GET" and path == "/events"
+        return eventStream()
+    end
+
+    when method == "POST" and path == "/publish"
+        let event = url.searchParams.get("event") ?? "message"
+        let data = url.searchParams.get("data") ?? ""
+        broadcast(event, data)
+        return json({ delivered: count(subscribers), event: event })
+    end
+
+    return notFound()
+end
+
+let port = parseNumber(env("PORT", "4500"))
+print("Realtime demo on http://localhost:{port} (channel {channel})")
+await serve(port, handler)

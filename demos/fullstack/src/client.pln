@@ -1,0 +1,64 @@
+# Browser client. Built with `--std-base=/std` so imports point at URLs the
+# server exposes, then loaded by the page as a native ES module.
+import { createElement, mount } from "std/dom"
+import { append } from "std/list"
+import { Todo } from "./shared"
+
+declare function fetch(url: text, options?: any) -> Promise of any
+declare const JSON: any
+
+let todos: list of Todo = []
+let status = "loading"
+
+async function refresh() -> nothing
+    let response = await fetch("/todos")
+    todos = await response.json() as list of Todo
+    status = "ready"
+    paint()
+end
+
+async function addTodo() -> nothing
+    let body = JSON.stringify({ title: "from the browser", done: false })
+    await fetch("/todos", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: body,
+    })
+    await refresh()
+end
+
+function row(todo: Todo) -> any
+    return element "li" with className: "todo"
+        "{todo.title}"
+    end
+end
+
+function view() -> any
+    let rows: list of any = []
+    for todo in todos
+        rows = append(rows, row(todo))
+    end
+    render
+        element "main"
+            element "h1"
+                "PlainScript full stack"
+            end
+            element "p" with className: "status"
+                "status: {status}"
+            end
+            element "ul"
+                ...rows
+            end
+            element "button" with onClick: addTodo
+                "Add a todo"
+            end
+        end
+    end
+end
+
+function paint() -> nothing
+    mount(view(), "#app")
+end
+
+paint()
+refresh()

@@ -5,6 +5,7 @@
 
 # Node
 node_modules/
+.plainscript/
 
 # Plain AI translation cache (RFC-0020 §15, §44)
 .plain/ai-cache/

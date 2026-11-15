@@ -1,0 +1,60 @@
+# PlainScript demo: a JSON HTTP API on Node's standard library.
+#
+#   plainscript run demos/api/src/server.pln
+#   curl localhost:4321/tickets
+#   curl -X POST localhost:4321/tickets -H 'content-type: application/json' \
+#        -d '{"title":"from curl"}'
+#
+# The handler takes a Web Request and returns a Web Response, the same shape
+# used by Cloudflare Workers, Deno and Bun.
+import { serve, json, notFound, requestJson, urlOf } from "std/http"
+import { print, env } from "std/io"
+import { append, count } from "std/list"
+import { parseNumber } from "std/text"
+
+type Ticket
+    id: number
+    title: text
+    done: boolean
+end
+
+let tickets: list of Ticket = [
+    { id: 1, title: "first ticket", done: false },
+]
+let nextId = 2
+
+async function handler(request: any) -> any
+    let url = urlOf(request)
+    let method = request.method
+
+    when method == "GET" and url.pathname == "/health"
+        return json({ status: "ok", tickets: count(tickets) })
+    end
+
+    when method == "GET" and url.pathname == "/tickets"
+        return json(tickets)
+    end
+
+    when method == "GET" and url.pathname == "/tickets/1"
+        return json(tickets[0])
+    end
+
+    when method == "POST" and url.pathname == "/tickets"
+        let body = await requestJson(request)
+        when body is map of text to any
+            when body.title is text and body.title != ""
+                let ticket: Ticket = { id: nextId, title: body.title, done: false }
+                nextId += 1
+                tickets = append(tickets, ticket)
+                return json(ticket, 201)
+            end
+        end
+        return json({ error: "title is required" }, 400)
+    end
+
+    return notFound()
+end
+
+let port = parseNumber(env("PORT", "4321"))
+print("PlainScript API listening on http://localhost:{port}")
+await serve(port, handler)

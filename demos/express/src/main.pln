@@ -1,0 +1,18 @@
+import express from "express"
+import { print } from "std/io"
+
+const app = express()
+let hits = 0
+
+app.get("/", (request: any, response: any) => do
+    hits += 1
+    response.json({ ok: true, hits: hits, framework: "express" })
+end)
+
+app.get("/users/:id", (request: any, response: any) => do
+    response.json({ id: request.params.id })
+end)
+
+app.listen(4501, () => do
+    print("express app listening on 4501")
+end)
