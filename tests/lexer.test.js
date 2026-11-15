@@ -16,7 +16,10 @@ test('keywords and identifiers are distinguished', () => {
     ['punct', '='],
     ['number', '1'],
   ]);
+  assert.ok(KEYWORDS.has('if'));
+  assert.ok(KEYWORDS.has('else'));
   assert.ok(KEYWORDS.has('when'));
+  assert.ok(KEYWORDS.has('otherwise'));
   assert.ok(!KEYWORDS.has('renderer'));
 });
 

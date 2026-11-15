@@ -81,7 +81,7 @@ import { serve, json, notFound, requestJson, urlOf } from "std/http"
 
 async function handler(request: any) -> any
     let url = urlOf(request)
-    when request.method == "GET" and url.pathname == "/health"
+    if request.method == "GET" and url.pathname == "/health"
         return json({ status: "ok" })
     end
     return notFound()

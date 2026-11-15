@@ -10,11 +10,11 @@ const { CompileError } = require('./diagnostics');
 // from their leading indentation.
 
 const OPENER_WORDS = new Set([
-  'when', 'otherwise', 'for', 'while', 'match', 'case', 'try', 'catch',
+  'if', 'else', 'for', 'while', 'match', 'case', 'try', 'catch',
   'finally', 'render', 'element',
 ]);
 
-const DEDENT_WORDS = new Set(['end', 'otherwise', 'catch', 'finally']);
+const DEDENT_WORDS = new Set(['end', 'else', 'catch', 'finally']);
 
 function tokensByLine(tokens) {
   const byLine = new Map();
@@ -67,7 +67,7 @@ function format(source, file) {
       else if (token.v === 'function' && !hasDeclare) openers += 1;
       else if (token.v === 'type' && !hasEquals) openers += 1;
     }
-    if (firstWord === 'otherwise' && words.includes('when')) openers -= 1;
+    if (firstWord === 'else' && words.includes('if')) openers -= 1;
     if (firstWord === 'end') {
       depth = indentDepth + openers - Math.max(0, closers - 1);
     } else {

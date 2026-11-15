@@ -2,6 +2,15 @@
 
 All notable changes to PlainScript are documented here.
 
+## Unreleased — syntax migration (breaking; release version TBD)
+
+- Replace conditional `when`/`otherwise` with `if`/`else if`/`else`, and use `if` for
+  match guards. Retired words remain reserved so old branch syntax fails clearly.
+- Keep `end` block terminators and existing type-checking/runtime semantics.
+- Add the researched design comparison and migration guidance in `docs/SYNTAX_DESIGN.md`
+  and `docs/MIGRATION.md`.
+- No npm package has been published for this change.
+
 ## [2.0.0]  -  2026-11-14
 
 ### Language Revival — PlainScript 2.0.0

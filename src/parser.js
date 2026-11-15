@@ -13,7 +13,7 @@ const { Span, error, CompileError } = require('./diagnostics');
 //   ---------    ---------------------------------------------------------
 //   binding      let x: number = 1        const y = "fixed"
 //   function     function f(a: number) -> text ... end
-//   conditional  when c ... otherwise ... end
+//   conditional  if c ... else ... end
 //   loop         for x in xs ... end      for i in 0 to 9 ... end
 //   pattern      match v { case ... }     written with case ... end
 //   type         type User <fields> end   type Shape = Circle(r: number) or Empty
@@ -30,7 +30,7 @@ class ParseAbort extends Error {
 
 const STATEMENT_START = new Set([
   'import', 'export', 'type', 'declare', 'function', 'async', 'let', 'const',
-  'when', 'for', 'while', 'match', 'try', 'throw', 'return', 'break',
+  'if', 'for', 'while', 'match', 'try', 'throw', 'return', 'break',
   'continue', 'render', 'element',
 ]);
 
@@ -149,7 +149,7 @@ class Parser {
           return this.functionDeclaration({ exported: false, async: true });
         case 'let':
         case 'const': return this.variableDeclaration({ exported: false });
-        case 'when': return this.conditional();
+        case 'if': return this.conditional();
         case 'for': return this.forLoop();
         case 'while': return this.whileLoop();
         case 'match': return this.matchStatement();
@@ -630,27 +630,27 @@ class Parser {
   // ------------------------------------------------------------- control flow
 
   conditional() {
-    const start = this.expectKw('when');
-    const stoppers = new Set(['otherwise', 'end']);
+    const start = this.expectKw('if');
+    const stoppers = new Set(['else', 'end']);
     const branches = [{ condition: this.expression(), body: null, line: start.line, col: start.col }];
     branches[0].body = this.statementsUntil(stoppers, 'conditional');
-    let otherwise = null;
+    let alternate = null;
 
-    while (this.atKw('otherwise')) {
+    while (this.atKw('else')) {
       this.next();
-      if (this.atKw('when')) {
+      if (this.atKw('if')) {
         this.next();
         const condition = this.expression();
         const body = this.statementsUntil(stoppers, 'conditional');
         branches.push({ condition, body, line: start.line, col: start.col });
         continue;
       }
-      otherwise = this.statementsUntil(new Set(['end']), 'conditional');
+      alternate = this.statementsUntil(new Set(['end']), 'conditional');
       break;
     }
 
     this.expectKw('end', 'PS2009');
-    return this.node('Conditional', start, { branches, otherwise });
+    return this.node('Conditional', start, { branches, otherwise: alternate });
   }
 
   forLoop() {
@@ -683,7 +683,7 @@ class Parser {
       const caseToken = this.next();
       const pattern = this.pattern();
       let guard = null;
-      if (this.atKw('when')) {
+      if (this.atKw('if')) {
         this.next();
         guard = this.expression();
       }

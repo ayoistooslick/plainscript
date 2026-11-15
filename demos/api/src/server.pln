@@ -27,22 +27,22 @@ async function handler(request: any) -> any
     let url = urlOf(request)
     let method = request.method
 
-    when method == "GET" and url.pathname == "/health"
+    if method == "GET" and url.pathname == "/health"
         return json({ status: "ok", tickets: count(tickets) })
     end
 
-    when method == "GET" and url.pathname == "/tickets"
+    if method == "GET" and url.pathname == "/tickets"
         return json(tickets)
     end
 
-    when method == "GET" and url.pathname == "/tickets/1"
+    if method == "GET" and url.pathname == "/tickets/1"
         return json(tickets[0])
     end
 
-    when method == "POST" and url.pathname == "/tickets"
+    if method == "POST" and url.pathname == "/tickets"
         let body = await requestJson(request)
-        when body is map of text to any
-            when body.title is text and body.title != ""
+        if body is map of text to any
+            if body.title is text and body.title != ""
                 let ticket: Ticket = { id: nextId, title: body.title, done: false }
                 nextId += 1
                 tickets = append(tickets, ticket)

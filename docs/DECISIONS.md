@@ -15,10 +15,12 @@ This document captures the key design decisions behind the PlainScript 2.0 rebui
 **Examples:**
 - Block closers: only `end`, no `done`, `together`, or combinations
 - Variables: `let` for mutable, `const` for immutable (no `var`, no `set`)
-- Conditions: `when`/`otherwise` (no `if`/`else` at the expression level; `if` is reserved for JS interop)
+- Conditions: `if`/`else if`/`else`; match guards also use `if`
 - Loops: `for … in` and `for i in a to b` (no `while` as a primary construct; `while` exists but is limited)
 
 **Rationale:** Multiple spellings for the same concept cause confusion, bloat the compiler, and make the language harder to learn and teach. One spelling means one mental model, one parser rule, one codegen path.
+
+**Syntax update:** The initial 2.0.0 grammar used `when`/`otherwise`. The current source tree replaces those branch introducers with the more familiar `if`/`else` vocabulary; `when` is also replaced by `if` in match guards. This is a hard source-syntax migration, not a permanent alias. The semantic AST and generated behavior are unchanged. See `docs/SYNTAX_DESIGN.md`; choose a new release version before publishing this breaking change.
 
 ## 3. JavaScript as the compilation target, not TypeScript
 

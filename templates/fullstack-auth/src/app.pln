@@ -43,7 +43,7 @@ end
 function sameHash(left: text, right: text) -> boolean
     let candidate = Buffer.from(left, "hex") as any
     let expected = Buffer.from(right, "hex") as any
-    when candidate.length != expected.length
+    if candidate.length != expected.length
         return false
     end
     return timingSafeEqual(candidate, expected) as boolean
@@ -61,7 +61,7 @@ end
 
 function findUserByName(username: text) -> StoredUser?
     for user in users
-        when user.username == username
+        if user.username == username
             return user
         end
     end
@@ -70,7 +70,7 @@ end
 
 function findUserByEmail(email: text) -> StoredUser?
     for user in users
-        when user.email == email
+        if user.email == email
             return user
         end
     end
@@ -79,7 +79,7 @@ end
 
 function findUserById(id: number) -> StoredUser?
     for user in users
-        when user.id == id
+        if user.id == id
             return user
         end
     end
@@ -110,14 +110,14 @@ function createSession(userId: number) -> text
 end
 
 function sessionUserId(token: text) -> number or nothing
-    when token == ""
+    if token == ""
         return nothing
     end
     return sessions[token]
 end
 
 function endSession(token: text) -> nothing
-    when token != ""
+    if token != ""
         sessions[token] = nothing
     end
 end
@@ -126,10 +126,10 @@ end
 
 function cookieValue(request: any, name: text) -> text
     let header = request.headers.get("cookie")
-    when header is text
+    if header is text
         for part in split(header, ";")
             let entry = trim(part)
-            when startsWith(entry, "{name}=")
+            if startsWith(entry, "{name}=")
                 return slice(entry, length(name) + 1)
             end
         end
@@ -138,9 +138,9 @@ function cookieValue(request: any, name: text) -> text
 end
 
 function textField(body: any, name: text) -> text
-    when body is map of text to any
+    if body is map of text to any
         let value = body[name]
-        when value is text
+        if value is text
             return value
         end
     end
@@ -155,28 +155,28 @@ async function handler(request: any) -> any
     let path = url.pathname as text
     let token = cookieValue(request, "session")
 
-    when method == "GET" and path == "/health"
+    if method == "GET" and path == "/health"
         return json({ status: "ok", users: count(users) })
     end
 
-    when method == "POST" and path == "/api/auth/register"
+    if method == "POST" and path == "/api/auth/register"
         let body = await requestJson(request)
         let username = textField(body, "username")
         let email = textField(body, "email")
         let password = textField(body, "password")
-        when username == ""
+        if username == ""
             return json({ error: "username is required" }, 400)
         end
-        when email == ""
+        if email == ""
             return json({ error: "email is required" }, 400)
         end
-        when length(password) < 8
+        if length(password) < 8
             return json({ error: "password must be at least 8 characters" }, 400)
         end
-        when findUserByName(username) != nothing
+        if findUserByName(username) != nothing
             return json({ error: "username is already taken" }, 409)
         end
-        when findUserByEmail(email) != nothing
+        if findUserByEmail(email) != nothing
             return json({ error: "email is already registered" }, 409)
         end
         let user = addUser(username, email, password)
@@ -184,13 +184,13 @@ async function handler(request: any) -> any
         return json({ sessionId: sessionId, user: publicUser(user) }, 201)
     end
 
-    when method == "POST" and path == "/api/auth/login"
+    if method == "POST" and path == "/api/auth/login"
         let body = await requestJson(request)
         let username = textField(body, "username")
         let password = textField(body, "password")
         let user = findUserByName(username)
-        when user != nothing
-            when verifyPassword(password, user)
+        if user != nothing
+            if verifyPassword(password, user)
                 let sessionId = createSession(user.id)
                 return json({ sessionId: sessionId, user: publicUser(user) }, 200)
             end
@@ -198,23 +198,23 @@ async function handler(request: any) -> any
         return json({ error: "invalid credentials" }, 401)
     end
 
-    when method == "POST" and path == "/api/auth/logout"
+    if method == "POST" and path == "/api/auth/logout"
         endSession(token)
         return json({ ok: true })
     end
 
-    when method == "GET" and path == "/api/auth/me"
+    if method == "GET" and path == "/api/auth/me"
         let userId = sessionUserId(token)
-        when userId != nothing
+        if userId != nothing
             let user = findUserById(userId)
-            when user != nothing
+            if user != nothing
                 return json({ user: publicUser(user) })
             end
         end
         return json({ error: "not authenticated" }, 401)
     end
 
-    when method == "GET" and path == "/api/users"
+    if method == "GET" and path == "/api/users"
         let listed: list of PublicUser = []
         for user in users
             listed = append(listed, publicUser(user))

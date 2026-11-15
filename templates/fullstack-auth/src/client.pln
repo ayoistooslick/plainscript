@@ -43,7 +43,7 @@ function getCookie(name: text) -> text
     let raw = document.cookie as text
     for part in split(raw, ";")
         let entry = trim(part)
-        when startsWith(entry, "{name}=")
+        if startsWith(entry, "{name}=")
             return slice(entry, length(name) + 1)
         end
     end
@@ -91,7 +91,7 @@ end
 
 function dashboardView() -> any
     let name = "there"
-    when currentUser != nothing
+    if currentUser != nothing
         name = currentUser.username
     end
     return createElement("div", { className: "dashboard" },
@@ -114,14 +114,14 @@ end
 
 function bindClick(id: text, handler: any) -> nothing
     let node = document.getElementById(id)
-    when node != nothing
+    if node != nothing
         node.onclick = handler
     end
 end
 
 function fieldValue(id: text) -> text
     let node = document.getElementById(id)
-    when node != nothing
+    if node != nothing
         return node.value as text
     end
     return ""
@@ -145,7 +145,7 @@ async function attemptLogin(username: text, password: text) -> boolean
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ username: username, password: password }),
     })
-    when result.ok
+    if result.ok
         setCookie("session", result.data?.sessionId ?? "")
         authStatus = { loggedIn: true, user: result.data?.user ?? nothing }
         currentUser = authStatus.user
@@ -162,7 +162,7 @@ async function attemptRegister(username: text, email: text, password: text) -> b
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ username: username, email: email, password: password }),
     })
-    when result.ok
+    if result.ok
         showSuccess("Account created. Please log in.")
         showAuthPage()
         return true
@@ -184,7 +184,7 @@ async function refreshSession() -> boolean
     let result = await apiRequest("/api/auth/me", {
         headers: { "authorization": getCookie("session") },
     })
-    when result.ok
+    if result.ok
         authStatus = { loggedIn: true, user: result.data?.user ?? nothing }
         currentUser = authStatus.user
         showDashboard()

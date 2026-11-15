@@ -8,8 +8,14 @@ const { tokenize } = require('../src/lexer');
 const { CompileError } = require('../src/diagnostics');
 
 test('nested blocks are indented four spaces per level', () => {
-  const source = 'function f(n: number) -> number\nwhen n > 0\nreturn n\notherwise\nreturn 0\nend\nend\n';
-  const expected = 'function f(n: number) -> number\n    when n > 0\n        return n\n    otherwise\n        return 0\n    end\nend\n';
+  const source = 'function f(n: number) -> number\nif n > 0\nreturn n\nelse\nreturn 0\nend\nend\n';
+  const expected = 'function f(n: number) -> number\n    if n > 0\n        return n\n    else\n        return 0\n    end\nend\n';
+  assert.strictEqual(format(source, 'f.pln'), expected);
+});
+
+test('else-if clauses align with the opening if and indent their bodies once', () => {
+  const source = 'if a\nfirst()\nelse if b\nsecond()\nelse\nthird()\nend\n';
+  const expected = 'if a\n    first()\nelse if b\n    second()\nelse\n    third()\nend\n';
   assert.strictEqual(format(source, 'f.pln'), expected);
 });
 

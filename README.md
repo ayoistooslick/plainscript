@@ -17,7 +17,7 @@ Created by **Ayodele Ayokunle David**. PlainScript is MIT licensed.
 ## What PlainScript is
 
 - **A language with its own semantics.** Blocks close with `end`. There is exactly one
-  spelling for each concept: `let`/`const`, `function`, `when`/`otherwise`, `match`/`case`,
+  spelling for each concept: `let`/`const`, `function`, `if`/`else`, `match`/`case`,
   `for … in`, `type`, `import`/`export`. There are no synonyms such as `done`/`end` or
   `show`/`print`/`log`.
 - **Statically typed, with inference.** Function signatures are checked, not assumed.
@@ -121,19 +121,20 @@ print(area(Rectangle(3, 4)))        # 12
 # Optional values use T? and are narrowed with `is nothing`.
 function findAge(name: text) -> number?
     for person in people
-        when person.name == name
+        if person.name == name
             return person.age
         end
     end
     return nothing
 end
 
-when findAge("ada") is number
+if findAge("ada") is number
     print("found")
 end
 ```
 
-See [docs/SPEC.md](docs/SPEC.md) for the complete language definition, and run
+See [docs/SPEC.md](docs/SPEC.md) for the complete language definition and
+[docs/SYNTAX_DESIGN.md](docs/SYNTAX_DESIGN.md) for the syntax rationale and migration notes. Run
 `node src/cli.js ir file.pln` to see the typed intermediate representation the backend
 consumes.
 
@@ -200,7 +201,7 @@ src/        lexer, parser, checker, typed HIR, codegen, modules, formatter, CLI
 stdlib/     JavaScript runtime modules plus .d.pln declaration files
 tests/      lexer, parser, checker, compiler, runtime, CLI, interop, formatter, packaging
 demos/      cli, api, database, fullstack, react, realtime, next
-docs/       specification, architecture, audit, decisions, migration, stdlib, CLI, interop
+docs/       specification, architecture, audit, decisions, migration, syntax design, CLI, interop
 plainscript-vscode/  syntax highlighting and snippets for .pln files
 legacy/v1/  the complete v1 compiler, tests and docs, archived for reference
 ```

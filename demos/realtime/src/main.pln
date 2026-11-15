@@ -81,15 +81,15 @@ async function handler(request: any) -> any
     let method = request.method
     let path = url.pathname as text
 
-    when method == "GET" and path == "/"
+    if method == "GET" and path == "/"
         return json({ channel: channel, subscribers: count(subscribers), ticks: ticks })
     end
 
-    when method == "GET" and path == "/events"
+    if method == "GET" and path == "/events"
         return eventStream()
     end
 
-    when method == "POST" and path == "/publish"
+    if method == "POST" and path == "/publish"
         let event = url.searchParams.get("event") ?? "message"
         let data = url.searchParams.get("data") ?? ""
         broadcast(event, data)
