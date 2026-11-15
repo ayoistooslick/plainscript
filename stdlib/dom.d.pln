@@ -1,0 +1,4 @@
+# Declarations for std/dom.
+
+export declare function createElement(tag: any, props: any, ...children: list of any) -> any
+export declare function mount(node: any, container: any) -> any
