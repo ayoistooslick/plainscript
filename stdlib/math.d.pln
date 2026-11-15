@@ -1,0 +1,20 @@
+# Declarations for std/math.
+
+export declare function abs(value: number) -> number
+export declare function floor(value: number) -> number
+export declare function ceil(value: number) -> number
+export declare function round(value: number) -> number
+export declare function trunc(value: number) -> number
+export declare function sqrt(value: number) -> number
+export declare function pow(base: number, exponent: number) -> number
+export declare function log(value: number) -> number
+export declare function exp(value: number) -> number
+export declare function min(left: number, right: number) -> number
+export declare function max(left: number, right: number) -> number
+export declare function clamp(value: number, low: number, high: number) -> number
+export declare function random() -> number
+export declare function randomInt(minimum: number, maximum: number) -> number
+export declare function sum(values: list of number) -> number
+export declare function mean(values: list of number) -> number
+export declare function median(values: list of number) -> number
+export declare function deviation(values: list of number) -> number

@@ -1,0 +1,10 @@
+# Declarations for std/test.
+
+export declare function test(name: text, body: () -> any) -> nothing
+export declare function equals(actual: any, expected: any, message?: text) -> nothing
+export declare function isTrue(value: boolean, message?: text) -> nothing
+export declare function isFalse(value: boolean, message?: text) -> nothing
+export declare function contains(haystack: any, needle: any, message?: text) -> nothing
+export declare function throws(body: () -> any, messagePart?: text) -> nothing
+export declare function rejects(body: () -> any, messagePart?: text) -> Promise of nothing
+export declare function fail(message?: text) -> nothing
