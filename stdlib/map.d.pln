@@ -1,0 +1,12 @@
+# Declarations for std/map. Maps are records with text keys.
+
+export declare function keys<V>(map: map of text to V) -> list of text
+export declare function values<V>(map: map of text to V) -> list of V
+export declare function entries<V>(map: map of text to V) -> list of { key: text, value: V }
+export declare function has<V>(map: map of text to V, key: text) -> boolean
+export declare function get<V>(map: map of text to V, key: text, fallback?: V) -> V?
+export declare function set<V>(map: map of text to V, key: text, value: V) -> map of text to V
+export declare function remove<V>(map: map of text to V, key: text) -> map of text to V
+export declare function size<V>(map: map of text to V) -> number
+export declare function merge<V>(left: map of text to V, right: map of text to V) -> map of text to V
+export declare function fromEntries<V>(pairs: list of { key: text, value: V }) -> map of text to V

@@ -1,0 +1,29 @@
+# Declarations for std/list.
+
+export declare function count<T>(items: list of T) -> number
+export declare function isEmpty<T>(items: list of T) -> boolean
+export declare function map<A, B>(items: list of A, transform: (value: A, index: number) -> B) -> list of B
+export declare function filter<T>(items: list of T, predicate: (value: T, index: number) -> boolean) -> list of T
+export declare function reduce<A, B>(items: list of A, initial: B, combine: (accumulator: B, value: A, index: number) -> B) -> B
+export declare function find<T>(items: list of T, predicate: (value: T, index: number) -> boolean) -> T?
+export declare function findIndex<T>(items: list of T, predicate: (value: T, index: number) -> boolean) -> number
+export declare function any<T>(items: list of T, predicate: (value: T, index: number) -> boolean) -> boolean
+export declare function all<T>(items: list of T, predicate: (value: T, index: number) -> boolean) -> boolean
+export declare function each<T>(items: list of T, action: (value: T, index: number) -> nothing) -> nothing
+export declare function sort<T>(items: list of T, compare: (left: T, right: T) -> number) -> list of T
+export declare function sortBy<T>(items: list of T, key: (value: T) -> any) -> list of T
+export declare function reverse<T>(items: list of T) -> list of T
+export declare function slice<T>(items: list of T, start: number, stop?: number) -> list of T
+export declare function append<T>(items: list of T, value: T) -> list of T
+export declare function concat<T>(items: list of T, other: list of T) -> list of T
+export declare function first<T>(items: list of T) -> T?
+export declare function last<T>(items: list of T) -> T?
+export declare function range(start: number, stop: number) -> list of number
+export declare function zip<A, B>(left: list of A, right: list of B) -> list of list of any
+export declare function flatten<T>(items: list of list of T) -> list of T
+export declare function flatMap<A, B>(items: list of A, transform: (value: A, index: number) -> list of B) -> list of B
+export declare function unique<T>(items: list of T) -> list of T
+export declare function sum(items: list of number) -> number
+export declare function take<T>(items: list of T, count: number) -> list of T
+export declare function drop<T>(items: list of T, count: number) -> list of T
+export declare function chunk<T>(items: list of T, size: number) -> list of list of T
