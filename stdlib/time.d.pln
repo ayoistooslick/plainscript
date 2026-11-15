@@ -1,0 +1,8 @@
+# Declarations for std/time.
+
+export declare function now() -> number
+export declare function isoNow() -> text
+export declare function isoOf(milliseconds: number) -> text
+export declare function parse(text: text) -> number
+export declare function sleep(milliseconds: number) -> Promise of nothing
+export declare function elapsed(startedAt: number) -> number
