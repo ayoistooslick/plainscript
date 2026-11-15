@@ -6,7 +6,7 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
 const DOCS = path.join(ROOT, 'docs');
-const OUT = path.join(DOCS, 'site');
+const OUT = DOCS;
 
 const pages = [
   { slug: 'index', title: 'PlainScript', source: path.join(ROOT, 'README.md'), group: 'Start here', home: true },
@@ -181,9 +181,10 @@ function homeBody(rendered) {
   return `<section class="hero"><div><div class="eyebrow">A language for serious JavaScript software</div><h1>Make the machine readable.</h1><p>PlainScript is a statically typed language that compiles to ordinary JavaScript modules. Learn the syntax, understand the compiler, and build full-stack applications without leaving the ecosystem.</p></div><aside class="hero-aside"><strong>Start with the shape of the language.</strong><p>Read the quick tour, then move into the specification when you need exact semantics. The docs are organized for both paths.</p><code>plainscript new my-app</code></aside></section><section class="quick-grid"><a class="quick-card" href="cli.html"><span class="number">01 / BUILD</span><h2>Install and run</h2><p>Use the CLI to check, build, format, test, and scaffold a project.</p></a><a class="quick-card" href="spec.html"><span class="number">02 / LEARN</span><h2>Learn the language</h2><p>Follow the language model from modules and types to async code and rendering.</p></a><a class="quick-card" href="architecture.html"><span class="number">03 / UNDERSTAND</span><h2>Explore the compiler</h2><p>Trace source through lexer, parser, checker, HIR, and JavaScript emission.</p></a></section><article class="page-layout"><div class="prose">${rendered.html}</div>${toc(rendered.headings)}</article>`;
 }
 
-fs.rmSync(OUT, { recursive: true, force: true });
+for (const generated of ['index.html', 'cli.html', 'templates.html', 'spec.html', 'syntax-design.html', 'architecture.html', 'interop.html', 'migration.html', 'progress.html', 'audit.html', 'decisions.html', 'style.css', 'app.js', '.nojekyll']) {
+  fs.rmSync(path.join(OUT, generated), { force: true });
+}
 fs.mkdirSync(OUT, { recursive: true });
-if (fs.existsSync(path.join(DOCS, 'assets'))) fs.cpSync(path.join(DOCS, 'assets'), path.join(OUT, 'assets'), { recursive: true });
 fs.writeFileSync(path.join(OUT, 'style.css'), css.trimStart());
 const search = [];
 for (const page of pages) {
