@@ -1,0 +1,14 @@
+declare function fetch(url: text, options?: any) -> Promise of any
+declare const document: any
+
+async function load() -> nothing
+    let response = await fetch("/api/products")
+    let products = await response.json()
+    let lines = ""
+    for product in products as list of any
+        lines = "{lines}<li>{product.name} — ${(product.price / 100)} · {product.stock} in stock</li>"
+    end
+    document.querySelector("#app").innerHTML = "<h1>Commerce</h1><p>Inventory-backed catalogue</p><ul>{lines}</ul>"
+end
+
+load()

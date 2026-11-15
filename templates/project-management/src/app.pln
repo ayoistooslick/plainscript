@@ -1,0 +1,102 @@
+import { serve, json, html, javascript, notFound, urlOf, requestJson } from "std/http"
+import { print, env } from "std/io"
+import { parseNumber, split, length } from "std/text"
+import { count } from "std/list"
+import { readText } from "std/fs"
+import { DatabaseSync } from "node:sqlite"
+
+let db = new DatabaseSync(env("DB_PATH", "./project-management.db"))
+db.exec("create table if not exists projects (id integer primary key autoincrement, name text not null, description text not null default '')")
+db.exec("create table if not exists tasks (id integer primary key autoincrement, project_id integer not null, title text not null, status text not null default 'todo', priority text not null default 'medium', assignee text not null default '', due_date text not null default '')")
+db.exec("create table if not exists comments (id integer primary key autoincrement, task_id integer not null, body text not null, author text not null, created_at text not null default current_timestamp)")
+
+function field(body: any, name: text) -> text
+    if body is map of text to any
+        let value = body[name]
+        if value is text
+            return value
+        end
+    end
+    return ""
+end
+
+function project(row: any) -> any
+    return { id: row.id as number, name: row.name as text, description: row.description as text }
+end
+
+function task(row: any) -> any
+    return { id: row.id as number, projectId: row.project_id as number, title: row.title as text, status: row.status as text, priority: row.priority as text, assignee: row.assignee as text, dueDate: row.due_date as text }
+end
+
+function idFrom(path: text) -> number or nothing
+    let parts = split(path, "/")
+    if count(parts) == 3
+        let raw = parts[2]
+        if raw != nothing
+            let value = parseNumber(raw, -1)
+            if value >= 0
+                return value
+            end
+        end
+    end
+    return nothing
+end
+
+function projects() -> list of any
+    let result: list of any = []
+    for row in db.prepare("select id, name, description from projects order by id desc").all() as list of any
+        result = result |> (items: list of any) => items
+        result[count(result)] = project(row)
+    end
+    return result
+end
+
+async function handler(request: any) -> any
+    let url = urlOf(request)
+    let path = url.pathname as text
+    if path == "/"
+        return html(readText("public/index.html"))
+    end
+    if path == "/client.js"
+        return javascript(readText("dist/client.js"))
+    end
+    if request.method == "GET" and path == "/api/projects"
+        return json(projects())
+    end
+    if request.method == "POST" and path == "/api/projects"
+        let body = await requestJson(request)
+        let name = field(body, "name")
+        if length(name) < 2
+            return json({ error: "project name must contain at least two characters" }, 400)
+        end
+        let result = db.prepare("insert into projects (name, description) values (?, ?)").run(name, field(body, "description"))
+        return json(project(db.prepare("select * from projects where id = ?").get(result.lastInsertRowid)), 201)
+    end
+    if request.method == "GET" and path == "/api/tasks"
+        return json(db.prepare("select * from tasks order by id desc").all())
+    end
+    if request.method == "POST" and path == "/api/tasks"
+        let body = await requestJson(request)
+        let title = field(body, "title")
+        if title == ""
+            return json({ error: "task title is required" }, 400)
+        end
+        let projectId = body.projectId as number
+        let result = db.prepare("insert into tasks (project_id, title, status, priority, assignee, due_date) values (?, ?, ?, ?, ?, ?)").run(projectId, title, field(body, "status") ?? "todo", field(body, "priority") ?? "medium", field(body, "assignee"), field(body, "dueDate"))
+        return json(task(db.prepare("select * from tasks where id = ?").get(result.lastInsertRowid)), 201)
+    end
+    let id = idFrom(path)
+    if request.method == "PATCH" and id != nothing
+        let body = await requestJson(request)
+        db.prepare("update tasks set status = coalesce(?, status), priority = coalesce(?, priority), assignee = coalesce(?, assignee) where id = ?").run(field(body, "status"), field(body, "priority"), field(body, "assignee"), id)
+        return json(db.prepare("select * from tasks where id = ?").get(id))
+    end
+    if request.method == "GET" and path == "/api/dashboard"
+        return json({ projects: db.prepare("select count(*) as total from projects").get().total, tasks: db.prepare("select count(*) as total from tasks").get().total, completed: db.prepare("select count(*) as total from tasks where status = 'done'").get().total })
+    end
+    return notFound()
+end
+
+let port = parseNumber(env("PORT", "3000"))
+print("Project management on http://localhost:{port}")
+await serve(port, handler)

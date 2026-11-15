@@ -1,0 +1,20 @@
+declare function fetch(url: text, options?: any) -> Promise of any
+declare const document: any
+
+declare function renderProjects(projects: any) -> nothing
+
+async function load() -> nothing
+    let response = await fetch("/api/projects")
+    let projects = await response.json()
+    renderProjects(projects)
+end
+
+function renderProjects(projects: any) -> nothing
+    let lines = ""
+    for project in projects as list of any
+        lines = "{lines}<li><strong>{project.name}</strong><br>{project.description}</li>"
+    end
+    document.querySelector("#app").innerHTML = "<h1>Projects</h1><p>Persistent PlainScript workspace data</p><ul>{lines}</ul>"
+end
+
+load()

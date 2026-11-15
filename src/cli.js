@@ -32,6 +32,7 @@ Commands
   fmt [files...]             normalise indentation and blank lines
   test [files...]            run *.test.pln files
   new <name> [--template <id>]  scaffold a new project, optionally from a bundled template
+                              templates: project-management, ecommerce, realtime-chat
   ir <file.pln>              print the high-level IR as JSON
   version                    print the compiler version
   help                       show this message

@@ -1,0 +1,86 @@
+import { serve, json, html, javascript, notFound, urlOf, requestJson } from "std/http"
+import { print, env } from "std/io"
+import { parseNumber, split } from "std/text"
+import { count } from "std/list"
+import { readText } from "std/fs"
+import { DatabaseSync } from "node:sqlite"
+
+let db = new DatabaseSync(env("DB_PATH", "./store.db"))
+db.exec("create table if not exists products (id integer primary key autoincrement, name text not null, price integer not null, stock integer not null, category text not null default 'general')")
+db.exec("create table if not exists orders (id integer primary key autoincrement, customer_id text not null, total integer not null, payment_status text not null, created_at text not null default current_timestamp)")
+db.exec("create table if not exists order_items (id integer primary key autoincrement, order_id integer not null, product_id integer not null, quantity integer not null, unit_price integer not null)")
+if db.prepare("select count(*) as total from products").get().total == 0
+    db.prepare("insert into products (name, price, stock, category) values (?, ?, ?, ?)").run("PlainScript Handbook", 2499, 25, "books")
+    db.prepare("insert into products (name, price, stock, category) values (?, ?, ?, ?)").run("Compiler Sticker Pack", 899, 100, "accessories")
+end
+
+function field(body: any, name: text) -> text
+    if body is map of text to any and body[name] is text
+        return body[name] as text
+    end
+    return ""
+end
+
+async function handler(request: any) -> any
+    let url = urlOf(request)
+    let path = url.pathname as text
+    if path == "/"
+        return html(readText("public/index.html"))
+    end
+    if path == "/client.js"
+        return javascript(readText("dist/client.js"))
+    end
+    if request.method == "GET" and path == "/api/products"
+        return json(db.prepare("select id, name, price, stock, category from products order by id").all())
+    end
+    if request.method == "POST" and path == "/api/products"
+        let body = await requestJson(request)
+        let name = field(body, "name")
+        let price = body.price as number
+        let stock = body.stock as number
+        if name == "" or price < 0 or stock < 0
+            return json({ error: "name, non-negative price, and non-negative stock are required" }, 400)
+        end
+        let result = db.prepare("insert into products (name, price, stock, category) values (?, ?, ?, ?)").run(name, price, stock, field(body, "category"))
+        return json(db.prepare("select * from products where id = ?").get(result.lastInsertRowid), 201)
+    end
+    if request.method == "POST" and path == "/api/checkout"
+        let body = await requestJson(request)
+        let customer = field(body, "customerId")
+        let productId = body.productId as number
+        let quantity = body.quantity as number
+        if customer == "" or quantity < 1
+            return json({ error: "customerId and a positive quantity are required" }, 400)
+        end
+        let product = db.prepare("select * from products where id = ?").get(productId)
+        if product == nothing
+            return json({ error: "product not found" }, 404)
+        end
+        if product.stock < quantity
+            return json({ error: "insufficient inventory" }, 409)
+        end
+        let total = product.price * quantity
+        db.exec("begin")
+        try
+            let order = db.prepare("insert into orders (customer_id, total, payment_status) values (?, ?, 'simulated')").run(customer, total)
+            db.prepare("insert into order_items (order_id, product_id, quantity, unit_price) values (?, ?, ?, ?)").run(order.lastInsertRowid, productId, quantity, product.price)
+            db.prepare("update products set stock = stock - ? where id = ?").run(quantity, productId)
+            db.exec("commit")
+            return json({ id: order.lastInsertRowid, total: total, paymentStatus: "simulated", message: "No real payment provider was charged" }, 201)
+        catch failure
+            db.exec("rollback")
+            return json({ error: "checkout failed" }, 500)
+        end
+    end
+    if request.method == "GET" and path == "/api/orders"
+        return json(db.prepare("select * from orders order by id desc").all())
+    end
+    if request.method == "GET" and path == "/api/dashboard"
+        return json({ products: db.prepare("select count(*) as total from products").get().total, orders: db.prepare("select count(*) as total from orders").get().total, revenue: db.prepare("select coalesce(sum(total), 0) as total from orders").get().total })
+    end
+    return notFound()
+end
+
+let port = parseNumber(env("PORT", "3000"))
+print("Commerce on http://localhost:{port}")
+await serve(port, handler)

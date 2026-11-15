@@ -1,0 +1,19 @@
+declare function fetch(url: text, options?: any) -> Promise of any
+declare const document: any
+declare const EventSource: any
+
+async function load() -> nothing
+    let response = await fetch("/api/conversations")
+    let conversations = await response.json()
+    let lines = ""
+    for conversation in conversations as list of any
+        lines = "{lines}<li>{conversation.name}</li>"
+    end
+    document.querySelector("#app").innerHTML = "<h1>Chat</h1><p>Persistent conversations with live events</p><ul>{lines}</ul>"
+    let events = new EventSource("/events")
+    events.addEventListener("message", (event: any) => do
+        document.title = "New message"
+    end)
+end
+
+load()

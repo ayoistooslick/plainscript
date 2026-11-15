@@ -178,7 +178,7 @@ That was my file's bug, not the compiler's — the parser pointed at the right c
 
 **Class:** documentation/template defect (not compiler).
 
-`templates/fullstack-auth/src/shared.pln` and `client.pln` contained invented syntax:
+`the former auth template/src/shared.pln` and `client.pln` contained invented syntax:
 `?User` (prefix optional), `createElement "div" with ...` (JSX-ish calls), backtick
 template literals, `element` used as a variable name (reserved keyword), `{ ... }` arrow
 bodies, and calls without parentheses. Result: 40+ parse errors; the module never
@@ -201,7 +201,7 @@ input/session types and uses postfix optional (`PublicUser?`).
 
 **Class:** application work (the stress test).
 
-`templates/fullstack-auth/src/app.pln` now implements:
+`the former auth template/src/app.pln` now implements:
 
 - `POST /api/auth/register` — validation (required fields, password ≥ 8), duplicate
   username/email → `409`, scrypt hash with a 16-byte random salt, session issued, `201`.
@@ -243,7 +243,7 @@ name/private/devDependency, and writes `.gitignore`. Unknown ids list what is av
 and exit `2`. `package.json` ships `templates/`; `docs/CLI.md` documents the flag.
 
 **Tests:** `tests/cli.test.js` →
-`new --template scaffolds the bundled fullstack-auth project` (scaffolds, then runs
+`new --template scaffolds the bundled the former auth template project` (scaffolds, then runs
 `plainscript check` inside the new project), `new rejects an unknown template`.
 
 **Status:** Fix implemented, regression tested.
@@ -599,10 +599,10 @@ No existing test was modified, skipped, or weakened.
 - `src/checker.js` — async lambda frame and `Promise of` result type.
 - `src/cli.js` — `--template` scaffolding, `copyTemplate`, help text.
 - `package.json` — `files` includes `templates`.
-- `templates/fullstack-auth/src/app.pln` — real auth API.
-- `templates/fullstack-auth/src/client.pln` — rewritten to valid PlainScript.
-- `templates/fullstack-auth/src/shared.pln` — valid optional types, public projection.
-- `templates/fullstack-auth/package.json` — publishable script/name shape.
+- `the former auth template/src/app.pln` — real auth API.
+- `the former auth template/src/client.pln` — rewritten to valid PlainScript.
+- `the former auth template/src/shared.pln` — valid optional types, public projection.
+- `the former auth template/package.json` — publishable script/name shape.
 - `tests/grammar-matrix.test.js` — new matrix.
 - `tests/cli.test.js` — two template tests.
 - `docs/SPEC.md` — parameter annotations, async lambda type, `and`/`or` only,

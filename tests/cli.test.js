@@ -139,19 +139,22 @@ test('new scaffolds a runnable project', () => {
   assert.strictEqual(run.stdout, 'Hello, WORLD!\n');
 });
 
-test('new --template scaffolds the bundled fullstack-auth project', () => {
+test('new --template scaffolds each bundled application', () => {
   const directory = sandbox();
-  const result = cli(['new', 'auth-app', '--template', 'fullstack-auth'], directory);
-  assert.strictEqual(result.status, 0, result.stderr);
-  const project = path.join(directory, 'auth-app');
-  for (const file of ['src/app.pln', 'src/client.pln', 'src/shared.pln']) {
-    assert.ok(fs.existsSync(path.join(project, file)), `missing ${file}`);
+  for (const template of ['project-management', 'ecommerce', 'realtime-chat']) {
+    const name = `${template}-app`;
+    const result = cli(['new', name, '--template', template], directory);
+    assert.strictEqual(result.status, 0, result.stderr);
+    const project = path.join(directory, name);
+    for (const file of ['src/app.pln', 'src/client.pln', 'src/shared.pln', 'README.md']) {
+      assert.ok(fs.existsSync(path.join(project, file)), `${template}: missing ${file}`);
+    }
+    const packageJson = JSON.parse(fs.readFileSync(path.join(project, 'package.json'), 'utf8'));
+    assert.strictEqual(packageJson.name, name);
+    assert.ok(packageJson.devDependencies['plainscript-lang']);
+    const check = cli(['check', 'src/app.pln', 'src/client.pln', 'src/shared.pln'], project);
+    assert.strictEqual(check.status, 0, `${template}: ${check.stderr}`);
   }
-  const packageJson = JSON.parse(fs.readFileSync(path.join(project, 'package.json'), 'utf8'));
-  assert.strictEqual(packageJson.name, 'auth-app');
-  assert.ok(packageJson.devDependencies['plainscript-lang']);
-  const check = cli(['check'], project);
-  assert.strictEqual(check.status, 0, check.stderr);
 });
 
 test('new rejects an unknown template', () => {

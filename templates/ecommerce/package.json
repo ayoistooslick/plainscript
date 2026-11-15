@@ -1,0 +1,14 @@
+{
+  "name": "plainscript-ecommerce",
+  "version": "0.1.0",
+  "description": "SQLite-backed catalogue and order application built in PlainScript",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "plainscript build",
+    "check": "plainscript check",
+    "start": "plainscript run src/app.pln",
+    "test": "plainscript test"
+  },
+  "devDependencies": { "plainscript-lang": "^2.0.0" }
+}
