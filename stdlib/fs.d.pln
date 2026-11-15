@@ -1,0 +1,14 @@
+# Declarations for std/fs.
+
+export declare function readText(file: text) -> text
+export declare function writeText(file: text, text: text) -> nothing
+export declare function appendText(file: text, text: text) -> nothing
+export declare function exists(file: text) -> boolean
+export declare function remove(file: text) -> nothing
+export declare function makeDir(directory: text) -> nothing
+export declare function listDir(directory: text) -> list of text
+export declare function stat(file: text) -> { size: number, modified: number, isDirectory: boolean }
+export declare function joinPath(...parts: list of text) -> text
+export declare function baseName(file: text) -> text
+export declare function folderOf(file: text) -> text
+export declare function extensionOf(file: text) -> text
