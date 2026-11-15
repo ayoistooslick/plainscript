@@ -1,0 +1,143 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Compiler architecture — PlainScript documentation."><title>Compiler architecture · PlainScript</title><link rel="stylesheet" href="style.css"></head><body><div class="site-shell"><aside class="sidebar"><a class="brand" href="index.html"><span class="brand-mark">PS</span><span><span class="brand-name">PlainScript</span><span class="brand-meta">Language docs · 2.0</span></span></a><div class="nav-group"><div class="nav-label">Start here</div><a class="nav-link " href="index.html">PlainScript</a><a class="nav-link " href="cli.html">CLI reference</a><a class="nav-link " href="templates.html">Application templates</a></div><div class="nav-group"><div class="nav-label">Language</div><a class="nav-link " href="spec.html">Language specification</a><a class="nav-link " href="syntax-design.html">Syntax design</a></div><div class="nav-group"><div class="nav-label">Compiler</div><a class="nav-link active" href="architecture.html">Compiler architecture</a><a class="nav-link " href="interop.html">JavaScript interoperability</a></div><div class="nav-group"><div class="nav-label">Guides</div><a class="nav-link " href="migration.html">Migration guide</a></div><div class="nav-group"><div class="nav-label">Project</div><a class="nav-link " href="progress.html">Engineering progress</a><a class="nav-link " href="audit.html">Audit</a><a class="nav-link " href="decisions.html">Decisions</a></div><div class="sidebar-footer">Open source under MIT.<br><a href="https://github.com/ayoistooslick/Plainscript">View on GitHub ↗</a></div></aside><main class="main"><header class="topbar"><div class="search-wrap"><label class="search" aria-label="Search documentation"><span>⌕</span><input id="doc-search" type="search" placeholder="Search the docs…" autocomplete="off"><kbd>/</kbd></label><div id="search-results" class="search-results" role="listbox"></div></div><nav class="top-links"><a href="index.html">Docs</a><a href="https://github.com/ayoistooslick/Plainscript">GitHub ↗</a></nav></header><div class="content"><article class="page-layout"><div class="prose"><h1 id="compiler-architecture">Compiler architecture</h1>
+<p>PlainScript 2.0 is a single-pass-per-stage compiler with an explicit typed IR between checking and emission. There are no runtime dependencies, and the emitted code has no PlainScript runtime.</p>
+<pre><code> .pln source
+      │
+      ▼
+ ┌─────────┐   tokens (text, templates, punctuation, keywords)
+ │ lexer   │   src/lexer.js
+ └─────────┘
+      │
+      ▼
+ ┌─────────┐   AST with spans on every node
+ │ parser  │   src/parser.js
+ └─────────┘
+      │
+      ▼
+ ┌─────────┐   diagnostics + export tables + inferred signatures
+ │ checker │   src/checker.js  (types in src/types.js)
+ └─────────┘
+      │
+      ▼
+ ┌─────────┐   typed HIR: desugared templates, pipes, patterns, elements
+ │ lowering│   src/hir.js
+ └─────────┘
+      │
+      ▼
+ ┌─────────┐   ES module text + source map
+ │ emitter │   src/codegen.js, src/sourcemap.js
+ └─────────┘</code></pre>
+<p><code>src/modules.js</code> owns the module graph: resolution, cycle detection, std declarations, per-module compilation and output writing. <code>src/cli.js</code> is a thin front end over it. <code>src/index.js</code> is the programmatic API.</p>
+<h2 id="layers">Layers</h2>
+<table><thead><tr><th>Layer</th><th>Location</th><th>Responsibility</th></tr></thead><tbody>
+<tr><td>Language core</td><td><code>docs/SPEC.md</code></td><td>Syntax and semantics, independent of JavaScript.</td></tr>
+<tr><td>Compiler</td><td><code>src/lexer.js</code>, <code>parser.js</code>, <code>checker.js</code>, <code>types.js</code>, <code>hir.js</code>, <code>codegen.js</code>, <code>modules.js</code>, <code>diagnostics.js</code>, <code>sourcemap.js</code></td><td>Accepts only specified programs and emits equivalent modules.</td></tr>
+<tr><td>Runtime interface</td><td><code>stdlib/*.js</code></td><td>Ordinary JavaScript modules the emitted code imports. No global runtime, no class hierarchy, no reflection.</td></tr>
+<tr><td>Standard library</td><td><code>stdlib/<em>.js</code> + <code>stdlib/</em>.d.pln</code></td><td>Fundamentals only.</td></tr>
+<tr><td>Packages</td><td>user projects</td><td>Everything service-, vendor- or framework-specific.</td></tr>
+</tbody></table>
+<p>The 2.0 compiler does <strong>not</strong> contain a bundler, a dependency detector, an LSP server or service helpers. Those are separate tools (Vite/webpack/Next for bundling), future work (LSP) or packages.</p>
+<h2 id="lexer">Lexer</h2>
+<ul>
+<li>Produces <code>{t, v, line, col}</code> tokens: <code>ident</code>, <code>kw</code>, <code>number</code>, <code>text</code>, <code>template</code>,</li>
+<p><code>punct</code>, <code>eof</code>.</p>
+<li>Text literals are split into interpolation parts at lex time; the parser receives</li>
+<p><code>{text}</code> and <code>{exprTokens}</code> segments, so <code>&quot;a {b} c&quot;</code> is one <code>template</code> token.</p>
+<li>Triple-quoted and raw single-quoted literals are distinct token forms.</li>
+<li>Comments are dropped but lines are preserved for diagnostics.</li>
+<li>Lexical errors are <code>PS1001</code>–<code>PS1004</code>; the lexer reports and recovers at the line end.</li>
+</ul>
+<h2 id="parser">Parser</h2>
+<p>Recursive descent with one token of lookahead, plus targeted backtracking for lambdas and generic parameter lists (<code>tryLambda</code>, <code>tryTypeParameters</code>). Design points:</p>
+<ul>
+<li>Blocks are keyword-delimited (<code>end</code>), so newlines are insignificant. This removes</li>
+<p>automatic-semicolon-insertion ambiguity entirely.</p>
+<li><code>return</code> requires an expression, removing the only place where a newline would otherwise</li>
+<p>change meaning.</p>
+<li>Every node carries <code>line</code> and <code>col</code>; diagnostics use them for code frames.</li>
+<li>Reserved words cannot be identifiers, but are accepted as property names after <code>.</code>, as</li>
+<p>element attributes and as record keys.</p>
+<li><code>element</code> is parsed in both statement and expression position; <code>render</code> is a statement.</li>
+</ul>
+<p>The parser never infers types and never emits code.</p>
+<h2 id="type-checker">Type checker</h2>
+<p><code>src/checker.js</code> runs after parsing and before lowering. It:</p>
+<ol>
+<li>Collects type declarations, resolving aliases and variant constructors (<code>collectTypes</code>,</li>
+<p><code>resolveAllTypes</code>).</p>
+<li>Hoists imports, functions, <code>declare</code>d values and exported type names (<code>hoist</code>,</li>
+<p><code>hoistFunctions</code>).</p>
+<li>Checks statements with a lexical scope chain, inferring expression types</li>
+<p>(<code>typeOf</code>) and reporting diagnostics.</p>
+<li>Applies narrowing facts derived from conditions (<code>narrowFacts</code>, <code>applyFacts</code>).</li>
+<li>Verifies match exhaustiveness and unreachable cases.</li>
+<li>Verifies return coverage and declared return types.</li>
+<li>Publishes an export table (<code>values</code> and <code>types</code>) for importers, plus inferred function</li>
+<p>signatures and the set of type-only imports used to erase runtime imports.</p>
+</ol>
+<p>Types live in <code>src/types.js</code>: <code>prim</code>, <code>list</code>, <code>map</code>, <code>promise</code>, <code>record</code>, <code>variant</code>, <code>unit</code>, <code>fn</code>, <code>union</code>, <code>var</code>, <code>named</code>, plus <code>assignable</code>, <code>infer</code>, <code>substitute</code>, <code>deref</code>, <code>showType</code>. Named aliases are registered per checker instance so diagnostics keep the author&#39;s names.</p>
+<p>The checker is the only enforcer of types. It is therefore required to be complete for the constructs it accepts: when a construct&#39;s types cannot be checked, that is a compiler bug, not a runtime concern.</p>
+<h2 id="typed-hir">Typed HIR</h2>
+<p><code>src/hir.js</code> lowers the AST into a smaller language the emitter can assume:</p>
+<ul>
+<li><code>VarDecl</code> with real patterns, function declarations with resolved parameter metadata.</li>
+<li>Templates become concatenation; pipes become calls; <code>??</code>/<code>?.</code> stay as operators.</li>
+<li>Variant construction and unit variants become objects/strings (<code>$kind</code>).</li>
+<li>Match becomes a lowered decision structure with bindings.</li>
+<li><code>render</code>/<code>element</code> become <code>createElement(tag, props, ...children)</code> calls at the correct</li>
+<p>scope.</p>
+<li>Casts disappear; <code>is</code> tests become inline runtime checks.</li>
+<li>Type-only imports disappear.</li>
+<li>Names that collide with JavaScript reserved words are escaped with a <code>$</code> prefix</li>
+<p>(<code>jsName</code>), so a PlainScript <code>default</code> or <code>new</code> parameter is legal and emitted safely.</p>
+</ul>
+<p>The HIR is inspectable with <code>plainscript ir file.pln</code> and is what a future backend would consume. It is deliberately not JavaScript: it has no statements for imports of types, no templates, no patterns and no render forms.</p>
+<h2 id="emitter">Emitter</h2>
+<p><code>src/codegen.js</code> walks the HIR and prints ES modules.</p>
+<ul>
+<li>Statements map to JavaScript statements; <code>match</code> lowers to a labelled block with ordered</li>
+<p>branch tests and <code>break</code>.</p>
+<li><code>is</code> lowers to <code>typeof</code>, <code>Array.isArray</code>, object tests or <code>$kind</code> comparisons.</li>
+<li>Every emitted statement records a mapping, and <code>src/sourcemap.js</code> encodes a v3 source</li>
+<p>map. Output files end with <code>//# sourceMappingURL=&lt;name&gt;.js.map</code>.</p>
+<li>The emitter contains no type information; it cannot introduce a runtime type check that</li>
+<p>the language does not specify.</p>
+</ul>
+<h2 id="module-graph">Module graph</h2>
+<p><code>src/modules.js</code>:</p>
+<ul>
+<li>Resolves <code>std/&lt;name&gt;</code> to bundled declarations and runtime files, relative <code>.pln</code> files to</li>
+<p>their sources, and bare specifiers to the JavaScript runtime.</p>
+<li>Detects import cycles (<code>PS4001</code>) and unresolved modules (<code>PS4002</code>) before emitting.</li>
+<li>Compiles the whole graph before writing anything, so a failed build leaves no partial</li>
+<p>output.</p>
+<li>Rewrites relative specifiers from <code>.pln</code> to <code>.js</code>, and emits <code>std/…</code> either as</li>
+<p><code>plainscript-lang/std/…</code> or as a URL base when <code>--std-base</code> is set for browser builds.</p>
+<li>Writes a <code>package.json</code> with <code>&quot;type&quot;: &quot;module&quot;</code> into the output directory when the</li>
+<p>surrounding project is not already ESM.</p>
+</ul>
+<h2 id="standard-library-interface">Standard library interface</h2>
+<p>Each module is a hand-written JavaScript file plus a <code>.d.pln</code> declaration file that the checker parses like any other PlainScript module. This keeps runtime and types in one reviewable place, with no build step and no <code>.d.ts</code> tooling, and it means a standard library signature bug is a compiler-visible bug rather than a documentation problem.</p>
+<h2 id="diagnostics">Diagnostics</h2>
+<p><code>src/diagnostics.js</code> defines <code>CompileError</code> and the reporting helpers. Diagnostics carry a stable code, message, file, line, column and optional source excerpt. The CLI prints code frames, counts errors and exits non-zero. Warnings do not exist as a category; anything worth reporting is an error, and everything reported is fixed before emission.</p>
+<h2 id="testing-strategy">Testing strategy</h2>
+<table><thead><tr><th>File</th><th>Layer</th></tr></thead><tbody>
+<tr><td><code>tests/lexer.test.js</code></td><td>tokens, interpolation, escapes, errors</td></tr>
+<tr><td><code>tests/parser.test.js</code></td><td>grammar, precedence, spans, parse errors</td></tr>
+<tr><td><code>tests/checker.test.js</code></td><td>inference, assignability, narrowing, exhaustiveness, returns</td></tr>
+<tr><td><code>tests/compiler.test.js</code></td><td>HIR, codegen, source maps, modules, std rewriting</td></tr>
+<tr><td><code>tests/runtime.test.js</code></td><td>executed programs, async, errors, stdlib behaviour</td></tr>
+<tr><td><code>tests/cli.test.js</code></td><td>run/build/check/fmt/test/new, exit codes, files written</td></tr>
+<tr><td><code>tests/interop.test.js</code></td><td>npm packages, Node builtins, ambient declarations, JS consumers</td></tr>
+<tr><td><code>tests/formatter.test.js</code></td><td>idempotence, token preservation, invalid input</td></tr>
+<tr><td><code>tests/package.test.js</code></td><td>package metadata and exports</td></tr>
+</tbody></table>
+<p>Tests use <code>tests/helpers.js</code> to compile into sandboxed directories under <code>.plainscript/tests/</code>, so std resolution and module rewriting are exercised exactly as in a real project.</p>
+<h2 id="extension-points">Extension points</h2>
+<ul>
+<li><strong>A second backend</strong>: implement an emitter over the HIR; the checker and lowering are</li>
+<p>target-independent.</p>
+<li><strong>Editor tooling</strong>: the checker&#39;s export tables and diagnostics are already structured</li>
+<p>data; an LSP would call <code>Compiler.compile</code> per document and translate diagnostics.</p>
+<li><strong>Standard library growth</strong>: add <code>stdlib/x.js</code> + <code>stdlib/x.d.pln</code>; no compiler change is</li>
+<p>needed unless the module needs a new host capability.</p>
+</ul></div><aside class="toc"><div class="toc-title">On this page</div><a class="toc-h2" href="#layers">Layers</a><a class="toc-h2" href="#lexer">Lexer</a><a class="toc-h2" href="#parser">Parser</a><a class="toc-h2" href="#type-checker">Type checker</a><a class="toc-h2" href="#typed-hir">Typed HIR</a><a class="toc-h2" href="#emitter">Emitter</a><a class="toc-h2" href="#module-graph">Module graph</a><a class="toc-h2" href="#standard-library-interface">Standard library interface</a><a class="toc-h2" href="#diagnostics">Diagnostics</a><a class="toc-h2" href="#testing-strategy">Testing strategy</a><a class="toc-h2" href="#extension-points">Extension points</a></aside></article><footer class="page-footer"><span>PlainScript 2.0 documentation</span><a href="https://github.com/ayoistooslick/Plainscript/issues">Report a documentation issue ↗</a></footer></div></main></div><script src="app.js"></script></body></html>

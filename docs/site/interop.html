@@ -1,0 +1,137 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="JavaScript interoperability — PlainScript documentation."><title>JavaScript interoperability · PlainScript</title><link rel="stylesheet" href="style.css"></head><body><div class="site-shell"><aside class="sidebar"><a class="brand" href="index.html"><span class="brand-mark">PS</span><span><span class="brand-name">PlainScript</span><span class="brand-meta">Language docs · 2.0</span></span></a><div class="nav-group"><div class="nav-label">Start here</div><a class="nav-link " href="index.html">PlainScript</a><a class="nav-link " href="cli.html">CLI reference</a><a class="nav-link " href="templates.html">Application templates</a></div><div class="nav-group"><div class="nav-label">Language</div><a class="nav-link " href="spec.html">Language specification</a><a class="nav-link " href="syntax-design.html">Syntax design</a></div><div class="nav-group"><div class="nav-label">Compiler</div><a class="nav-link " href="architecture.html">Compiler architecture</a><a class="nav-link active" href="interop.html">JavaScript interoperability</a></div><div class="nav-group"><div class="nav-label">Guides</div><a class="nav-link " href="migration.html">Migration guide</a></div><div class="nav-group"><div class="nav-label">Project</div><a class="nav-link " href="progress.html">Engineering progress</a><a class="nav-link " href="audit.html">Audit</a><a class="nav-link " href="decisions.html">Decisions</a></div><div class="sidebar-footer">Open source under MIT.<br><a href="https://github.com/ayoistooslick/Plainscript">View on GitHub ↗</a></div></aside><main class="main"><header class="topbar"><div class="search-wrap"><label class="search" aria-label="Search documentation"><span>⌕</span><input id="doc-search" type="search" placeholder="Search the docs…" autocomplete="off"><kbd>/</kbd></label><div id="search-results" class="search-results" role="listbox"></div></div><nav class="top-links"><a href="index.html">Docs</a><a href="https://github.com/ayoistooslick/Plainscript">GitHub ↗</a></nav></header><div class="content"><article class="page-layout"><div class="prose"><h1 id="javascript-interoperability">JavaScript interoperability</h1>
+<p>PlainScript emits ES modules. There is no runtime library, no wrapper around React, and no custom module format, so interoperability is a question of what the emitted JavaScript can import — which is everything Node, a bundler or a browser can import.</p>
+<pre><code>import { createElement, useState } from &quot;react&quot;     # npm package
+import express from &quot;express&quot;                        # npm package, CommonJS default
+import { readFile } from &quot;node:fs/promises&quot;          # Node builtin
+import &quot;./style.css&quot;                                 # bundler asset
+import { helper } from &quot;./helper.pln&quot;                # PlainScript module</code></pre>
+<p>Types at the boundary are <code>any</code> unless declared:</p>
+<pre><code>declare const process: any
+declare function fetch(url: text, options?: any) -&gt; Promise of any
+declare const document: any</code></pre>
+<p>Declaring is how you opt JavaScript values into the checker without a separate declaration language.</p>
+<h2 id="node-js">Node.js</h2>
+<p>Target: Node 20+. <code>plainscript run</code> compiles the module graph into <code>.plainscript/run/</code> with an ESM <code>package.json</code> and spawns Node. <code>plainscript build</code> emits ESM files with explicit <code>.js</code> specifiers, so the same output runs under <code>node dist/main.js</code>.</p>
+<p>Verified:</p>
+<ul>
+<li><code>std/fs</code>, <code>std/http</code> and <code>std/io</code> on Node&#39;s standard library.</li>
+<li><code>import</code> of <code>node:</code> builtins; the interop test suite imports a builtin and asserts on the</li>
+<p>result.</p>
+<li>npm packages resolved by Node from <code>node_modules</code>.</li>
+</ul>
+<h3 id="express">Express</h3>
+<p><code>demos/express</code> runs a real Express 4 application. The handlers are PlainScript lambdas with block bodies (<code>=&gt; do … end</code>), and the app was exercised with <code>curl</code>:</p>
+<pre><code>import express from &quot;express&quot;
+import { print } from &quot;std/io&quot;
+
+const app = express()
+let hits = 0
+
+app.get(&quot;/&quot;, (request: any, response: any) =&gt; do
+    hits += 1
+    response.json({ ok: true, hits: hits, framework: &quot;express&quot; })
+end)
+
+app.get(&quot;/users/:id&quot;, (request: any, response: any) =&gt; do
+    response.json({ id: request.params.id })
+end)
+
+app.listen(4501, () =&gt; do
+    print(&quot;express app listening on 4501&quot;)
+end)</code></pre>
+<pre><code>$ curl -s localhost:4501/
+{&quot;ok&quot;:true,&quot;hits&quot;:1,&quot;framework&quot;:&quot;express&quot;}
+$ curl -s localhost:4501/users/42
+{&quot;id&quot;:&quot;42&quot;}</code></pre>
+<p>Node&#39;s ESM loader handles Express&#39;s CommonJS default export; named imports from CommonJS work when Node&#39;s cjs-module-lexer can detect them.</p>
+<h3 id="a-node-http-api-without-a-framework">A Node HTTP API without a framework</h3>
+<p><code>demos/api</code> uses <code>std/http</code> with the Web <code>Request</code>/<code>Response</code> model:</p>
+<pre><code>import { serve, json, notFound, requestJson, urlOf } from &quot;std/http&quot;
+
+async function handler(request: any) -&gt; any
+    let url = urlOf(request)
+    if request.method == &quot;GET&quot; and url.pathname == &quot;/health&quot;
+        return json({ status: &quot;ok&quot; })
+    end
+    return notFound()
+end
+
+await serve(4321, handler)</code></pre>
+<p>Verified with <code>curl</code>: <code>GET /health</code>, <code>GET /tickets</code>, <code>POST /tickets</code> returning <code>201</code> with the created object, and <code>404</code> for an unknown path.</p>
+<p>Because the handler signature is Web-standard, the same code shape runs on Node 20, Deno, Bun and Cloudflare Workers; only <code>serve(port, …)</code> is Node-specific.</p>
+<h2 id="react">React</h2>
+<p><code>render</code> blocks call <code>createElement</code> from the enclosing scope. Importing React is enough — no JSX transform, no Babel plugin, no custom runtime.</p>
+<pre><code>import { createElement, useState } from &quot;react&quot;
+
+export function Counter() -&gt; any
+    let (count, setCount) = useState(0)
+    render
+        element &quot;button&quot; with onClick: () =&gt; setCount(count + 1)
+            &quot;clicked {count} times&quot;
+        end
+    end
+end</code></pre>
+<p>Hooks are ordinary functions; the <code>(count, setCount)</code> tuple returned by <code>useState</code> is destructured with the language&#39;s normal binding pattern. Event handlers are lambdas typed <code>any</code> at React&#39;s boundary. Props are <code>with name: value</code>; <code>key</code> and <code>className</code> are accepted like any other property (keywords are valid property names).</p>
+<h3 id="vite">Vite</h3>
+<p><code>demos/react</code> is a Vite project whose entry imports the compiled component:</p>
+<pre><code>demos/react/
+  index.html              &lt;script type=&quot;module&quot; src=&quot;/src/main.js&quot;&gt;
+  src/main.js             createRoot(...).render(createElement(App))
+  src/App.pln             the component
+  src/generated/App.js    emitted by plainscript build
+  vite.config.js          allows importing stdlib from the repository root
+  plainscript.config.json rootDir src, outDir src/generated</code></pre>
+<pre><code>cd demos/react
+npm install
+npm run build      # plainscript build &amp;&amp; vite build</code></pre>
+<p>Observed output: Vite bundled 25 modules, React included, into <code>dist/assets/index-*.js</code> (224 kB, 70 kB gzip). The built page was then loaded in a browser: the heading, the input and the add button rendered, typing a title and pressing &quot;Add&quot; produced a row, and clicking the row toggled it to &quot;done&quot;. That exercises <code>useState</code>, <code>onChange</code>, <code>onSubmit</code>, <code>onClick</code>, dynamic child lists and conditional labels.</p>
+<p>Development: <code>npm run dev</code> compiles PlainScript first, then starts Vite. The config&#39;s <code>server.fs.allow</code> includes the repository root because compiled modules import <code>std/list.js</code> from there; a published package would resolve it inside <code>node_modules</code> instead.</p>
+<h2 id="next-js">Next.js</h2>
+<p><code>demos/next</code> is a Next.js 15 App Router project with a PlainScript React Server Component:</p>
+<pre><code>app/Home.pln        component, compiled to app/generated/Home.js
+app/page.js         import { Home } ... ; export default function Page() { return Home(); }
+app/layout.js       root layout</code></pre>
+<pre><code>cd demos/next
+npm install
+npm run build      # plainscript build &amp;&amp; next build</code></pre>
+<p>Observed: <code>next build</code> (Next 15.5.29) reported <code>✓ Compiled successfully</code>, generated four static pages, and prerendered <code>/</code> as static content. The generated component imports <code>react</code> and <code>std/list</code>; webpack resolved both. No Next plugin or loader is involved — the file that Next consumes is ordinary JavaScript.</p>
+<p>PlainScript components are server components by default, like any React component. Client components work the same way with <code>&quot;use client&quot;</code> placed at the top of a <code>.js</code> wrapper, or by adding the directive to the emitted file in a build step; PlainScript syntax itself has no directives.</p>
+<h2 id="browser">Browser</h2>
+<p>The backend emits modules, not a bundle. Two ways to run PlainScript in a browser:</p>
+<ol>
+<li><strong>Through a bundler</strong> (Vite, webpack, Next, esbuild) — the default and simplest option.</li>
+<li><strong>Directly</strong>, by serving the emitted modules and their standard library imports as</li>
+<p>URLs. Build with <code>--std-base</code>:</p>
+</ol>
+<pre><code>plainscript build src/client.pln --std-base=/std</code></pre>
+<p>The emitted client then begins:</p>
+<pre><code>import { createElement, mount } from &quot;/std/dom.js&quot;;
+import { append } from &quot;/std/list.js&quot;;</code></pre>
+<p>The server must serve those paths. <code>demos/fullstack</code> copies <code>stdlib/dom.js</code> and <code>stdlib/list.js</code> into <code>public/std/</code> and returns them with a JavaScript content type. Verified in a browser: the client fetched <code>/todos</code>, rendered two rows, and a click on &quot;Add a todo&quot; POSTed to the API and re-rendered with the new row.</p>
+<p>Browser globals (<code>fetch</code>, <code>document</code>, <code>window</code>, <code>JSON</code>, <code>Date</code>) are not built in; declare them:</p>
+<pre><code>declare function fetch(url: text, options?: any) -&gt; Promise of any
+declare const JSON: any</code></pre>
+<p><code>std/dom</code> provides only <code>createElement</code> and <code>mount</code>; it reads <code>document</code> at call time, so it is browser-only and must not be imported by server code.</p>
+<h2 id="npm-packages">npm packages</h2>
+<p>Any package that works in ESM works here. Two practical notes:</p>
+<ul>
+<li><strong>Types</strong>: a package&#39;s values are <code>any</code> unless you declare a shape. There are no</li>
+<p>community type definitions for PlainScript in 2.0.</p>
+<li><strong>CommonJS</strong>: default imports work in Node (<code>import express from &quot;express&quot;</code>). Named</li>
+<p>imports depend on Node&#39;s static analysis of the CommonJS module; when in doubt, import the default and read members.</p>
+</ul>
+<p><code>tests/interop.test.js</code> covers deep property access on untyped values, default imports from npm-style modules, Node builtins, ambient declarations, errors thrown by JavaScript being catchable, and PlainScript libraries being importable from JavaScript.</p>
+<h2 id="consuming-plainscript-from-javascript">Consuming PlainScript from JavaScript</h2>
+<p>A built PlainScript module is a normal ESM module:</p>
+<pre><code>// consumer.mjs
+import { greet } from &quot;./dist/lib/greet.js&quot;;
+console.log(greet(&quot;world&quot;));</code></pre>
+<p>Only <code>export</code>ed values are visible. Types are erased, so JavaScript callers get no runtime checking; the PlainScript side was checked when it was built.</p>
+<h2 id="what-is-not-supported">What is not supported</h2>
+<ul>
+<li>JSX/TSX files, or a <code>.pln</code> file containing JSX.</li>
+<li>Automatic TypeScript declaration (<code>.d.ts</code>) output; the <code>.d.pln</code> declarations are for</li>
+<p>PlainScript only.</p>
+<li>Bundling, code splitting or asset handling in the compiler. Use the ecosystem&#39;s tools.</li>
+<li>Decorators, proxies or reflection-based dependency injection.</li>
+</ul></div><aside class="toc"><div class="toc-title">On this page</div><a class="toc-h2" href="#node-js">Node.js</a><a class="toc-h3" href="#express">Express</a><a class="toc-h3" href="#a-node-http-api-without-a-framework">A Node HTTP API without a framework</a><a class="toc-h2" href="#react">React</a><a class="toc-h3" href="#vite">Vite</a><a class="toc-h2" href="#next-js">Next.js</a><a class="toc-h2" href="#browser">Browser</a><a class="toc-h2" href="#npm-packages">npm packages</a><a class="toc-h2" href="#consuming-plainscript-from-javascript">Consuming PlainScript from JavaScript</a><a class="toc-h2" href="#what-is-not-supported">What is not supported</a></aside></article><footer class="page-footer"><span>PlainScript 2.0 documentation</span><a href="https://github.com/ayoistooslick/Plainscript/issues">Report a documentation issue ↗</a></footer></div></main></div><script src="app.js"></script></body></html>

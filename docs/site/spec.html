@@ -1,0 +1,429 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Language specification — PlainScript documentation."><title>Language specification · PlainScript</title><link rel="stylesheet" href="style.css"></head><body><div class="site-shell"><aside class="sidebar"><a class="brand" href="index.html"><span class="brand-mark">PS</span><span><span class="brand-name">PlainScript</span><span class="brand-meta">Language docs · 2.0</span></span></a><div class="nav-group"><div class="nav-label">Start here</div><a class="nav-link " href="index.html">PlainScript</a><a class="nav-link " href="cli.html">CLI reference</a><a class="nav-link " href="templates.html">Application templates</a></div><div class="nav-group"><div class="nav-label">Language</div><a class="nav-link active" href="spec.html">Language specification</a><a class="nav-link " href="syntax-design.html">Syntax design</a></div><div class="nav-group"><div class="nav-label">Compiler</div><a class="nav-link " href="architecture.html">Compiler architecture</a><a class="nav-link " href="interop.html">JavaScript interoperability</a></div><div class="nav-group"><div class="nav-label">Guides</div><a class="nav-link " href="migration.html">Migration guide</a></div><div class="nav-group"><div class="nav-label">Project</div><a class="nav-link " href="progress.html">Engineering progress</a><a class="nav-link " href="audit.html">Audit</a><a class="nav-link " href="decisions.html">Decisions</a></div><div class="sidebar-footer">Open source under MIT.<br><a href="https://github.com/ayoistooslick/Plainscript">View on GitHub ↗</a></div></aside><main class="main"><header class="topbar"><div class="search-wrap"><label class="search" aria-label="Search documentation"><span>⌕</span><input id="doc-search" type="search" placeholder="Search the docs…" autocomplete="off"><kbd>/</kbd></label><div id="search-results" class="search-results" role="listbox"></div></div><nav class="top-links"><a href="index.html">Docs</a><a href="https://github.com/ayoistooslick/Plainscript">GitHub ↗</a></nav></header><div class="content"><article class="page-layout"><div class="prose"><h1 id="the-plainscript-2-0-language-specification">The PlainScript 2.0 Language Specification</h1>
+<p>This document defines the language implemented by the compiler in <code>src/</code>. When this document and the compiler disagree, the compiler is authoritative and the document is a bug.</p>
+<p>PlainScript is statically typed, expression-oriented where it helps readability, and compiles to ECMAScript modules. Types exist at compile time only; they are erased from the output except for the small runtime checks described in <a href="#13-runtime-semantics">Runtime semantics</a>.</p>
+<p>---</p>
+<h2 id="1-design-rules">1. Design rules</h2>
+<ol>
+<li><strong>One spelling per concept.</strong> No keyword synonyms, no optional punctuation that changes</li>
+<p>meaning, no silent coercions beyond JavaScript&#39;s own.</p>
+<li><strong>Readable, not conversational.</strong> Programs read as structured prose, but <code>if</code>, <code>then</code>,</li>
+<p><code>do</code> and <code>end</code> are not English sentences and are not treated as such.</p>
+<li><strong>The compiler enforces the language.</strong> If the checker accepts a program, the emitter</li>
+<p>produces code with the same meaning. Nothing relies on a runtime type library.</p>
+<li><strong>JavaScript is the platform, not the definition.</strong> Semantics are defined here, then</li>
+<p>realised on the JavaScript runtime that PlainScript targets. Where a JavaScript detail leaks (numbers are IEEE-754 doubles, object identity, <code>Promise</code>), it is stated.</p>
+<li><strong>Interop is a boundary, not a hole.</strong> Values crossing into untyped JavaScript become</li>
+<p><code>any</code> explicitly. Nothing else is implicitly <code>any</code>.</p>
+</ol>
+<p>---</p>
+<h2 id="2-lexical-structure">2. Lexical structure</h2>
+<h3 id="2-1-source-files">2.1 Source files</h3>
+<ul>
+<li>Files use the extension <code>.pln</code> and are UTF-8.</li>
+<li>A program is a sequence of declarations and statements. Newlines are insignificant</li>
+<p>except inside text literals; statement boundaries are determined by the grammar and by block keywords.</p>
+<li>Indentation carries no meaning to the compiler. <code>plainscript fmt</code> normalises it for</li>
+<p>readers.</p>
+</ul>
+<h3 id="2-2-comments">2.2 Comments</h3>
+<pre><code># A line comment runs to the end of the line.</code></pre>
+<p>There are no block comments. Documentation comments are ordinary comments; the compiler does not extract them.</p>
+<h3 id="2-3-identifiers">2.3 Identifiers</h3>
+<p>An identifier starts with a letter or <code>_</code> and continues with letters, digits or <code>_</code>. Unicode letters are accepted. Identifiers are case-sensitive. Keywords (section 14) are not identifiers.</p>
+<h3 id="2-4-numbers">2.4 Numbers</h3>
+<p>Decimal integers and fractions: <code>0</code>, <code>42</code>, <code>3.5</code>, <code>1e9</code>, <code>2.5e-3</code>. Numeric literals are IEEE-754 doubles, as in JavaScript. There is no separate integer type and no bigint literal.</p>
+<h3 id="2-5-text">2.5 Text</h3>
+<p>Three forms:</p>
+<pre><code>&quot;double quoted, with {interpolation} and \&quot;escapes\&quot;&quot;
+&#39;single quoted, raw: {braces} and \n are literal&#39;
+&quot;&quot;&quot;triple quoted,
+   spanning lines,
+   no interpolation&quot;&quot;&quot;</code></pre>
+<ul>
+<li><code>&quot;…&quot;</code> supports <code>{expression}</code> interpolation and the escapes <code>\&quot;</code>, <code>\\</code>, <code>\n</code>, <code>\t</code>, <code>\r</code>.</li>
+<p>A literal <code>{</code> is written <code>\{</code>.</p>
+<li><code>&#39;…&#39;</code> is raw: no interpolation, no escapes. It cannot contain a single quote.</li>
+<li><code>&quot;&quot;&quot;…&quot;&quot;&quot;</code> is multiline and raw. It cannot contain <code>&quot;&quot;&quot;</code>.</li>
+</ul>
+<p>Interpolation embeds any expression: <code>&quot;total: {sum(values)}&quot;</code>. The expression is lowered to string concatenation, so its runtime value uses JavaScript&#39;s string conversion rules.</p>
+<h3 id="2-6-punctuation">2.6 Punctuation</h3>
+<pre><code>( ) [ ] { } , : . ?. ?? |&gt; ... -&gt; =&gt; = == != &lt; &lt;= &gt; &gt;= + - * / % += -= *= /= %= is as</code></pre>
+<p><code>#</code> starts a comment. <code>...</code> is spread/rest. <code>-&gt;</code> introduces a return type. <code>=&gt;</code> forms a lambda.</p>
+<p>---</p>
+<h2 id="3-programs-and-modules">3. Programs and modules</h2>
+<p>Every <code>.pln</code> file is a module. Modules are ECMAScript modules: the emitted file has one <code>import</code>/<code>export</code> surface and is loaded by the host (Node, a bundler, a browser).</p>
+<pre><code>import { print } from &quot;std/io&quot;
+import express from &quot;express&quot;
+import * as path from &quot;node:path&quot;
+import &quot;./side-effect.pln&quot;</code></pre>
+<ul>
+<li><code>std/&lt;name&gt;</code> resolves to the bundled standard library.</li>
+<li><code>./x</code> and <code>../x</code> resolve to sibling <code>.pln</code> files; the specifier is emitted with <code>.js</code>.</li>
+<li>Bare specifiers (<code>express</code>) are passed through to the JavaScript runtime unchanged.</li>
+<li>Modules are compiled as a graph. Circular imports are a compile error (<code>PS4001</code>), not a</li>
+<p>partially initialised runtime module.</p>
+<li>A module that imports a name that is not exported is an error (<code>PS3205</code>).</li>
+<li>Imports of <strong>types only</strong> are erased from the output; a module imported solely for its</li>
+<p>types produces no runtime import.</p>
+</ul>
+<p>Exports:</p>
+<pre><code>export const answer = 42
+export function greet(name: text) -&gt; text ... end
+export type Person ... end
+export { localName as publicName }
+export { thing } from &quot;./other&quot;
+export default main
+export default function handler(request: any) -&gt; any ... end
+export default function (request: any) -&gt; any ... end</code></pre>
+<p>Only a <code>const</code>/<code>let</code> name, function or type can be exported. A destructuring declaration cannot be exported (<code>PS3312</code>).</p>
+<p>A <code>default</code> export may be a function <strong>declaration</strong>. When it is named, the name is bound inside the module (so the function can call itself) and the emitted code is <code>export default function name(...)</code>, not a lambda; anonymous default functions are allowed and can only be reached through the imported binding. A <code>default</code> export of any other expression (<code>export default main</code>, <code>export default { ... }</code>) is emitted as <code>export default &lt;expression&gt;</code>.</p>
+<p>A compiled module can ship its surface as a declaration file. <code>plainscript build --declarations</code> writes <code>&lt;name&gt;.d.pln</code> next to every emitted <code>&lt;name&gt;.js</code>. A declaration file contains only exported type declarations, <code>declare function</code> signatures (inferred return types included), <code>declare const</code> values, re-exports, and the imports those signatures use; private types referenced by public signatures are kept without <code>export</code>.</p>
+<p>A relative import of <code>./x.js</code> reads <code>./x.d.pln</code> for its types, so a project can compile and run against built JavaScript without the library&#39;s sources. JavaScript imported without a declaration is an error (<code>PS4005</code>) instead of a silently untyped module.</p>
+<p>A bare specifier (<code>import { Task } from &quot;my-lib&quot;</code>) resolves through <code>node_modules</code> using the same entry rules the JavaScript host uses. Types come from the declaration named by the <code>exports</code> map&#39;s <code>types</code> condition for that subpath, or by the package&#39;s <code>types</code>/<code>typings</code> field, or a <code>.d.pln</code> beside the resolved entry. An installed package that ships no declaration stays untyped, which is the normal case for JavaScript libraries.</p>
+<p><code>plainscript build --declarations</code> writes that metadata for a library too: when the build has a single entry module, <code>types</code> and <code>exports[&quot;.&quot;].types</code> are set to its declaration and <code>exports[&quot;.&quot;].import</code> to its runtime, preserving any existing export keys and conditions.</p>
+<p>A <code>type</code> declaration may name a type imported from another module. Importing a variant alias also brings its constructors with it, so <code>Published(3)</code> and <code>case Published(views)</code> behave the same in the importing module as in the declaring one.</p>
+<p><code>declare</code> introduces ambient values without emitting code:</p>
+<pre><code>declare function fetch(url: text) -&gt; Promise of any
+declare const process: any</code></pre>
+<p>---</p>
+<h2 id="4-declarations">4. Declarations</h2>
+<h3 id="4-1-variables">4.1 Variables</h3>
+<pre><code>let count = 0            # mutable
+const limit = 10         # immutable
+let total: number = 0    # explicit type
+let (left, right) = pair              # tuple destructuring
+let { name, age } = person            # record destructuring</code></pre>
+<ul>
+<li><code>let</code> bindings are mutable; <code>const</code> bindings are not (<code>PS3307</code>). Mutating a <code>const</code></li>
+<p>object&#39;s fields is a separate question answered by the field&#39;s own type.</p>
+<li>Destructuring binds fresh variables. Tuple patterns take their element type from a</li>
+<p><code>list of T</code>; record patterns take field types from a record and give <code>any</code> for map values. An unknown record field is an error (<code>PS3313</code>).</p>
+<li>A declaration without an initialiser is a parse error; there is no implicit <code>nothing</code>.</li>
+</ul>
+<h3 id="4-2-functions">4.2 Functions</h3>
+<pre><code>function greet&lt;T&gt;(name: text, punctuation?: text, ...rest: list of text) -&gt; text
+    return punctuation ?? &quot;!&quot;
+end</code></pre>
+<ul>
+<li>Parameters may be required, optional (<code>?</code>), or rest (<code>...</code>). An optional parameter must</li>
+<p>come after required ones; a rest parameter must be last.</p>
+<li>The declared return type is required unless the function&#39;s result is inferred from its</li>
+<p><code>return</code> statements. Inference yields a union of returned types plus <code>nothing</code> when the body can fall through.</p>
+<li>A function that declares a non-optional result must return on every path (<code>PS3401</code>).</li>
+<p><code>return</code> always takes a value; use <code>return nothing</code> for an early exit (<code>PS3402</code>).</p>
+<li>Generic parameters are introduced with <code>&lt;T, U&gt;</code> after the name and are inferred at call</li>
+<p>sites.</p>
+<li>A parameter type annotation is required on a function declaration. A lambda may omit it</li>
+<p>only when an expected function type supplies the parameter type (§4.3).</p>
+<li>A function declared directly as a default export may omit its name:</li>
+<p><code>export default function (request: any) -&gt; any ... end</code>. Every other function declaration requires one.</p>
+<li>Functions are values: passing one where a function type is expected checks arity and</li>
+<p>parameter/return assignability.</p>
+</ul>
+<h3 id="4-3-lambdas">4.3 Lambdas</h3>
+<pre><code>let double = (value: number) =&gt; value * 2
+let later = async (value: number) =&gt; await work(value)</code></pre>
+<p>A lambda body is a single expression, or a block introduced by <code>do</code> and closed with <code>end</code>:</p>
+<pre><code>app.get(&quot;/&quot;, (request: any, response: any) =&gt; do
+    response.json({ ok: true })
+end)</code></pre>
+<p>Parameter types may be omitted when they can be inferred from the expected function type. An async lambda (<code>async (x) =&gt; ...</code>) is an async function: <code>await</code> is legal inside it and its type is a function returning <code>Promise of</code> the awaited result. Because a block lambda needs its <code>end</code>, the single-expression form is preferred for callbacks passed inside argument lists.</p>
+<h3 id="4-4-types">4.4 Types</h3>
+<p>Record type:</p>
+<pre><code>type Person
+    name: text
+    age: number
+    nickname?: text
+end</code></pre>
+<p>Variant type:</p>
+<pre><code>type Shape = Circle(radius: number) or Rectangle(width: number, height: number) or Point</code></pre>
+<ul>
+<li>A unit variant (<code>Point</code>) has no fields and compiles to its own name as a string.</li>
+<li>A variant with fields compiles to <code>{ $kind: &quot;Circle&quot;, radius }</code>.</li>
+<li>Constructors (<code>Circle(2)</code>, <code>Point</code>) are ordinary functions/values in scope.</li>
+<li><code>type</code> also names any other type: <code>type Handler = (request: any) -&gt; any</code>,</li>
+<p><code>type Result&lt;T&gt; = Ok(value: T) or Failed(reason: text)</code>.</p>
+</ul>
+<p>Aliases are transparent for assignability but retain their name in diagnostics.</p>
+<p>---</p>
+<h2 id="5-types">5. Types</h2>
+<h3 id="5-1-primitives">5.1 Primitives</h3>
+<table><thead><tr><th>Type</th><th>Values</th><th>Notes</th></tr></thead><tbody>
+<tr><td><code>number</code></td><td>IEEE-754 doubles</td><td>No separate integer type.</td></tr>
+<tr><td><code>text</code></td><td>strings</td><td>UTF-16 code units, as in JavaScript.</td></tr>
+<tr><td><code>boolean</code></td><td><code>true</code>, <code>false</code></td><td>No truthiness: conditions must be <code>boolean</code>.</td></tr>
+<tr><td><code>nothing</code></td><td><code>nothing</code></td><td>The absence of a value; JavaScript <code>null</code>/<code>undefined</code> at the boundary.</td></tr>
+<tr><td><code>any</code></td><td>anything</td><td>Only at JavaScript boundaries or explicit annotations.</td></tr>
+</tbody></table>
+<h3 id="5-2-composite-types">5.2 Composite types</h3>
+<pre><code>list of T                 # JavaScript array
+map of text to T          # object with text keys
+map of K to V             # K must be text at this version
+T?                        # T or nothing
+Promise of T              # awaited value is T
+(A, B) -&gt; R               # function value
+{ name: text, age: number }   # anonymous record
+A or B                    # union
+T&lt;...&gt;                    # named generic instantiation</code></pre>
+<p><code>map of text to V</code> is the only map form with field syntax: when a value&#39;s type is a map, <code>value.field</code> reads a key (with <code>T?</code> when the key may be absent). Lists do not have methods or a <code>.length</code> property; use <code>std/list</code>.</p>
+<p>There are no tuple types (<code>(number, text)</code>), no <code>readonly</code> field modifiers, and no <code>keyof</code>/<code>typeof</code> type queries. Use records, lists and explicit unions instead; these are deliberate omissions rather than unsound checking.</p>
+<h3 id="5-3-assignability">5.3 Assignability</h3>
+<p>A value of type <code>S</code> is assignable to <code>T</code> when:</p>
+<ul>
+<li><code>T</code> is <code>any</code>, or <code>S</code> is <code>nothing</code> and <code>T</code> is optional;</li>
+<li>primitives are identical;</li>
+<li>both are lists with assignable elements, or maps with assignable values;</li>
+<li>both are functions with equal parameter counts (optional and rest handled), assignable</li>
+<p>parameters (contravariant) and assignable results;</p>
+<li>records are structurally assignable: every required field of <code>T</code> exists in <code>S</code> with an</li>
+<p>assignable type; extra fields in <code>S</code> are allowed; optional fields may be absent;</p>
+<li><code>S</code> is a member of union <code>T</code>, or every member of union <code>S</code> is assignable to <code>T</code>;</li>
+<li><code>T</code> is a named alias that dereferences to a matching type.</li>
+</ul>
+<p>Nominal typing is not used. Two records with the same fields are the same type.</p>
+<h3 id="5-4-narrowing">5.4 Narrowing</h3>
+<p>Facts are derived from conditions and applied inside their branches:</p>
+<pre><code>if value is text                          # value: text in this branch
+if value is nothing                       # optional becomes nothing
+if value is not nothing                   # optional loses nothing
+if shape is Circle                        # variant narrowed to Circle
+if shape is Circle and shape.radius &gt; 1
+if item.done                              # boolean field fact
+if x == &quot;yes&quot;                             # literal equality narrows unions</code></pre>
+<p>Narrowing understands <code>and</code>, <code>or</code>, <code>not</code>, <code>is</code>, <code>is not</code>, <code>==</code>, <code>!=</code>, member paths and <code>else</code> (the negation of all preceding branches). Reading a <code>T?</code> without narrowing is <code>PS3350</code>; reading a field that only some union members have is <code>PS3351</code>.</p>
+<p><code>is</code> tests are runtime checks for primitives, lists, maps and variant tags; other type tests are compile-time only.</p>
+<h3 id="5-5-generics">5.5 Generics</h3>
+<p>Type parameters on functions and types are inferred from arguments:</p>
+<pre><code>function first&lt;T&gt;(items: list of T) -&gt; T?
+    return items[0]
+end
+
+let value = first([1, 2, 3])     # value: number?</code></pre>
+<p>An unresolvable type parameter falls back to <code>any</code>. Generic constraints are not supported in 2.0.</p>
+<p>---</p>
+<h2 id="6-expressions">6. Expressions</h2>
+<h3 id="6-1-precedence">6.1 Precedence</h3>
+<p>From loosest to tightest:</p>
+<table><thead><tr><th>Level</th><th>Operators</th></tr></thead><tbody>
+<tr><td>1</td><td>`\</td><td>&gt;` pipeline (left associative)</td></tr>
+<tr><td>2</td><td><code>or</code></td></tr>
+<tr><td>3</td><td><code>and</code></td></tr>
+<tr><td>4</td><td><code>??</code></td></tr>
+<tr><td>5</td><td><code>==</code> <code>!=</code></td></tr>
+<tr><td>6</td><td><code>&lt;</code> <code>&lt;=</code> <code>&gt;</code> <code>&gt;=</code></td></tr>
+<tr><td>7</td><td><code>+</code> <code>-</code></td></tr>
+<tr><td>8</td><td><code>*</code> <code>/</code> <code>%</code></td></tr>
+<tr><td>9</td><td>unary <code>not</code>, unary <code>-</code>, <code>await</code></td></tr>
+<tr><td>10</td><td><code>new</code>, <code>as</code> casts, calls, member access, indexing</td></tr>
+</tbody></table>
+<table><thead><tr><th></th></tr></thead><tbody>
+<p>the language and are rejected by the lexer; there is one spelling per concept.</p>
+</tbody></table>
+<table><thead><tr><th>&gt;<code> passes the left value as the <strong>first</strong> argument: </code>value</th></tr></thead><tbody>
+<p>When the right side is a lambda, it is called with the left value: <code>value |&gt; (x) =&gt; x + 1</code>.</p>
+</tbody></table>
+<h3 id="6-2-literals">6.2 Literals</h3>
+<pre><code>42, 3.5, &quot;text {value}&quot;, &#39;raw&#39;, &quot;&quot;&quot;multiline&quot;&quot;&quot;
+true, false, nothing
+[1, 2, 3]
+{ name: &quot;ada&quot;, &quot;quoted key&quot;: 1 }</code></pre>
+<p>Record/map literals use <code>{ key: value }</code>; keys may be identifiers or text literals. There is no shorthand <code>{ name }</code> form and no computed key syntax.</p>
+<h3 id="6-3-operators">6.3 Operators</h3>
+<ul>
+<li>Arithmetic: <code>+ - * / %</code>, requiring <code>number</code> operands (<code>PS3344</code>). <code>+</code> does not concatenate</li>
+<p>text; use interpolation.</p>
+<li>Comparison: <code>== != &lt; &lt;= &gt; &gt;=</code> compare values; <code>==</code> is strict equality.</li>
+<li>Logic: <code>and</code>, <code>or</code>, <code>not</code>, short-circuiting, requiring <code>boolean</code> operands.</li>
+<li><code>??</code> returns the right side when the left is <code>nothing</code>.</li>
+<li><code>?.</code> short-circuits member access and calls on <code>nothing</code>.</li>
+<li><code>is</code> / <code>is not</code> test a type (narrowing in conditions).</li>
+<li><code>new</code> constructs a JavaScript class value: <code>new URL(text)</code>, <code>new DatabaseSync(path)</code>,</li>
+<p><code>new Response(body, { headers: ... })</code>. It applies to the whole call expression (<code>new Parser(a, b)</code>), and the constructed value has type <code>any</code> because constructor signatures live on the JavaScript side.</p>
+<li><code>as</code> asserts a type. It is erased; incompatible casts are a compile error where the</li>
+<p>compiler can prove disjointness (<code>PS3360</code>).</p>
+</ul>
+<h3 id="6-4-assignment">6.4 Assignment</h3>
+<p><code>x = v</code>, <code>x += v</code>, <code>x -= v</code>, <code>x *= v</code>, <code>x /= v</code>, <code>x %= v</code>. Assignment is a statement. Targets are names, fields and indexes. Assigning to a <code>const</code> or function name is <code>PS3307</code>; assigning an incompatible type is <code>PS3317</code>.</p>
+<p>---</p>
+<h2 id="7-statements">7. Statements</h2>
+<h3 id="7-1-conditions">7.1 Conditions</h3>
+<pre><code>if condition
+    ...
+else if other
+    ...
+else
+    ...
+end</code></pre>
+<p>Conditions must be <code>boolean</code> (<code>PS3318</code>). <code>if</code> is a statement, not an expression; use a function or <code>match</code> when a value is needed. <code>else if</code> and <code>else</code> are optional, and the whole conditional ends with <code>end</code>.</p>
+<h3 id="7-2-loops">7.2 Loops</h3>
+<pre><code>for item in items
+    ...
+end
+
+for index in 0 to 10          # 0..9, exclusive upper bound
+    ...
+end
+
+while running
+    ...
+end</code></pre>
+<p><code>break</code> and <code>continue</code> work in loops (<code>PS3309</code> outside one). A <code>for … in</code> loop over a <code>list of T</code> binds <code>item: T</code>. A range loop binds a <code>number</code>.</p>
+<h3 id="7-3-match">7.3 Match</h3>
+<pre><code>match shape
+    case Circle(radius) if radius &gt; 0
+        ...
+    case Rectangle(width, height)
+        ...
+    case Point
+        ...
+    case _
+        ...
+end</code></pre>
+<p>Patterns:</p>
+<table><thead><tr><th>Pattern</th><th>Matches</th></tr></thead><tbody>
+<tr><td><code>_</code></td><td>anything, binds nothing</td></tr>
+<tr><td><code>name</code></td><td>anything, binds <code>name</code></td></tr>
+<tr><td><code>42</code>, <code>&quot;text&quot;</code>, <code>true</code>, <code>nothing</code></td><td>equality</td></tr>
+<tr><td><code>Circle(radius)</code></td><td>variant tag <code>Circle</code>, binds fields positionally</td></tr>
+<tr><td><code>Point</code></td><td>unit variant (a string tag)</td></tr>
+<tr><td><code>[a, b]</code></td><td>list of exactly two, binds elements</td></tr>
+<tr><td><code>[a, ...rest]</code></td><td>list with at least one element</td></tr>
+<tr><td><code>(a, b)</code></td><td>tuple/record pair</td></tr>
+<tr><td><code>{ name, age }</code></td><td>record fields by name</td></tr>
+</tbody></table>
+<p>A guard introduced by <code>if</code> may follow a <code>case</code> pattern. Matching is exhaustive when every variant is covered or a wildcard/binding pattern is present (<code>PS3345</code>). Duplicate cases are <code>PS3306</code>. A binding pattern makes later cases unreachable, which the checker reports.</p>
+<h3 id="7-4-errors">7.4 Errors</h3>
+<pre><code>try
+    risky()
+catch error
+    print(&quot;failed: {error}&quot;)
+finally
+    cleanup()
+end</code></pre>
+<p><code>catch</code> binds <code>any</code>; thrown values may be anything. <code>throw value</code> throws. <code>finally</code> runs on both paths. Errors are not typed in 2.0.</p>
+<h3 id="7-5-render-blocks">7.5 Render blocks</h3>
+<pre><code>render
+    element &quot;main&quot; with className: &quot;page&quot;
+        element &quot;h1&quot;
+            &quot;{title}&quot;
+        end
+        element &quot;ul&quot;
+            ...rows
+        end
+    end
+end</code></pre>
+<ul>
+<li><code>render</code> is a statement whose value is discarded (typically returned by the enclosing</li>
+<p>function).</p>
+<li><code>element &quot;tag&quot; with prop: value, other: flag</code> creates an element by calling</li>
+<p><code>createElement(tag, props, ...children)</code> <strong>from the enclosing scope</strong>. That name must be imported or declared; PlainScript has no built-in element factory.</p>
+<li>A prop without <code>:</code> is shorthand for a boolean/name value: <code>with disabled</code>.</li>
+<li>Children are statements. A child expression contributes its value; <code>...expr</code> spreads a</li>
+<p>list of children; nested <code>element</code> blocks nest.</p>
+<li><code>element</code> is also an expression, which is how dynamic child lists are built:</li>
+</ul>
+<pre><code>let rows: list of any = []
+for item in items
+    rows = append(rows, element &quot;li&quot; &quot;{item.title}&quot; end)
+end</code></pre>
+<p>There are no fragments, no context syntax and no automatic keys.</p>
+<h3 id="7-6-other-statements">7.6 Other statements</h3>
+<ul>
+<li><code>print x</code> is not a statement; import <code>print</code> from <code>std/io</code> or call a function.</li>
+<li>An expression on its own line is evaluated and discarded.</li>
+</ul>
+<p>---</p>
+<h2 id="8-async">8. Async</h2>
+<pre><code>async function load(url: text) -&gt; text
+    let response = await fetch(url)
+    return await response.text()
+end</code></pre>
+<ul>
+<li><code>async function</code> returns <code>Promise of R</code>, where <code>R</code> is the declared or inferred result.</li>
+<li><code>await</code> requires a <code>Promise</code> operand (<code>PS3327</code>) and an enclosing <code>async</code> function</li>
+<p>(<code>PS3406</code>).</p>
+<li><code>await value as T</code> casts the awaited value.</li>
+<li>Top-level <code>await</code> is allowed, because output is an ES module.</li>
+<li>Async lambdas are supported: <code>async (x: number) =&gt; await work(x)</code>.</li>
+</ul>
+<p>There is no structured concurrency, no cancellation type and no worker syntax.</p>
+<p>---</p>
+<h2 id="9-diagnostics">9. Diagnostics</h2>
+<p>Every diagnostic has a stable code, a file, a line and a column, and a source excerpt. Errors are never downgraded to warnings; <code>check</code> exits non-zero when any diagnostic is reported. Compilation failure writes nothing.</p>
+<table><thead><tr><th>Range</th><th>Area</th></tr></thead><tbody>
+<tr><td><code>PS1xxx</code></td><td>lexer</td></tr>
+<tr><td><code>PS2xxx</code></td><td>parser</td></tr>
+<tr><td><code>PS3xxx</code></td><td>types, names, control flow</td></tr>
+<tr><td><code>PS4001</code></td><td>circular import</td></tr>
+<tr><td><code>PS4002</code></td><td>unresolvable import</td></tr>
+<tr><td><code>PS5000</code></td><td>internal compiler error</td></tr>
+</tbody></table>
+<p>Notable type codes: <code>PS3205</code> missing export, <code>PS3301</code> unknown name, <code>PS3304</code> not callable, <code>PS3307</code> immutable assignment, <code>PS3311</code> bad initialiser, <code>PS3317</code> bad assignment, <code>PS3327</code> await non-Promise, <code>PS3333</code> unknown field, <code>PS3341</code>/<code>PS3342</code> arity, <code>PS3343</code> argument type, <code>PS3344</code> arithmetic on non-numbers, <code>PS3345</code> non-exhaustive match, <code>PS3350</code> maybe-nothing access, <code>PS3351</code> union missing field, <code>PS3401</code> missing return, <code>PS3402</code> <code>return</code> without a value, <code>PS3404</code> return type mismatch, <code>PS3406</code> await outside async.</p>
+<p>---</p>
+<h2 id="10-compilation-model">10. Compilation model</h2>
+<pre><code>source .pln
+  → lexer         tokens (with interpolation and template parts)
+  → parser        AST (spans on every node)
+  → type checker  diagnostics + export tables
+  → lowering      typed HIR: templates, pipes, patterns and elements desugared
+  → emitter       ESM + source map</code></pre>
+<ul>
+<li>Output is one <code>.js</code> file per <code>.pln</code> file, next to a <code>.js.map</code>. There is no bundling.</li>
+<li>Relative <code>.pln</code> imports become <code>.js</code>; <code>std/…</code> becomes a package or a base URL.</li>
+<li><code>plainscript run</code> compiles into <code>.plainscript/run/</code> with</li>
+<p><code>package.json {&quot;type&quot;:&quot;module&quot;}</code> so Node loads the output as ESM.</p>
+<li><code>plainscript build</code> writes <code>dist/</code> (configurable) and adds a <code>package.json</code> with</li>
+<p><code>&quot;type&quot;: &quot;module&quot;</code> when the surrounding project is not already ESM.</p>
+<li>Source maps map each emitted statement to its source line.</li>
+</ul>
+<p>---</p>
+<h2 id="11-runtime-semantics">11. Runtime semantics</h2>
+<ul>
+<li>Numbers, text, booleans, lists and maps are the JavaScript values of the same name.</li>
+<p>There is no boxing and no wrapper classes.</p>
+<li><code>nothing</code> is JavaScript <code>null</code> in generated code. <code>undefined</code> from JavaScript is</li>
+<p>indistinguishable from <code>nothing</code> after crossing the boundary.</p>
+<li>Records and maps are plain objects. Variant values are strings (unit variants) or</li>
+<p>objects with <code>$kind</code>.</p>
+<li>Types are erased. Field access, calls and loop iteration rely on the checker, not on</li>
+<p>runtime guards.</p>
+<li><code>is</code> lowers to inline checks: <code>typeof</code> for primitives, <code>Array.isArray</code> for lists, a</li>
+<p>non-null object test for maps, <code>$kind</code>/string comparison for variants.</p>
+<li><code>??</code> and <code>?.</code> are JavaScript&#39;s own operators, so their semantics match exactly.</li>
+<li>Equality is JavaScript strict equality; there is no structural equality operator.</li>
+<li>Errors thrown by JavaScript propagate as values and can be caught.</li>
+</ul>
+<p>---</p>
+<h2 id="12-scope-rules">12. Scope rules</h2>
+<ul>
+<li>A module has one top-level scope. Function declarations are hoisted within their block.</li>
+<li><code>if</code>, <code>for</code>, <code>while</code>, <code>match</code> arms, <code>try</code>/<code>catch</code>/<code>finally</code> and function bodies create</li>
+<p>child scopes.</p>
+<li>Closures capture the enclosing scope; nested functions see the local variables around</li>
+<p>them.</p>
+<li>Shadowing is allowed and resolved lexically. Redeclaring a name in the same scope is a</li>
+<p>duplicate-name diagnostic.</p>
+<li>Module imports are visible in the whole module, including before their import statement.</li>
+</ul>
+<p>---</p>
+<h2 id="13-interoperability-rules">13. Interoperability rules</h2>
+<ul>
+<li>Values from JavaScript without declarations have type <code>any</code>; <code>any</code> is assignable in both</li>
+<p>directions and member access on it is unchecked.</p>
+<li>Declaring shapes for JavaScript is done with <code>declare</code> and record types, not with a</li>
+<p>separate declaration language.</p>
+<li><code>Promise</code> is the JavaScript promise; <code>async</code>/<code>await</code> compile to native syntax.</li>
+<li><code>std/http</code> uses the Web-standard <code>Request</code>/<code>Response</code> objects, which Node 20, Deno, Bun</li>
+<p>and Cloudflare Workers all provide.</p>
+<li>Emitted code never imports a PlainScript runtime. The only imports are the ones written</li>
+<p>in source plus the standard library modules the program uses.</p>
+</ul>
+<p>---</p>
+<h2 id="14-reserved-words">14. Reserved words</h2>
+<pre><code>and        as         async      await      break      case       catch
+const      continue   declare    do         element    else       end
+export     false      finally    for        from       function   if
+import     in         is         let        match      new        nothing
+not        or         otherwise  render     return     throw      to
+true       try        type       when       while      with</code></pre>
+<p>Reserved words cannot be identifiers, including function, parameter, variable and type names. <code>when</code> and <code>otherwise</code> are retained as reserved words only so source using their retired branch syntax receives a parser error; they are not accepted as branch introducers. Reserved words may be used as fields after <code>.</code>, as element property names, and as record literal keys.</p></div><aside class="toc"><div class="toc-title">On this page</div><a class="toc-h2" href="#1-design-rules">1. Design rules</a><a class="toc-h2" href="#2-lexical-structure">2. Lexical structure</a><a class="toc-h3" href="#2-1-source-files">2.1 Source files</a><a class="toc-h3" href="#2-2-comments">2.2 Comments</a><a class="toc-h3" href="#2-3-identifiers">2.3 Identifiers</a><a class="toc-h3" href="#2-4-numbers">2.4 Numbers</a><a class="toc-h3" href="#2-5-text">2.5 Text</a><a class="toc-h3" href="#2-6-punctuation">2.6 Punctuation</a><a class="toc-h2" href="#3-programs-and-modules">3. Programs and modules</a><a class="toc-h2" href="#4-declarations">4. Declarations</a><a class="toc-h3" href="#4-1-variables">4.1 Variables</a><a class="toc-h3" href="#4-2-functions">4.2 Functions</a><a class="toc-h3" href="#4-3-lambdas">4.3 Lambdas</a><a class="toc-h3" href="#4-4-types">4.4 Types</a><a class="toc-h2" href="#5-types">5. Types</a><a class="toc-h3" href="#5-1-primitives">5.1 Primitives</a><a class="toc-h3" href="#5-2-composite-types">5.2 Composite types</a><a class="toc-h3" href="#5-3-assignability">5.3 Assignability</a><a class="toc-h3" href="#5-4-narrowing">5.4 Narrowing</a><a class="toc-h3" href="#5-5-generics">5.5 Generics</a><a class="toc-h2" href="#6-expressions">6. Expressions</a><a class="toc-h3" href="#6-1-precedence">6.1 Precedence</a><a class="toc-h3" href="#6-2-literals">6.2 Literals</a><a class="toc-h3" href="#6-3-operators">6.3 Operators</a><a class="toc-h3" href="#6-4-assignment">6.4 Assignment</a><a class="toc-h2" href="#7-statements">7. Statements</a><a class="toc-h3" href="#7-1-conditions">7.1 Conditions</a><a class="toc-h3" href="#7-2-loops">7.2 Loops</a><a class="toc-h3" href="#7-3-match">7.3 Match</a><a class="toc-h3" href="#7-4-errors">7.4 Errors</a><a class="toc-h3" href="#7-5-render-blocks">7.5 Render blocks</a><a class="toc-h3" href="#7-6-other-statements">7.6 Other statements</a><a class="toc-h2" href="#8-async">8. Async</a><a class="toc-h2" href="#9-diagnostics">9. Diagnostics</a><a class="toc-h2" href="#10-compilation-model">10. Compilation model</a><a class="toc-h2" href="#11-runtime-semantics">11. Runtime semantics</a><a class="toc-h2" href="#12-scope-rules">12. Scope rules</a><a class="toc-h2" href="#13-interoperability-rules">13. Interoperability rules</a><a class="toc-h2" href="#14-reserved-words">14. Reserved words</a></aside></article><footer class="page-footer"><span>PlainScript 2.0 documentation</span><a href="https://github.com/ayoistooslick/Plainscript/issues">Report a documentation issue ↗</a></footer></div></main></div><script src="app.js"></script></body></html>

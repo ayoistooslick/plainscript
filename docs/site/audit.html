@@ -1,0 +1,107 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Audit — PlainScript documentation."><title>Audit · PlainScript</title><link rel="stylesheet" href="style.css"></head><body><div class="site-shell"><aside class="sidebar"><a class="brand" href="index.html"><span class="brand-mark">PS</span><span><span class="brand-name">PlainScript</span><span class="brand-meta">Language docs · 2.0</span></span></a><div class="nav-group"><div class="nav-label">Start here</div><a class="nav-link " href="index.html">PlainScript</a><a class="nav-link " href="cli.html">CLI reference</a><a class="nav-link " href="templates.html">Application templates</a></div><div class="nav-group"><div class="nav-label">Language</div><a class="nav-link " href="spec.html">Language specification</a><a class="nav-link " href="syntax-design.html">Syntax design</a></div><div class="nav-group"><div class="nav-label">Compiler</div><a class="nav-link " href="architecture.html">Compiler architecture</a><a class="nav-link " href="interop.html">JavaScript interoperability</a></div><div class="nav-group"><div class="nav-label">Guides</div><a class="nav-link " href="migration.html">Migration guide</a></div><div class="nav-group"><div class="nav-label">Project</div><a class="nav-link " href="progress.html">Engineering progress</a><a class="nav-link active" href="audit.html">Audit</a><a class="nav-link " href="decisions.html">Decisions</a></div><div class="sidebar-footer">Open source under MIT.<br><a href="https://github.com/ayoistooslick/Plainscript">View on GitHub ↗</a></div></aside><main class="main"><header class="topbar"><div class="search-wrap"><label class="search" aria-label="Search documentation"><span>⌕</span><input id="doc-search" type="search" placeholder="Search the docs…" autocomplete="off"><kbd>/</kbd></label><div id="search-results" class="search-results" role="listbox"></div></div><nav class="top-links"><a href="index.html">Docs</a><a href="https://github.com/ayoistooslick/Plainscript">GitHub ↗</a></nav></header><div class="content"><article class="page-layout"><div class="prose"><h1 id="audit-of-plainscript-1-x">Audit of PlainScript 1.x</h1>
+<p>This audit was performed on the source archived at <code>legacy/v1/</code>, not on README claims. Every number and quotation below comes from that tree.</p>
+<h2 id="method">Method</h2>
+<ul>
+<li>Read the lexer, parser, generator, type checker, module loader, CLI, formatter, source</li>
+<p>map writer, LSP server and the 36 test files.</p>
+<li>Ran the v1 suite before archiving: <strong>427 tests passed</strong>. The suite exercised the</li>
+<p>implementation as written, including its aliases and service constructs.</p>
+<li>Compared the published package metadata (<code>plainscript-lang</code>, <code>latest = 1.1.5</code>) with the</li>
+<p>repository&#39;s <code>package.json</code> and documentation.</p>
+<li>Checked what the documentation promised against what the compiler accepted.</li>
+</ul>
+<h2 id="size-and-shape">Size and shape</h2>
+<table><thead><tr><th>File</th><th>Lines</th></tr></thead><tbody>
+<tr><td><code>compiler/parser.js</code></td><td>5,263</td></tr>
+<tr><td><code>compiler/generator.js</code></td><td>5,181</td></tr>
+<tr><td><code>compiler/cli.js</code></td><td>1,298</td></tr>
+<tr><td><code>compiler/type-checker.js</code></td><td>803</td></tr>
+<tr><td><code>compiler/lexer.js</code></td><td>587</td></tr>
+<tr><td><code>compiler/lsp.js</code></td><td>311</td></tr>
+<tr><td><code>compiler/bundler.js</code></td><td>259</td></tr>
+<tr><td><code>compiler/dependency-detector.js</code></td><td>199</td></tr>
+<tr><td><code>compiler/formatter.js</code></td><td>193</td></tr>
+<tr><td><code>compiler/sourcemap.js</code></td><td>142</td></tr>
+<tr><td><code>compiler/ir.js</code></td><td>62</td></tr>
+<tr><td><strong>Total</strong></td><td><strong>14,304</strong></td></tr>
+</tbody></table>
+<p>Two files, the parser and the generator, held 73% of the compiler. The type checker was 6% of it. That ratio describes the project&#39;s real centre of gravity: accepting and emitting many surface forms, rather than enforcing a language.</p>
+<h2 id="what-worked">What worked</h2>
+<ul>
+<li>The compiler was real. It lexed, parsed and emitted runnable Node programs, and the test</li>
+<p>suite passed.</p>
+<li>Source maps were produced.</li>
+<li>Module resolution, async/await and a usable CLI existed.</li>
+<li>Code generation was direct and fast; there was no runtime library to load.</li>
+<li>Error reporting had file/line/column and code frames.</li>
+</ul>
+<p>These are the parts worth keeping in spirit, and 2.0 re-implements them with a smaller, stricter surface.</p>
+<h2 id="what-was-wrong">What was wrong</h2>
+<h3 id="1-alias-soup-instead-of-a-language">1. Alias soup instead of a language</h3>
+<p>The lexer and parser accepted multiple spellings for the same construct. The parser&#39;s own suggestion table begins:</p>
+<pre><code>const STATEMENT_KEYWORDS = [
+  &#39;remember&#39;, &#39;show&#39;, &#39;display&#39;, &#39;log&#39;, &#39;if&#39;, &#39;make&#39;, &#39;intend&#39;, &#39;give&#39;,
+  &#39;for&#39;, &#39;while&#39;, &#39;repeat&#39;, &#39;until&#39;, &#39;use&#39;, &#39;import&#39;, &#39;when&#39;, &#39;listen&#39;, &#39;reply&#39;, &#39;serve&#39;,
+  &#39;web&#39;, &#39;route&#39;, &#39;start&#39;, &#39;database&#39;, &#39;query&#39;, &#39;insert&#39;, &#39;update&#39;, &#39;delete&#39;, &#39;execute&#39;,
+  &#39;ask&#39;, &#39;bot&#39;, &#39;ocr&#39;, &#39;try&#39;, &#39;recover&#39;, &#39;retry&#39;,
+  ...</code></pre>
+<p>and the block/expression tables add <code>done</code>, <code>end</code>, <code>together</code>, <code>print</code>, <code>bring</code>, <code>otherwise</code>, <code>else</code>, <code>above</code>, <code>below</code>, <code>at least</code>, <code>be</code>, <code>then</code> and more.</p>
+<p>Consequences:</p>
+<ul>
+<li>Every construct had several correct spellings and no canonical one, so programs from</li>
+<p>different authors looked like different languages.</p>
+<li><code>if</code>/<code>else</code> and <code>when</code>/<code>otherwise</code> coexisted; <code>done</code> and <code>end</code> closed blocks;</li>
+<p><code>show</code>/<code>print</code>/<code>display</code>/<code>log</code> all printed.</p>
+<li>The parser spent thousands of lines on tolerant matching and recovery for these forms.</li>
+<li>&quot;Did you mean?&quot; suggestions were derived from a keyword table that was itself the source</li>
+<p>of the ambiguity.</p>
+</ul>
+<h3 id="2-service-integrations-were-part-of-the-grammar">2. Service integrations were part of the grammar</h3>
+<p>The parser&#39;s keyword set and the generator contained first-class syntax and runtime code for specific services. Occurrences in <code>compiler/parser.js</code>:</p>
+<pre><code>39 SQL      17 whatsapp    14 session    14 Telegram    9 ocr    4 oauth    4 mongodb</code></pre>
+<p>The generator emitted helper implementations directly, for example <code>__whatsappStart</code>, <code>__whatsappPair</code>, <code>__whatsappOnMessage</code>, <code>__whatsappReply</code>, <code>__whatsappSend</code>, <code>__whatsappDownload</code>, plus SQL execution, sessions, OCR and OAuth plumbing.</p>
+<p>This is the &quot;boilerplate language&quot; failure mode: the language grew constructs for individual vendors instead of primitives those vendors&#39; packages could be written with. It made the language impossible to specify, impossible to keep current, and useless to anyone not using those exact services.</p>
+<h3 id="3-the-ir-was-dead-code">3. The IR was dead code</h3>
+<p><code>compiler/ir.js</code> opens with:</p>
+<blockquote>The current JavaScript backend still consumes the rich AST directly. This module</blockquote>
+<blockquote>establishes a serializable semantic boundary for tooling, diagnostics, contract</blockquote>
+<blockquote>analysis, and future backends without changing generated programs.</blockquote>
+<p>The IR was 62 lines, unused by the backend, and not covered by the &quot;future backends&quot; it described. There was therefore no compiler middle end: parsing, checking and emission were entangled in the generator&#39;s 5,181 lines.</p>
+<h3 id="4-type-checking-was-a-surface-check">4. Type checking was a surface check</h3>
+<p><code>type-checker.js</code> was 803 lines and checked a &quot;spec&quot; layer: annotations were compared where they were convenient, but there was no complete model of assignability, no generics inference, no narrowing beyond simple cases, no exhaustiveness, and no guarantee that a program the checker accepted would not fail at runtime on a type error. The generator did not depend on checked types.</p>
+<p>The practical result: the language <em>looked</em> typed and the type checker was advisory.</p>
+<h3 id="5-documentation-described-a-different-project">5. Documentation described a different project</h3>
+<p>The repository shipped <code>knowledge.md</code>, an agent guide pinning version <code>1.0.363</code>, plus <code>RELEASE_NOTES.md</code> for 1.1.5, a changelog whose entries mixed compiler facts with &quot;completeness milestones&quot;, and README material for constructs that the grammar accepted through aliases. The npm package&#39;s latest version (1.1.5) and the repository&#39;s documentation drifted apart.</p>
+<h3 id="6-tooling-was-coupled-to-internals-that-could-not-survive-a-rewrite">6. Tooling was coupled to internals that could not survive a rewrite</h3>
+<ul>
+<li>The VS Code extension started <code>../compiler/lsp.js</code> from the source tree, so the packaged</li>
+<p>extension could not work outside a clone.</p>
+<li>CI ran <code>npm run release:check</code>, <code>npm run docs:check</code> and <code>node tests/packaging.test.js</code>,</li>
+<p>none of which exist in the tree, so the pipeline could not pass.</p>
+<li>A bundler and a dependency detector existed inside the compiler, mixing the language&#39;s</li>
+<p>job (emit modules) with a build tool&#39;s job (bundle them).</p>
+</ul>
+<h3 id="7-test-coverage-measured-the-wrong-thing">7. Test coverage measured the wrong thing</h3>
+<p>427 passing tests is not a small suite, but many asserted that aliases worked and that service helpers were emitted. Passing tests therefore <em>locked in</em> the design problems instead of protecting a specification. There was no test that the checker rejected an untyped program, because the checker&#39;s contract was not that strong.</p>
+<h2 id="verdict">Verdict</h2>
+<p>The v1 implementation was a working compiler for a language that had not been designed. It optimised for accepting input and generating integrations. The parts worth keeping were mechanical — lexing, parsing, emission, source maps, the CLI shape — not architectural.</p>
+<p>Rebuilding was cheaper and more honest than patching:</p>
+<ul>
+<li>The surface had to shrink, not grow, so a breaking major release was required.</li>
+<li>The type system had to become the contract, which meant the backend had to consume</li>
+<p>checked types through a real IR.</p>
+<li>The standard library had to replace both the intrinsic keyword helpers and the vendors.</li>
+</ul>
+<p>That is what 2.0 does. It keeps the ambition (a readable language that compiles to JavaScript and works with the JavaScript ecosystem), and removes the parts that made the language unspecifiable.</p>
+<h2 id="comparison">Comparison</h2>
+<table><thead><tr><th>Concern</th><th>v1</th><th>v2</th></tr></thead><tbody>
+<tr><td>Keywords</td><td>dozens of synonyms, service verbs</td><td>45 reserved words, one spelling each</td></tr>
+<tr><td>Blocks</td><td><code>done</code>/<code>end</code>/<code>together</code></td><td><code>end</code></td></tr>
+<tr><td>Types</td><td>advisory spec checker</td><td>assignability, inference, generics, narrowing, exhaustiveness</td></tr>
+<tr><td>Middle end</td><td>unused 62-line IR</td><td>typed HIR consumed by the emitter</td></tr>
+<tr><td>Services</td><td>grammar + generator code</td><td>not in the language; packages instead</td></tr>
+<tr><td>Stdlib</td><td>intrinsic keywords and helpers</td><td>11 explicit modules with <code>.d.pln</code> declarations</td></tr>
+<tr><td>Output</td><td>AST-driven generator, optional bundler</td><td>ESM per file, source maps, no bundler</td></tr>
+<tr><td>Tests</td><td>427 assertions incl. aliases</td><td>127 tests per compiler layer + built demos</td></tr>
+<tr><td>Docs</td><td>mixed versions and claims</td><td>specification, audit, decisions, migration</td></tr>
+</tbody></table></div><aside class="toc"><div class="toc-title">On this page</div><a class="toc-h2" href="#method">Method</a><a class="toc-h2" href="#size-and-shape">Size and shape</a><a class="toc-h2" href="#what-worked">What worked</a><a class="toc-h2" href="#what-was-wrong">What was wrong</a><a class="toc-h3" href="#1-alias-soup-instead-of-a-language">1. Alias soup instead of a language</a><a class="toc-h3" href="#2-service-integrations-were-part-of-the-grammar">2. Service integrations were part of the grammar</a><a class="toc-h3" href="#3-the-ir-was-dead-code">3. The IR was dead code</a><a class="toc-h3" href="#4-type-checking-was-a-surface-check">4. Type checking was a surface check</a><a class="toc-h3" href="#5-documentation-described-a-different-project">5. Documentation described a different project</a><a class="toc-h3" href="#6-tooling-was-coupled-to-internals-that-could-not-survive-a-rewrite">6. Tooling was coupled to internals that could not survive a rewrite</a><a class="toc-h3" href="#7-test-coverage-measured-the-wrong-thing">7. Test coverage measured the wrong thing</a><a class="toc-h2" href="#verdict">Verdict</a><a class="toc-h2" href="#comparison">Comparison</a></aside></article><footer class="page-footer"><span>PlainScript 2.0 documentation</span><a href="https://github.com/ayoistooslick/Plainscript/issues">Report a documentation issue ↗</a></footer></div></main></div><script src="app.js"></script></body></html>

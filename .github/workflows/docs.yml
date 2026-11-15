@@ -5,7 +5,11 @@ on:
     branches:
       - main
     paths:
+      - "README.md"
       - "docs/**"
+      - "scripts/build-docs-site.js"
+      - "package.json"
+      - "package-lock.json"
 
   workflow_dispatch:
 
@@ -19,7 +23,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  deploy:
+  build:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -27,13 +31,23 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/configure-pages@v5
-
-      - uses: actions/upload-pages-artifact@v3
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
-          path: docs
-
-      - id: deployment
+          node-version: 22
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Build documentation site
+        run: npm run docs:build
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/site
+      - name: Deploy to GitHub Pages
+        id: deployment
         uses: actions/deploy-pages@v4
