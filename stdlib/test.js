@@ -72,7 +72,7 @@ export async function rejects(body, messagePart) {
     await body();
   } catch (failure) {
     const message = failure && failure.message ? failure.message : String(failure);
-    if (messagePart && !messagePart.includes(messagePart)) {
+    if (messagePart && !message.includes(messagePart)) {
       throw new Error(`expected rejection containing ${JSON.stringify(messagePart)}, got ${JSON.stringify(message)}`);
     }
     return;
