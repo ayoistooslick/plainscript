@@ -1,0 +1,22 @@
+{
+  "name": "plainscript-fullstack-auth",
+  "version": "2.0.0",
+  "description": "PlainScript 2.0 full-stack authentication template: hashed passwords, sessions, typed API and a typed browser client.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "plainscript build",
+    "check": "plainscript check",
+    "start": "plainscript run src/app.pln",
+    "test": "plainscript test"
+  },
+  "devDependencies": {
+    "plainscript-lang": "^2.0.0"
+  },
+  "keywords": [
+    "plainscript",
+    "fullstack",
+    "authentication",
+    "template"
+  ]
+}

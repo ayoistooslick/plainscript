@@ -1,0 +1,89 @@
+# A React component written in PlainScript.
+#
+# `render` blocks lower to createElement calls from the module scope, so the
+# compiler only needs React to be imported — no JSX runtime, no plugin.
+import { createElement, useState } from "react"
+import { append, count } from "std/list"
+
+declare const Date: any
+
+export type Item
+    id: number
+    title: text
+    done: boolean
+end
+
+export function App() -> any
+    # React's tuple return is destructured with the normal binding pattern.
+    let (items, setItems) = useState([])
+    let (draft, setDraft) = useState("")
+
+    function add() -> nothing
+        when draft != ""
+            setItems(append(items, { id: Date.now(), title: draft, done: false }))
+            setDraft("")
+        end
+    end
+
+    function toggle(id: number) -> nothing
+        let next: list of Item = []
+        for item in items
+            when item.id == id
+                next = append(next, { id: item.id, title: item.title, done: not item.done })
+            otherwise
+                next = append(next, item)
+            end
+        end
+        setItems(next)
+    end
+
+    function submit(event: any) -> nothing
+        event.preventDefault()
+        add()
+    end
+
+    function rows() -> list of any
+        let built: list of any = []
+        for item in items
+            built = append(built, element "li" with key: item.id, className: "row", onClick: () => toggle(item.id)
+                element "span" with className: "title"
+                    "{item.title}"
+                end
+                element "span" with className: "state"
+                    "{stateLabel(item)}"
+                end
+            end)
+        end
+        return built
+    end
+
+    let remaining = count(items)
+
+    render
+        element "main" with className: "app"
+            element "h1"
+                "PlainScript + React"
+            end
+            element "p" with className: "muted"
+                "{remaining} item(s)"
+            end
+            element "form" with onSubmit: submit
+                element "input" with value: draft, placeholder: "What needs doing?", onChange: (event: any) => setDraft(event.target.value)
+                end
+                element "button" with type: "submit"
+                    "Add"
+                end
+            end
+            element "ul"
+                ...rows()
+            end
+        end
+    end
+end
+
+function stateLabel(item: Item) -> text
+    when item.done
+        return "done"
+    end
+    return "open"
+end

@@ -1,0 +1,42 @@
+# A React Server Component written in PlainScript and rendered by Next.js.
+import { createElement } from "react"
+import { append } from "std/list"
+
+export type Feature
+    title: text
+    detail: text
+end
+
+const features: list of Feature = [
+    { title: "Compiled ahead of time", detail: "PlainScript checks types, then emits plain ES modules." },
+    { title: "No JSX runtime", detail: "render blocks call createElement from the module scope." },
+    { title: "Next.js native", detail: "The output is an ordinary React component Next can render." },
+]
+
+export function Home() -> any
+    let cards: list of any = []
+    for feature in features
+        cards = append(cards, element "li" with key: feature.title, className: "card"
+            element "h2"
+                "{feature.title}"
+            end
+            element "p"
+                "{feature.detail}"
+            end
+        end)
+    end
+
+    render
+        element "main" with className: "page"
+            element "h1"
+                "PlainScript inside Next.js"
+            end
+            element "p" with className: "lead"
+                "This page is a React Server Component compiled from PlainScript."
+            end
+            element "ul" with className: "grid"
+                ...cards
+            end
+        end
+    end
+end

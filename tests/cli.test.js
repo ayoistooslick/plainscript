@@ -1,216 +1,258 @@
-// CLI tests for PlainScript  -  global --quiet / --verbose flags and the
-// version / check / build / run commands, driven as real child processes.
-//
-//   version:  prints a semver string (PlainScript vMAJOR.MINOR.PATCH)
-//   check:    ✓ success line for valid files, ✗ + error + non-zero exit for bad ones
-//   --quiet:  suppresses the ✓/✗ per-file chatter and stage lines, never errors
-//   --quiet:  still surfaces validation errors and non-zero exits
-//   --quiet build:  compiles to disk with a silent stdout
-//   --quiet run:    program stdout survives, chatter is gone, works from any cwd
-//   --verbose:      prints ✓ ... (Nms) timing lines
-//
-// Run with: node tests/cli.test.js
+'use strict';
 
+const { test } = require('node:test');
+const assert = require('node:assert');
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
-const { execFileSync } = require('child_process');
+const { spawn, spawnSync } = require('child_process');
 
-let passed = 0;
-let failed = 0;
+const { ROOT, sandbox, writeFiles } = require('./helpers');
 
-function test(name, fn) {
-  try {
-    fn();
-    console.log(`  PASS  ${name}`);
-    passed++;
-  } catch (e) {
-    console.log(`  FAIL  ${name}`);
-    console.log(`        ${e.message}`);
-    failed++;
+const CLI = path.join(ROOT, 'src', 'cli.js');
+
+function cli(args, cwd = ROOT) {
+  const result = spawnSync(process.execPath, [CLI, ...args], { cwd, encoding: 'utf8' });
+  return { stdout: result.stdout, stderr: result.stderr, status: result.status };
+}
+
+test('version prints the package version', () => {
+  const result = cli(['version']);
+  const packageJson = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
+  assert.strictEqual(result.status, 0);
+  assert.strictEqual(result.stdout.trim(), packageJson.version);
+});
+
+test('help lists every command and the module system', () => {
+  const result = cli(['help']);
+  assert.strictEqual(result.status, 0);
+  for (const command of ['run', 'build', 'check', 'fmt', 'test', 'new', 'ir']) {
+    assert.match(result.stdout, new RegExp(`\\b${command}\\b`));
   }
-}
+});
 
-function assert(condition, message) {
-  if (!condition) throw new Error(message);
-}
+test('unknown commands exit with a usage error', () => {
+  const result = cli(['nonsense']);
+  assert.strictEqual(result.status, 2);
+  assert.match(result.stderr, /Unknown command/);
+});
 
-const REPO_ROOT = path.join(__dirname, '..');
-const CLI = path.join(REPO_ROOT, 'compiler', 'cli.js');
+test('run compiles and executes a program', () => {
+  const directory = sandbox();
+  writeFiles(directory, {
+    'main.pln': 'import { print } from "std/io"\nprint("from cli")\n',
+  });
+  const result = cli(['run', 'main.pln'], directory);
+  assert.strictEqual(result.status, 0, result.stderr);
+  assert.strictEqual(result.stdout, 'from cli\n');
+});
 
-function runCli(args, cwd) {
-  try {
-    const stdout = execFileSync(process.execPath, [CLI, ...args], {
-      cwd,
-      encoding: 'utf8',
-      stdio: 'pipe',
-      env: { ...process.env },
-    });
-    return { status: 0, stdout, stderr: '' };
-  } catch (e) {
-    return {
-      status: e.status === null ? 1 : e.status || 1,
-      stdout: e.stdout || '',
-      stderr: e.stderr || '',
-    };
+test('run passes arguments through', () => {
+  const directory = sandbox();
+  writeFiles(directory, {
+    'main.pln': 'import { print, args } from "std/io"\nprint(args()[0])\n',
+  });
+  const result = cli(['run', 'main.pln', 'first'], directory);
+  assert.strictEqual(result.status, 0, result.stderr);
+  assert.strictEqual(result.stdout, 'first\n');
+});
+
+test('check reports diagnostics with codes and source frames', () => {
+  const directory = sandbox();
+  writeFiles(directory, {
+    'bad.pln': 'let value: number = "text"\n',
+  });
+  const result = cli(['check', 'bad.pln'], directory);
+  assert.strictEqual(result.status, 1);
+  assert.match(result.stderr, /PS3311/);
+  assert.match(result.stderr, /bad\.pln:1:1/);
+  assert.match(result.stderr, /\^/);
+});
+
+test('check --quiet prints only diagnostics', () => {
+  const directory = sandbox();
+  writeFiles(directory, { 'good.pln': 'let value = 1\n' });
+  const result = cli(['check', '--quiet', 'good.pln'], directory);
+  assert.strictEqual(result.status, 0, result.stderr);
+  assert.strictEqual(result.stdout, '');
+  assert.strictEqual(result.stderr, '');
+});
+
+test('fmt normalises indentation and --check reports drift', () => {
+  const directory = sandbox();
+  const messy = 'function f() -> number\nreturn 1\n      end\n';
+  writeFiles(directory, { 'main.pln': messy });
+
+  const check = cli(['fmt', '--check', 'main.pln'], directory);
+  assert.strictEqual(check.status, 1);
+  assert.match(check.stderr, /not formatted/);
+
+  const formatted = cli(['fmt', 'main.pln'], directory);
+  assert.strictEqual(formatted.status, 0, formatted.stderr);
+  const expected = 'function f() -> number\n    return 1\nend\n';
+  assert.strictEqual(fs.readFileSync(path.join(directory, 'main.pln'), 'utf8'), expected);
+
+  const again = cli(['fmt', '--check', 'main.pln'], directory);
+  assert.strictEqual(again.status, 0, again.stderr);
+});
+
+test('build writes JavaScript, source maps and a module marker', () => {
+  const directory = sandbox();
+  writeFiles(directory, {
+    'package.json': JSON.stringify({ name: 'built', version: '0.0.0' }),
+    'src/app.pln': 'import { print } from "std/io"\nprint("built")\n',
+  });
+  const result = cli(['build'], directory);
+  assert.strictEqual(result.status, 0, result.stderr);
+  assert.ok(fs.existsSync(path.join(directory, 'dist', 'app.js')));
+  assert.ok(fs.existsSync(path.join(directory, 'dist', 'app.js.map')));
+  const marker = JSON.parse(fs.readFileSync(path.join(directory, 'dist', 'package.json'), 'utf8'));
+  assert.strictEqual(marker.type, 'module');
+
+  const run = spawnSync(process.execPath, [path.join(directory, 'dist', 'app.js')], { encoding: 'utf8' });
+  assert.strictEqual(run.status, 0, run.stderr);
+  assert.strictEqual(run.stdout, 'built\n');
+});
+
+test('build respects plainscript.config.json', () => {
+  const directory = sandbox();
+  writeFiles(directory, {
+    'package.json': JSON.stringify({ name: 'configured', version: '0.0.0' }),
+    'plainscript.config.json': JSON.stringify({ compilerOptions: { rootDir: 'lib', outDir: 'build' } }),
+    'lib/app.pln': 'import { print } from "std/io"\nprint("ok")\n',
+  });
+  const result = cli(['build'], directory);
+  assert.strictEqual(result.status, 0, result.stderr);
+  assert.ok(fs.existsSync(path.join(directory, 'build', 'app.js')));
+});
+
+test('new scaffolds a runnable project', () => {
+  const directory = sandbox();
+  const result = cli(['new', 'demo'], directory);
+  assert.strictEqual(result.status, 0, result.stderr);
+  const project = path.join(directory, 'demo');
+  assert.ok(fs.existsSync(path.join(project, 'src', 'app.pln')));
+  const packageJson = JSON.parse(fs.readFileSync(path.join(project, 'package.json'), 'utf8'));
+  assert.strictEqual(packageJson.type, 'module');
+  assert.ok(packageJson.devDependencies['plainscript-lang']);
+  const run = cli(['run', 'src/app.pln'], project);
+  assert.strictEqual(run.status, 0, run.stderr);
+  assert.strictEqual(run.stdout, 'Hello, WORLD!\n');
+});
+
+test('new --template scaffolds the bundled fullstack-auth project', () => {
+  const directory = sandbox();
+  const result = cli(['new', 'auth-app', '--template', 'fullstack-auth'], directory);
+  assert.strictEqual(result.status, 0, result.stderr);
+  const project = path.join(directory, 'auth-app');
+  for (const file of ['src/app.pln', 'src/client.pln', 'src/shared.pln']) {
+    assert.ok(fs.existsSync(path.join(project, file)), `missing ${file}`);
   }
-}
-
-function outputOf(r) {
-  return `${r.stdout}${r.stderr}`;
-}
-
-function tmpDir(prefix = 'plainscript-cli-') {
-  return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
-}
-
-test('version: prints a semver string', () => {
-  const r = runCli(['version'], REPO_ROOT);
-  assert(r.status === 0, `version exit code must be 0, got ${r.status}`);
-  const out = outputOf(r).trim();
-  assert(/^PlainScript v\d+\.\d+\.\d+$/.test(out), `expected a semver version, got:\n${out}`);
+  const packageJson = JSON.parse(fs.readFileSync(path.join(project, 'package.json'), 'utf8'));
+  assert.strictEqual(packageJson.name, 'auth-app');
+  assert.ok(packageJson.devDependencies['plainscript-lang']);
+  const check = cli(['check'], project);
+  assert.strictEqual(check.status, 0, check.stderr);
 });
 
-test('--version and -v: standard flags print the same version string', () => {
-  const viaFlag = runCli(['--version'], REPO_ROOT);
-  const viaShort = runCli(['-v'], REPO_ROOT);
-  const viaWord = runCli(['version'], REPO_ROOT);
-  assert(viaFlag.status === 0, `--version must exit 0, got ${viaFlag.status}`);
-  assert(viaShort.status === 0, `-v must exit 0, got ${viaShort.status}`);
-  const a = outputOf(viaFlag).trim();
-  const b = outputOf(viaShort).trim();
-  const c = outputOf(viaWord).trim();
-  assert(a === c && b === c, `all version forms must agree, got: ${JSON.stringify([a, b, c])}`);
-  assert(/^PlainScript v\d+\.\d+\.\d+$/.test(c), `expected a semver version, got: ${c}`);
+test('new rejects an unknown template', () => {
+  const directory = sandbox();
+  const result = cli(['new', 'nope', '--template', 'missing'], directory);
+  assert.strictEqual(result.status, 2);
+  assert.match(result.stderr, /Unknown template/);
 });
 
-test('-v as a program argument survives run (does not mean version)', () => {
-  const tmp = tmpDir();
-  const prog = path.join(tmp, 'echo-args.pln');
-  fs.writeFileSync(prog, 'remember a as args()\nshow "count: " + count of a\nshow "first: " + a[0]\n');
-  const r = runCli(['run', prog, '-v'], tmp);
-  assert(r.status === 0, `run must exit 0, got ${r.status}`);
-  const out = outputOf(r);
-  assert(out.includes('first: -v'), `program must receive -v as an argument, got:\n${out}`);
+test('ir prints the high-level program as JSON', () => {
+  const directory = sandbox();
+  writeFiles(directory, { 'main.pln': 'let value = 1\n' });
+  const result = cli(['ir', 'main.pln'], directory);
+  assert.strictEqual(result.status, 0, result.stderr);
+  const ir = JSON.parse(result.stdout);
+  assert.strictEqual(ir.kind, 'Program');
+  assert.strictEqual(ir.body[0].kind, 'VarDecl');
 });
 
-test('check: valid file prints a ✓ success line and exits 0', () => {
-  const dir = tmpDir();
-  fs.writeFileSync(path.join(dir, 'ok.pln'), 'show "hello"\n', 'utf8');
-  const r = runCli(['check', 'ok.pln'], dir);
-  assert(r.status === 0, `check of a valid file must exit 0, got ${r.status}`);
-  assert(outputOf(r).includes('✓'), `expected a ✓ success line, got:\n${outputOf(r)}`);
+test('run forwards termination to the program it started', async () => {
+  const directory = sandbox();
+  const pidFile = path.join(directory, 'program.pid');
+  writeFiles(directory, {
+    'main.pln': `import { writeFileSync } from "node:fs"
+import { env } from "std/io"
+import { setInterval } from "node:timers"
+
+declare const process: any
+writeFileSync(env("PID_FILE", "program.pid"), "{process.pid}")
+setInterval(() => do
+    let alive = 1
+end, 1000)
+`,
+  });
+
+  const child = spawn(process.execPath, [CLI, 'run', 'main.pln'], {
+    cwd: directory,
+    env: { ...process.env, PID_FILE: pidFile },
+    stdio: 'ignore',
+  });
+
+  const deadline = Date.now() + 8000;
+  while (!fs.existsSync(pidFile) && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  assert.ok(fs.existsSync(pidFile), 'the program did not start');
+  const programPid = Number(fs.readFileSync(pidFile, 'utf8'));
+  assert.ok(programPid > 0);
+
+  child.kill('SIGTERM');
+  const exited = await Promise.race([
+    new Promise((resolve) => child.once('close', () => resolve(true))),
+    new Promise((resolve) => setTimeout(() => resolve(false), 4000)),
+  ]);
+
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  let programAlive = true;
+  try {
+    process.kill(programPid, 0);
+  } catch (failure) {
+    programAlive = false;
+  }
+  if (programAlive) {
+    try { process.kill(programPid, 'SIGKILL'); } catch (failure) { /* already gone */ }
+  }
+
+  assert.ok(exited, 'the CLI did not exit after SIGTERM');
+  assert.strictEqual(programAlive, false, 'the program outlived the CLI that started it');
 });
 
-test('check: invalid file prints ✗ + error and exits non-zero', () => {
-  const dir = tmpDir();
-  fs.writeFileSync(path.join(dir, 'bad.pln'), 'this is not valid plainscript !!!\n', 'utf8');
-  const r = runCli(['check', 'bad.pln'], dir);
-  assert(r.status !== 0, `check of an invalid file must exit non-zero, got ${r.status}`);
-  const out = outputOf(r);
-  assert(out.includes('✗'), `expected a ✗ failure line, got:\n${out}`);
-  assert(out.includes('bad.pln'), `failure line must name the file, got:\n${out}`);
+test('test runs PlainScript test files', () => {
+  const directory = sandbox();
+  writeFiles(directory, {
+    'tests/math.test.pln': `import { test, equals } from "std/test"
+import { upper } from "std/text"
+
+test("upper works", () => do
+    equals(upper("abc"), "ABC")
+end)
+
+test("arithmetic works", () => do
+    equals(1 + 2, 3)
+end)
+`,
+  });
+  const result = cli(['test'], directory);
+  assert.strictEqual(result.status, 0, result.stderr);
+  assert.match(result.stdout, /ok {2}upper works/);
+  assert.match(result.stdout, /2 passed, 0 failed/);
 });
 
-test('test: runs an explicit PlainScript test file', () => {
-  const dir = tmpDir();
-  const file = path.join(dir, 'math.test.pln');
-  fs.writeFileSync(file, [
-    'make add(a, b)',
-    '  give a + b',
-    'done',
-    'test "addition"',
-    '  check add(2, 3) equals 5',
-    'done',
-  ].join('\n'), 'utf8');
-  const r = runCli(['test', file], dir);
-  assert(r.status === 0, `test command must exit 0, got ${r.status}:\n${outputOf(r)}`);
-  assert(outputOf(r).includes('addition'), `test output must name the test, got:\n${outputOf(r)}`);
-  assert(outputOf(r).includes('1 PlainScript test file'), `test output must summarize files, got:\n${outputOf(r)}`);
+test('a failing test file exits non-zero', () => {
+  const directory = sandbox();
+  writeFiles(directory, {
+    'tests/fail.test.pln': `import { test, equals } from "std/test"
+test("fails", () => do
+    equals(1, 2)
+end)
+`,
+  });
+  const result = cli(['test'], directory);
+  assert.strictEqual(result.status, 1);
+  assert.match(result.stdout, /1 passed|0 passed, 1 failed/);
 });
-
-test('--quiet check: valid file prints no ✓/✗ lines and exits 0', () => {
-  const dir = tmpDir();
-  fs.writeFileSync(path.join(dir, 'ok.pln'), 'show "hello"\n', 'utf8');
-  const r = runCli(['--quiet', 'check', 'ok.pln'], dir);
-  assert(r.status === 0, `quiet check of a valid file must exit 0, got ${r.status}`);
-  const out = outputOf(r);
-  assert(!out.includes('✓') && !out.includes('✗'),
-    `quiet check must print no ✓/✗ per-file line, got:\n${out}`);
-});
-
-test('--quiet check: invalid file still prints the error and exits non-zero', () => {
-  const dir = tmpDir();
-  fs.writeFileSync(path.join(dir, 'bad.pln'), 'this is not valid plainscript !!!\n', 'utf8');
-  const r = runCli(['--quiet', 'check', 'bad.pln'], dir);
-  assert(r.status !== 0, `quiet check of an invalid file must exit non-zero, got ${r.status}`);
-  const out = outputOf(r);
-  assert(out.includes('✗'), `quiet mode must not hide the failure marker, got:\n${out}`);
-  assert(out.length > 0 && out.trim().length > 0, 'quiet mode must not swallow the error output');
-});
-
-test('--quiet build: compiles a .pln to dist/ with no ✓ -> lines on stdout', () => {
-  // Single-file build form: under --quiet the stage banner is silent and the
-  // whole invocation prints no ✓/-> chatter (the batch form resets
-  // QUIET_STAGES at the end of the compile pass).
-  const dir = tmpDir();
-  fs.writeFileSync(path.join(dir, 'messi.pln'), 'remember club as "inter miami"\nshow club\n', 'utf8');
-  const r = runCli(['--quiet', 'build', 'messi.pln'], dir);
-  assert(r.status === 0, `quiet build must exit 0, got ${r.status}`);
-  assert(fs.existsSync(path.join(dir, 'dist', 'messi.js')),
-    `expected dist/messi.js on disk, got:\n${outputOf(r)}`);
-  const out = outputOf(r);
-  assert(!out.includes('✓'), `quiet build must print no ✓ -> lines, got:\n${out}`);
-  const js = fs.readFileSync(path.join(dir, 'dist', 'messi.js'), 'utf8');
-  assert(js.includes('let club = "inter miami"'), 'dist/messi.js must match the source program');
-});
-
-test('--quiet build: batch project build is silent too and still writes dist/', () => {
-  // The batch (no-file) form compiles every .pln under the source root; under
-  // --quiet neither the stage banner nor the per-file "✓ -> dist/..." summary
-  // lines may appear, but the compiled artifacts must still land on disk.
-  const dir = tmpDir();
-  fs.mkdirSync(path.join(dir, 'src'), { recursive: true });
-  fs.writeFileSync(path.join(dir, 'src', 'a.pln'), 'remember n as 1\nshow n\n', 'utf8');
-  fs.writeFileSync(path.join(dir, 'src', 'b.pln'), 'remember s as "ping"\nshow s\n', 'utf8');
-  const r = runCli(['--quiet', 'build'], dir);
-  assert(r.status === 0, `quiet batch build must exit 0, got ${r.status}`);
-  assert(fs.existsSync(path.join(dir, 'dist', 'a.js')),
-    `expected dist/a.js on disk, got:\n${outputOf(r)}`);
-  assert(fs.existsSync(path.join(dir, 'dist', 'b.js')),
-    `expected dist/b.js on disk, got:\n${outputOf(r)}`);
-  const out = outputOf(r);
-  assert(!out.includes('✓') && !out.includes('->') && !out.includes('compiled to'),
-    `quiet batch build must be silent, got:\n${out}`);
-});
-
-test('--quiet run: prints program output with no chatter, from repo root and /tmp', () => {
-  const hello = path.join('examples', 'hello.pln');
-
-  const fromRoot = runCli(['--quiet', 'run', hello], REPO_ROOT);
-  assert(fromRoot.status === 0, `quiet run from repo root must exit 0, got ${fromRoot.status}`);
-  assert(fromRoot.stdout.includes('Hello, PlainScript!'),
-    `program output must survive --quiet, got:\n${outputOf(fromRoot)}`);
-  assert(!fromRoot.stdout.includes('✓'),
-    `no stage chatter under --quiet, got:\n${fromRoot.stdout}`);
-
-  const tmp = tmpDir();
-  const absHello = path.join(REPO_ROOT, hello);
-  const fromTmp = runCli(['--quiet', 'run', absHello], tmp);
-  assert(fromTmp.status === 0, `quiet run from /tmp must exit 0, got ${fromTmp.status}`);
-  assert(fromTmp.stdout.includes('Hello, PlainScript!'),
-    `program output must survive from /tmp, got:\n${outputOf(fromTmp)}`);
-  assert(!fromTmp.stdout.includes('✓'),
-    `no stage chatter under --quiet from /tmp, got:\n${fromTmp.stdout}`);
-});
-
-test('--verbose run: prints a ✓ ... (Nms) timing line', () => {
-  const hello = path.join('examples', 'hello.pln');
-  const r = runCli(['--verbose', 'run', hello], REPO_ROOT);
-  assert(r.status === 0, `verbose run must exit 0, got ${r.status}`);
-  assert(/✓ .*\(\d+ms\)/.test(outputOf(r)),
-    `expected a "✓ ... (Nms)" timing line, got:\n${outputOf(r)}`);
-});
-
-console.log(`\n${passed} passed, ${failed} failed`);
-if (failed > 0) process.exit(1);

@@ -1,0 +1,63 @@
+# Full-stack PlainScript: one JSON API, one browser client, shared types.
+#
+#   cd demos/fullstack
+#   npm run build
+#   npm start
+#   open http://localhost:4400
+#
+import { serve, json, html, javascript, notFound, requestJson, urlOf } from "std/http"
+import { readText } from "std/fs"
+import { append } from "std/list"
+import { print, env } from "std/io"
+import { parseNumber } from "std/text"
+import { Todo } from "./shared"
+
+let port = parseNumber(env("PORT", "4400"))
+
+let todos: list of Todo = [
+    { id: 1, title: "write the v2 compiler", done: true },
+    { id: 2, title: "ship PlainScript 2.0.0", done: false },
+]
+let nextId = 3
+
+async function handler(request: any) -> any
+    let url = urlOf(request)
+
+    when url.pathname == "/"
+        return html(readText("public/index.html"))
+    end
+
+    when url.pathname == "/app.js"
+        return javascript(readText("dist/client.js"))
+    end
+
+    when url.pathname == "/std/dom.js"
+        return javascript(readText("public/std/dom.js"))
+    end
+
+    when url.pathname == "/std/list.js"
+        return javascript(readText("public/std/list.js"))
+    end
+
+    when request.method == "GET" and url.pathname == "/todos"
+        return json(todos)
+    end
+
+    when request.method == "POST" and url.pathname == "/todos"
+        let body = await requestJson(request)
+        when body is map of text to any
+            when body.title is text
+                let todo: Todo = { id: nextId, title: body.title, done: false }
+                nextId += 1
+                todos = append(todos, todo)
+                return json(todo, 201)
+            end
+        end
+        return json({ error: "title is required" }, 400)
+    end
+
+    return notFound()
+end
+
+print("Full-stack demo on http://localhost:{port}")
+await serve(port, handler)

@@ -1,0 +1,262 @@
+# Release 1.1.5  -  Completeness Foundations
+
+**Release date:** 2026-09-26
+
+---
+
+- Generic functions infer concrete argument types and substitute them into return contracts.
+- Named aliases resolve through assignments, returns, collections, and local module surfaces.
+- Typed `set`, `map`, and fixed-size `tuple` contracts are checked statically and at runtime.
+- Boolean match blocks report duplicate cases and missing exhaustive arms.
+- Cancellation tokens and deterministic disposal helpers are available through the standard library.
+
+---
+
+# Release 1.1.0  -  Release Notes
+
+**Release date:** 2026-09-20
+
+---
+
+## What is new in 1.1.0?
+
+PlainScript 1.1.0 is the language-depth release. The compiler now carries
+declared types further through functions, collections, expressions, branches,
+and resolved local modules while remaining conservative when a value cannot be
+known statically.
+
+### Contracts and collections
+
+- Functions and intents accept `returns` and `returning` contracts.
+- Return values are checked statically, missing returns are diagnosed, and
+  declared return types propagate through calls.
+- Typed mutable bindings support recursive `list of T` and `dictionary of T`
+  contracts with `let name as Type is value`.
+- List elements, dictionary values, nested records, optional elements, and
+  union elements are validated recursively.
+- Known collection indexing contributes the element type to later checks.
+
+### Expression and flow checking
+
+- Known primitive, record, collection, and function result types flow through
+  literals, variables, arithmetic, comparisons, member access, indexing,
+  assignments, and conditional expressions.
+- Null checks narrow optional values within their checked branch.
+- Diagnostics remain conservative for unknown expressions and preserve the
+  existing contract error families.
+
+### Modules and tooling
+
+- Resolved local import graphs participate in static checking, including
+  imported contracts and functions.
+- Missing imported symbols receive deterministic module diagnostics.
+- The LSP provides recursive type hover, references, rename, signature help,
+  completion, definition lookup, and diagnostics.
+- IR preserves return contracts and typed binding annotations.
+- `plainscript check` reports static diagnostics with source-file context.
+
+### Validation
+
+- Added `examples/typed-collections.pln` as a real runnable example.
+- Full compiler, backend, compatibility, torture, packaging, IR, LSP, module,
+  type, and documentation validation passes.
+
+---
+
+# Release 1.0.363  -  Release Notes
+
+**Release date:** 2026-09-14
+
+---
+
+## What is new in 1.0.363?
+
+This release hardens the assignment surface, adds interactive terminal and
+data/AI primitives, and introduces a `run in parallel` block that runs a whole
+sequence of statements concurrently.
+
+## Assignment
+
+- **Compound operators:** `+=`, `-=`, `*=`, `/=`, `%=` (the legacy `++=`
+  spelling still means `+=`), plus the word forms `or becomes` (`||=`),
+  `and becomes` (`&&=`), and `nullish becomes` (`??=`).
+- **`set` / `change`:** `set <expr> to <value>` and `change <expr> to <value>`
+  compile to assignment, along with the postfix aliases
+  `<expr> set to <value>` and `<expr> change to <value>`.
+- **`end` closes any block.** `end` is now a full synonym for `done`, so
+  functions, loops, and conditionals all accept either word.
+
+## Interactive terminal primitives
+
+- `confirm("Delete this file?")`  -  a `(y/n)` prompt that returns a boolean.
+- `choose("Pick one", ["a", "b"])`  -  a numbered picker that returns the
+  chosen option.
+- `clearTerminal()`, `terminalWidth()`, `terminalHeight()`, and `stderr(...)`
+  for terminal ergonomics and writing to the error stream.
+- Global CLI flags `--quiet` (silences banner/stage/per-file chatter while
+  still reporting errors) and `--verbose` (prints stage timing lines).
+- `plainscript --version` and `plainscript -v` now print the version string
+  directly, matching `plainscript version`.
+
+## Data & AI primitives
+
+- Statistics: `mean`, `median`, `variance`, `deviation` on numeric arrays.
+- Vectors: `dotProduct`, `magnitude`, `normalize`.
+- Randomness: `randomInteger`, `randomChoice`, `weightedChoice`, `shuffle`,
+  `sample`.
+- Helpers: `memoize` (Map-backed caching), `parseBoolean`, `characters`.
+
+## Concurrency, collections, and regex
+
+- `run in parallel ... done as <name>` runs every statement in the block as a
+  concurrent async task and resolves `Promise.all`, collecting each statement's
+  value into `name` in body order.
+- `count of <collection>` returns the `.count`, `.length`, or `.size`.
+- `match pattern "..." in "..." as <name>` regex capture, and the `all of`,
+  `any of`, `settled of` Promise combinators.
+
+## Examples and tests
+
+- New runnable examples: `ai-memory-cli`, `todo-cli`, `file-manager-cli`,
+  `terminal-cli`, `interactive-cli`, `stats-cli`, `random-cli`,
+  `string-helpers`, `memoize-demo`, `compound-assignments`,
+  `normalization-forms`, and `run-in-parallel`.
+- New suites `assignment.test.js`, `primitives.test.js`, `concurrency.test.js`,
+  `terminal.test.js`, and `cli.test.js` add 95+ assertions for everything above.
+
+## Bug fixes
+
+- Property-of assignment inside `for each` loops (numbered-item ambiguity) is
+  fixed, so `completed of todo`-style targets assign correctly.
+- `set`/`change ... to` work in both prefix and postfix positions.
+- `run in parallel` now collects each statement's resulting value.
+- A batch `--quiet build` no longer leaks per-file summary chatter.
+
+---
+
+## Verification
+
+The repository ships a complete test suite:
+
+```bash
+npm test
+```
+
+---
+
+# PlainScript v0.1.7  -  Release Notes
+
+**Release date:** 2026
+
+---
+
+## What is PlainScript 0.1.7?
+
+PlainScript is an Intent-Oriented Programming Language (IOPL). You describe
+**what** you want in plain sentences; the deterministic compiler decides
+**how** to implement it in JavaScript. This is the first release: the whole
+language, the production build model, the backend capabilities, and the
+editor tooling ship together.
+
+## Highlights
+
+### The `plainscript` npm package
+
+- Install per project: `npm install --save-dev plainscript`. No global install.
+- CLI commands: `plainscript build | run | start | init | new | install | add |
+  remove | update | check | fmt | doctor | version | help`.
+- Everything runs through npm scripts and `npx`.
+
+### Production builds (`plainscript build`)
+
+- Sources compile to `dist/` preserving names and structure:
+  `src/messi.pln` → `dist/messi.js`, nested folders included.
+- Imports are bundled into each output, so every file in `dist/` runs
+  standalone under Node.
+- Deterministic output: rebuilds are byte-identical  -  safe to commit,
+  diff, and cache.
+
+- `plainscript build` discovers all `.pln` files under `src/` and compiles each to
+  `dist/`, preserving file names and folder structure. No configuration file needed.
+- Source discovery skips `node_modules`, hidden directories, and the output
+  directory itself.
+
+### npm-package building
+
+- A project is a normal npm package: point `main` at the built entry and
+  publish. Consumers `require()` the generated `dist/` output like any
+  Node package  -  no custom registry, no custom format.
+- The `prepare` script hooks straight into the compiler:
+  `"prepare": "plainscript build"`.
+
+## The language
+
+- Variables, conditions, functions, arrays, objects, and loops read as
+  sentences: `let age is 16`, `if age is at least 18`, `define add(a, b)`,
+  `for each player in players`.
+- String templates preserve whitespace and interpolate with `${expression}`,
+  compiling directly to JavaScript template literals.
+- PlainScript Expressions: `print first player from players`, `add("X" to items)`,
+  `print city of address of customer`, `let data is read("users.txt")`.
+- Multi-file projects bundle imports per entry; every source file gets its
+  own standalone output under `dist/`.
+- JavaScript and npm interoperability use supported `use`, `bring`, and
+  `import` forms. Raw `javascript ... end` blocks are rejected by the compiler.
+
+## Backend capabilities
+
+Everything below is compiled by the same deterministic compiler  -  no rules
+engine, no AI, no hidden codegen:
+
+- Web apps and routing with groups, CORS, params, and custom 404s.
+- SQLite databases (native `better-sqlite3` or WebAssembly `sql.js`) and
+  PostgreSQL, with parameter binding and transactions.
+- Sessions signed with HMAC cookies, scrypt password hashing, HMAC tokens,
+  Google OAuth login, file uploads with size/type limits, OCR, cookies,
+  per-IP rate limiting, email via SMTP, cron schedules and background jobs,
+  WebSocket servers, and Redis-backed caching.
+
+## AI / ML and data / storage
+
+- **AI (builtin `ai`):** `chat(model, messages, options)` for OpenAI-compatible LLM
+  chat completions, `embedText(model, text, options)` for text embeddings, and
+  `similarity(a, b)` returning cosine vector similarity (-1..1). Conveniences
+  `ai_tags(text)` and `ai_post(subject, ideas, options)` compose the same runtime.
+  Auth reads `OPENAI_API_KEY`/`OPENAI_BASE_URL`, overridable per-call via options.
+- **Data / storage:** `paginate(list, page, perPage)` returns
+  `{ items, count, page, pages, perPage, hasNext, hasPrev }`; the `cache` builtin
+  falls back to an in-memory Map store with TTL when no Redis is configured.
+- **Web / full-stack:** route-scoped `body()` / `body("field")` accessor and a
+  `redirect to "<url>"` statement inside route handlers.
+
+## Collections & string primitives
+
+- `range`, `clamp`, `first`, `last`, `flatten`, `includes`, `pick`, `omit`,
+  `groupBy`, `startsWith`, `endsWith`, `truncate`, `padStart`, `padEnd`.
+- Record kinds (classes), concurrency combinators (`all of`/`any of`/`settled of`),
+  generators (`yield`), reflection, binary data, YAML, CLI/process helpers,
+  Map/Set wrappers, and dynamic module loading through the supported runtime
+  helper. Raw JavaScript blocks are not supported.
+
+## WhatsApp bots
+
+- QR or pairing-code linking with compile-time pairing-number validation;
+  pairing values may be prompted at runtime with `ask`.
+- Normalized message records, group support, own-message filtering, and
+  automatic reconnection after transient disconnects.
+
+## Editor support
+
+- `plainscript-vscode/`: syntax highlighting, snippets, folding, and a file icon
+  for `.pln` sources.
+- `editors/mt-manager/`: MT Manager syntax highlighting (`.mtsx`) for Android.
+
+## Verification
+
+The repository ships a complete test suite covering the lexer, parser,
+generator, formatter, CLI, build model, backend runtimes, WhatsApp runtime,
+and live acceptance boots of the example projects:
+
+```bash
+npm test
+```

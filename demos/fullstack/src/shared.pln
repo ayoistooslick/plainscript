@@ -1,0 +1,7 @@
+# Shared between the server and the browser client. Imported as a type only,
+# so it disappears from both emitted programs: one definition, checked twice.
+export type Todo
+    id: number
+    title: text
+    done: boolean
+end

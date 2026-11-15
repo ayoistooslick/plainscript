@@ -1,0 +1,1562 @@
+'use strict';
+
+const T = require('./types');
+const { Span, error } = require('./diagnostics');
+
+const PRIMITIVES = new Set(['number', 'text', 'boolean', 'nothing', 'any', 'unknown', 'never']);
+
+class Scope {
+  constructor(parent) {
+    this.parent = parent || null;
+    this.names = new Map();
+  }
+
+  define(name, entry) {
+    this.names.set(name, entry);
+  }
+
+  lookup(name) {
+    let scope = this;
+    while (scope) {
+      if (scope.names.has(name)) return scope.names.get(name);
+      scope = scope.parent;
+    }
+    return null;
+  }
+
+  child() {
+    return new Scope(this);
+  }
+
+  visibleNames() {
+    const names = new Set();
+    let scope = this;
+    while (scope) {
+      for (const name of scope.names.keys()) names.add(name);
+      scope = scope.parent;
+    }
+    return [...names];
+  }
+}
+
+function spanOf(node, file) {
+  return new Span(file, node.line, node.col, node.endColumn ? node.endColumn - node.col : 1);
+}
+
+function editDistance(a, b) {
+  const rows = b.length + 1;
+  const cols = a.length + 1;
+  const dp = Array.from({ length: rows }, (_, i) => [i, ...Array(cols - 1).fill(0)]);
+  for (let j = 1; j < cols; j += 1) dp[0][j] = j;
+  for (let i = 1; i < rows; i += 1) {
+    for (let j = 1; j < cols; j += 1) {
+      dp[i][j] = Math.min(
+        dp[i - 1][j] + 1,
+        dp[i][j - 1] + 1,
+        dp[i - 1][j - 1] + (a[j - 1] === b[i - 1] ? 0 : 1),
+      );
+    }
+  }
+  return dp[rows - 1][cols - 1];
+}
+
+function closest(name, candidates) {
+  let best = null;
+  let bestScore = Infinity;
+  for (const candidate of candidates) {
+    const score = editDistance(name, candidate);
+    if (score < bestScore) { bestScore = score; best = candidate; }
+  }
+  return bestScore <= Math.max(2, Math.floor(name.length / 3)) ? best : null;
+}
+
+class Checker {
+  constructor(options) {
+    this.file = options.file;
+    this.source = options.source || '';
+    this.program = options.program;
+    this.resolveImportFn = options.resolveImport || (() => null);
+    this.diagnostics = [];
+    this.typeDecls = new Map();
+    this.typeExports = new Map();
+    this.variantCtors = new Map();
+    this.global = new Scope(null);
+    this.scope = this.global;
+    this.functionStack = [];
+    this.loopDepth = 0;
+    this.asyncDepth = 0;
+    this.exports = new Map();
+    this.exportedNames = new Set();
+    // Named imports that resolve to types only. They are erased at codegen.
+    this.typeOnlyImports = new Set();
+    this.defaultExport = null;
+    this.inferredFunctions = new Map();
+  }
+
+  report(code, message, node, hint) {
+    this.diagnostics.push(error(code, message, spanOf(node, this.file), hint ? { hint } : {}));
+  }
+
+  aliasKey(name) {
+    return `${this.file}::${name}`;
+  }
+
+  define(name, entry, node) {
+    if (this.scope === this.global && this.global.names.has(name)) {
+      this.report('PS3308', `"${name}" is already declared in this module.`, node);
+      return;
+    }
+    this.scope.define(name, entry);
+  }
+
+  lookup(name) {
+    return this.scope.lookup(name);
+  }
+
+  // --------------------------------------------------------------- type layer
+
+  resolveType(node, typeEnv = new Map()) {
+    if (!node) return T.PRIM.any;
+    switch (node.kind) {
+      case 'NamedType': {
+        const { name } = node;
+        if (typeEnv.has(name)) return typeEnv.get(name);
+        if (PRIMITIVES.has(name)) return T.PRIM[name];
+        if (name === 'error') return T.PRIM.error;
+        const declaration = this.typeDecls.get(name);
+        if (!declaration) {
+          const suggestion = closest(name, [...PRIMITIVES, ...this.typeDecls.keys()]);
+          this.report('PS3201', `Unknown type "${name}".`, node, suggestion ? `Did you mean "${suggestion}"?` : null);
+          return T.PRIM.error;
+        }
+        if (declaration.importedType) return declaration.importedType;
+        if (declaration.typeParams.length !== node.args.length) {
+          this.report(
+            'PS3202',
+            `Type "${name}" expects ${declaration.typeParams.length} type argument(s) but got ${node.args.length}.`,
+            node,
+          );
+          return T.PRIM.error;
+        }
+        if (declaration.typeParams.length === 0) {
+          return T.namedRef(this.aliasKey(name), name);
+        }
+        const localEnv = new Map();
+        declaration.typeParams.forEach((param, index) => {
+          localEnv.set(param, this.resolveType(node.args[index], typeEnv));
+        });
+        return this.resolveTypeDeclarationBody(declaration, localEnv);
+      }
+      case 'ListType':
+        return T.listOf(this.resolveType(node.elem, typeEnv));
+      case 'MapType':
+        return T.mapOf(this.resolveType(node.key, typeEnv), this.resolveType(node.value, typeEnv));
+      case 'PromiseType':
+        return T.promiseOf(this.resolveType(node.value, typeEnv));
+      case 'OptionalType':
+        return T.union([this.resolveType(node.inner, typeEnv), T.PRIM.nothing]);
+      case 'UnionType':
+        return T.union(node.members.map((member) => this.resolveType(member, typeEnv)));
+      case 'FunctionType':
+        return T.fnType(
+          node.params.map((parameter) => ({
+            name: parameter.name,
+            type: this.resolveType(parameter.type, typeEnv),
+            optional: parameter.optional,
+            rest: parameter.rest,
+          })),
+          this.resolveType(node.ret, typeEnv),
+        );
+      case 'RecordType': {
+        const fields = new Map();
+        for (const field of node.fields) {
+          fields.set(field.name, { type: this.resolveType(field.type, typeEnv), optional: field.optional });
+        }
+        return T.record(fields);
+      }
+      case 'VariantType': {
+        const fields = node.fields.map((field) => ({ name: field.name, type: this.resolveType(field.type, typeEnv) }));
+        return T.variant(node.name, fields, null);
+      }
+      default:
+        return T.PRIM.any;
+    }
+  }
+
+  // Registers `type X ...` declarations, then resolves them. Variant aliases
+  // also introduce constructor values (Circle(...)) and unit values (Empty).
+  collectTypes() {
+    for (const statement of this.program.body) {
+      if (statement.kind !== 'TypeDecl') continue;
+      if (this.typeDecls.has(statement.name)) {
+        this.report('PS3203', `Type "${statement.name}" is already declared in this module.`, statement);
+        continue;
+      }
+      this.typeDecls.set(statement.name, statement);
+    }
+  }
+
+  resolveAllTypes() {
+    for (const [name, declaration] of this.typeDecls) {
+      const key = this.aliasKey(name);
+      // Place the indirection first so recursive aliases can refer to it.
+      T.registerAlias(key, T.PRIM.any);
+      const typeEnv = new Map(declaration.typeParams.map((param) => [param, T.typeVar(param)]));
+      const resolved = this.resolveTypeDeclarationBody(declaration, typeEnv);
+      T.registerAlias(key, resolved);
+      // Only exported types cross a module boundary; local aliases stay local.
+      if (declaration.exported) {
+        this.typeExports.set(name, resolved);
+        this.exportedNames.add(name);
+      }
+    }
+  }
+
+  resolveTypeDeclarationBody(declaration, typeEnv) {
+    if (declaration.recordFields) {
+      const fields = new Map();
+      for (const field of declaration.recordFields) {
+        fields.set(field.name, { type: this.resolveType(field.type, typeEnv), optional: Boolean(field.optional) });
+      }
+      return T.record(fields, { name: declaration.name });
+    }
+    const body = declaration.value;
+    if (!body) return T.PRIM.any;
+
+    if (body.kind === 'UnionType') {
+      // Inside a variant alias, bare capitalised names are unit variants.
+      const variantNames = new Set();
+      for (const member of body.members) {
+        if (member.kind === 'VariantType') variantNames.add(member.name);
+        else if (member.kind === 'NamedType' && !PRIMITIVES.has(member.name) &&
+          !this.typeDecls.has(member.name) && !typeEnv.has(member.name)) {
+          variantNames.add(member.name);
+        }
+      }
+      const members = body.members.map((member) => {
+        if (member.kind === 'VariantType') {
+          const fields = member.fields.map((field) => ({ name: field.name, type: this.resolveType(field.type, typeEnv) }));
+          const type = T.variant(member.name, fields, declaration.name);
+          this.registerVariant(member.name, type, declaration, fields);
+          return type;
+        }
+        if (member.kind === 'NamedType' && variantNames.has(member.name)) {
+          const type = T.unitVariant(member.name, declaration.name);
+          this.registerVariant(member.name, type, declaration, []);
+          return type;
+        }
+        return this.resolveType(member, typeEnv);
+      });
+      return T.union(members);
+    }
+
+    if (body.kind === 'VariantType') {
+      const fields = body.fields.map((field) => ({ name: field.name, type: this.resolveType(field.type, typeEnv) }));
+      const type = T.variant(body.name, fields, declaration.name);
+      this.registerVariant(body.name, type, declaration, fields);
+      return type;
+    }
+
+    return this.resolveType(body, typeEnv);
+  }
+
+  registerVariant(name, type, declaration, fields) {
+    if (this.variantCtors.has(name)) {
+      this.report('PS3204', `Variant "${name}" is already declared in this module.`, declaration);
+      return;
+    }
+    if (fields.length === 0) {
+      this.variantCtors.set(name, { kind: 'value', type });
+      return;
+    }
+    this.variantCtors.set(name, {
+      kind: 'function',
+      type: T.fnType(fields.map((field) => ({ name: field.name, type: field.type, optional: false })), type),
+    });
+  }
+
+  registerImportedVariants(type) {
+    if (!type) return;
+    const members = type.k === 'union' ? type.members : [type];
+    for (const member of members) {
+      if (!member || (member.k !== 'variant' && member.k !== 'unit')) continue;
+      if (this.variantCtors.has(member.name)) continue;
+      if (member.k === 'unit' || member.fields.length === 0) {
+        this.variantCtors.set(member.name, { kind: 'value', type: member });
+        continue;
+      }
+      this.variantCtors.set(member.name, {
+        kind: 'function',
+        type: T.fnType(member.fields.map((field) => ({ name: field.name, type: field.type, optional: false })), member),
+      });
+    }
+  }
+
+  // ------------------------------------------------------------- value layer
+
+  signatureOf(node) {
+    if (node.__signature) return node.__signature;
+    const typeEnv = new Map(node.typeParams.map((param) => [param, T.typeVar(param)]));
+    const params = node.params.map((parameter) => ({
+      name: parameter.name,
+      type: this.resolveType(parameter.type, typeEnv),
+      optional: Boolean(parameter.optional),
+      rest: Boolean(parameter.rest),
+      defaultValue: parameter.defaultValue,
+      node: parameter,
+    }));
+    const declared = node.returnType ? this.resolveType(node.returnType, typeEnv) : null;
+    const ret = node.async
+      ? (declared && declared.k === 'promise' ? declared : T.promiseOf(declared || T.PRIM.any))
+      : (declared || null);
+    const signature = { params, ret, declaredReturn: declared, typeParams: node.typeParams, typeEnv, async: Boolean(node.async) };
+    node.__signature = signature;
+    return signature;
+  }
+
+  // Function declarations are hoisted within the block that contains them, so
+  // a function body may call a sibling declared further down.
+  hoistFunctions(statements) {
+    for (const statement of statements) {
+      if (statement.kind !== 'FunctionDecl') continue;
+      // An anonymous `export default function () ... end` has no local name.
+      if (!statement.name) continue;
+      if (this.scope.names.has(statement.name)) continue;
+      const signature = this.signatureOf(statement);
+      statement.__signature = signature;
+      this.define(statement.name, {
+        kind: 'function',
+        type: T.fnType(signature.params, signature.ret, signature.typeParams),
+        signature,
+        node: statement,
+        mutable: false,
+      }, statement);
+      if (statement.exported) this.exportedNames.add(statement.name);
+    }
+  }
+
+  hoist() {
+    for (const statement of this.program.body) {
+      switch (statement.kind) {
+        case 'Import': {
+          const resolved = this.resolveImportFn(statement.spec, statement);
+          const values = resolved && resolved.values ? resolved.values : null;
+          const types = resolved && resolved.types ? resolved.types : null;
+          if (statement.defaultName) {
+            const entry = values && values.get('default');
+            this.define(statement.defaultName, {
+              kind: 'const',
+              type: entry ? entry.type : T.PRIM.any,
+              importType: true,
+              node: statement,
+            }, statement);
+          }
+          if (statement.namespace) {
+            this.define(statement.namespace, { kind: 'const', type: T.PRIM.any, node: statement }, statement);
+          }
+          for (const name of statement.names) {
+            const entry = values ? values.get(name.imported) : null;
+            const importedType = types ? types.get(name.imported) : null;
+
+            if (importedType) {
+              this.typeDecls.set(name.local, { name: name.local, typeParams: [], value: null, recordFields: null, importedType });
+              T.registerAlias(this.aliasKey(name.local), importedType);
+              // A variant alias carries its constructors: importing the type is
+              // what makes `case Published(views)` (and `Published(3)`)
+              // meaningful in this module.
+              this.registerImportedVariants(importedType);
+            }
+
+            // A name that exists only as a type is a compile-time import and
+            // disappears from the emitted JavaScript.
+            if (!entry && importedType) {
+              this.typeOnlyImports.add(name.local);
+              continue;
+            }
+
+            if (values && !entry) {
+              this.report('PS3205', `"${name.imported}" is not exported by "${statement.spec}".`, statement);
+            }
+            this.define(name.local, {
+              kind: entry && entry.kind ? entry.kind : 'const',
+              type: entry ? entry.type : T.PRIM.any,
+              importType: true,
+              node: statement,
+            }, statement);
+          }
+          break;
+        }
+        case 'FunctionDecl':
+          this.hoistFunctions([statement]);
+          break;
+        case 'DeclareFunction': {
+          const signature = this.signatureOf(statement);
+          this.define(statement.name, {
+            kind: 'function',
+            type: T.fnType(signature.params, signature.ret, signature.typeParams),
+            signature,
+            node: statement,
+            mutable: false,
+          }, statement);
+          if (statement.exported) this.exportedNames.add(statement.name);
+          break;
+        }
+        case 'DeclareValue': {
+          this.define(statement.name, {
+            kind: 'const',
+            type: this.resolveType(statement.type),
+            mutable: false,
+            node: statement,
+          }, statement);
+          if (statement.exported) this.exportedNames.add(statement.name);
+          break;
+        }
+        case 'TypeDecl':
+          if (statement.exported) this.exportedNames.add(statement.name);
+          break;
+        default:
+          break;
+      }
+    }
+
+    for (const [name, constructor] of this.variantCtors) {
+      if (this.global.names.has(name)) continue;
+      this.global.define(name, {
+        kind: constructor.kind === 'function' ? 'function' : 'const',
+        type: constructor.type,
+        variant: true,
+        mutable: false,
+      });
+    }
+  }
+
+  // ------------------------------------------------------------------ driver
+
+  run() {
+    this.collectTypes();
+    // Imports and function signatures are hoisted before type bodies resolve,
+    // so a `type` declaration can name a type that was imported from another
+    // module (`type Entry = { task: Task }`).
+    this.hoist();
+    this.resolveAllTypes();
+    this.checkStatements(this.program.body);
+    this.collectExports();
+    return {
+      diagnostics: this.diagnostics,
+      exports: { values: this.buildExportValues(), types: this.typeExports },
+      inferredFunctions: this.inferredFunctions,
+      typeOnlyImports: this.typeOnlyImports,
+    };
+  }
+
+  collectExports() {
+    for (const statement of this.program.body) {
+      if (statement.kind === 'ExportNamed') {
+        for (const name of statement.names) {
+          if (statement.spec) continue; // re-exports are resolved by the module graph
+          if (!this.lookup(name.local)) {
+            this.report('PS3206', `Cannot export "${name.local}": it is not declared in this module.`, statement);
+            continue;
+          }
+          this.exports.set(name.exported, name.local);
+          this.exportedNames.add(name.local);
+        }
+      }
+      if (statement.kind === 'ExportDefault') {
+        this.defaultExport = statement.value;
+      }
+    }
+  }
+
+  buildExportValues() {
+    const values = new Map();
+    for (const exported of this.exportedNames) {
+      const entry = this.lookup(exported);
+      if (!entry) continue;
+      values.set(exported, { kind: entry.kind, type: entry.type });
+    }
+    for (const [exported, local] of this.exports) {
+      const entry = this.lookup(local);
+      if (!entry) continue;
+      values.set(exported, { kind: entry.kind, type: entry.type });
+    }
+    if (this.defaultExportType) {
+      values.set('default', { kind: 'const', type: this.defaultExportType });
+    } else if (this.defaultExport) {
+      // `export default name` takes the type of the local it names, so a
+      // declaration file can re-export an existing declaration with its type.
+      const local = this.defaultExport.kind === 'Name' ? this.lookup(this.defaultExport.name) : null;
+      values.set('default', { kind: local ? local.kind : 'const', type: local ? local.type : T.PRIM.any });
+    }
+    return values;
+  }
+
+  checkStatements(statements) {
+    for (const statement of statements) this.checkStatement(statement);
+  }
+
+  checkBlock(statements) {
+    const previous = this.scope;
+    this.scope = previous.child();
+    this.hoistFunctions(statements);
+    this.checkStatements(statements);
+    this.scope = previous;
+  }
+
+  checkStatement(node) {
+    switch (node.kind) {
+      case 'Import':
+      case 'TypeDecl':
+      case 'DeclareFunction':
+      case 'DeclareValue':
+      case 'ExportNamed':
+        return;
+      case 'ExportDefault':
+        this.defaultExportType = this.typeOf(node.value);
+        return;
+      case 'FunctionDecl':
+        this.checkFunction(node);
+        return;
+      case 'VarDecl':
+        this.checkVarDecl(node);
+        return;
+      case 'Assignment':
+        this.checkAssignment(node);
+        return;
+      case 'ExprStmt':
+        this.typeOf(node.expression);
+        return;
+      case 'Conditional':
+        this.checkConditional(node);
+        return;
+      case 'ForEach':
+      case 'ForRange':
+        this.checkFor(node);
+        return;
+      case 'While':
+        this.checkWhile(node);
+        return;
+      case 'Match':
+        this.checkMatch(node);
+        return;
+      case 'Try':
+        this.checkTry(node);
+        return;
+      case 'Throw':
+        this.typeOf(node.value);
+        return;
+      case 'Return':
+        this.checkReturn(node);
+        return;
+      case 'Break':
+      case 'Continue':
+        if (this.loopDepth === 0) {
+          this.report('PS3309', `"${node.kind.toLowerCase()}" can only be used inside a loop.`, node);
+        }
+        return;
+      case 'Render':
+        this.checkRender(node);
+        return;
+      case 'Element':
+        this.typeOf(node);
+        return;
+      default:
+        this.report('PS3310', `The checker does not know how to handle a ${node.kind} statement.`, node);
+    }
+  }
+
+  checkVarDecl(node) {
+    let declared = null;
+    if (node.type) declared = this.resolveType(node.type);
+    let initType = this.typeOf(node.init, declared);
+    if (declared && !T.assignable(initType, declared)) {
+      this.report('PS3311', `Cannot initialise "${describePattern(node.pattern)}" with ${T.showType(initType)}; expected ${T.showType(declared)}.`, node);
+      initType = declared;
+    }
+    const type = declared || initType;
+
+    if (node.pattern.kind === 'NamePattern') {
+      this.define(node.pattern.name, {
+        kind: 'var',
+        type,
+        mutable: node.declKind === 'let',
+        node,
+      }, node);
+      if (node.exported) this.exportedNames.add(node.pattern.name);
+      return;
+    }
+
+    this.bindPattern(node.pattern, type, { mutable: node.declKind === 'let', node });
+    if (node.exported) this.report('PS3312', 'Only a single name may be exported, not a destructuring pattern.', node);
+  }
+
+  bindPattern(pattern, type, options = {}) {
+    if (pattern.kind === 'NamePattern') {
+      this.define(pattern.name, {
+        kind: 'var',
+        type,
+        mutable: options.mutable !== false,
+        node: pattern,
+      }, pattern);
+      return;
+    }
+    if (pattern.kind === 'TuplePattern') {
+      const element = elementTypeOf(type);
+      for (const item of pattern.items) this.bindPattern(item, element, options);
+      return;
+    }
+    if (pattern.kind === 'RecordPattern') {
+      const resolved = T.deref(type);
+      for (const field of pattern.fields) {
+        let fieldType = T.PRIM.any;
+        if (resolved.k === 'record') {
+          const found = resolved.fields.get(field.key);
+          if (!found) this.report('PS3313', `Cannot destructure unknown field "${field.key}".`, pattern);
+          else fieldType = found.type;
+        }
+        this.bindPattern(field.target, fieldType, options);
+      }
+    }
+  }
+
+  checkFunction(node) {
+    const signature = node.__signature || this.signatureOf(node);
+    const previous = this.scope;
+    // Closures capture the enclosing scope, not the module scope.
+    this.scope = previous.child();
+
+    for (const parameter of signature.params) {
+      this.scope.define(parameter.name, {
+        kind: 'param',
+        type: parameter.type,
+        mutable: true,
+        node: parameter.node,
+      });
+      if (parameter.defaultValue) {
+        const defaultType = this.typeOf(parameter.defaultValue, parameter.type);
+        if (!T.assignable(defaultType, parameter.type)) {
+          this.report('PS3314', `Default value for "${parameter.name}" is ${T.showType(defaultType)}; expected ${T.showType(parameter.type)}.`, parameter.defaultValue);
+        }
+      }
+      if (parameter.rest) {
+        const resolved = T.deref(parameter.type);
+        if (resolved.k !== 'list') {
+          this.report('PS3315', `A rest parameter ("...${parameter.name}") must be a list type.`, parameter.node);
+        }
+      }
+    }
+
+    this.functionStack.push({
+      node,
+      declaredReturn: signature.declaredReturn,
+      async: Boolean(node.async),
+      inferred: null,
+    });
+    if (node.async) this.asyncDepth += 1;
+
+    this.hoistFunctions(node.body);
+    this.checkStatements(node.body);
+    const frame = this.functionStack.pop();
+    if (node.async) this.asyncDepth -= 1;
+
+    if (signature.declaredReturn) {
+      const returns = inspectReturns(node.body);
+      const expected = signature.declaredReturn;
+      const label = node.name ? `"${node.name}"` : 'the default export';
+      if (!T.containsNothing(expected) && !T.sameType(expected, T.PRIM.nothing) && !alwaysReturns(node.body)) {
+        this.report('PS3401', `Function ${label} declares a ${T.showType(expected)} result but can finish without returning one.`, node);
+      }
+      if (returns.missingValue && !T.containsNothing(expected) && !(expected.k === 'prim' && expected.name === 'nothing')) {
+        this.report('PS3402', `Function ${label} must return a value of type ${T.showType(expected)}.`, node);
+      }
+    }
+
+    if (!signature.declaredReturn) {
+      const returns = inspectReturns(node.body);
+      let inferred = returns.types.length ? T.union(returns.types) : T.PRIM.nothing;
+      if (returns.types.length && !alwaysReturns(node.body)) inferred = T.union([inferred, T.PRIM.nothing]);
+      const ret = node.async ? (inferred.k === 'promise' ? inferred : T.promiseOf(inferred)) : inferred;
+      node.__signature.ret = ret;
+      node.__signature.inferred = true;
+      const entry = node.name ? this.global.names.get(node.name) : null;
+      if (entry && entry.kind === 'function') entry.type = T.fnType(signature.params, ret, signature.typeParams);
+      if (node.name) this.inferredFunctions.set(node.name, ret);
+    }
+
+    if (node.defaultExport) {
+      this.defaultExportType = T.fnType(signature.params, signature.ret, signature.typeParams);
+    }
+
+    this.scope = previous;
+  }
+
+  checkAssignment(node) {
+    const target = node.target;
+    let targetType = T.PRIM.any;
+
+    if (target.kind === 'Name') {
+      const entry = this.lookup(target.name);
+      if (!entry) {
+        this.report('PS3301', `Unknown name "${target.name}".`, target, this.suggestionFor(target.name));
+        this.typeOf(node.value);
+        return;
+      }
+      if (entry.kind === 'const' || entry.kind === 'function' || entry.mutable === false) {
+        this.report('PS3307', `"${target.name}" is immutable; declare it with "let" to reassign it.`, target);
+      }
+      targetType = entry.type;
+    } else if (target.kind === 'Member') {
+      targetType = this.memberType(target, true);
+    } else if (target.kind === 'Index') {
+      targetType = this.indexType(target, true);
+    } else {
+      this.report('PS3316', 'Invalid assignment target.', target);
+    }
+
+    const valueType = this.typeOf(node.value, targetType);
+    if (!T.assignable(valueType, targetType)) {
+      this.report('PS3317', `Cannot assign ${T.showType(valueType)} to ${T.showType(targetType)}.`, node);
+    }
+  }
+
+  checkConditional(node) {
+    const facts = [];
+    for (const branch of node.branches) {
+      const conditionType = this.typeOf(branch.condition);
+      if (!T.assignable(conditionType, T.PRIM.boolean) && !T.isAny(conditionType)) {
+        this.report('PS3318', `A condition must be boolean, found ${T.showType(conditionType)}.`, branch.condition);
+      }
+      facts.push(narrowFacts(branch.condition));
+      this.checkBlockWithNarrowing(branch.body, facts[facts.length - 1]);
+    }
+    if (node.otherwise) {
+      const negative = [];
+      for (const fact of facts) negative.push(negateFacts(fact));
+      this.checkBlockWithNarrowing(node.otherwise, mergeFacts(negative));
+    }
+  }
+
+  checkBlockWithNarrowing(statements, facts) {
+    const previous = this.scope;
+    this.scope = previous.child();
+    this.scope.checker = this;
+    applyFacts(this.scope, facts);
+    this.hoistFunctions(statements);
+    this.checkStatements(statements);
+    this.scope = previous;
+  }
+
+  checkFor(node) {
+    this.loopDepth += 1;
+    const previous = this.scope;
+    this.scope = previous.child();
+
+    if (node.kind === 'ForEach') {
+      const iterableType = T.deref(this.typeOf(node.iterable));
+      let elementType = T.PRIM.any;
+      if (iterableType.k === 'list') elementType = iterableType.elem;
+      else if (iterableType.k === 'prim' && iterableType.name === 'text') elementType = T.PRIM.text;
+      else if (iterableType.k === 'map') elementType = T.record(new Map([
+        ['key', { type: iterableType.key, optional: false }],
+        ['value', { type: iterableType.value, optional: false }],
+      ]));
+      else if (!T.isAny(iterableType)) {
+        this.report('PS3319', `Cannot iterate over ${T.showType(iterableType)}; expected a list, map, or text.`, node.iterable);
+      }
+      this.bindPattern(node.pattern, elementType, { mutable: false, node });
+    } else {
+      const fromType = this.typeOf(node.from);
+      const toType = this.typeOf(node.to);
+      if (!T.assignable(fromType, T.PRIM.number) || !T.assignable(toType, T.PRIM.number)) {
+        this.report('PS3320', 'A numeric range needs number bounds.', node);
+      }
+      this.bindPattern(node.pattern, T.PRIM.number, { mutable: false, node });
+    }
+
+    this.checkStatements(node.body);
+    this.scope = previous;
+    this.loopDepth -= 1;
+  }
+
+  checkWhile(node) {
+    this.loopDepth += 1;
+    const conditionType = this.typeOf(node.condition);
+    if (!T.assignable(conditionType, T.PRIM.boolean) && !T.isAny(conditionType)) {
+      this.report('PS3318', `A condition must be boolean, found ${T.showType(conditionType)}.`, node.condition);
+    }
+    this.checkBlockWithNarrowing(node.body, narrowFacts(node.condition));
+    this.loopDepth -= 1;
+  }
+
+  checkMatch(node) {
+    const subjectType = this.typeOf(node.subject);
+    const covered = new Set();
+    let hasCatchAll = false;
+
+    for (const branch of node.cases) {
+      const previous = this.scope;
+      this.scope = previous.child();
+      const patternInfo = this.bindMatchPattern(branch.pattern, subjectType);
+      for (const name of patternInfo.coverage) covered.add(name);
+      if (patternInfo.catchAll) hasCatchAll = true;
+      if (branch.guard) {
+        const guardType = this.typeOf(branch.guard);
+        if (!T.assignable(guardType, T.PRIM.boolean) && !T.isAny(guardType)) {
+          this.report('PS3318', `A case guard must be boolean, found ${T.showType(guardType)}.`, branch.guard);
+        }
+      }
+      this.checkStatements(branch.body);
+      this.scope = previous;
+    }
+
+    const missing = missingCoverage(subjectType, covered, hasCatchAll);
+    if (missing.length) {
+      this.report('PS3321', `match on ${T.showType(subjectType)} does not handle ${missing.join(', ')}. Add those cases or "case _".`, node);
+    }
+  }
+
+  bindMatchPattern(pattern, subjectType) {
+    const coverage = new Set();
+    const info = { coverage, catchAll: false };
+
+    switch (pattern.kind) {
+      case 'WildcardPattern':
+        info.catchAll = true;
+        return info;
+      case 'LiteralPattern': {
+        const value = pattern.value;
+        if (value.kind === 'Nothing') coverage.add('nothing');
+        else if (value.kind === 'Boolean') coverage.add(String(value.value));
+        else if (value.kind === 'Text') coverage.add(`text:${value.v || value.value}`);
+        else coverage.add('literal');
+        const literalType = value.kind === 'Nothing' ? T.PRIM.nothing
+          : value.kind === 'Boolean' ? T.PRIM.boolean
+            : value.kind === 'Text' ? T.PRIM.text : T.PRIM.number;
+        if (!T.assignable(literalType, subjectType)) {
+          this.report('PS3322', `This case can never match: ${T.showType(literalType)} is not a ${T.showType(subjectType)}.`, pattern);
+        }
+        return info;
+      }
+      case 'NamePattern': {
+        const constructor = this.variantCtors.get(pattern.name);
+        if (constructor && constructor.kind === 'value') {
+          coverage.add(`variant:${pattern.name}`);
+          return info;
+        }
+        if (pattern.name === '_') { info.catchAll = true; return info; }
+        this.define(pattern.name, { kind: 'var', type: subjectType, mutable: false, node: pattern }, pattern);
+        info.catchAll = true;
+        return info;
+      }
+      case 'VariantPattern': {
+        const resolved = T.deref(subjectType);
+        const candidates = resolved.k === 'union' ? resolved.members : [resolved];
+        const match = candidates.find((member) => T.deref(member).k === 'variant' && T.deref(member).name === pattern.name);
+        if (!match) {
+          this.report('PS3323', `Variant "${pattern.name}" is not part of ${T.showType(subjectType)}.`, pattern);
+          for (const item of pattern.fields) this.bindMatchPattern(item, T.PRIM.any);
+          return info;
+        }
+        coverage.add(`variant:${pattern.name}`);
+        const variantType = T.deref(match);
+        if (pattern.fields.length !== variantType.fields.length) {
+          this.report(
+            'PS3324',
+            `Variant "${pattern.name}" has ${variantType.fields.length} field(s) but this pattern binds ${pattern.fields.length}.`,
+            pattern,
+          );
+        }
+        pattern.fields.forEach((field, index) => {
+          const declared = variantType.fields[index];
+          this.bindMatchPattern(field, declared ? declared.type : T.PRIM.any);
+        });
+        return info;
+      }
+      case 'ListPattern': {
+        const resolved = T.deref(subjectType);
+        const element = resolved.k === 'list' ? resolved.elem : T.PRIM.any;
+        for (const item of pattern.items) this.bindMatchPattern(item, element);
+        if (pattern.rest) {
+          this.define(pattern.rest, { kind: 'var', type: T.listOf(element), mutable: false, node: pattern }, pattern);
+        }
+        coverage.add('list');
+        return info;
+      }
+      case 'TuplePattern': {
+        const resolved = T.deref(subjectType);
+        const element = resolved.k === 'list' ? resolved.elem : T.PRIM.any;
+        for (const item of pattern.items) this.bindMatchPattern(item, element);
+        coverage.add('list');
+        return info;
+      }
+      case 'RecordMatchPattern': {
+        const resolved = T.deref(subjectType);
+        for (const field of pattern.fields) {
+          let fieldType = T.PRIM.any;
+          if (resolved.k === 'record') {
+            const found = resolved.fields.get(field.key);
+            if (found) fieldType = found.type;
+          } else if (resolved.k === 'union') {
+            const types = resolved.members.map((member) => {
+              const memberType = T.deref(member);
+              return memberType.k === 'record' ? memberType.fields.get(field.key) : null;
+            }).filter(Boolean);
+            if (types.length) fieldType = T.union(types.map((item) => item.type));
+          }
+          this.bindMatchPattern(field.pattern, fieldType);
+        }
+        coverage.add('record');
+        return info;
+      }
+      default:
+        return info;
+    }
+  }
+
+  checkTry(node) {
+    this.checkBlock(node.body);
+    if (node.handler) {
+      const previous = this.scope;
+      this.scope = previous.child();
+      this.scope.define(node.errorName, { kind: 'var', type: T.PRIM.any, mutable: false });
+      this.checkStatements(node.handler);
+      this.scope = previous;
+    }
+    if (node.finalizer) this.checkBlock(node.finalizer);
+  }
+
+  checkReturn(node) {
+    const valueType = this.typeOf(node.value);
+    node.__type = valueType;
+    const frame = this.functionStack[this.functionStack.length - 1];
+    if (!frame) {
+      this.report('PS3403', '"return" can only be used inside a function.', node);
+      return;
+    }
+    if (frame.declaredReturn && !T.assignable(valueType, frame.declaredReturn)) {
+      this.report('PS3404', `This function returns ${T.showType(frame.declaredReturn)}, but the value is ${T.showType(valueType)}.`, node);
+    }
+  }
+
+  checkRender(node) {
+    const factory = this.lookup('createElement');
+    if (!factory) {
+      this.report('PS3405', 'A render block needs "createElement" in scope. Import it from React or "std/dom".', node);
+    }
+    for (const child of node.children) this.checkStatement(child);
+  }
+
+  // ------------------------------------------------------------- expressions
+
+  typeOf(node, expected) {
+    if (!node) return T.PRIM.nothing;
+    switch (node.kind) {
+      case 'Number': return T.PRIM.number;
+      case 'Text': return T.PRIM.text;
+      case 'Boolean': return T.PRIM.boolean;
+      case 'Nothing': return T.PRIM.nothing;
+      case 'Template': {
+        for (const part of node.parts) {
+          if (part.kind === 'TemplateExpression') this.typeOf(part.expression);
+        }
+        return T.PRIM.text;
+      }
+      case 'Name': return this.nameType(node);
+      case 'ListLiteral': {
+        const expectedElement = expected && T.deref(expected).k === 'list' ? T.deref(expected).elem : null;
+        const types = [];
+        for (const item of node.items) {
+          if (item.kind === 'Spread') {
+            const spreadType = T.deref(this.typeOf(item.value));
+            if (spreadType.k === 'list') types.push(spreadType.elem);
+            else if (!T.isAny(spreadType)) this.report('PS3325', `Only a list can be spread into a list, found ${T.showType(spreadType)}.`, item);
+          } else {
+            types.push(this.typeOf(item, expectedElement));
+          }
+        }
+        return T.listOf(types.length ? T.union(types) : (expectedElement || T.PRIM.any));
+      }
+      case 'RecordLiteral': {
+        const fields = new Map();
+        for (const field of node.fields) {
+          if (field.spread) {
+            const spreadType = T.deref(this.typeOf(field.spread));
+            if (spreadType.k === 'record') {
+              for (const [key, value] of spreadType.fields) fields.set(key, value);
+            } else if (!T.isAny(spreadType)) {
+              this.report('PS3326', `Only a record can be spread into a record, found ${T.showType(spreadType)}.`, field.spread);
+            }
+            continue;
+          }
+          fields.set(field.key, { type: this.typeOf(field.value), optional: false });
+        }
+        return T.record(fields);
+      }
+      case 'Member': return this.memberType(node, false);
+      case 'Index': return this.indexType(node, false);
+      case 'Call': return this.callType(node, expected);
+      case 'Await': {
+        const frame = this.functionStack[this.functionStack.length - 1];
+        if (frame && !frame.async) {
+          this.report('PS3406', '"await" can only be used inside an async function.', node);
+        }
+        const valueType = this.typeOf(node.value);
+        const resolved = T.deref(valueType);
+        if (resolved.k === 'promise') return resolved.value;
+        if (T.isAny(resolved)) return T.PRIM.any;
+        this.report('PS3327', `"await" needs a Promise, found ${T.showType(valueType)}.`, node);
+        return T.PRIM.any;
+      }
+      case 'New':
+        this.typeOf(node.callee);
+        // Constructors cross the JavaScript boundary as untyped values.
+        return T.PRIM.any;
+      case 'Unary': {
+        const operandType = this.typeOf(node.operand);
+        if (node.operator === 'not') {
+          if (!T.assignable(operandType, T.PRIM.boolean) && !T.isAny(operandType)) {
+            this.report('PS3328', `"not" needs a boolean, found ${T.showType(operandType)}.`, node);
+          }
+          return T.PRIM.boolean;
+        }
+        if (!T.assignable(operandType, T.PRIM.number) && !T.isAny(operandType)) {
+          this.report('PS3329', `Unary "-" needs a number, found ${T.showType(operandType)}.`, node);
+        }
+        return T.PRIM.number;
+      }
+      case 'Binary': return this.binaryType(node);
+      case 'TypeTest': {
+        if (!node.value || node.value.kind !== 'Name') this.typeOf(node.value);
+        const target = this.resolveType(node.type);
+        const valueType = node.value && node.value.kind === 'Name' ? this.nameType(node.value) : T.PRIM.any;
+        if (!T.assignable(target, valueType) && !T.assignable(valueType, target) && !T.isAny(valueType)) {
+          this.report('PS3330', `"is ${T.showType(target)}" can never be true for ${T.showType(valueType)}.`, node);
+        }
+        return T.PRIM.boolean;
+      }
+      case 'Cast': {
+        const valueType = this.typeOf(node.value);
+        const target = this.resolveType(node.type);
+        const source = T.deref(valueType);
+        if (!T.assignable(valueType, target) && !T.assignable(target, valueType) && !T.isAny(source) && !T.isAny(T.deref(target))) {
+          this.report('PS3331', `Cannot cast ${T.showType(valueType)} to ${T.showType(target)}; the types do not overlap.`, node);
+        }
+        return target;
+      }
+      case 'Pipe': return this.pipeType(node);
+      case 'FunctionExpression': return this.functionExpressionType(node, expected);
+      case 'Spread': return this.typeOf(node.value);
+      case 'Element': {
+        this.typeOf(node.tag);
+        for (const property of node.props) this.typeOf(property.value);
+        for (const child of node.children) this.checkStatement(child);
+        return T.PRIM.any;
+      }
+      default:
+        this.report('PS3332', `The checker does not know how to type a ${node.kind} expression.`, node);
+        return T.PRIM.error;
+    }
+  }
+
+  nameType(node) {
+    const entry = this.lookup(node.name);
+    if (entry) return entry.type;
+    const constructor = this.variantCtors.get(node.name);
+    if (constructor) return constructor.type;
+    this.report('PS3301', `Unknown name "${node.name}".`, node, this.suggestionFor(node.name));
+    return T.PRIM.error;
+  }
+
+  suggestionFor(name) {
+    const candidate = closest(name, [...this.scope.visibleNames(), ...this.variantCtors.keys()]);
+    return candidate ? `Did you mean "${candidate}"?` : null;
+  }
+
+  memberType(node, forAssignment) {
+    const objectType = T.deref(this.typeOf(node.object));
+    if (T.isAny(objectType)) return T.PRIM.any;
+    if (objectType.k === 'record') {
+      const field = objectType.fields.get(node.property);
+      if (!field) {
+        this.report('PS3333', `Type ${T.showType(objectType)} has no field "${node.property}".`, node);
+        return T.PRIM.error;
+      }
+      if (forAssignment && field.optional) return field.type;
+      // An optional field is absent-able, so reading it is a maybe-value.
+      if (field.optional || node.optional) return T.union([field.type, T.PRIM.nothing]);
+      return field.type;
+    }
+    if (objectType.k === 'union') {
+      const types = [];
+      let nullable = false;
+      for (const member of objectType.members) {
+        const resolved = T.deref(member);
+        if (resolved.k === 'prim' && resolved.name === 'nothing') {
+          nullable = true;
+          if (!node.optional) {
+            this.report('PS3350', `This value may be nothing; guard it or use "?." to access "${node.property}".`, node);
+          }
+          continue;
+        }
+        if (resolved.k === 'record' || resolved.k === 'variant') {
+          const field = resolved.k === 'record'
+            ? resolved.fields.get(node.property)
+            : resolved.fields.find((item) => item.name === node.property);
+          if (!field) {
+            this.report('PS3351', `Not every member of ${T.showType(objectType)} has a field "${node.property}"; narrow the value first.`, node);
+            return T.PRIM.error;
+          }
+          types.push(field.type);
+        } else if (!T.isAny(resolved)) {
+          this.report('PS3351', `Not every member of ${T.showType(objectType)} has a field "${node.property}"; narrow the value first.`, node);
+          return T.PRIM.error;
+        }
+      }
+      const result = T.union(types);
+      return node.optional || nullable ? T.union([result, T.PRIM.nothing]) : result;
+    }
+    if (objectType.k === 'variant') {
+      const field = objectType.fields.find((item) => item.name === node.property);
+      if (!field) {
+        this.report('PS3333', `Variant ${objectType.name} has no field "${node.property}".`, node);
+        return T.PRIM.error;
+      }
+      return field.type;
+    }
+    if (objectType.k === 'map') {
+      // A text-keyed map exposes its values through field access too: JSON and
+      // most npm APIs are spelled with dots at the boundary.
+      const keyType = T.deref(objectType.key);
+      if (keyType.k !== 'prim' || keyType.name !== 'text') {
+        this.report('PS3352', `Type ${T.showType(objectType)} is not keyed by text; index it with [].`, node);
+        return T.PRIM.error;
+      }
+      return node.optional ? T.union([objectType.value, T.PRIM.nothing]) : objectType.value;
+    }
+    if (objectType.k === 'prim' && objectType.name === 'text') {
+      this.report('PS3336', 'Text has no fields. Use functions from "std/text".', node);
+      return T.PRIM.error;
+    }
+    this.report('PS3335', `Type ${T.showType(objectType)} has no field "${node.property}".`, node);
+    return T.PRIM.error;
+  }
+
+  indexType(node, forAssignment) {
+    const objectType = T.deref(this.typeOf(node.object));
+    const indexType = this.typeOf(node.index);
+    if (T.isAny(objectType)) return T.PRIM.any;
+    if (objectType.k === 'list') {
+      if (!T.assignable(indexType, T.PRIM.number) && !T.isAny(indexType)) {
+        this.report('PS3337', `A list index must be a number, found ${T.showType(indexType)}.`, node.index);
+      }
+      return node.optional || !forAssignment ? T.union([objectType.elem, T.PRIM.nothing]) : objectType.elem;
+    }
+    if (objectType.k === 'map') {
+      if (!T.assignable(indexType, objectType.key)) {
+        this.report('PS3338', `This map is keyed by ${T.showType(objectType.key)}, not ${T.showType(indexType)}.`, node.index);
+      }
+      return node.optional ? T.union([objectType.value, T.PRIM.nothing]) : objectType.value;
+    }
+    if (objectType.k === 'prim' && objectType.name === 'text') {
+      if (!T.assignable(indexType, T.PRIM.number) && !T.isAny(indexType)) {
+        this.report('PS3337', `A text index must be a number, found ${T.showType(indexType)}.`, node.index);
+      }
+      return T.PRIM.text;
+    }
+    if (objectType.k === 'record') {
+      if (!T.assignable(indexType, T.PRIM.text) && !T.isAny(indexType)) {
+        this.report('PS3339', 'A record index must be text.', node.index);
+      }
+      return T.PRIM.any;
+    }
+    this.report('PS3340', `Type ${T.showType(objectType)} cannot be indexed.`, node);
+    return T.PRIM.error;
+  }
+
+  callType(node, expected) {
+    let calleeType;
+
+    if (node.callee.kind === 'Name' && this.variantCtors.has(node.callee.name)) {
+      calleeType = this.variantCtors.get(node.callee.name).type;
+    } else {
+      calleeType = this.typeOf(node.callee);
+    }
+
+    const resolved = T.deref(calleeType);
+    if (T.isAny(resolved)) {
+      for (const argument of node.args) this.typeOf(argument);
+      return T.PRIM.any;
+    }
+    if (resolved.k !== 'fn') {
+      for (const argument of node.args) this.typeOf(argument);
+      this.report('PS3304', `${describeCallee(node.callee)} is ${T.showType(calleeType)} and cannot be called.`, node);
+      return T.PRIM.error;
+    }
+
+    const subst = new Map();
+    const required = resolved.params.filter((parameter) => !parameter.optional && !parameter.rest).length;
+    const hasRest = resolved.params.some((parameter) => parameter.rest);
+    if (node.args.length < required) {
+      this.report('PS3341', `Expected at least ${required} argument(s) but got ${node.args.length}.`, node);
+    }
+    if (!hasRest && node.args.length > resolved.params.length) {
+      this.report('PS3342', `Expected at most ${resolved.params.length} argument(s) but got ${node.args.length}.`, node);
+    }
+
+    node.args.forEach((argument, index) => {
+      const parameter = resolved.params[index] || resolved.params[resolved.params.length - 1];
+      if (argument.kind === 'Spread') {
+        const spreadType = T.deref(this.typeOf(argument.value));
+        if (spreadType.k === 'list' && parameter) T.infer(parameter.type, spreadType.elem, subst);
+        return;
+      }
+      // A rest parameter is declared as a list but each argument is one element.
+      let expectedType = null;
+      let declared = null;
+      if (parameter) {
+        declared = parameter.type;
+        expectedType = parameter.rest ? elementTypeOf(parameter.type) : parameter.type;
+      }
+      const argumentType = this.typeOf(argument, expectedType);
+      if (parameter) {
+        T.infer(expectedType, argumentType, subst);
+        if (!T.assignable(argumentType, T.substitute(expectedType, subst))) {
+          this.report(
+            'PS3343',
+            `Argument ${index + 1} is ${T.showType(argumentType)}; expected ${T.showType(T.substitute(expectedType, subst))}.`,
+            argument,
+          );
+        }
+      }
+    });
+
+    return T.substitute(resolved.ret, subst);
+  }
+
+  binaryType(node) {
+    const left = this.typeOf(node.left);
+    const right = this.typeOf(node.right);
+    const leftResolved = T.deref(left);
+    const rightResolved = T.deref(right);
+
+    switch (node.operator) {
+      case '+':
+      case '-':
+      case '*':
+      case '/':
+      case '%':
+      case '**': {
+        if (!T.assignable(left, T.PRIM.number) || !T.assignable(right, T.PRIM.number)) {
+          this.report(
+            'PS3344',
+            `Arithmetic "${node.operator}" needs numbers, found ${T.showType(left)} and ${T.showType(right)}. Use "{a}{b}" to join text.`,
+            node,
+          );
+          return T.PRIM.error;
+        }
+        return T.PRIM.number;
+      }
+      case '==':
+      case '!=': {
+        if (!T.assignable(left, right) && !T.assignable(right, left)) {
+          this.report('PS3345', `Comparing ${T.showType(left)} with ${T.showType(right)} can never be true.`, node);
+        }
+        return T.PRIM.boolean;
+      }
+      case '<':
+      case '<=':
+      case '>':
+      case '>=': {
+        const comparable = (T.assignable(left, T.PRIM.number) && T.assignable(right, T.PRIM.number)) ||
+          (T.assignable(left, T.PRIM.text) && T.assignable(right, T.PRIM.text));
+        if (!comparable) {
+          this.report('PS3346', `"${node.operator}" compares two numbers or two texts, found ${T.showType(left)} and ${T.showType(right)}.`, node);
+        }
+        return T.PRIM.boolean;
+      }
+      case 'and':
+      case 'or': {
+        if (!T.assignable(left, T.PRIM.boolean) || !T.assignable(right, T.PRIM.boolean)) {
+          this.report('PS3318', `"${node.operator}" needs boolean operands, found ${T.showType(left)} and ${T.showType(right)}.`, node);
+        }
+        return T.PRIM.boolean;
+      }
+      case '??': {
+        const fallback = T.union([T.withoutNothing(leftResolved), rightResolved]);
+        return fallback;
+      }
+      default:
+        this.report('PS3347', `Unknown operator "${node.operator}".`, node);
+        return T.PRIM.error;
+    }
+  }
+
+  pipeType(node) {
+    this.typeOf(node.left);
+    let call;
+    if (node.right.kind === 'Call') {
+      call = { ...node.right, args: [node.left, ...node.right.args] };
+      if (node.right.callee.kind === 'Name' && this.variantCtors.has(node.right.callee.name)) {
+        this.report('PS3348', 'A pipeline cannot construct a variant directly.', node);
+      }
+    } else if (node.right.kind === 'Name' || node.right.kind === 'Member' || node.right.kind === 'FunctionExpression') {
+      call = { kind: 'Call', callee: node.right, args: [node.left], line: node.line, col: node.col };
+    } else {
+      this.report('PS3349', 'The right side of "|>" must be a function or a call.', node.right);
+      return T.PRIM.error;
+    }
+    return this.callType(call);
+  }
+
+  functionExpressionType(node, expected) {
+    const expectedFn = expected ? T.deref(expected) : null;
+    const localEnv = new Map();
+    const params = node.params.map((parameter, index) => {
+      let type;
+      if (parameter.type) {
+        type = this.resolveType(parameter.type, localEnv);
+      } else if (expectedFn && expectedFn.k === 'fn' && expectedFn.params[index]) {
+        type = expectedFn.params[index].type;
+      } else {
+        type = T.PRIM.any;
+      }
+      return { name: parameter.name, type, optional: false, rest: false };
+    });
+
+    const previous = this.scope;
+    this.scope = previous.child();
+    for (const parameter of params) {
+      this.scope.define(parameter.name, { kind: 'param', type: parameter.type, mutable: true });
+    }
+
+    // A lambda is its own function frame: `await` inside it belongs to the
+    // lambda, not to the enclosing function. An async lambda is an async
+    // function, so its result type is the Promise of the values it returns.
+    this.functionStack.push({ node, declaredReturn: null, async: Boolean(node.async), inferred: null });
+    if (node.async) this.asyncDepth += 1;
+    let ret;
+    if (node.expression) {
+      ret = this.typeOf(node.expression, expectedFn && expectedFn.k === 'fn' ? expectedFn.ret : null);
+    } else {
+      this.checkStatements(node.body);
+      const info = inspectReturns(node.body);
+      ret = info.types.length ? T.union(info.types) : T.PRIM.nothing;
+    }
+    if (node.async) this.asyncDepth -= 1;
+    this.functionStack.pop();
+    this.scope = previous;
+    if (node.async && T.deref(ret).k !== 'promise') ret = T.promiseOf(ret);
+    return T.fnType(params, ret);
+  }
+}
+
+// --------------------------------------------------------------- narrowing
+
+// A narrowable place is a name followed by plain field accesses:
+// `value`, `user.email`, `order.customer.name`. Optional chains are excluded
+// because they already produce a maybe-value.
+function pathOf(node) {
+  const segments = [];
+  let current = node;
+  while (current && current.kind === 'Member' && !current.optional) {
+    segments.unshift(current.property);
+    current = current.object;
+  }
+  if (current && current.kind === 'Name') {
+    segments.unshift(current.name);
+    return segments;
+  }
+  return null;
+}
+
+function narrowFacts(condition) {
+  const facts = [];
+  if (!condition) return facts;
+  if (condition.kind === 'TypeTest') {
+    const path = pathOf(condition.value);
+    if (path) facts.push({ path, type: condition.type, negative: false });
+  }
+  if (condition.kind === 'Binary') {
+    if (condition.operator === 'and') {
+      facts.push(...narrowFacts(condition.left), ...narrowFacts(condition.right));
+    }
+    if (condition.operator === '==' || condition.operator === '!=') {
+      const negative = condition.operator === '!=';
+      const sides = [[condition.left, condition.right], [condition.right, condition.left]];
+      for (const [left, right] of sides) {
+        const path = pathOf(left);
+        if (path && right.kind === 'Nothing') {
+          facts.push({ path, type: { kind: 'NamedType', name: 'nothing', args: [] }, negative });
+        }
+      }
+    }
+  }
+  if (condition.kind === 'Unary' && condition.operator === 'not') {
+    for (const fact of narrowFacts(condition.operand)) facts.push({ ...fact, negative: !fact.negative });
+  }
+  return facts;
+}
+
+function narrowMember(type, segments, replacement, negative) {
+  if (!segments.length) return replacement;
+  const resolved = T.deref(type);
+  if (resolved.k === 'union') {
+    return T.union(resolved.members.map((member) => narrowMember(member, segments, replacement, negative)));
+  }
+  if (resolved.k !== 'record' && resolved.k !== 'variant') return type;
+  const [head, ...rest] = segments;
+  const fields = resolved.k === 'variant'
+    ? new Map(resolved.fields.map((field) => [field.name, { type: field.type, optional: false }]))
+    : new Map(resolved.fields);
+  const field = fields.get(head);
+  if (!field) return type;
+  let narrowed;
+  if (rest.length) {
+    narrowed = narrowMember(field.type, rest, replacement, negative);
+  } else {
+    narrowed = negative ? T.withoutNothing(field.type) : replacement;
+  }
+  // Once a guard proves the field is present, it is no longer optional, so
+  // reading it stops producing a maybe-value.
+  fields.set(head, { ...field, type: narrowed, optional: T.containsNothing(narrowed) });
+  return T.record(fields, { name: resolved.name, open: resolved.open });
+}
+
+function negateFacts(facts) {
+  return facts.map((fact) => ({ ...fact, negative: !fact.negative }));
+}
+
+function mergeFacts(factGroups) {
+  const merged = [];
+  for (const group of factGroups) merged.push(...group);
+  return merged;
+}
+
+function applyFacts(scope, facts) {
+  const checker = scope.checker;
+  for (const fact of facts || []) {
+    const entry = scope.lookup(fact.path[0]);
+    if (!entry) continue;
+    const rest = fact.path.slice(1);
+    const isNothingFact = fact.type.kind === 'NamedType' && fact.type.name === 'nothing';
+    const replacement = isNothingFact
+      ? T.PRIM.nothing
+      : (checker ? checker.resolveType(fact.type) : T.PRIM.any);
+
+    let type;
+    if (!rest.length) {
+      type = fact.negative ? T.withoutNothing(entry.type) : replacement;
+    } else {
+      type = narrowMember(entry.type, rest, replacement, fact.negative);
+    }
+    scope.define(fact.path[0], { ...entry, type });
+  }
+}
+
+// ------------------------------------------------------------- flow helpers
+
+function inspectReturns(statements) {
+  const types = [];
+  let missingValue = false;
+
+  const walk = (nodes) => {
+    for (const node of nodes) {
+      if (!node) continue;
+      if (node.kind === 'Return') {
+        if (!node.value || node.value.kind === 'Nothing') missingValue = true;
+        else types.push(node.value.__type || T.PRIM.any);
+      } else if (node.kind === 'Conditional') {
+        for (const branch of node.branches) walk(branch.body);
+        if (node.otherwise) walk(node.otherwise);
+      } else if (node.kind === 'Try') {
+        walk(node.body);
+        if (node.handler) walk(node.handler);
+        if (node.finalizer) walk(node.finalizer);
+      } else if (node.kind === 'Match') {
+        for (const branch of node.cases) walk(branch.body);
+      } else if (node.kind === 'FunctionDecl' || node.kind === 'FunctionExpression') {
+        // Nested functions own their returns.
+      } else if (node.kind === 'ForEach' || node.kind === 'ForRange' || node.kind === 'While') {
+        walk(node.body);
+      }
+    }
+  };
+  walk(statements);
+  return { types, missingValue };
+}
+
+function alwaysReturns(statements) {
+  if (!statements || statements.length === 0) return false;
+  for (let index = statements.length - 1; index >= 0; index -= 1) {
+    const node = statements[index];
+    if (node.kind === 'Return' || node.kind === 'Throw') return true;
+    if (node.kind === 'Render') return true;
+    if (node.kind === 'Conditional') {
+      if (!node.otherwise) return false;
+      return node.branches.every((branch) => alwaysReturns(branch.body)) && alwaysReturns(node.otherwise);
+    }
+    if (node.kind === 'Match') {
+      return node.cases.every((branch) => alwaysReturns(branch.body));
+    }
+    if (node.kind === 'Try') {
+      const bodyReturns = alwaysReturns(node.body);
+      const handlerReturns = node.handler ? alwaysReturns(node.handler) : false;
+      return bodyReturns && (!node.handler || handlerReturns);
+    }
+    if (node.kind === 'FunctionDecl' || node.kind === 'TypeDecl' || node.kind === 'Import') continue;
+    return false;
+  }
+  return false;
+}
+
+function missingCoverage(subjectType, covered, catchAll) {
+  if (catchAll) return [];
+  const resolved = T.deref(subjectType);
+  const members = resolved.k === 'union' ? resolved.members.map((member) => T.deref(member)) : [resolved];
+  const missing = [];
+
+  for (const member of members) {
+    if (member.k === 'prim' && member.name === 'boolean') {
+      if (!covered.has('true')) missing.push('true');
+      if (!covered.has('false')) missing.push('false');
+    } else if (member.k === 'prim' && member.name === 'nothing') {
+      if (!covered.has('nothing')) missing.push('nothing');
+    } else if (member.k === 'variant' || member.k === 'unit') {
+      if (!covered.has('variant:' + member.name)) missing.push(member.name);
+    } else if (member.k === 'record' && hasVariantUnion(members)) {
+      // Covered by variant arms.
+    }
+  }
+  return missing;
+}
+
+function hasVariantUnion(members) {
+  return members.some((member) => member.k === 'variant' || member.k === 'unit');
+}
+
+function elementTypeOf(type) {
+  const resolved = T.deref(type);
+  if (resolved.k === 'list') return resolved.elem;
+  return T.PRIM.any;
+}
+
+function describePattern(pattern) {
+  if (!pattern) return 'value';
+  if (pattern.kind === 'NamePattern') return pattern.name;
+  return 'this pattern';
+}
+
+function describeCallee(callee) {
+  if (!callee) return 'This value';
+  if (callee.kind === 'Name') return `"${callee.name}"`;
+  if (callee.kind === 'Member') return `"${callee.property}"`;
+  return 'This value';
+}
+
+function checkModule(options) {
+  const checker = new Checker(options);
+  const result = checker.run();
+  return { ...result, checker };
+}
+
+module.exports = { checkModule, Checker, Scope, applyFacts, narrowFacts, alwaysReturns };

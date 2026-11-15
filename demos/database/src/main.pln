@@ -1,0 +1,231 @@
+# PlainScript demo: a database-backed JSON API on Node's built-in SQLite.
+#
+#   plainscript run demos/database/src/main.pln
+#   curl localhost:4400/tasks
+#   curl -X POST localhost:4400/tasks -H 'content-type: application/json' \
+#        -d '{"title":"write the database demo"}'
+#   curl -X PUT localhost:4400/tasks/1 -H 'content-type: application/json' \
+#        -d '{"title":"done","done":true}'
+#   curl -X DELETE localhost:4400/tasks/1
+#
+# DB_PATH defaults to an in-memory database. Point it at a file to keep data
+# across restarts:
+#
+#   DB_PATH=./tasks.db plainscript run demos/database/src/main.pln
+
+import { serve, json, notFound, urlOf, requestJson } from "std/http"
+import { print, env } from "std/io"
+import { parseNumber, split } from "std/text"
+import { count, append } from "std/list"
+import { DatabaseSync } from "node:sqlite"
+
+type Task
+    id: number
+    title: text
+    done: boolean
+end
+
+# One connection for the process. Statements are prepared once and reused, so
+# every request path uses bound parameters rather than string interpolation.
+let database = new DatabaseSync(env("DB_PATH", ":memory:"))
+database.exec("create table if not exists tasks (id integer primary key autoincrement, title text not null, done integer not null default 0)")
+
+let insertTask = database.prepare("insert into tasks (title, done) values (?, ?)")
+let selectAll = database.prepare("select id, title, done from tasks order by id")
+let selectOne = database.prepare("select id, title, done from tasks where id = ?")
+let updateOne = database.prepare("update tasks set title = ?, done = ? where id = ?")
+let deleteOne = database.prepare("delete from tasks where id = ?")
+
+# ------------------------------------------------------------------ row shaping
+
+function toTask(row: any) -> Task
+    return { id: row.id as number, title: row.title as text, done: row.done == 1 }
+end
+
+# The WHERE clause and LIMIT/OFFSET are assembled, but every value is bound as a
+# statement parameter: only the SQL shape is built here, never user text.
+function filteredTasks(done: boolean or nothing, limit: number, offset: number) -> list of Task
+    let sql = "select id, title, done from tasks"
+    let params: list of any = []
+    when done != nothing
+        sql = "{sql} where done = ?"
+        params = append(params, flagOf(done))
+    end
+    sql = "{sql} order by id limit ? offset ?"
+    params = append(params, limit)
+    params = append(params, offset)
+
+    let tasks: list of Task = []
+    for row in database.prepare(sql).all(...params) as list of any
+        tasks = append(tasks, toTask(row))
+    end
+    return tasks
+end
+
+function allTasks() -> list of Task
+    return filteredTasks(nothing, 1000, 0)
+end
+
+function findTask(id: number) -> Task or nothing
+    for row in selectOne.all(id) as list of any
+        return toTask(row)
+    end
+    return nothing
+end
+
+function taskCount() -> number
+    for row in database.prepare("select count(*) as total from tasks").all() as list of any
+        return row.total as number
+    end
+    return 0
+end
+
+# ---------------------------------------------------------------- request input
+
+function textField(body: any, name: text) -> text
+    when body is map of text to any
+        let value = body[name]
+        when value is text
+            return value
+        end
+    end
+    return ""
+end
+
+function boolField(body: any, name: text, fallback: boolean) -> boolean
+    when body is map of text to any
+        let value = body[name]
+        when value is boolean
+            return value
+        end
+    end
+    return fallback
+end
+
+function doneFrom(search: any) -> boolean or nothing
+    let raw = search.get("done")
+    when raw == "true"
+        return true
+    end
+    when raw == "false"
+        return false
+    end
+    return nothing
+end
+
+function numberFrom(search: any, name: text, fallback: number) -> number
+    let raw = search.get(name)
+    when raw != nothing
+        let parsed = parseNumber(raw as text, -1)
+        when parsed >= 0
+            return parsed
+        end
+    end
+    return fallback
+end
+
+function flagOf(value: boolean) -> number
+    when value
+        return 1
+    end
+    return 0
+end
+
+# /tasks/<id> has exactly three segments: "", "tasks", "<id>".
+function idFrom(path: text) -> number or nothing
+    let parts = split(path, "/")
+    when count(parts) != 3
+        return nothing
+    end
+    let second = parts[1]
+    when second != nothing
+        when second == "tasks"
+            let raw = parts[2]
+            when raw != nothing
+                let parsed = parseNumber(raw, -1)
+                when parsed >= 0
+                    return parsed
+                end
+            end
+        end
+    end
+    return nothing
+end
+
+# --------------------------------------------------------------------- routes
+
+async function handler(request: any) -> any
+    let url = urlOf(request)
+    let method = request.method
+    let path = url.pathname as text
+
+    when method == "GET" and path == "/health"
+        return json({ status: "ok", tasks: taskCount() })
+    end
+
+    when method == "GET" and path == "/tasks"
+        let done = doneFrom(url.searchParams)
+        let limit = numberFrom(url.searchParams, "limit", 50)
+        let offset = numberFrom(url.searchParams, "offset", 0)
+        return json(filteredTasks(done, limit, offset))
+    end
+
+    when method == "POST" and path == "/tasks"
+        let body = await requestJson(request)
+        let title = textField(body, "title")
+        when title == ""
+            return json({ error: "title is required" }, 400)
+        end
+        let done = boolField(body, "done", false)
+        let result = insertTask.run(title, flagOf(done))
+        let created = findTask(result.lastInsertRowid as number)
+        when created != nothing
+            return json(created, 201)
+        end
+        return json({ error: "task was not created" }, 500)
+    end
+
+    let id = idFrom(path)
+
+    when method == "GET" and id != nothing
+        let task = findTask(id)
+        when task != nothing
+            return json(task)
+        end
+        return json({ error: "task not found" }, 404)
+    end
+
+    when method == "PUT" and id != nothing
+        let body = await requestJson(request)
+        let title = textField(body, "title")
+        when title == ""
+            return json({ error: "title is required" }, 400)
+        end
+        let existing = findTask(id)
+        when existing != nothing
+            let done = boolField(body, "done", existing.done)
+            updateOne.run(title, flagOf(done), id)
+            let updated = findTask(id)
+            when updated != nothing
+                return json(updated)
+            end
+        end
+        return json({ error: "task not found" }, 404)
+    end
+
+    when method == "DELETE" and id != nothing
+        let existing = findTask(id)
+        when existing == nothing
+            return json({ error: "task not found" }, 404)
+        end
+        deleteOne.run(id)
+        return json({ deleted: true })
+    end
+
+    return notFound()
+end
+
+let port = parseNumber(env("PORT", "4400"))
+let databasePath = env("DB_PATH", ":memory:")
+print("Tasks API on http://localhost:{port} (database: {databasePath})")
+await serve(port, handler)

@@ -1,0 +1,10 @@
+{
+  "name": "plainscript-fullstack-demo",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "node ../../src/cli.js build && node ../../src/cli.js build src/client.pln --std-base=/std && mkdir -p public/std && cp ../../stdlib/dom.js ../../stdlib/list.js public/std/",
+    "start": "node ../../src/cli.js run src/server.pln"
+  }
+}
