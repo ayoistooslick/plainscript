@@ -1,0 +1,10 @@
+# Declarations for std/io. The checker reads this file; the runtime is io.js.
+
+export declare function print(value?: any) -> nothing
+export declare function eprint(value?: any) -> nothing
+export declare function readLine(prompt?: text) -> Promise of text
+export declare function args() -> list of text
+export declare function env(name: text, fallback?: text) -> text
+export declare function exit(code?: number) -> nothing
+export declare function stdinText() -> text
+export declare function pid() -> number

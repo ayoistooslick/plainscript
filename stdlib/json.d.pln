@@ -1,0 +1,8 @@
+# Declarations for std/json.
+
+export type Json = nothing or boolean or number or text or list of Json or map of text to Json
+
+export declare function encode(value: Json, indent?: number) -> text
+export declare function decode(text: text) -> Json
+export declare function tryDecode(text: text, fallback?: Json) -> Json
+export declare function clone(value: any) -> any
