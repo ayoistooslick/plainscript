@@ -65,8 +65,8 @@ test('operations validate both sides, run authorization and expose a typed trans
   await assert.rejects(unsafeClient({ id: 8 }), (error) => error.stage === 'client output validation');
 });
 
-test('PlainScript can declare a typed operation and compile a server/client consumer', () => {
-  const result = runSource(`import { object, text, number, operation, implement, createClient, Schema } from "std/contract"
+test('PlainScript enforces imported generic operation input/output types end to end', () => {
+  const valid = runSource(`import { object, text, number, operation, implement, createClient, Schema } from "std/contract"
 import { print } from "std/io"
 type Input
     id: number
@@ -85,8 +85,26 @@ let client = createClient(getTask, async (name: text, input: any) => do
     return await endpoint(input)
 end)
 let result = await client({ id: 4 })
-print("client invoked")
+print(result.title)
 `);
-  assert.equal(result.status, 0, result.stderr);
-  assert.equal(result.stdout, 'client invoked\n');
+  assert.equal(valid.status, 0, valid.stderr);
+  assert.equal(valid.stdout, 'task-4\n');
+
+  const invalid = runSource(`import { object, text, number, operation, createClient, Schema } from "std/contract"
+type Input
+    id: number
+end
+type Output
+    title: text
+end
+let inputSchema: Schema<Input> = object({ id: number() })
+let outputSchema: Schema<Output> = object({ title: text() })
+let spec = operation("tasks.get", inputSchema, outputSchema)
+let client = createClient(spec, async (name: text, input: any) => do
+    return { title: "ok" }
+end)
+let response = await client({ id: "wrong" })
+`);
+  assert.ok(invalid.compiler.diagnostics.some((diagnostic) => diagnostic.code === 'PS3343'),
+    'a text input must not satisfy an operation requiring a numeric id');
 });
