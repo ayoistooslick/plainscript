@@ -129,7 +129,23 @@ class Checker {
           this.report('PS3201', `Unknown type "${name}".`, node, suggestion ? `Did you mean "${suggestion}"?` : null);
           return T.PRIM.error;
         }
-        if (declaration.importedType) return declaration.importedType;
+        if (declaration.importedType) {
+          const imported = declaration.importedType;
+          if (imported.k !== 'genericAlias') return imported;
+          if (imported.params.length !== node.args.length) {
+            this.report(
+              'PS3202',
+              `Type "${name}" expects ${imported.params.length} type argument(s) but got ${node.args.length}.`,
+              node,
+            );
+            return T.PRIM.error;
+          }
+          const substitutions = new Map();
+          imported.params.forEach((param, index) => {
+            substitutions.set(param, this.resolveType(node.args[index], typeEnv));
+          });
+          return T.substitute(imported.body, substitutions);
+        }
         if (declaration.typeParams.length !== node.args.length) {
           this.report(
             'PS3202',
@@ -206,7 +222,9 @@ class Checker {
       T.registerAlias(key, resolved);
       // Only exported types cross a module boundary; local aliases stay local.
       if (declaration.exported) {
-        this.typeExports.set(name, resolved);
+        this.typeExports.set(name, declaration.typeParams.length
+          ? { k: 'genericAlias', params: [...declaration.typeParams], body: resolved }
+          : resolved);
         this.exportedNames.add(name);
       }
     }
@@ -381,6 +399,8 @@ class Checker {
               kind: entry && entry.kind ? entry.kind : 'const',
               type: entry ? entry.type : T.PRIM.any,
               importType: true,
+              importSpec: statement.spec,
+              importedName: name.imported,
               node: statement,
             }, statement);
           }
@@ -1203,6 +1223,7 @@ class Checker {
       this.report('PS3342', `Expected at most ${resolved.params.length} argument(s) but got ${node.args.length}.`, node);
     }
 
+    const argumentTypes = [];
     node.args.forEach((argument, index) => {
       const parameter = resolved.params[index] || resolved.params[resolved.params.length - 1];
       if (argument.kind === 'Spread') {
@@ -1217,20 +1238,74 @@ class Checker {
         declared = parameter.type;
         expectedType = parameter.rest ? elementTypeOf(parameter.type) : parameter.type;
       }
-      const argumentType = this.typeOf(argument, expectedType);
+      // Earlier arguments can bind generic variables used by a later callback.
+      // Contextual typing must see those substitutions before checking the body;
+      // otherwise a lambda body like `request.id` is checked against unresolved I.
+      const contextualType = expectedType ? T.substitute(expectedType, subst) : expectedType;
+      const argumentType = this.typeOf(argument, contextualType);
+      argumentTypes[index] = argumentType;
       if (parameter) {
-        T.infer(expectedType, argumentType, subst);
-        if (!T.assignable(argumentType, T.substitute(expectedType, subst))) {
+        const callbackMismatch = argument.kind === 'FunctionExpression'
+          && contextualType
+          && T.deref(contextualType).k === 'fn'
+          && !T.assignable(argumentType, contextualType);
+        if (callbackMismatch) {
           this.report(
             'PS3343',
-            `Argument ${index + 1} is ${T.showType(argumentType)}; expected ${T.showType(T.substitute(expectedType, subst))}.`,
+            `Argument ${index + 1} is ${T.showType(argumentType)}; expected ${T.showType(contextualType)}.`,
             argument,
           );
+        } else {
+          T.infer(expectedType, argumentType, subst);
+          if (!T.assignable(argumentType, T.substitute(expectedType, subst))) {
+            this.report(
+              'PS3343',
+              `Argument ${index + 1} is ${T.showType(argumentType)}; expected ${T.showType(T.substitute(expectedType, subst))}.`,
+              argument,
+            );
+          }
         }
       }
     });
 
-    return T.substitute(resolved.ret, subst);
+    const resultType = T.substitute(resolved.ret, subst);
+    if (node.callee.kind === 'Name') {
+      const entry = this.lookup(node.callee.name);
+      if (entry && entry.importSpec === 'std/contract' && entry.importedName === 'object') {
+        return this.schemaForRecord(argumentTypes[0], resultType);
+      }
+    }
+    return resultType;
+  }
+
+  schemaForRecord(shapeType, schemaTemplate) {
+    const shape = T.deref(shapeType);
+    if (!shape || shape.k !== 'record') return schemaTemplate;
+    const fields = new Map();
+    for (const [name, field] of shape.fields) {
+      const fieldSchema = T.deref(field.type);
+      const parseField = fieldSchema && fieldSchema.k === 'record' ? fieldSchema.fields.get('parse') : null;
+      const parser = parseField && T.deref(parseField.type);
+      if (!parser || parser.k !== 'fn') {
+        fields.set(name, { type: T.PRIM.any, optional: false });
+        continue;
+      }
+      const output = parser.ret;
+      const optional = T.containsNothing(output);
+      fields.set(name, { type: optional ? T.withoutNothing(output) : output, optional });
+    }
+    const outputType = T.record(fields);
+    const template = T.deref(schemaTemplate);
+    if (!template || template.k !== 'record') return schemaTemplate;
+    const schemaFields = new Map(template.fields);
+    const parse = schemaFields.get('parse');
+    if (parse) {
+      const signature = T.deref(parse.type);
+      if (signature && signature.k === 'fn') {
+        schemaFields.set('parse', { ...parse, type: T.fnType(signature.params, outputType) });
+      }
+    }
+    return T.record(schemaFields, { name: template.name, open: template.open });
   }
 
   binaryType(node) {
