@@ -33,10 +33,11 @@ Created by **Ayodele Ayokunle David**. PlainScript is MIT licensed.
   `math`, `json`, `time`, `fs`, `http`, `io`, `dom`, `test`) plus `std/contract` runtime
   validators. Stripe,
   Telegram, OpenAI, databases and auth are packages, not keywords.
-- **Explicit runtime boundary validation.** `std/contract` validates untrusted values;
-  erased static types do not validate HTTP or database data. This is a foundation, not
-  generated RPC clients or automatic database synchronization; see
-  [Unified Contracts](docs/UNIFIED_CONTRACTS.md).
+- **Schema-derived full-stack contracts (early).** `std/contract.object` supplies runtime
+  validation and checker-visible record types that flow through operations into backend
+  handlers and frontend clients. It is not a migration framework or a generated router;
+  see [Unified Contracts](docs/UNIFIED_CONTRACTS.md) and the runnable
+  [SQLite + React contracts demo](demos/contracts-fullstack/README.md).
 
 ## What PlainScript is not
 
@@ -195,6 +196,7 @@ Verified in this repository:
 | [`demos/react`](demos/react) | React + Vite; built, loaded in a browser, add/toggle interactions verified. |
 | [`demos/next`](demos/next) | Next.js App Router; `next build` compiled and prerendered the PlainScript server component. |
 | [`demos/database`](demos/database) | SQLite CRUD API (`node:sqlite`, prepared statements); curl matrix incl. `201`/`400`/`404`, and rows still present after restarting the process. |
+| [`demos/contracts-fullstack`](demos/contracts-fullstack) | Schema-derived operation contracts shared across a PlainScript API and React client; Vite production build and API validation/auth/SQLite-restart integration tests passed. |
 | [`demos/realtime`](demos/realtime) | Server-Sent Events; `curl -N /events` captured `hello`, `presence`, per-second `tick` frames and a published message. |
 
 See [docs/INTEROP.md](docs/INTEROP.md) for the integration recipes; each demo's source
@@ -210,7 +212,7 @@ src/        lexer, parser, checker, typed HIR, codegen, modules, formatter, CLI
 stdlib/     JavaScript runtime modules plus .d.pln declaration files
 templates/  project-management, ecommerce, and realtime-chat application templates
 tests/      lexer, parser, checker, compiler, runtime, CLI, interop, formatter, packaging
-demos/      cli, api, database, fullstack, react, realtime, next
+demos/      cli, api, database, fullstack, contracts-fullstack, react, realtime, next
 docs/       specification, architecture, audit, decisions, migration, syntax design, CLI, interop
 plainscript-vscode/  syntax highlighting and snippets for .pln files
 legacy/v1/  the complete v1 compiler, tests and docs, archived for reference

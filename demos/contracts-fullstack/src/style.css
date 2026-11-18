@@ -1,0 +1,18 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap');
+:root { font-family: 'DM Sans', sans-serif; color: #e5e7eb; background: #0b1020; font-synthesis: none; }
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; background: radial-gradient(ellipse at 15% 0%, #17233d, #0b1020 52%); }
+.app { width: min(100% - 2rem, 720px); margin: 0 auto; padding: 4rem 0; }
+header { margin-bottom: 2.5rem; }
+.eyebrow { color: #67e8f9; font: 500 .75rem 'DM Mono', monospace; letter-spacing: .15em; }
+h1 { margin: .8rem 0; font: 800 clamp(2rem, 7vw, 3.5rem) Manrope, sans-serif; letter-spacing: -.05em; }
+.lead { color: #a7b2c8; font-size: 1.08rem; }
+form { display: flex; gap: .7rem; padding: .8rem; border: 1px solid #334155; border-radius: 1rem; background: #111827; }
+input { flex: 1; min-width: 0; padding: .8rem; border: 0; outline: 0; color: #f9fafb; background: transparent; font: inherit; }
+button { padding: .75rem 1rem; border: 0; border-radius: .7rem; color: #07131c; background: #67e8f9; font: 700 .9rem 'DM Sans', sans-serif; cursor: pointer; }
+.status { margin: 1.5rem 0 .8rem; color: #94a3b8; font: .8rem 'DM Mono', monospace; }
+.tasks { margin: 0; padding: 0; list-style: none; border-top: 1px solid #263248; }
+.task { display: flex; align-items: center; gap: 1rem; padding: 1rem .2rem; border-bottom: 1px solid #263248; }
+.task-title { flex: 1; overflow-wrap: anywhere; }
+.toggle { min-width: 4.5rem; padding: .45rem .7rem; color: #e0f2fe; background: #1e293b; border: 1px solid #334155; }
+footer { margin-top: 3rem; color: #64748b; font-size: .85rem; }

@@ -1,0 +1,94 @@
+import { DatabaseSync } from "node:sqlite"
+import { serve, json, notFound, urlOf, requestJson } from "std/http"
+import { print, env } from "std/io"
+import { parseNumber } from "std/text"
+import { append } from "std/list"
+import { ListTasks, CreateTask, ToggleTask } from "./shared"
+import { implement } from "std/contract"
+
+let port = parseNumber(env("PORT", "4410"))
+let databasePath = env("DB_PATH", "./tasks.db")
+let database = new DatabaseSync(databasePath)
+database.exec("create table if not exists tasks (id integer primary key autoincrement, title text not null, done integer not null default 0)")
+let listStatement = database.prepare("select id, title, done from tasks order by id")
+let getStatement = database.prepare("select id, title, done from tasks where id = ?")
+let createStatement = database.prepare("insert into tasks (title, done) values (?, 0)")
+let toggleStatement = database.prepare("update tasks set done = case done when 0 then 1 else 0 end where id = ?")
+
+function rowTask(row: any) -> any
+    return { id: row.id as number, title: row.title as text, done: row.done == 1 }
+end
+
+async function listTasks(input: any) -> list of any
+    let tasks: list of any = []
+    for row in listStatement.all() as list of any
+        tasks = append(tasks, rowTask(row))
+    end
+    return tasks
+end
+
+async function createTask(input: any) -> any
+    let result = createStatement.run(input.title)
+    for row in getStatement.all(result.lastInsertRowid as number) as list of any
+        return rowTask(row)
+    end
+    return { id: 0, title: input.title, done: false }
+end
+
+async function toggleTask(input: any) -> any
+    toggleStatement.run(input.id)
+    for row in getStatement.all(input.id) as list of any
+        return rowTask(row)
+    end
+    return { id: input.id, title: "missing", done: false }
+end
+
+async function authorize(context: any, input: any) -> boolean
+    if context is map of text to any
+        let request = context["request"]
+        if request is any
+            let header = request.headers.get("authorization")
+            return header == "Bearer plainscript-demo"
+        end
+    end
+    return false
+end
+
+let listEndpoint = implement(ListTasks, listTasks, { authorize: authorize })
+let createEndpoint = implement(CreateTask, createTask, { authorize: authorize })
+let toggleEndpoint = implement(ToggleTask, toggleTask, { authorize: authorize })
+
+async function runOperation(endpoint: any, body: any, request: any) -> any
+    try
+        let result = await endpoint(body, { request: request })
+        return json(result)
+    catch failure
+        let error = failure as any
+        if error.stage == "authorization"
+            return json({ error: "forbidden" }, 403)
+        end
+        if error.stage == "input validation"
+            return json({ error: "invalid input", detail: error.message }, 400)
+        end
+        return json({ error: "operation failed", stage: error.stage }, 500)
+    end
+end
+
+async function handler(request: any) -> any
+    let url = urlOf(request)
+    if request.method == "GET" and url.pathname == "/api/tasks"
+        return await runOperation(listEndpoint, {}, request)
+    end
+    if request.method == "POST" and url.pathname == "/api/tasks"
+        let body = await requestJson(request)
+        return await runOperation(createEndpoint, body, request)
+    end
+    if request.method == "POST" and url.pathname == "/api/tasks/toggle"
+        let body = await requestJson(request)
+        return await runOperation(toggleEndpoint, body, request)
+    end
+    return notFound()
+end
+
+print("PlainScript contracts demo API on http://localhost:{port}; SQLite database: {databasePath}")
+await serve(port, handler)

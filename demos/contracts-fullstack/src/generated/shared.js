@@ -1,0 +1,6 @@
+import { object, text, number, boolean, array, operation } from "../../../../stdlib/contract.js";
+export const TaskSchema = object({ id: number(), title: text({ minLength: 1 }), done: boolean() });
+export const ListTasks = operation("tasks.list", object({  }), array(TaskSchema));
+export const CreateTask = operation("tasks.create", object({ title: text({ minLength: 1 }) }), TaskSchema);
+export const ToggleTask = operation("tasks.toggle", object({ id: number() }), TaskSchema);
+//# sourceMappingURL=shared.js.map
