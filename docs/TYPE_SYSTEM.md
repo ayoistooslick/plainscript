@@ -12,6 +12,10 @@ is the enforcer, and untyped JavaScript boundaries remain `any` deliberately.
   types are checked against the expected result.
 - Generic constraints: `function label<T: Named>(value: T) -> text`. Constraint fields are
   available in the function body, and a non-matching argument is rejected.
+- Record intersections (`Named & Aged`) merge fields into one structural record. Indexed
+  access reads a field or tuple element (`Person["name"]`, `Pair[0]`); a missing field or
+  out-of-range index is rejected. Intersections of non-record types are currently
+  diagnosed rather than approximated.
 - Control-flow narrowing for `is`, `== nothing`/`!= nothing`, optional chains and
   discriminant checks; exhaustiveness checking for booleans, variants and literal unions.
 - Literal enum unions derived from `std/contract.enumeration`/`literal`. A model field
@@ -28,9 +32,10 @@ is the enforcer, and untyped JavaScript boundaries remain `any` deliberately.
 
 ## Still absent
 
-Conditional types, mapped types, indexed-access types (`T[K]`), general function
-overloads, user-defined type predicates/refinement signatures and a complete model of
-function variance remain future work. Declaration interoperability is PlainScript's
+Conditional types, mapped types, generic/deferred indexed access (`T[K]` where both are
+unresolved type parameters), general function overloads, user-defined type
+predicates/refinement signatures and a complete model of function variance remain future
+work. Intersections are supported for records, not arbitrary unions/functions. Declaration interoperability is PlainScript's
 `.d.pln` format; arbitrary TypeScript `.d.ts` syntax is not parsed. Unresolved generics and
 `any` are permissive by design at untyped boundaries.
 

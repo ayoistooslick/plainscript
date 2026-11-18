@@ -20,8 +20,8 @@ This roadmap reports status; it is not a promise of dates.
 
 ## Next engineering priorities
 
-1. Conditional/mapped/indexed-access types, user-defined type predicates and function
-   overloads, with a full variance model.
+1. Conditional/mapped types, generic deferred indexed access, user-defined type
+   predicates and function overloads, with a full variance model.
 2. Additional database drivers behind the `std/db` surface and persisted background jobs.
 3. Debug Adapter Protocol support and richer code actions/refactors in the LSP.
 4. Generated API documentation/OpenAPI from operation descriptors and a production

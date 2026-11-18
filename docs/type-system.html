@@ -8,6 +8,8 @@
 <p>inferred structurally, callback parameters are contextually typed, and callback return types are checked against the expected result.</p>
 <li>Generic constraints: <code>function label&lt;T: Named&gt;(value: T) -&gt; text</code>. Constraint fields are</li>
 <p>available in the function body, and a non-matching argument is rejected.</p>
+<li>Record intersections (<code>Named &amp; Aged</code>) merge fields into one structural record. Indexed</li>
+<p>access reads a field or tuple element (<code>Person[&quot;name&quot;]</code>, <code>Pair[0]</code>); a missing field or out-of-range index is rejected. Intersections of non-record types are currently diagnosed rather than approximated.</p>
 <li>Control-flow narrowing for <code>is</code>, <code>== nothing</code>/<code>!= nothing</code>, optional chains and</li>
 <p>discriminant checks; exhaustiveness checking for booleans, variants and literal unions.</p>
 <li>Literal enum unions derived from <code>std/contract.enumeration</code>/<code>literal</code>. A model field</li>
@@ -22,6 +24,6 @@
 <p><code>success</code>/<code>failure</code> and checked by <code>implementFallible</code>/<code>createFallibleClient</code>.</p>
 </ul>
 <h2 id="still-absent">Still absent</h2>
-<p>Conditional types, mapped types, indexed-access types (<code>T[K]</code>), general function overloads, user-defined type predicates/refinement signatures and a complete model of function variance remain future work. Declaration interoperability is PlainScript&#39;s <code>.d.pln</code> format; arbitrary TypeScript <code>.d.ts</code> syntax is not parsed. Unresolved generics and <code>any</code> are permissive by design at untyped boundaries.</p>
+<p>Conditional types, mapped types, generic/deferred indexed access (<code>T[K]</code> where both are unresolved type parameters), general function overloads, user-defined type predicates/refinement signatures and a complete model of function variance remain future work. Intersections are supported for records, not arbitrary unions/functions. Declaration interoperability is PlainScript&#39;s <code>.d.pln</code> format; arbitrary TypeScript <code>.d.ts</code> syntax is not parsed. Unresolved generics and <code>any</code> are permissive by design at untyped boundaries.</p>
 <p><code>std/contract</code> is a runtime validator in addition to a checker type. The compiler derives model types from the known constructors; it does not verify arbitrary hand-written <code>Schema&lt;T&gt;</code> values against an unrelated <code>T</code>. Use <code>object(...)</code>, <code>enumeration(...)</code>, <code>array(...)</code>, <code>optional(...)</code> and <code>literal(...)</code> when you want derivation.</p>
 <p>See <a href="UNIFIED_CONTRACTS.html">Unified Contracts</a> for the end-to-end path.</p></div><aside class="toc"><div class="toc-title">On this page</div><a class="toc-h2" href="#implemented-and-tested">Implemented and tested</a><a class="toc-h2" href="#still-absent">Still absent</a></aside></article><footer class="page-footer"><span>PlainScript 2.0 documentation</span><a href="https://github.com/ayoistooslick/Plainscript/issues">Report a documentation issue ↗</a></footer></div></main></div><script src="app.js"></script></body></html>

@@ -160,7 +160,7 @@ legacy/v1/  the complete v1 compiler, tests and docs, archived for reference</co
 <li><strong>No bundler.</strong> <code>build</code> emits one module per file. Browser projects use Vite, webpack or</li>
 <p>Next to bundle, as the demos do. Importing the standard library in a browser requires <code>--std-base</code> plus serving those module URLs (see the full-stack demo).</p>
 <li><strong>Advanced type completeness.</strong> Literal enum unions, tuples, <code>keyof</code>, <code>typeof</code>,</li>
-<p>generic constraints and <code>std/contract</code>-derived models are implemented. Conditional and mapped types, indexed-access types, user-defined type predicates and general function overloads are not.</p>
+<p>generic constraints, record intersections, concrete indexed access and <code>std/contract</code>-derived models are implemented. Conditional and mapped types, generic/deferred indexed access, user-defined type predicates and general function overloads are not.</p>
 <li><strong>Concurrency is cooperative.</strong> <code>std/task</code> provides task groups, cancellation, timeouts,</li>
 <p>channels and worker handles; it cannot stop JavaScript promises or host calls that ignore a cancellation signal. There is no compiler-level task syntax.</p>
 <li><strong><code>render</code> blocks are not JSX.</strong> Attributes are <code>with name: value</code>, children are</li>

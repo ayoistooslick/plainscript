@@ -208,8 +208,22 @@ class Checker {
         return T.promiseOf(this.resolveType(node.value, typeEnv));
       case 'OptionalType':
         return T.union([this.resolveType(node.inner, typeEnv), T.PRIM.nothing]);
+      case 'LiteralType': {
+        const base = typeof node.value === 'text' || typeof node.value === 'string'
+          ? T.PRIM.text
+          : typeof node.value === 'number' ? T.PRIM.number : T.PRIM.boolean;
+        return T.literalType(node.value, base);
+      }
       case 'UnionType':
         return T.union(node.members.map((member) => this.resolveType(member, typeEnv)));
+      case 'IntersectionType':
+        return this.intersectionType(node.members, typeEnv, node);
+      case 'IndexedAccessType':
+        return this.indexedAccessType(
+          this.resolveType(node.target, typeEnv),
+          this.resolveType(node.index, typeEnv),
+          node,
+        );
       case 'FunctionType':
         return T.fnType(
           node.params.map((parameter) => ({
@@ -234,6 +248,79 @@ class Checker {
       default:
         return T.PRIM.any;
     }
+  }
+
+  intersectionType(members, typeEnv, node) {
+    const resolved = members.map((member) => T.deref(this.resolveType(member, typeEnv)));
+    if (resolved.some((member) => member.k !== 'record')) {
+      this.report('PS3208', 'Intersection types currently require every member to resolve to a record.', node);
+      return T.PRIM.error;
+    }
+    const fields = new Map();
+    for (const member of resolved) {
+      for (const [name, field] of member.fields) {
+        const existing = fields.get(name);
+        if (!existing) fields.set(name, field);
+        else fields.set(name, { type: this.intersectField(existing.type, field.type), optional: existing.optional && field.optional });
+      }
+    }
+    return T.record(fields);
+  }
+
+  intersectField(left, right) {
+    if (T.sameType(left, right)) return left;
+    const a = T.deref(left);
+    const b = T.deref(right);
+    if (a.k === 'record' && b.k === 'record') {
+      const fields = new Map(a.fields);
+      for (const [name, field] of b.fields) {
+        const existing = fields.get(name);
+        fields.set(name, existing
+          ? { type: this.intersectField(existing.type, field.type), optional: existing.optional && field.optional }
+          : field);
+      }
+      return T.record(fields);
+    }
+    if (a.k === 'prim' && b.k === 'prim' && a.name === b.name) return a;
+    if (a.k === 'literal' && b.k === 'literal' && a.value === b.value) return a;
+    if (a.k === 'literal') return T.assignable(a, b) ? a : T.PRIM.never;
+    if (b.k === 'literal') return T.assignable(b, a) ? b : T.PRIM.never;
+    return T.PRIM.never;
+  }
+
+  indexedAccessType(targetType, indexType, node) {
+    let target = T.deref(targetType);
+    if (target.k === 'var' && target.constraint) target = T.deref(target.constraint);
+    const index = T.deref(indexType);
+    if (index.k === 'union') {
+      return T.union(index.members.map((member) => this.indexedAccessType(target, member, node)));
+    }
+    const literal = index.k === 'literal' ? index.value : null;
+    if (target.k === 'record' && literal !== null) {
+      const field = target.fields.get(String(literal));
+      if (!field) {
+        this.report('PS3207', `Type ${T.showType(target)} has no field "${literal}".`, node);
+        return T.PRIM.error;
+      }
+      return field.optional ? T.union([field.type, T.PRIM.nothing]) : field.type;
+    }
+    if (target.k === 'tuple' && typeof literal === 'number') {
+      const element = target.elements[literal];
+      if (!element) {
+        this.report('PS3207', `Tuple index ${literal} is out of range for ${T.showType(target)}.`, node);
+        return T.PRIM.error;
+      }
+      return element;
+    }
+    if (target.k === 'list' && index.k === 'prim' && index.name === 'number') return target.elem;
+    if (target.k === 'map' && index.k === 'prim' && index.name === 'text') return target.value;
+    if (target.k === 'map' && literal !== null) return target.value;
+    this.report(
+      'PS3207',
+      `Cannot index ${T.showType(target)} with ${T.showType(indexType)}; use a record field literal, tuple index, or map key.`,
+      node,
+    );
+    return T.PRIM.error;
   }
 
   // Registers `type X ...` declarations, then resolves them. Variant aliases

@@ -394,18 +394,35 @@ class Parser {
   // of element, not a list-or-text. Parenthesise to group: `(number or text)?`.
   typeExpression() {
     const start = this.peek();
-    const members = [this.typeOptional()];
+    const members = [this.typeIntersection()];
     while (this.atKw('or')) {
       this.next();
-      members.push(this.typeOptional());
+      members.push(this.typeIntersection());
     }
     if (members.length > 1) return this.node('UnionType', start, { members });
     return members[0];
   }
 
+  typeIntersection() {
+    const start = this.peek();
+    const members = [this.typeOptional()];
+    while (this.atPunct('&')) {
+      this.next();
+      members.push(this.typeOptional());
+    }
+    if (members.length > 1) return this.node('IntersectionType', start, { members });
+    return members[0];
+  }
+
   typeOptional() {
     const start = this.peek();
-    const type = this.typePrimary();
+    let type = this.typePrimary();
+    while (this.atPunct('[')) {
+      this.next();
+      const index = this.typeExpression();
+      this.expectPunct(']');
+      type = this.node('IndexedAccessType', start, { target: type, index });
+    }
     if (this.atPunct('?')) {
       this.next();
       return this.node('OptionalType', start, { inner: type });
@@ -416,6 +433,14 @@ class Parser {
   typePrimary() {
     const token = this.peek();
 
+    if (token.t === 'text' || token.t === 'number') {
+      this.next();
+      return this.node('LiteralType', token, { value: token.t === 'number' ? Number(token.v) : token.v });
+    }
+    if (token.t === 'kw' && (token.v === 'true' || token.v === 'false')) {
+      this.next();
+      return this.node('LiteralType', token, { value: token.v === 'true' });
+    }
     if (token.t === 'kw' && token.v === 'nothing') {
       this.next();
       return this.node('NamedType', token, { name: 'nothing', args: [] });

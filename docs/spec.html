@@ -167,11 +167,15 @@ Promise of T              # awaited value is T
 { name: text, age: number }   # anonymous record
 [A, B]                    # fixed-length tuple
 A or B                    # union
+A &amp; B                     # intersection (records merge)
 keyof { name: text }      # literal union of field names
 typeof value              # type of a declared value
+Person[&quot;name&quot;]            # indexed access to a field
+Pair[0]                   # indexed access to a tuple element
+&quot;open&quot;                    # literal type
 T&lt;...&gt;                    # named generic instantiation</code></pre>
 <p><code>map of text to V</code> is the only map form with field syntax: when a value&#39;s type is a map, <code>value.field</code> reads a key (with <code>T?</code> when the key may be absent). Lists do not have methods or a <code>.length</code> property; use <code>std/list</code>.</p>
-<p>Tuple types use brackets: <code>[number, text]</code>. A literal numeric index selects that element; destructuring and assignment are checked element by element. <code>keyof</code> produces a literal union of the record&#39;s field names, and <code>typeof</code> reuses the type of a hoisted value. Conditional/mapped/indexed-access types and <code>readonly</code> field modifiers are not implemented; these remain deliberate omissions rather than unsound checking.</p>
+<p>Tuple types use brackets: <code>[number, text]</code>. A literal numeric index selects that element; destructuring and assignment are checked element by element. <code>keyof</code> produces a literal union of the record&#39;s field names, and <code>typeof</code> reuses the type of a hoisted value. Indexed access is supported for record field literals, tuple indexes and map keys; a field key that does not exist is <code>PS3207</code>. <code>A &amp; B</code> merges record fields, with conflicting required fields intersected (usually <code>never</code>). Conditional/mapped types, generic deferred indexed access, <code>readonly</code> field modifiers and overloads are not implemented.</p>
 <h3 id="5-3-assignability">5.3 Assignability</h3>
 <p>A value of type <code>S</code> is assignable to <code>T</code> when:</p>
 <ul>

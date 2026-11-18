@@ -247,8 +247,9 @@ These are known and deliberate for 2.0.0, not oversights:
   Next to bundle, as the demos do. Importing the standard library in a browser requires
   `--std-base` plus serving those module URLs (see the full-stack demo).
 - **Advanced type completeness.** Literal enum unions, tuples, `keyof`, `typeof`,
-  generic constraints and `std/contract`-derived models are implemented. Conditional and
-  mapped types, indexed-access types, user-defined type predicates and general function
+  generic constraints, record intersections, concrete indexed access and
+  `std/contract`-derived models are implemented. Conditional and mapped types,
+  generic/deferred indexed access, user-defined type predicates and general function
   overloads are not.
 - **Concurrency is cooperative.** `std/task` provides task groups, cancellation, timeouts,
   channels and worker handles; it cannot stop JavaScript promises or host calls that

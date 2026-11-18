@@ -27,7 +27,8 @@ plainscript check demos/contracts-fullstack/src/App.pln
 - **Authentication.** scrypt password hashing, constant-time verification, HS256 bearer
   tokens with claims validation, policies, and the demo's login/token flow.
 - **Type system additions.** Enum literal unions, tuples, `keyof`, `typeof`, generic
-  constraints, improved callback return checking and cross-module variant metadata.
+  constraints, record intersections, concrete indexed access, improved callback return
+  checking and cross-module variant metadata.
 - **Concurrency.** Task groups, cancellation, timeouts, channels and worker handles with
   tests for ordering, failure cancellation and cleanup.
 - **Tooling.** LSP diagnostics/completion/hover/definition/references/rename/symbols/
@@ -43,7 +44,7 @@ Focused files:
 - `tests/contract-errors.test.js`, `tests/contract-demo.test.js`, `tests/db.test.js`
 - `tests/task.test.js`, `tests/ws.test.js`
 - `tests/lsp.test.js`, `tests/watch.test.js`
-- `tests/advanced-types.test.js`, `tests/generics.test.js`
+- `tests/advanced-types.test.js`, `tests/generics.test.js`, `tests/intersections.test.js`
 - `docs/BENCHMARKS.md`
 
 ## Remaining limitations

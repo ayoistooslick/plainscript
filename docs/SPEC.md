@@ -289,8 +289,12 @@ Promise of T              # awaited value is T
 { name: text, age: number }   # anonymous record
 [A, B]                    # fixed-length tuple
 A or B                    # union
+A & B                     # intersection (records merge)
 keyof { name: text }      # literal union of field names
 typeof value              # type of a declared value
+Person["name"]            # indexed access to a field
+Pair[0]                   # indexed access to a tuple element
+"open"                    # literal type
 T<...>                    # named generic instantiation
 ```
 
@@ -300,9 +304,11 @@ methods or a `.length` property; use `std/list`.
 
 Tuple types use brackets: `[number, text]`. A literal numeric index selects that element;
 destructuring and assignment are checked element by element. `keyof` produces a literal
-union of the record's field names, and `typeof` reuses the type of a hoisted value.
-Conditional/mapped/indexed-access types and `readonly` field modifiers are not implemented;
-these remain deliberate omissions rather than unsound checking.
+union of the record's field names, and `typeof` reuses the type of a hoisted value. Indexed
+access is supported for record field literals, tuple indexes and map keys; a field key that
+does not exist is `PS3207`. `A & B` merges record fields, with conflicting required fields
+intersected (usually `never`). Conditional/mapped types, generic deferred indexed access,
+`readonly` field modifiers and overloads are not implemented.
 
 ### 5.3 Assignability
 
