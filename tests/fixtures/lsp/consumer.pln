@@ -1,0 +1,3 @@
+import { greet, Greeting } from "./lib"
+
+let greeting: Greeting = { message: greet("Ada") }

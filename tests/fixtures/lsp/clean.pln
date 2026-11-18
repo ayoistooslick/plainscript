@@ -1,0 +1,11 @@
+# PlainScript language-server fixture.
+# Used by tests/lsp.test.js for hover, navigation and formatting.
+type Greeting
+    message: text
+end
+
+export function greet(name: text) -> text
+    return "Hello, {name}!"
+end
+
+let greeting: Greeting = { message: greet("Ada") }

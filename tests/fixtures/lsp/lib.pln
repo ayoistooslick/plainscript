@@ -1,0 +1,7 @@
+export type Greeting
+    message: text
+end
+
+export function greet(name: text) -> text
+    return "Hello, {name}!"
+end
