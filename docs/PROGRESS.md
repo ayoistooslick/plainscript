@@ -10,9 +10,9 @@ Status vocabulary used below (no issue is "fixed" without every step):
 - **Still unresolved** — known, not done.
 - **Intentionally unsupported** — design decision, documented in `docs/SPEC.md`.
 
-Last verified: full suite `npm test` → **182 tests, 182 pass, 0 fail**; all active `.pln` files in
-the project-management, ecommerce, realtime-chat templates and fullstack, database, realtime,
-and React demos pass `plainscript check`.
+Last verified: full suite `npm test` → **184 tests, 184 pass, 0 fail**; active `.pln` files in
+the project-management, ecommerce, realtime-chat templates and fullstack, contracts-fullstack,
+database, realtime, and React demos pass `plainscript check`.
 
 ---
 
@@ -709,3 +709,13 @@ The current contract work exposed a checker defect: exports of generic aliases s
 **Verified:** regression coverage checks imported aliases containing nested lists and optional fields; mismatched generic record fields fail; `Schema<Input>` works through the bundled `std/contract` declarations; a correctly annotated operation compiles and runs, an incompatible frontend input fails with `PS3343`, and a bad declared operation output fails with `PS3404`.
 
 **Still unresolved:** validator shapes do not yet derive model types, so the author still writes both a `type Input` and `Schema<Input>` annotation plus a runtime object schema. This is a concrete checker improvement, not completion of unified contracts or the wider PlainScript mission.
+
+
+---
+## Schema-derived contracts exercised in a React + SQLite application
+
+Added `demos/contracts-fullstack`: `src/shared.pln` defines Task/list/create/toggle operation schemas once; the checker derives input/output records from those schemas. `src/server.pln` runs contract-validated handlers over a prepared-statement SQLite store and applies a demo authorization callback. `src/App.pln` calls the same operation descriptors from a React UI through `createClient`; there are no duplicated PlainScript model declarations in these modules.
+
+**Verified:** all three `.pln` sources pass `plainscript check`; `npm run build` compiles the PlainScript modules and bundles the React/Vite client. A Node integration test checks invalid input (400), unauthorized access (403), create/list/toggle behavior, and stored rows after terminating and restarting the API process with the same SQLite file.
+
+**Limits:** requires Node 22+ for `node:sqlite`; sample bearer key is intentionally hard-coded and not production auth. The demo uses `CREATE TABLE IF NOT EXISTS`, not versioned migrations. Transport/router mapping and errors are application code/runtime callbacks, not generated/typed language features. This is an end-to-end proof slice, not yet the complete flagship product experience.

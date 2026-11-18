@@ -40,11 +40,23 @@ No grammar change was needed: schemas are normal values imported from a standard
 ## Implemented versus not implemented
 
 - **Implemented and tested:** schema constructors and recursive validation; strict/passthrough object handling; structured paths/errors; inferred nested record/array/optional output shapes for object schemas; operation descriptor; server input/output validation; authorization callback; client-side input/output validation around a supplied transport; imported generic alias substitution; contextual typing for callbacks after generic substitutions; compile-time rejection of incompatible inferred client inputs and backend handler outputs; shared operation types flowing across separate compiled server/client modules.
-- **Partially implemented:** enum schema values widen to their primitive type; compiler inference is attached to the `std/contract.object` import and only supports known schema constructs. Auth and transport are callbacks only. Operation descriptors do not yet carry a typed error union.
+- **Partially implemented:** a runnable SQLite-backed React/PlainScript demo uses shared schema-derived operations for list/create/toggle; it validates inputs and outputs, exercises authorization, and has an automated process-restart persistence test. Enum schema values widen to their primitive type; compiler inference is attached to the `std/contract.object` import and only supports known schema constructs. Demo authorization is a hard-coded sample bearer token, not a production auth system. Operation descriptors do not yet carry a typed error union.
 - **Not implemented:** compiler-owned operation declarations; generated HTTP/router transport; typed error unions; database mapping, migrations or transactions; enum literal-union inference; detection of affected frontend consumers on backend contract changes across a complete application build.
 
 ## Validation and extension plan
 
-The next increment should type errors in operation contracts and make schema inference robust through aliases/re-exports and enum literal values. Then build a database-backed React application using the inferred operation/client types and demonstrate a contract change breaking both server and frontend compilation. The compiler currently proves cross-module type compatibility but does not itself run a separate “change model” mutation test; the negative client and handler fixtures are the regression proof. No flagship app, React integration, migration workflow, transaction API, or typed error union is claimed.
+The next increment should type errors in operation contracts, make schema inference robust through aliases/re-exports and enum literal values, and evolve the compact demo into a production-style flagship with a real migration workflow and a deliberate contract-change test spanning frontend and backend. The current negative client and handler fixtures verify mismatch detection, and the demo verifies persistence across restarts; it is a proof slice, not a mature application. No migration framework, transaction API, generated transport, or typed error union is claimed.
 
 Run `node --test tests/contract.test.js` for focused regression coverage and `npm test` for the full suite.
+
+
+## Developer-experience comparison (qualitative, not a benchmark)
+
+| Concern | PlainScript demo | TypeScript + Zod + tRPC |
+| --- | --- | --- |
+| Runtime model validation | `std/contract.object` derives the parsed record type and validates at runtime | Zod schema plus `z.infer` gives the corresponding validated runtime/type pair |
+| Operation/client typing | `operation` + `implement` + `createClient`; shared PlainScript module types both sides | tRPC router procedures infer input/output types through the router and generated client |
+| App language/toolchain | PlainScript source compiles to ESM; React and SQLite are existing JS packages | TypeScript source plus Zod/tRPC libraries, framework adapters and TS build tooling |
+| Production completeness | Proof-of-concept transport/router mapping; basic demo bearer auth; no migrations or typed errors | Mature ecosystem with broad integrations, middleware, batching/transformers and extensive docs |
+
+The meaningful potential advantage shown here is a first-party schema-to-client type path with no parallel model declarations and no TypeScript type-query layer in the app source. This does **not** establish superiority: Zod+tRPC already provides a highly capable version of the same core experience, while PlainScript still lacks generated transports, typed error contracts, database migrations and comparable ecosystem maturity. No performance or developer-study benchmark was run.

@@ -1,0 +1,19 @@
+{
+  "name": "plainscript-contracts-fullstack-demo",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build:plain": "node ../../src/cli.js build",
+    "build": "npm run build:plain && vite build",
+    "api": "node ../../src/cli.js run src/server.pln",
+    "dev": "npm run build:plain && vite --host 0.0.0.0"
+  },
+  "dependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "vite": "^6.0.0"
+  }
+}

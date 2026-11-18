@@ -1,0 +1,138 @@
+import { createElement, useEffect, useState } from "react"
+import { ListTasks, CreateTask, ToggleTask } from "./shared"
+import { createClient } from "std/contract"
+import { append, count } from "std/list"
+
+declare function fetch(url: text, options?: any) -> Promise of any
+
+async function transport(name: text, input: any) -> any
+    let path = "/api/tasks"
+    let method = "GET"
+    if name == "tasks.create"
+        method = "POST"
+    end
+    if name == "tasks.toggle"
+        path = "/api/tasks/toggle"
+        method = "POST"
+    end
+    let requestBody: any = nothing
+    if method != "GET"
+        requestBody = JSON.stringify(input)
+    end
+    let response = await fetch(path, {
+        method: method,
+        headers: {
+            "content-type": "application/json",
+            "authorization": "Bearer plainscript-demo",
+        },
+        body: requestBody,
+    })
+    if not response.ok
+        throw "Request failed: {response.status}"
+    end
+    return await response.json()
+end
+
+let listTasks = createClient(ListTasks, transport)
+let createTask = createClient(CreateTask, transport)
+let toggleTask = createClient(ToggleTask, transport)
+
+declare const JSON: any
+function taskRows(tasks: list of any, onToggle: any) -> list of any
+    let rows: list of any = []
+    for task in tasks
+        let label = "Open"
+        if task.done
+            label = "Done"
+        end
+        rows = append(rows, element "li" with className: "task", key: task.id
+            element "button" with className: "toggle", onClick: () => onToggle(task.id)
+                "{label}"
+            end
+            element "span" with className: "task-title"
+                "{task.title}"
+            end
+        end)
+    end
+    return rows
+end
+
+export function App() -> any
+    let (tasks, setTasks) = useState([])
+    let (draft, setDraft) = useState("")
+    let (message, setMessage) = useState("Loading from SQLite…")
+
+    async function refresh() -> nothing
+        try
+            let current = await listTasks({})
+            setTasks(current)
+            setMessage("Saved in SQLite")
+        catch failure
+            setMessage("Could not load tasks")
+        end
+    end
+
+    async function add() -> nothing
+        try
+            let created = await createTask({ title: draft })
+            setTasks(append(tasks, created))
+            setDraft("")
+            setMessage("Task saved")
+        catch failure
+            setMessage("Title is required")
+        end
+    end
+
+    async function toggle(id: number) -> nothing
+        try
+            let updated = await toggleTask({ id: id })
+            let next = []
+            for task in tasks
+                if task.id == updated.id
+                    next = append(next, updated)
+                else
+                    next = append(next, task)
+                end
+            end
+            setTasks(next)
+        catch failure
+            setMessage("Could not update task")
+        end
+    end
+
+    useEffect(() => refresh(), [])
+    render
+        element "main" with className: "app"
+            element "header"
+                element "p" with className: "eyebrow"
+                    "PLAINScript / CONTRACTS"
+                end
+                element "h1"
+                    "One schema. Three layers."
+                end
+                element "p" with className: "lead"
+                    "Typed operations connect React to validated SQLite-backed handlers."
+                end
+            end
+            element "form" with onSubmit: (event: any) => do
+                event.preventDefault()
+                add()
+            end
+                element "input" with value: draft, placeholder: "A task worth finishing…", onChange: (event: any) => setDraft(event.target.value)
+                end
+                element "button" with type: "submit"
+                    "Add task"
+                end
+            end
+            element "p" with className: "status"
+                "{message} · {count(tasks)} tasks"
+            end
+            element "ul" with className: "tasks"
+                ...taskRows(tasks, toggle)
+            end
+            element "footer"
+                "Input and output types are inferred from the shared runtime schemas."
+            end
+        end
+    end
+end
