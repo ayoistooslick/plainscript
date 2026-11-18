@@ -662,3 +662,21 @@ publishing.
 **Compatibility/release note:** Existing programs using `when` / `otherwise` as branches
 must be migrated. The package version remains `2.0.0`; selecting a release number for this
 breaking syntax update is still required before any npm release. No package was published.
+
+---
+## 7. Initial `std/contract` runtime validation foundation
+
+**Scope:** Added `stdlib/contract.js` and its `.d.pln` declarations. The module supports
+primitive schemas, literal/enum schemas, optional values, arrays, objects, selected
+constraints, strict/passthrough unknown-key policies, nested error paths, `parse`, and
+`safeParse`. It is imported like any other std module and does not change compiler grammar.
+
+**Regression coverage:** `tests/contract.test.js` exercises valid and invalid nested values,
+constraint failures, unknown keys, structured safe-parse failures, and a compiled/run
+PlainScript consumer.
+
+**Status:** Runtime validation foundation verified. It is **not** an end-to-end unified
+full-stack contract implementation: object-schema types are not derived from their shapes,
+there are no operation declarations/generated clients/auth/database schema synchronization,
+and static types are not automatically validated. See `docs/UNIFIED_CONTRACTS.md` for the
+precise boundary and follow-up requirements.

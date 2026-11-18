@@ -1,7 +1,7 @@
 {
   "name": "plainscript-lang",
   "version": "2.0.0",
-  "description": "PlainScript: a statically typed language with plain-language syntax that compiles to JavaScript and interoperates with the JavaScript ecosystem.",
+  "description": "PlainScript: an independent, statically typed full-stack language for the JavaScript platform.",
   "author": {
     "name": "Ayodele Ayokunle David",
     "email": "davidayodele847@gmail.com"

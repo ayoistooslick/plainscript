@@ -1,0 +1,26 @@
+# Runtime validators for untrusted JavaScript, HTTP and persistence boundaries.
+export type Schema<T>
+    kind: text
+    parse: (value: any, path?: text) -> T
+end
+export type Validation<T>
+    success: boolean
+    data: T?
+    error: any?
+end
+export declare function text(options?: any) -> Schema<text>
+export declare function number(options?: any) -> Schema<number>
+export declare function boolean() -> Schema<boolean>
+export declare function literal<T>(expected: T) -> Schema<T>
+export declare function enumeration<T>(values: list of T) -> Schema<T>
+export declare function optional<T>(inner: Schema<T>) -> Schema<T?>
+export declare function array<T>(inner: Schema<T>, options?: any) -> Schema<list of T>
+export declare function object<T>(shape: map of text to any, options?: any) -> Schema<T>
+export declare function parse<T>(schema: Schema<T>, value: any) -> T
+export declare function safeParse<T>(schema: Schema<T>, value: any) -> Validation<T>
+export type ContractError
+    name: text
+    message: text
+    path: text
+    expected: text
+end
