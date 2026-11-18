@@ -1,7 +1,7 @@
 # PlainScript 2.0
 
-PlainScript is a statically typed programming language with plain-language syntax that
-compiles to JavaScript. It is designed to be readable without hiding the machine: every
+PlainScript is an independent, statically typed programming language for the JavaScript
+platform. It is designed to be readable without hiding the machine: every
 program is type-checked before it runs, lowered through an explicit intermediate
 representation, and emitted as ordinary ES modules that interoperate with the JavaScript
 ecosystem.
@@ -30,8 +30,13 @@ Created by **Ayodele Ayokunle David**. PlainScript is MIT licensed.
   Web `Request`/`Response` model are supported by emitting plain modules, not by wrapping
   frameworks.
 - **Small and honest.** The standard library covers fundamentals (`text`, `list`, `map`,
-  `math`, `json`, `time`, `fs`, `http`, `io`, `dom`, `test`) and nothing else. Stripe,
+  `math`, `json`, `time`, `fs`, `http`, `io`, `dom`, `test`) plus `std/contract` runtime
+  validators. Stripe,
   Telegram, OpenAI, databases and auth are packages, not keywords.
+- **Explicit runtime boundary validation.** `std/contract` validates untrusted values;
+  erased static types do not validate HTTP or database data. This is a foundation, not
+  generated RPC clients or automatic database synchronization; see
+  [Unified Contracts](docs/UNIFIED_CONTRACTS.md).
 
 ## What PlainScript is not
 
