@@ -102,4 +102,53 @@ function safeParse(schema, value) {
   catch (error) { if (error instanceof ContractError) return { success: false, data: null, error }; throw error; }
 }
 
-export { ContractError, text, number, boolean, literal, enumeration, optional, array, object, parse, safeParse };
+class OperationError extends Error {
+  constructor(operation, stage, cause) {
+    super(`${operation}: ${stage} failed: ${cause.message}`, { cause });
+    this.name = 'OperationError';
+    this.operation = operation;
+    this.stage = stage;
+    this.cause = cause;
+  }
+}
+
+function operation(name, input, output) {
+  if (typeof name !== 'string' || !name) throw new TypeError('operation name must be non-empty text');
+  if (!input || typeof input.parse !== 'function' || !output || typeof output.parse !== 'function') {
+    throw new TypeError('operation input and output must be contract schemas');
+  }
+  return Object.freeze({ name, input, output });
+}
+
+function implement(contract, handler, options = {}) {
+  if (!contract || typeof handler !== 'function') throw new TypeError('implement expects an operation and handler');
+  return async (untrustedInput, context) => {
+    let input;
+    try { input = parse(contract.input, untrustedInput); }
+    catch (cause) { throw new OperationError(contract.name, 'input validation', cause); }
+    if (options.authorize && !(await options.authorize(context, input))) {
+      const cause = new Error('authorization denied');
+      cause.code = 'FORBIDDEN';
+      throw new OperationError(contract.name, 'authorization', cause);
+    }
+    let result;
+    try { result = await handler(input, context); }
+    catch (cause) { throw new OperationError(contract.name, 'handler', cause); }
+    try { return parse(contract.output, result); }
+    catch (cause) { throw new OperationError(contract.name, 'output validation', cause); }
+  };
+}
+
+function createClient(contract, transport) {
+  if (!contract || typeof transport !== 'function') throw new TypeError('createClient expects an operation and transport');
+  return async (input) => {
+    let validated;
+    try { validated = parse(contract.input, input); }
+    catch (cause) { throw new OperationError(contract.name, 'client input validation', cause); }
+    const result = await transport(contract.name, validated);
+    try { return parse(contract.output, result); }
+    catch (cause) { throw new OperationError(contract.name, 'client output validation', cause); }
+  };
+}
+
+export { ContractError, OperationError, text, number, boolean, literal, enumeration, optional, array, object, parse, safeParse, operation, implement, createClient };
