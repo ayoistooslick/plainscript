@@ -204,6 +204,10 @@ end
   `return` always takes a value; use `return nothing` for an early exit (`PS3402`).
 - Generic parameters are introduced with `<T, U>` after the name and are inferred at call
   sites.
+- Exported generic aliases preserve their parameter list across module boundaries. An
+  importing module must provide the declared number of type arguments, and those arguments
+  are substituted recursively through record fields, lists, optionals, functions and
+  unions just as they are within the declaring module.
 - A parameter type annotation is required on a function declaration. A lambda may omit it
   only when an expected function type supplies the parameter type (§4.3).
 - A function declared directly as a default export may omit its name:
@@ -346,6 +350,16 @@ let value = first([1, 2, 3])     # value: number?
 
 An unresolvable type parameter falls back to `any`. Generic constraints are not supported
 in 2.0.
+
+`std/contract.object` is checker-aware: when its shape is a record literal whose values are
+contract schemas, the result's `Schema<T>` parse result is inferred recursively from those
+schema outputs. Primitive schemas, nested object schemas, arrays and optional schemas are
+supported. An optional schema field becomes an optional property in `T`. This lets an
+operation's input and output model flow from schema values into its implementation and
+client signature without a separate model declaration. The check is based on the schema
+expression; arbitrary JavaScript validators are not inferred. Enum values currently widen
+to their primitive base type, so exhaustive value-union narrowing from an enum schema is not
+provided.
 
 ---
 

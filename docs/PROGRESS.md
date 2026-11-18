@@ -10,8 +10,9 @@ Status vocabulary used below (no issue is "fixed" without every step):
 - **Still unresolved** — known, not done.
 - **Intentionally unsupported** — design decision, documented in `docs/SPEC.md`.
 
-Last verified: full suite `npm test` → **167 tests, 167 pass, 0 fail**; all 13 active `.pln` files in
-`demos/` and `templates/` pass `plainscript check`.
+Last verified: full suite `npm test` → **182 tests, 182 pass, 0 fail**; all active `.pln` files in
+the project-management, ecommerce, realtime-chat templates and fullstack, database, realtime,
+and React demos pass `plainscript check`.
 
 ---
 
@@ -696,3 +697,15 @@ without a diagnostic, and accessing an inferred output field produced a false mi
 diagnostic. Therefore the present generic signatures are not evidence of compile-time
 contract enforcement. Schema-derived typing and generic inference are still the next priority;
 no guarantee is claimed until negative mismatch tests pass.
+
+
+---
+## Imported generic aliases preserve substitutions
+
+The current contract work exposed a checker defect: exports of generic aliases such as `Schema<T>` and `Box<T>` crossed module boundaries as a body without its parameter list. A consuming `Schema<Input>` was therefore not instantiated, which erased operation/client input and output types.
+
+**Fix:** generic exported aliases retain their parameters and body in checker export metadata. Imports enforce type-argument arity and substitute arguments recursively using the existing type substitution function.
+
+**Verified:** regression coverage checks imported aliases containing nested lists and optional fields; mismatched generic record fields fail; `Schema<Input>` works through the bundled `std/contract` declarations; a correctly annotated operation compiles and runs, an incompatible frontend input fails with `PS3343`, and a bad declared operation output fails with `PS3404`.
+
+**Still unresolved:** validator shapes do not yet derive model types, so the author still writes both a `type Input` and `Schema<Input>` annotation plus a runtime object schema. This is a concrete checker improvement, not completion of unified contracts or the wider PlainScript mission.
