@@ -680,3 +680,19 @@ full-stack contract implementation: object-schema types are not derived from the
 there are no operation declarations/generated clients/auth/database schema synchronization,
 and static types are not automatically validated. See `docs/UNIFIED_CONTRACTS.md` for the
 precise boundary and follow-up requirements.
+
+---
+## 8. Operation runtime composition (follow-up)
+
+Added `operation`, `implement`, and `createClient` to `std/contract`. A server wrapper
+validates input before invoking a handler, can invoke an authorization callback, and validates
+the handler response. A client wrapper validates local input and transport response. Errors
+carry the operation name and stage. Tests cover both wrappers, a denied authorization,
+malformed input/output, and a compiled PlainScript consumer.
+
+**Known blocker, reproduced:** current generic/schema typing does not make the schema shape
+produce a useful static type. A compile probe passed a text `id` to a numeric operation input
+without a diagnostic, and accessing an inferred output field produced a false missing-field
+diagnostic. Therefore the present generic signatures are not evidence of compile-time
+contract enforcement. Schema-derived typing and generic inference are still the next priority;
+no guarantee is claimed until negative mismatch tests pass.

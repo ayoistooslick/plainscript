@@ -3,6 +3,19 @@ export type Schema<T>
     kind: text
     parse: (value: any, path?: text) -> T
 end
+export type Operation<I, O>
+    name: text
+    input: Schema<I>
+    output: Schema<O>
+end
+export type OperationError
+    name: text
+    message: text
+    operation: text
+    stage: text
+    cause: any
+end
+export type Transport = (name: text, input: any) -> Promise of any
 export type Validation<T>
     success: boolean
     data: T?
@@ -18,6 +31,9 @@ export declare function array<T>(inner: Schema<T>, options?: any) -> Schema<list
 export declare function object<T>(shape: map of text to any, options?: any) -> Schema<T>
 export declare function parse<T>(schema: Schema<T>, value: any) -> T
 export declare function safeParse<T>(schema: Schema<T>, value: any) -> Validation<T>
+export declare function operation<I, O>(name: text, input: Schema<I>, output: Schema<O>) -> Operation<I, O>
+export declare function implement<I, O>(contract: Operation<I, O>, handler: (input: I) -> Promise of O, options?: any) -> (input: any, context?: any) -> Promise of O
+export declare function createClient<I, O>(contract: Operation<I, O>, transport: Transport) -> (input: I) -> Promise of O
 export type ContractError
     name: text
     message: text

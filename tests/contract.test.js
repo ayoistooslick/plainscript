@@ -44,3 +44,49 @@ print("{user.name}:{user.age}")
   assert.equal(result.status, 0, result.stderr);
   assert.equal(result.stdout, 'Ada:37\n');
 });
+
+test('operations validate both sides, run authorization and expose a typed transport client', async () => {
+  const input = contract.object({ id: contract.number({ min: 1 }) }, { unknownKeys: 'strict' });
+  const output = contract.object({ title: contract.text({ minLength: 1 }) }, { unknownKeys: 'strict' });
+  const getTask = contract.operation('tasks.get', input, output);
+  const endpoint = contract.implement(getTask, async ({ id }) => ({ title: `task-${id}` }), {
+    authorize: async (context) => Boolean(context && context.userId),
+  });
+  assert.deepEqual(await endpoint({ id: 7 }, { userId: 'u1' }), { title: 'task-7' });
+  await assert.rejects(endpoint({ id: 0 }, { userId: 'u1' }), (error) => error.stage === 'input validation');
+  await assert.rejects(endpoint({ id: 7 }, {}), (error) => error.stage === 'authorization');
+  const client = contract.createClient(getTask, async (name, value) => {
+    assert.equal(name, 'tasks.get');
+    assert.deepEqual(value, { id: 8 });
+    return { title: 'task-8' };
+  });
+  assert.deepEqual(await client({ id: 8 }), { title: 'task-8' });
+  const unsafeClient = contract.createClient(getTask, async () => ({ title: 2 }));
+  await assert.rejects(unsafeClient({ id: 8 }), (error) => error.stage === 'client output validation');
+});
+
+test('PlainScript can declare a typed operation and compile a server/client consumer', () => {
+  const result = runSource(`import { object, text, number, operation, implement, createClient, Schema } from "std/contract"
+import { print } from "std/io"
+type Input
+    id: number
+end
+type Output
+    title: text
+end
+let inputSchema: Schema<Input> = object({ id: number() })
+let outputSchema: Schema<Output> = object({ title: text() })
+let getTask = operation("tasks.get", inputSchema, outputSchema)
+async function lookup(input: Input) -> Output
+    return { title: "task-{input.id}" }
+end
+let endpoint = implement(getTask, lookup)
+let client = createClient(getTask, async (name: text, input: any) => do
+    return await endpoint(input)
+end)
+let result = await client({ id: 4 })
+print("client invoked")
+`);
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout, 'client invoked\n');
+});
