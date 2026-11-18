@@ -1,0 +1,49 @@
+# Cooperative cancellation, structured task groups, channels and workers.
+#
+# A task group owns every task started with run(). close() waits for all of
+# them, returns results in start order, and rejects with the first failure after
+# cancelling siblings. Cancellation is cooperative and propagates to children.
+
+export type Cancellation
+    cancelled: boolean
+    reason: any
+end
+
+export type TaskGroup
+    label: text
+    signal: Cancellation
+    cancelled: boolean
+    closed: boolean
+end
+
+export type Channel<T>
+    send: (value: T, signal?: Cancellation) -> Promise of nothing
+    receive: (signal?: Cancellation) -> Promise of T
+    close: () -> nothing
+    closed: boolean
+    size: number
+end
+
+export type WorkerHandle
+    raw: any
+    post: (message: any) -> nothing
+    onMessage: ((message: any) -> nothing) -> (() -> nothing)
+    onError: ((error: any) -> nothing) -> (() -> nothing)
+    terminate: () -> Promise of number
+    join: Promise of number
+end
+
+export declare function cancellation(reason?: any) -> Cancellation
+export declare function isCancelled(signal: Cancellation) -> boolean
+export declare function cancel(signal: Cancellation, reason?: any) -> boolean
+export declare function throwIfCancelled(signal: Cancellation) -> nothing
+export declare function onCancel(signal: Cancellation, callback: (reason: any) -> nothing) -> (() -> nothing)
+export declare function group(options?: any) -> TaskGroup
+export declare function run<T>(group: TaskGroup, task: (signal: Cancellation) -> Promise of T) -> Promise of T
+export declare function cancelGroup(group: TaskGroup, reason?: any) -> boolean
+export declare function close(group: TaskGroup) -> Promise of list of any
+export declare function all(group: TaskGroup) -> Promise of list of any
+export declare function delay(milliseconds: number, signal?: Cancellation) -> Promise of nothing
+export declare function timeout<T>(milliseconds: number, task: (signal: Cancellation) -> Promise of T, parent?: Cancellation) -> Promise of T
+export declare function channel<T>(capacity?: number) -> Channel<T>
+export declare function spawnWorker(source: text, options?: any) -> Promise of WorkerHandle

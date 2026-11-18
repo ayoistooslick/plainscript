@@ -189,16 +189,22 @@ class Parser {
     let namespace = null;
     const names = [];
 
+    let defaultToken = null;
+    let namespaceToken = null;
     if (this.atPunct('{')) {
       this.next();
       while (!this.atPunct('}')) {
         const imported = this.expectIdent('an import name');
         let local = imported.v;
+        let localToken = imported;
         if (this.atKw('as')) {
           this.next();
-          local = this.expectIdent('a local name').v;
+          localToken = this.expectIdent('a local name');
+          local = localToken.v;
         }
-        names.push({ imported: imported.v, local });
+        names.push(withHiddenPositions({ imported: imported.v, local }, {
+          line: localToken.line, col: localToken.col, importedLine: imported.line, importedCol: imported.col,
+        }));
         if (this.atPunct(',')) this.next();
         else break;
       }
@@ -206,17 +212,22 @@ class Parser {
     } else if (this.atPunct('*')) {
       this.next();
       this.expectKw('as');
-      namespace = this.expectIdent('a namespace name').v;
+      namespaceToken = this.expectIdent('a namespace name');
+      namespace = namespaceToken.v;
     } else {
-      defaultName = this.expectIdent('an import name').v;
+      defaultToken = this.expectIdent('an import name');
+      defaultName = defaultToken.v;
       if (this.atPunct(',')) {
         this.next();
         this.expectPunct('{');
         while (!this.atPunct('}')) {
           const imported = this.expectIdent('an import name');
           let local = imported.v;
-          if (this.atKw('as')) { this.next(); local = this.expectIdent('a local name').v; }
-          names.push({ imported: imported.v, local });
+          let localToken = imported;
+          if (this.atKw('as')) { this.next(); localToken = this.expectIdent('a local name'); local = localToken.v; }
+          names.push(withHiddenPositions({ imported: imported.v, local }, {
+            line: localToken.line, col: localToken.col, importedLine: imported.line, importedCol: imported.col,
+          }));
           if (this.atPunct(',')) this.next();
           else break;
         }
@@ -228,7 +239,11 @@ class Parser {
     const spec = this.peek();
     if (spec.t !== 'text') this.fail('PS2004', 'An import path must be a text literal.');
     this.next();
-    return this.node('Import', start, { spec: spec.v, defaultName, namespace, names });
+    return this.node('Import', start, {
+      spec: spec.v, defaultName, namespace, names,
+      defaultLine: defaultToken ? defaultToken.line : null, defaultCol: defaultToken ? defaultToken.col : null,
+      namespaceLine: namespaceToken ? namespaceToken.line : null, namespaceCol: namespaceToken ? namespaceToken.col : null,
+    });
   }
 
   exportDeclaration() {
@@ -291,18 +306,24 @@ class Parser {
 
   typeDeclaration(exported) {
     const start = this.expectKw('type');
-    const name = this.expectIdent('a type name').v;
-    const typeParams = this.typeParameterList();
+    const nameToken = this.expectIdent('a type name');
+    const name = nameToken.v;
+    const typeParameterInfo = this.typeParameterList();
+    const typeParams = typeParameterInfo.params;
 
     if (this.atPunct('=')) {
       this.next();
       const value = this.typeExpression();
-      return this.node('TypeDecl', start, { name, typeParams, value, recordFields: null, exported });
+      const node = this.node('TypeDecl', start, { name, nameLine: nameToken.line, nameCol: nameToken.col, typeParams, value, recordFields: null, exported });
+      if (Object.keys(typeParameterInfo.constraints).length) node.typeParamConstraints = typeParameterInfo.constraints;
+      return node;
     }
 
     if (this.atKw('end')) {
       this.next();
-      return this.node('TypeDecl', start, { name, typeParams, value: { k: 'record', fields: [] }, recordFields: [], exported });
+      const node = this.node('TypeDecl', start, { name, nameLine: nameToken.line, nameCol: nameToken.col, typeParams, value: { k: 'record', fields: [] }, recordFields: [], exported });
+      if (Object.keys(typeParameterInfo.constraints).length) node.typeParamConstraints = typeParameterInfo.constraints;
+      return node;
     }
 
     const fields = [];
@@ -315,44 +336,57 @@ class Parser {
       if (this.atPunct(',')) this.next();
     }
     this.expectKw('end');
-    return this.node('TypeDecl', start, { name, typeParams, value: null, recordFields: fields, exported });
+    const node = this.node('TypeDecl', start, { name, nameLine: nameToken.line, nameCol: nameToken.col, typeParams, value: null, recordFields: fields, exported });
+    if (Object.keys(typeParameterInfo.constraints).length) node.typeParamConstraints = typeParameterInfo.constraints;
+    return node;
   }
 
   declareDeclaration() {
     const start = this.expectKw('declare');
     if (this.atKw('function')) {
       const fnToken = this.next();
-      const name = this.expectIdent('a function name').v;
-      const typeParams = this.typeParameterList();
+      const nameToken = this.expectIdent('a function name');
+      const name = nameToken.v;
+      const typeParameterInfo = this.typeParameterList();
+      const typeParams = typeParameterInfo.params;
       const params = this.parameterList();
       let returnType = null;
       if (this.atPunct('->')) {
         this.next();
         returnType = this.typeExpression();
       }
-      return this.node('DeclareFunction', fnToken, { name, typeParams, params, returnType, exported: false, line: start.line, col: start.col });
+      const node = this.node('DeclareFunction', fnToken, { name, nameLine: nameToken.line, nameCol: nameToken.col, typeParams, params, returnType, exported: false, line: start.line, col: start.col });
+      if (Object.keys(typeParameterInfo.constraints).length) node.typeParamConstraints = typeParameterInfo.constraints;
+      return node;
     }
     if (this.atKw('const')) {
       this.next();
-      const name = this.expectIdent('a name').v;
+      const nameToken = this.expectIdent('a name');
+      const name = nameToken.v;
       this.expectPunct(':');
-      return this.node('DeclareValue', start, { name, type: this.typeExpression(), exported: false });
+      return this.node('DeclareValue', start, { name, nameLine: nameToken.line, nameCol: nameToken.col, type: this.typeExpression(), exported: false });
     }
     this.fail('PS2006', 'Expected "function" or "const" after "declare".');
     return null;
   }
 
   typeParameterList() {
-    if (!this.atPunct('<')) return [];
+    if (!this.atPunct('<')) return { params: [], constraints: {} };
     this.next();
     const params = [];
+    const constraints = {};
     while (!this.atPunct('>')) {
-      params.push(this.expectIdent('a type parameter').v);
+      const name = this.expectIdent('a type parameter').v;
+      params.push(name);
+      if (this.atPunct(':')) {
+        this.next();
+        constraints[name] = this.typeExpression();
+      }
       if (this.atPunct(',')) this.next();
       else break;
     }
     this.expectPunct('>');
-    return params;
+    return { params, constraints };
   }
 
   // `typeExpression` is the union level. Collection elements and map keys use
@@ -431,6 +465,17 @@ class Parser {
       const ret = this.typeExpression();
       return this.node('FunctionType', token, { params, ret });
     }
+    if (token.t === 'punct' && token.v === '[') {
+      this.next();
+      const elements = [];
+      while (!this.atPunct(']')) {
+        elements.push(this.typeExpression());
+        if (this.atPunct(',')) this.next();
+        else break;
+      }
+      this.expectPunct(']');
+      return this.node('TupleType', token, { elements });
+    }
     if (token.t === 'punct' && token.v === '{') {
       this.next();
       const fields = [];
@@ -462,6 +507,12 @@ class Parser {
       if (token.v === 'Promise' && this.atKw('of')) {
         this.next();
         return this.node('PromiseType', token, { value: this.typeOptional() });
+      }
+      if (token.v === 'keyof') {
+        return this.node('KeyofType', token, { target: this.typePrimary() });
+      }
+      if (token.v === 'typeof') {
+        return this.node('TypeofType', token, { value: this.primaryExpression() });
       }
       // Bare `list` and `map` mean "a list/map of anything", which is what a
       // runtime type test needs.
@@ -519,7 +570,8 @@ class Parser {
     while (!this.atPunct(')')) {
       let rest = false;
       if (this.atPunct('...')) { this.next(); rest = true; }
-      const name = this.expectIdent('a parameter name').v;
+      const nameToken = this.expectIdent('a parameter name');
+      const name = nameToken.v;
       const optional = this.atPunct('?');
       if (optional) this.next();
       this.expectPunct(':');
@@ -529,7 +581,7 @@ class Parser {
         this.next();
         defaultValue = this.expression();
       }
-      params.push({ name, type, rest, optional: optional || defaultValue !== null, defaultValue });
+      params.push({ name, nameLine: nameToken.line, nameCol: nameToken.col, type, rest, optional: optional || defaultValue !== null, defaultValue });
       if (this.atPunct(',')) this.next();
       else break;
     }
@@ -541,9 +593,11 @@ class Parser {
     const token = options.token || this.peek();
     this.expectKw('function');
     let name = null;
-    if (this.atIdent()) name = this.next().v;
+    let nameToken = null;
+    if (this.atIdent()) { nameToken = this.next(); name = nameToken.v; }
     else if (!options.defaultExport) this.fail('PS2002', `Expected a function name but found ${describe(this.peek())}.`);
-    const typeParams = this.typeParameterList();
+    const typeParameterInfo = this.typeParameterList();
+    const typeParams = typeParameterInfo.params;
     const params = this.parameterList();
     let returnType = null;
     if (this.atPunct('->')) {
@@ -551,10 +605,13 @@ class Parser {
       returnType = this.typeExpression();
     }
     const body = this.blockBody('function');
-    return this.node('FunctionDecl', token, {
-      name, typeParams, params, returnType, body, async: Boolean(options.async),
+    const node = this.node('FunctionDecl', token, {
+      name, nameLine: nameToken ? nameToken.line : null, nameCol: nameToken ? nameToken.col : null,
+      typeParams, params, returnType, body, async: Boolean(options.async),
       exported: Boolean(options.exported), defaultExport: Boolean(options.defaultExport),
     });
+    if (Object.keys(typeParameterInfo.constraints).length) node.typeParamConstraints = typeParameterInfo.constraints;
+    return node;
   }
 
   // Collects statements until one of `stoppers` appears, without consuming it.
@@ -1188,7 +1245,8 @@ class Parser {
 
   functionExpression() {
     const token = this.expectKw('function');
-    const typeParams = this.typeParameterList();
+    const typeParameterInfo = this.typeParameterList();
+    const typeParams = typeParameterInfo.params;
     const params = this.parameterList();
     let returnType = null;
     if (this.atPunct('->')) {
@@ -1196,7 +1254,9 @@ class Parser {
       returnType = this.typeExpression();
     }
     const body = this.blockBody('function expression');
-    return this.node('FunctionExpression', token, { typeParams, params, returnType, body, async: false });
+    const node = this.node('FunctionExpression', token, { typeParams, params, returnType, body, async: false });
+    if (Object.keys(typeParameterInfo.constraints).length) node.typeParamConstraints = typeParameterInfo.constraints;
+    return node;
   }
 
   // A parenthesised expression and a lambda parameter list both start with
@@ -1283,6 +1343,13 @@ function describe(token) {
 
 function isAssignable(node) {
   return node && (node.kind === 'Name' || node.kind === 'Member' || node.kind === 'Index');
+}
+
+function withHiddenPositions(value, positions) {
+  for (const [key, position] of Object.entries(positions)) {
+    Object.defineProperty(value, key, { value: position, enumerable: false, writable: true, configurable: true });
+  }
+  return value;
 }
 
 function parse(source, file) {

@@ -18,15 +18,18 @@
   "type": "commonjs",
   "main": "src/index.js",
   "bin": {
-    "plainscript": "./src/cli.js"
+    "plainscript": "./src/cli.js",
+    "plainscript-lsp": "./src/lsp.js"
   },
   "exports": {
     ".": "./src/index.js",
     "./std/*": "./stdlib/*.js",
+    "./lsp": "./src/lsp.js",
     "./package.json": "./package.json"
   },
   "scripts": {
     "test": "node --test tests/*.test.js",
+    "bench": "node scripts/benchmark.js 40 7",
     "check": "node src/cli.js check",
     "fmt": "node src/cli.js fmt",
     "docs:build": "node scripts/build-docs-site.js",
@@ -38,6 +41,7 @@
   "files": [
     "src",
     "stdlib",
+    "editors",
     "templates",
     "docs",
     "scripts",

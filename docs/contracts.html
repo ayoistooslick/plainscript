@@ -1,0 +1,73 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Unified contracts — PlainScript documentation."><title>Unified contracts · PlainScript</title><link rel="stylesheet" href="style.css"></head><body><div class="site-shell"><aside class="sidebar"><a class="brand" href="index.html"><span class="brand-mark">PS</span><span><span class="brand-name">PlainScript</span><span class="brand-meta">Language docs · 2.0</span></span></a><div class="nav-group"><div class="nav-label">Start here</div><a class="nav-link " href="index.html">PlainScript</a><a class="nav-link " href="cli.html">CLI reference</a><a class="nav-link " href="templates.html">Application templates</a></div><div class="nav-group"><div class="nav-label">Language</div><a class="nav-link " href="spec.html">Language specification</a><a class="nav-link " href="syntax-design.html">Syntax design</a><a class="nav-link " href="type-system.html">Type system</a></div><div class="nav-group"><div class="nav-label">Compiler</div><a class="nav-link " href="architecture.html">Compiler architecture</a><a class="nav-link " href="interop.html">JavaScript interoperability</a><a class="nav-link " href="benchmarks.html">Benchmarks</a></div><div class="nav-group"><div class="nav-label">Guides</div><a class="nav-link active" href="contracts.html">Unified contracts</a><a class="nav-link " href="concurrency.html">Concurrency</a><a class="nav-link " href="migration.html">Migration guide</a><a class="nav-link " href="comparison.html">Comparison with TypeScript</a></div><div class="nav-group"><div class="nav-label">Project</div><a class="nav-link " href="progress.html">Engineering progress</a><a class="nav-link " href="audit.html">Audit</a><a class="nav-link " href="decisions.html">Decisions</a></div><div class="sidebar-footer">Open source under MIT.<br><a href="https://github.com/ayoistooslick/Plainscript">View on GitHub ↗</a></div></aside><main class="main"><header class="topbar"><div class="search-wrap"><label class="search" aria-label="Search documentation"><span>⌕</span><input id="doc-search" type="search" placeholder="Search the docs…" autocomplete="off"><kbd>/</kbd></label><div id="search-results" class="search-results" role="listbox"></div></div><nav class="top-links"><a href="index.html">Docs</a><a href="https://github.com/ayoistooslick/Plainscript">GitHub ↗</a></nav></header><div class="content"><article class="page-layout"><div class="prose"><h1 id="unified-full-stack-contracts">Unified full-stack contracts</h1>
+<p><strong>Status: implemented through schemas, typed operations, typed errors, dispatch, SQLite models/migrations and a real authentication flow.</strong> The verified application is <a href="../demos/contracts-fullstack"><code>demos/contracts-fullstack</code></a>; its integration test logs in, validates, mutates, restarts the process and checks persistence.</p>
+<h2 id="one-schema-path">One schema path</h2>
+<p><code>std/contract.object</code> derives a structural record type from its schema shape. Enum and literal fields derive literal unions, optional schema fields become optional record fields, and arrays/nested objects retain their element and field types. The compiler does not require a parallel <code>type Task</code> or a frontend model declaration.</p>
+<pre><code>import { object, text, number, boolean, enumeration, oneOf, literal, fallibleOperation } from &quot;std/contract&quot;
+
+export const TaskSchema = object({
+    id: number(),
+    title: text({ minLength: 1 }),
+    done: boolean(),
+    status: enumeration([&quot;open&quot;, &quot;done&quot;]),
+})
+export const TaskError = oneOf([
+    object({ code: literal(&quot;NOT_FOUND&quot;), message: text() }),
+    object({ code: literal(&quot;FORBIDDEN&quot;), message: text() }),
+])
+export const GetTask = fallibleOperation(&quot;tasks.get&quot;, object({ id: number() }), TaskSchema, TaskError)</code></pre>
+<p><code>TaskSchema</code> is used by the server, the React client and <code>std/db.table</code>; a field change is one edit. <code>object</code> strips unknown keys by default, <code>strict</code> rejects them, and <code>passthrough</code> retains them. Runtime parsing is still mandatory at every trust boundary.</p>
+<h2 id="server-and-client">Server and client</h2>
+<pre><code>import { implementFallible, success, failure, router, resultToWire, createFallibleClient } from &quot;std/contract&quot;
+
+let endpoint = implementFallible(GetTask, async (input) =&gt; do
+    let task = tasks.get(input.id)
+    if task == nothing
+        return failure({ code: &quot;NOT_FOUND&quot;, message: &quot;missing&quot; })
+    end
+    return success(task as any)
+end, { authorize: authorize })
+
+let routes = router({ &quot;tasks.get&quot;: endpoint })
+let wire = resultToWire(await routes.handle(&quot;tasks.get&quot;, { id: 1 }, context))
+let client = createFallibleClient(GetTask, httpTransport(&quot;/api&quot;))</code></pre>
+<p><code>implementFallible</code> validates the input, calls the authorization callback, validates either the success payload or the declared error against <code>TaskError</code>, and returns an <code>OperationResult</code>. <code>createFallibleClient</code> validates the local input, decodes <code>{ok, value}</code>/<code>{ok, error}</code> (or runtime results), and validates both outcomes. <code>router</code> rejects unknown operation names with a routing <code>OperationError</code>. <code>httpTransport</code> is the built-in JSON transport; applications can supply any transport function with the same <code>(name, input) -&gt; Promise</code> shape.</p>
+<p>The normal <code>operation</code>/<code>implement</code>/<code>createClient</code> API remains for handlers that throw errors. It is not a substitute for the typed result path.</p>
+<h2 id="database-model-mapping-and-migrations">Database model mapping and migrations</h2>
+<pre><code>import { open, table, migrate, Database } from &quot;std/db&quot;
+
+let database = await open(&quot;./app.db&quot;)
+await migrate(database, [{
+    version: 1,
+    name: &quot;tasks&quot;,
+    up: async (db: Database) =&gt; do
+        db.exec(&quot;create table tasks (id integer primary key autoincrement, title text not null, done integer not null)&quot;)
+    end,
+}])
+let tasks = table(database, &quot;tasks&quot;, TaskSchema)</code></pre>
+<p><code>table</code> derives columns from <code>TaskSchema</code> (text, number, boolean, JSON arrays/objects, optional fields and primary-key options), validates rows through the same schema, and uses bound parameters for every value. <code>migrate</code> keeps a <code>plainscript_migrations</code> history, applies versions in order in <code>BEGIN IMMEDIATE</code> transactions, rolls back the whole migration on failure, rejects duplicate versions and refuses to apply around a history gap. <code>rollback</code> runs declared <code>down</code> migrations; a migration without <code>down</code> cannot be rolled back. The schema itself remains a contract, not a replacement for database design review.</p>
+<h2 id="authentication-and-authorization">Authentication and authorization</h2>
+<p><code>std/auth</code> supplies scrypt password hashing with random salts and constant-time verification, HS256 bearer tokens with <code>exp</code>/<code>nbf</code>/<code>iss</code>/<code>aud</code> validation, <code>bearer</code> extraction from plain or <code>Headers</code> requests, and reusable policies. The flagship demo:</p>
+<ul>
+<li>creates <code>tasks</code> and <code>users</code> through a versioned migration;</li>
+<li>seeds a development user with a scrypt hash;</li>
+<li>exposes <code>POST /api/auth/login</code> and signs a one-hour token;</li>
+<li>verifies tokens on every task route and passes the user through the authorization</li>
+<p>callback;</p>
+<li>returns a typed <code>NOT_FOUND</code> failure from <code>/api/tasks/get</code> with status 404.</li>
+</ul>
+<p><code>AUTH_SECRET</code> should be set in production. The checked-in fallback exists only so the demo can start immediately; it is clearly a development credential.</p>
+<h2 id="compile-time-behavior">Compile-time behavior</h2>
+<p>The module graph shares the schema-derived operation types. Incompatible client inputs, handler outputs and typed error codes are rejected before runtime (<code>PS3343</code>/<code>PS3404</code>). The negative tests include a wrong enum literal, an incompatible backend result and a <code>failure({ code: &quot;INVALID&quot; })</code> that is not in the declared error union. Enum literal unions also drive exhaustive <code>match</code> checking.</p>
+<h2 id="evidence-and-limitations">Evidence and limitations</h2>
+<p>Verified by:</p>
+<ul>
+<li><code>tests/contract-demo.test.js</code> — compiled sources; login, 401/403, invalid input, create,</li>
+<p>toggle, typed 404 failure, API restart and persistence;</p>
+<li><code>tests/contract-errors.test.js</code> — enum inference, exhaustiveness, typed results, router,</li>
+<p>negative error union, authorization failure validation;</p>
+<li><code>tests/contract-typecheck.test.js</code> and <code>tests/shared-contract-modules.test.js</code> — existing</li>
+<p>cross-module contract enforcement;</p>
+<li><code>tests/db.test.js</code> — schema-derived tables, persistence, invalid migration rollback,</li>
+<p>duplicate versions, rollback requirements and identifier/row rejection.</p>
+</ul>
+<p>Not implemented: compiler-owned operation syntax, generated OpenAPI/docs, automatic frontend code generation beyond the typed runtime client, a database driver abstraction beyond Node SQLite, and a production identity provider (OIDC/SAML). <code>std/auth</code> is real cryptography, not a full identity product. See <a href="ROADMAP.html">ROADMAP</a>.</p></div><aside class="toc"><div class="toc-title">On this page</div><a class="toc-h2" href="#one-schema-path">One schema path</a><a class="toc-h2" href="#server-and-client">Server and client</a><a class="toc-h2" href="#database-model-mapping-and-migrations">Database model mapping and migrations</a><a class="toc-h2" href="#authentication-and-authorization">Authentication and authorization</a><a class="toc-h2" href="#compile-time-behavior">Compile-time behavior</a><a class="toc-h2" href="#evidence-and-limitations">Evidence and limitations</a></aside></article><footer class="page-footer"><span>PlainScript 2.0 documentation</span><a href="https://github.com/ayoistooslick/Plainscript/issues">Report a documentation issue ↗</a></footer></div></main></div><script src="app.js"></script></body></html>

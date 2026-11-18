@@ -1,9 +1,25 @@
 import { createElement, useEffect, useState } from "react"
-import { ListTasks, CreateTask, ToggleTask } from "./shared"
-import { createClient } from "std/contract"
+import { ListTasks, CreateTask, ToggleTask, GetTask } from "./shared"
+import { createClient, createFallibleClient } from "std/contract"
 import { append, count } from "std/list"
 
 declare function fetch(url: text, options?: any) -> Promise of any
+
+let token: text = ""
+
+async function login() -> boolean
+    let response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ username: "demo", password: "plainscript-demo" }),
+    })
+    if not response.ok
+        return false
+    end
+    let payload = await response.json() as any
+    token = payload.token as text
+    return true
+end
 
 async function transport(name: text, input: any) -> any
     let path = "/api/tasks"
@@ -23,7 +39,7 @@ async function transport(name: text, input: any) -> any
         method: method,
         headers: {
             "content-type": "application/json",
-            "authorization": "Bearer plainscript-demo",
+            "authorization": "Bearer {token}",
         },
         body: requestBody,
     })
@@ -36,6 +52,7 @@ end
 let listTasks = createClient(ListTasks, transport)
 let createTask = createClient(CreateTask, transport)
 let toggleTask = createClient(ToggleTask, transport)
+let getTask = createFallibleClient(GetTask, transport)
 
 declare const JSON: any
 function taskRows(tasks: list of any, onToggle: any) -> list of any
@@ -63,10 +80,26 @@ export function App() -> any
     let (message, setMessage) = useState("Loading from SQLite…")
 
     async function refresh() -> nothing
+        if token == ""
+            let authenticated = await login()
+            if not authenticated
+                setMessage("Demo login failed")
+                return nothing
+            end
+        end
         try
             let current = await listTasks({})
             setTasks(current)
             setMessage("Saved in SQLite")
+            if count(current) > 0
+                let checked = await getTask({ id: current[0]?.id ?? 0 })
+                match checked
+                    case Success(value)
+                        setMessage("Verified {value.title}")
+                    case Failure(error)
+                        setMessage("Contract error: {error.code}")
+                end
+            end
         catch failure
             setMessage("Could not load tasks")
         end

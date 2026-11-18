@@ -42,6 +42,45 @@ class Compiler {
     // When compiling for the browser, standard library imports become URLs
     // relative to the page (for example /std/dom.js) instead of file paths.
     this.stdBase = options.stdBase || null;
+    // Editor and test harnesses can supply unsaved documents without writing
+    // them to disk. Keys are absolute paths.
+    this.overrides = options.overrides || new Map();
+  }
+
+  sourceFor(file) {
+    const absolute = path.resolve(file);
+    return this.overrides.has(absolute) ? this.overrides.get(absolute) : null;
+  }
+
+  existsFile(candidate) {
+    const absolute = path.resolve(candidate);
+    return this.overrides.has(absolute) || isFile(absolute);
+  }
+
+  invalidate(file) {
+    const target = path.resolve(file);
+    const removed = new Set([target]);
+    // A changed module can alter exported types used by any importer, so walk
+    // the reverse dependency closure. Unrelated modules stay in the cache and
+    // do not need to be parsed or checked again.
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const [candidate, record] of this.modules) {
+        if (removed.has(candidate)) continue;
+        for (const resolved of record.resolutions.values()) {
+          if (resolved.path && removed.has(path.resolve(resolved.path))) {
+            removed.add(candidate);
+            changed = true;
+            break;
+          }
+        }
+      }
+    }
+    for (const candidate of removed) this.modules.delete(candidate);
+    this.diagnostics.length = 0;
+    this.loading.clear();
+    return [...removed];
   }
 
   displayPath(file) {
@@ -58,7 +97,7 @@ class Compiler {
     if (spec.startsWith('.')) {
       const base = path.resolve(path.dirname(fromFile), spec);
 
-      if (isFile(base)) {
+      if (this.existsFile(base)) {
         // A declaration next to built JavaScript is how a compiled PlainScript
         // library is consumed: the runtime is `x.js`, the types are `x.d.pln`.
         if (base.endsWith('.d.pln')) {
@@ -79,7 +118,7 @@ class Compiler {
         path.join(base, 'index.d.pln'),
       ];
       for (const candidate of candidates) {
-        if (!isFile(candidate)) continue;
+        if (!this.existsFile(candidate)) continue;
         if (candidate.endsWith('.d.pln')) {
           return { kind: 'declared', path: candidate, runtime: candidate.replace(/\.d\.pln$/, '.js') };
         }
@@ -214,8 +253,8 @@ class Compiler {
     }
     if (this.modules.has(file)) return this.modules.get(file);
 
-    let source;
-    try {
+    let source = this.sourceFor(file);
+    if (source === null) try {
       source = fs.readFileSync(file, 'utf8');
     } catch (failure) {
       this.diagnostics.push(error('PS4004', `Cannot read ${this.displayPath(file)}: ${failure.message}`, new Span(this.displayPath(file), 1, 1)));

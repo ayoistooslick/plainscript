@@ -287,7 +287,10 @@ T?                        # T or nothing
 Promise of T              # awaited value is T
 (A, B) -> R               # function value
 { name: text, age: number }   # anonymous record
+[A, B]                    # fixed-length tuple
 A or B                    # union
+keyof { name: text }      # literal union of field names
+typeof value              # type of a declared value
 T<...>                    # named generic instantiation
 ```
 
@@ -295,9 +298,11 @@ T<...>                    # named generic instantiation
 `value.field` reads a key (with `T?` when the key may be absent). Lists do not have
 methods or a `.length` property; use `std/list`.
 
-There are no tuple types (`(number, text)`), no `readonly` field modifiers, and no
-`keyof`/`typeof` type queries. Use records, lists and explicit unions instead; these are
-deliberate omissions rather than unsound checking.
+Tuple types use brackets: `[number, text]`. A literal numeric index selects that element;
+destructuring and assignment are checked element by element. `keyof` produces a literal
+union of the record's field names, and `typeof` reuses the type of a hoisted value.
+Conditional/mapped/indexed-access types and `readonly` field modifiers are not implemented;
+these remain deliberate omissions rather than unsound checking.
 
 ### 5.3 Assignability
 
@@ -310,6 +315,8 @@ A value of type `S` is assignable to `T` when:
   parameters (contravariant) and assignable results;
 - records are structurally assignable: every required field of `T` exists in `S` with an
   assignable type; extra fields in `S` are allowed; optional fields may be absent;
+- both are tuples of equal length with pairwise-assignable elements;
+- literal types are assignable to their primitive base and to the same literal;
 - `S` is a member of union `T`, or every member of union `S` is assignable to `T`;
 - `T` is a named alias that dereferences to a matching type.
 
@@ -348,8 +355,21 @@ end
 let value = first([1, 2, 3])     # value: number?
 ```
 
-An unresolvable type parameter falls back to `any`. Generic constraints are not supported
-in 2.0.
+An unresolvable type parameter falls back to `any`. Generic constraints are written after
+a colon and are checked at call sites:
+
+```plainscript
+type Named
+    name: text
+end
+
+function label<T: Named>(value: T) -> text
+    return value.name
+end
+```
+
+`label({ name: "Ada" })` compiles and can read `value.name`; `label({ age: 37 })` reports
+`PS3343`. Constraints on type aliases use the same syntax.
 
 `std/contract.object` is checker-aware: when its shape is a record literal whose values are
 contract schemas, the result's `Schema<T>` parse result is inferred recursively from those
@@ -357,9 +377,9 @@ schema outputs. Primitive schemas, nested object schemas, arrays and optional sc
 supported. An optional schema field becomes an optional property in `T`. This lets an
 operation's input and output model flow from schema values into its implementation and
 client signature without a separate model declaration. The check is based on the schema
-expression; arbitrary JavaScript validators are not inferred. Enum values currently widen
-to their primitive base type, so exhaustive value-union narrowing from an enum schema is not
-provided.
+expression; arbitrary JavaScript validators are not inferred. `enumeration` and `literal`
+schemas derive literal unions, so `"open" or "done"` fields reject other values at compile
+time and are exhaustively matchable.
 
 ---
 
@@ -568,7 +588,10 @@ end
 - Top-level `await` is allowed, because output is an ES module.
 - Async lambdas are supported: `async (x: number) => await work(x)`.
 
-There is no structured concurrency, no cancellation type and no worker syntax.
+The language has no task/cancellation syntax of its own. Import `std/task` for task groups,
+cooperative cancellation, timeouts, channels and worker handles. These primitives wrap the
+host event loop and cannot preempt hostile synchronous code. See
+[CONCURRENCY.md](CONCURRENCY.md).
 
 ---
 

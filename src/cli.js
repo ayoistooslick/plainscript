@@ -33,7 +33,9 @@ Commands
   test [files...]            run *.test.pln files
   new <name> [--template <id>]  scaffold a new project, optionally from a bundled template
                               templates: project-management, ecommerce, realtime-chat
+  watch [files...]           rebuild the project when a .pln file changes
   ir <file.pln>              print the high-level IR as JSON
+  lsp                        start the language server over stdio
   version                    print the compiler version
   help                       show this message
 
@@ -270,7 +272,7 @@ function wirePackageTypes(root, outRoot, outputs, declarations, imported, flags)
   status(`  package.json: types -> ${typesPath}`, flags);
 }
 
-function commandBuild(positional, flags) {
+function commandBuild(positional, flags, options = {}) {
   const root = process.cwd();
   const { srcRoot, outRoot, exclude } = resolveLayout(root);
   const files = positional.length
@@ -288,7 +290,8 @@ function commandBuild(positional, flags) {
     return path.join(outRoot, relative).replace(/\.pln$/, OUTPUT_EXTENSION);
   };
 
-  const compiler = new Compiler({ root, outputFor, stdBase: flags.stdBase });
+  const compiler = options.compiler || new Compiler({ root, outputFor, stdBase: flags.stdBase });
+  compiler.diagnostics.length = 0;
   const outputs = [];
   for (const file of files) {
     const outFile = outputFor(file);
@@ -311,11 +314,20 @@ function commandBuild(positional, flags) {
   }
 
   let written = 0;
+  let unchanged = 0;
   for (const output of outputs) {
     fs.mkdirSync(path.dirname(output.outFile), { recursive: true });
     const mapName = `${path.basename(output.outFile)}.map`;
-    fs.writeFileSync(output.outFile, `${output.code}//# sourceMappingURL=${mapName}\n`);
-    fs.writeFileSync(`${output.outFile}.map`, JSON.stringify(output.map));
+    const code = `${output.code}//# sourceMappingURL=${mapName}\n`;
+    const map = JSON.stringify(output.map);
+    if (isFile(output.outFile) && isFile(`${output.outFile}.map`)
+      && fs.readFileSync(output.outFile, 'utf8') === code
+      && fs.readFileSync(`${output.outFile}.map`, 'utf8') === map) {
+      unchanged += 1;
+      continue;
+    }
+    fs.writeFileSync(output.outFile, code);
+    fs.writeFileSync(`${output.outFile}.map`, map);
     written += 1;
     status(`  ${path.relative(root, output.file)} -> ${path.relative(root, output.outFile)}`, flags);
   }
@@ -351,7 +363,56 @@ function commandBuild(positional, flags) {
     wirePackageTypes(root, outRoot, outputs, declarations, imported, flags);
   }
 
-  status(`built ${written} file(s) into ${path.relative(root, outRoot) || '.'}${declarations.length ? ` (+${declarations.length} declaration file(s))` : ''}`, flags);
+  status(`built ${written} file(s) into ${path.relative(root, outRoot) || '.'}${unchanged ? ` (${unchanged} unchanged)` : ''}${declarations.length ? ` (+${declarations.length} declaration file(s))` : ''}`, flags);
+  return 0;
+}
+
+function commandWatch(positional, flags) {
+  const root = process.cwd();
+  const { srcRoot, outRoot, exclude } = resolveLayout(root);
+  const outputFor = (file) => {
+    const relative = path.relative(srcRoot, file);
+    if (relative.startsWith('..')) return file.replace(/\.pln$/, OUTPUT_EXTENSION);
+    return path.join(outRoot, relative).replace(/\.pln$/, OUTPUT_EXTENSION);
+  };
+  const compiler = new Compiler({ root, outputFor, stdBase: flags.stdBase });
+  let changed = null;
+  let timer = null;
+  let building = false;
+  let pending = false;
+
+  const rebuild = () => {
+    if (building) { pending = true; return; }
+    building = true;
+    const started = Date.now();
+    if (changed) compiler.invalidate(changed);
+    commandBuild(positional, { ...flags, quiet: false }, { compiler });
+    building = false;
+    status(`rebuilt in ${Date.now() - started}ms`, flags);
+    if (pending) { pending = false; schedule(); }
+  };
+  const schedule = () => {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(rebuild, 80);
+  };
+
+  rebuild();
+  let watcher;
+  try {
+    watcher = fs.watch(srcRoot, { recursive: true }, (event, filename) => {
+      if (!filename || !String(filename).endsWith(SOURCE_EXTENSION)) return;
+      changed = path.resolve(srcRoot, String(filename));
+      schedule();
+    });
+  } catch (failure) {
+    process.stderr.write(`Cannot watch ${srcRoot}: ${failure.message}\n`);
+    return 1;
+  }
+  watcher.on('error', (failure) => process.stderr.write(`watch error: ${failure.message}\n`));
+  const close = () => { try { watcher.close(); } catch { /* already closed */ } process.exit(0); };
+  process.on('SIGINT', close);
+  process.on('SIGTERM', close);
+  status(`watching ${path.relative(root, srcRoot) || '.'} for .pln changes`, flags);
   return 0;
 }
 
@@ -535,6 +596,12 @@ print(greet(upper("world")))
   return 0;
 }
 
+function commandLsp() {
+  const { PlainScriptLanguageServer } = require('./lsp');
+  new PlainScriptLanguageServer(process.stdin, process.stdout, process.cwd()).start();
+  return 0;
+}
+
 function commandIr(positional, flags) {
   if (!positional.length) {
     process.stderr.write('plainscript ir needs a .pln file.\n');
@@ -576,10 +643,12 @@ function main(argv) {
     run: commandRun,
     build: commandBuild,
     check: commandCheck,
+    watch: commandWatch,
     fmt: commandFormat,
     format: commandFormat,
     test: commandTest,
     ir: commandIr,
+    lsp: commandLsp,
     new: commandNew,
     version: () => { process.stdout.write(`${VERSION}\n`); return 0; },
   };

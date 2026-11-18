@@ -30,14 +30,19 @@ Created by **Ayodele Ayokunle David**. PlainScript is MIT licensed.
   Web `Request`/`Response` model are supported by emitting plain modules, not by wrapping
   frameworks.
 - **Small and honest.** The standard library covers fundamentals (`text`, `list`, `map`,
-  `math`, `json`, `time`, `fs`, `http`, `io`, `dom`, `test`) plus `std/contract` runtime
-  validators. Stripe,
-  Telegram, OpenAI, databases and auth are packages, not keywords.
-- **Schema-derived full-stack contracts (early).** `std/contract.object` supplies runtime
-  validation and checker-visible record types that flow through operations into backend
-  handlers and frontend clients. It is not a migration framework or a generated router;
-  see [Unified Contracts](docs/UNIFIED_CONTRACTS.md) and the runnable
+  `math`, `json`, `time`, `fs`, `http`, `io`, `dom`, `test`) plus structured concurrency
+  (`std/task`), WebSockets (`std/ws`), SQLite persistence and migrations (`std/db`),
+  password/token authentication (`std/auth`) and runtime/schema contracts
+  (`std/contract`). Service SDKs remain ordinary npm packages, not keywords.
+- **Schema-derived full-stack contracts.** `std/contract.object` derives record types from
+  runtime schemas. `fallibleOperation` carries a typed error union, `implementFallible`
+  validates both outcomes, `router` dispatches by operation name, and `std/db` derives
+  table columns and versioned migrations from the same schema. See
+  [Unified Contracts](docs/UNIFIED_CONTRACTS.md) and the runnable
   [SQLite + React contracts demo](demos/contracts-fullstack/README.md).
+- **Editor support built in.** `plainscript lsp` speaks LSP over stdio with diagnostics,
+  completion, hover, definitions, workspace references, rename and formatting. The
+  VS Code extension in [`editors/vscode`](editors/vscode) launches it.
 
 ## What PlainScript is not
 
@@ -155,8 +160,10 @@ consumes.
 | Command | Purpose |
 | --- | --- |
 | `plainscript run [file]` | Compile and execute a program (default `src/main.pln`). |
-| `plainscript build [files…]` | Type-check the module graph and emit `.js` + `.js.map` into `dist/`. With `--declarations`, also write `<name>.d.pln` so another PlainScript project can compile against the built library without its sources. |
+| `plainscript build [files…]` | Type-check the module graph and emit `.js` + `.js.map` into `dist/`. With `--declarations`, also write `<name>.d.pln` so another PlainScript project can compile against the built library without its sources. Unchanged outputs are not rewritten. |
+| `plainscript watch [files…]` | Rebuild after `.pln` changes, reusing the module cache for unaffected files. |
 | `plainscript check [files…]` | Type-check only; exits non-zero on diagnostics. |
+| `plainscript lsp` | Start the language server over stdio. |
 | `plainscript fmt [files…]` | Normalise indentation and block layout without changing tokens. |
 | `plainscript test [files…]` | Run `std/test` files and report pass/fail. |
 | `plainscript new <dir>` | Scaffold a project. |
@@ -214,7 +221,7 @@ templates/  project-management, ecommerce, and realtime-chat application templat
 tests/      lexer, parser, checker, compiler, runtime, CLI, interop, formatter, packaging
 demos/      cli, api, database, fullstack, contracts-fullstack, react, realtime, next
 docs/       specification, architecture, audit, decisions, migration, syntax design, CLI, interop
-plainscript-vscode/  syntax highlighting and snippets for .pln files
+editors/vscode/  VS Code extension and TextMate grammar backed by `plainscript lsp`
 legacy/v1/  the complete v1 compiler, tests and docs, archived for reference
 ```
 
@@ -227,7 +234,8 @@ npm test
 The suite covers lexing, parsing, type checking, inference, narrowing, exhaustiveness,
 code generation, runtime behaviour, module resolution, async, error handling, CLI
 behaviour, formatter invariants, npm/Node interop and packaging. Demo applications are
-built and run separately; see [docs/DEMOS.md](docs/DEMOS.md).
+built and run separately; see [docs/DEMOS.md](docs/DEMOS.md). Reproducible compiler timings and
+their scope are in [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
 
 ## Limitations
 
@@ -238,15 +246,28 @@ These are known and deliberate for 2.0.0, not oversights:
 - **No bundler.** `build` emits one module per file. Browser projects use Vite, webpack or
   Next to bundle, as the demos do. Importing the standard library in a browser requires
   `--std-base` plus serving those module URLs (see the full-stack demo).
-- **No language server.** The VS Code extension provides syntax highlighting, snippets and
-  bracket configuration only. There is no completion or go-to-definition yet.
+- **Advanced type completeness.** Literal enum unions, tuples, `keyof`, `typeof`,
+  generic constraints and `std/contract`-derived models are implemented. Conditional and
+  mapped types, indexed-access types, user-defined type predicates and general function
+  overloads are not.
+- **Concurrency is cooperative.** `std/task` provides task groups, cancellation, timeouts,
+  channels and worker handles; it cannot stop JavaScript promises or host calls that
+  ignore a cancellation signal. There is no compiler-level task syntax.
 - **`render` blocks are not JSX.** Attributes are `with name: value`, children are
   statements, and dynamic child lists are built with `element` expressions. There are no
   fragments, context shorthand or automatic key inference.
 - **Types are erased.** No runtime reflection beyond `is` checks on primitives, lists,
   maps and variant tags. `as` is unchecked at runtime.
-- **No exceptions typing.** `catch` binds `any`.
-- **No concurrency primitives.** Async/await only; no worker or thread syntax.
+- **No exceptions typing.** `catch` binds `any`; typed operational errors use
+  `OperationResult`/`OperationFailure` instead.
+- **Database support is SQLite-first.** `std/db` targets Node 22's built-in `node:sqlite`;
+  other drivers need an adapter with the same small surface. WebSocket fragmentation and
+  extensions are not implemented.
+- **LSP scope.** Rename and references follow imported PlainScript symbols across the
+  workspace, but refactoring is limited to symbol rename. There is no debug adapter yet;
+  source maps are emitted for external debuggers.
+- **Benchmarks are PlainScript-only.** `npm run bench` is reproducible, but no pinned
+  TypeScript baseline is installed, so no cross-language speed claim is made.
 - **Not published yet.** npm still serves 1.1.5. Publishing 2.0.0 is a separate, explicit
   release step.
 

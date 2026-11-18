@@ -1,7 +1,17 @@
 import { createElement, useEffect, useState } from "react";
-import { ListTasks, CreateTask, ToggleTask } from "./shared.js";
-import { createClient } from "../../../../stdlib/contract.js";
+import { ListTasks, CreateTask, ToggleTask, GetTask } from "./shared.js";
+import { createClient, createFallibleClient } from "../../../../stdlib/contract.js";
 import { append, count } from "../../../../stdlib/list.js";
+let token = "";
+async function login() {
+    let response = (await fetch("/api/auth/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username: "demo", password: "plainscript-demo" }) }));
+    if ((!response.ok)) {
+        return false;
+    }
+    let payload = (await response.json());
+    token = payload.token;
+    return true;
+}
 async function transport(name, input) {
     let path = "/api/tasks";
     let method = "GET";
@@ -16,7 +26,7 @@ async function transport(name, input) {
     if ((method != "GET")) {
         requestBody = JSON.stringify(input);
     }
-    let response = (await fetch(path, { method: method, headers: { "content-type": "application/json", authorization: "Bearer plainscript-demo" }, body: requestBody }));
+    let response = (await fetch(path, { method: method, headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, body: requestBody }));
     if ((!response.ok)) {
         throw `Request failed: ${response.status}`;
     }
@@ -25,6 +35,7 @@ async function transport(name, input) {
 let listTasks = createClient(ListTasks, transport);
 let createTask = createClient(CreateTask, transport);
 let toggleTask = createClient(ToggleTask, transport);
+let getTask = createFallibleClient(GetTask, transport);
 function taskRows(tasks, onToggle) {
     let rows = [];
     for (const task of tasks) {
@@ -41,10 +52,35 @@ export function App() {
     let [draft, setDraft] = useState("");
     let [message, setMessage] = useState("Loading from SQLite…");
     async function refresh() {
+        if ((token == "")) {
+            let authenticated = (await login());
+            if ((!authenticated)) {
+                setMessage("Demo login failed");
+                return null;
+            }
+        }
         try {
             let current = (await listTasks({  }));
             setTasks(current);
             setMessage("Saved in SQLite");
+            if ((count(current) > 0)) {
+                let checked = (await getTask({ id: ((current[0])?.id ?? 0) }));
+                {
+                    const $match1 = checked;
+                    $arm1: {
+                        if ($match1 !== null && typeof $match1 === "object" && $match1.$kind === "Success") {
+                            const value = $match1["value"];
+                            setMessage(`Verified ${value.title}`);
+                            break $arm1;
+                        }
+                        if ($match1 !== null && typeof $match1 === "object" && $match1.$kind === "Failure") {
+                            const error = $match1["error"];
+                            setMessage(`Contract error: ${error.code}`);
+                            break $arm1;
+                        }
+                    }
+                }
+            }
         } catch (failure) {
             setMessage("Could not load tasks");
         }

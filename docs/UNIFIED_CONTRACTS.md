@@ -1,62 +1,128 @@
-# Unified full-stack contracts — design and status
+# Unified full-stack contracts
 
-**Status: partial foundation implemented.** PlainScript 2.0 now derives a record model from `std/contract.object` schema fields and threads it through generic operation/client signatures. Compiler regressions verify that an incompatible client input and an incompatible declared handler output are rejected. Runtime operation wrappers provide validation, an authorization callback and a supplied-transport client. There is still no compiler-owned operation syntax, generated network transport, typed error union, or database mapping/migration system.
+**Status: implemented through schemas, typed operations, typed errors, dispatch, SQLite
+models/migrations and a real authentication flow.** The verified application is
+[`demos/contracts-fullstack`](../demos/contracts-fullstack); its integration test logs in,
+validates, mutates, restarts the process and checks persistence.
 
-## Design principle
+## One schema path
 
-A domain type in a shared `.pln` module remains the compile-time source of truth imported by both server and UI modules. Runtime validation is a separate, explicit requirement: compiler types are erased and must never be treated as validators for JSON, database rows, environment variables, or JavaScript packages. At each trust boundary, a runtime schema must validate data before application code uses it.
-
-The first implementation is `std/contract` (`stdlib/contract.js` plus `stdlib/contract.d.pln`). It supplies schemas for text, finite numbers, booleans, literals, enumerations, optional values, arrays, and objects. Validators support text/number constraints, array minimum length, strict/passthrough object key policies, nested paths, `parse` (throws `ContractError`) and `safeParse` (returns a discriminated-by-boolean result). Object parsing constructs a fresh object from declared fields by default; unknown keys are stripped unless configured otherwise.
+`std/contract.object` derives a structural record type from its schema shape. Enum and
+literal fields derive literal unions, optional schema fields become optional record fields,
+and arrays/nested objects retain their element and field types. The compiler does not
+require a parallel `type Task` or a frontend model declaration.
 
 ```plainscript
-import { object, text, number, parse } from "std/contract"
-export type User
-    name: text
-    age: number
-end
-let userSchema: Schema<User> = object({
-    name: text({ minLength: 1 })
-    age: number({ min: 0 })
+import { object, text, number, boolean, enumeration, oneOf, literal, fallibleOperation } from "std/contract"
+
+export const TaskSchema = object({
+    id: number(),
+    title: text({ minLength: 1 }),
+    done: boolean(),
+    status: enumeration(["open", "done"]),
 })
-let user: User = parse(userSchema, untrustedJson)
+export const TaskError = oneOf([
+    object({ code: literal("NOT_FOUND"), message: text() }),
+    object({ code: literal("FORBIDDEN"), message: text() }),
+])
+export const GetTask = fallibleOperation("tasks.get", object({ id: number() }), TaskSchema, TaskError)
 ```
 
-For `std/contract.object`, the checker derives the model type directly from the schema shape, so a separate `type User` declaration or `Schema<User>` annotation is not required. Nested object schemas, arrays and optional schema values are supported. Runtime parsing validates untrusted values. See `docs/SPEC.md` §5.5 for the supported inference boundary.
+`TaskSchema` is used by the server, the React client and `std/db.table`; a field change is
+one edit. `object` strips unknown keys by default, `strict` rejects them, and `passthrough`
+retains them. Runtime parsing is still mandatory at every trust boundary.
 
-An operation can be described and wrapped without new syntax:
+## Server and client
 
 ```plainscript
-let lookup = operation("tasks.get", requestSchema, responseSchema)
-let endpoint = implement(lookup, loadTask, { authorize: canReadTask })
-let clientCall = createClient(lookup, transport)
+import { implementFallible, success, failure, router, resultToWire, createFallibleClient } from "std/contract"
+
+let endpoint = implementFallible(GetTask, async (input) => do
+    let task = tasks.get(input.id)
+    if task == nothing
+        return failure({ code: "NOT_FOUND", message: "missing" })
+    end
+    return success(task as any)
+end, { authorize: authorize })
+
+let routes = router({ "tasks.get": endpoint })
+let wire = resultToWire(await routes.handle("tasks.get", { id: 1 }, context))
+let client = createFallibleClient(GetTask, httpTransport("/api"))
 ```
 
-`implement` validates request data before the handler and validates the handler result. `createClient` validates its local input and remote result. The transport is an ordinary function and must be supplied by the application. Errors identify the operation and failed stage. This is a useful runtime composition API, not a generated HTTP/router stack or a typed error union.
+`implementFallible` validates the input, calls the authorization callback, validates either
+the success payload or the declared error against `TaskError`, and returns an
+`OperationResult`. `createFallibleClient` validates the local input, decodes
+`{ok, value}`/`{ok, error}` (or runtime results), and validates both outcomes.
+`router` rejects unknown operation names with a routing `OperationError`.
+`httpTransport` is the built-in JSON transport; applications can supply any transport
+function with the same `(name, input) -> Promise` shape.
 
-## Compiler and module behavior
+The normal `operation`/`implement`/`createClient` API remains for handlers that throw
+errors. It is not a substitute for the typed result path.
 
-No grammar change was needed: schemas are normal values imported from a standard-library module, and model types use existing `type` declarations. Importers can share model definitions through ordinary `.pln` modules, so incompatible declared function inputs/outputs are checked across the compiled module graph. Runtime checks are only performed where application code calls `parse`/`safeParse`; they are not injected automatically by the compiler.
+## Database model mapping and migrations
 
-## Implemented versus not implemented
+```plainscript
+import { open, table, migrate, Database } from "std/db"
 
-- **Implemented and tested:** schema constructors and recursive validation; strict/passthrough object handling; structured paths/errors; inferred nested record/array/optional output shapes for object schemas; operation descriptor; server input/output validation; authorization callback; client-side input/output validation around a supplied transport; imported generic alias substitution; contextual typing for callbacks after generic substitutions; compile-time rejection of incompatible inferred client inputs and backend handler outputs; shared operation types flowing across separate compiled server/client modules.
-- **Partially implemented:** a runnable SQLite-backed React/PlainScript demo uses shared schema-derived operations for list/create/toggle; it validates inputs and outputs, exercises authorization, and has an automated process-restart persistence test. Enum schema values widen to their primitive type; compiler inference is attached to the `std/contract.object` import and only supports known schema constructs. Demo authorization is a hard-coded sample bearer token, not a production auth system. Operation descriptors do not yet carry a typed error union.
-- **Not implemented:** compiler-owned operation declarations; generated HTTP/router transport; typed error unions; database mapping, migrations or transactions; enum literal-union inference; detection of affected frontend consumers on backend contract changes across a complete application build.
+let database = await open("./app.db")
+await migrate(database, [{
+    version: 1,
+    name: "tasks",
+    up: async (db: Database) => do
+        db.exec("create table tasks (id integer primary key autoincrement, title text not null, done integer not null)")
+    end,
+}])
+let tasks = table(database, "tasks", TaskSchema)
+```
 
-## Validation and extension plan
+`table` derives columns from `TaskSchema` (text, number, boolean, JSON arrays/objects,
+optional fields and primary-key options), validates rows through the same schema, and uses
+bound parameters for every value. `migrate` keeps a `plainscript_migrations` history,
+applies versions in order in `BEGIN IMMEDIATE` transactions, rolls back the whole migration
+on failure, rejects duplicate versions and refuses to apply around a history gap.
+`rollback` runs declared `down` migrations; a migration without `down` cannot be rolled
+back. The schema itself remains a contract, not a replacement for database design review.
 
-The next increment should type errors in operation contracts, make schema inference robust through aliases/re-exports and enum literal values, and evolve the compact demo into a production-style flagship with a real migration workflow and a deliberate contract-change test spanning frontend and backend. The current negative client and handler fixtures verify mismatch detection, and the demo verifies persistence across restarts; it is a proof slice, not a mature application. No migration framework, transaction API, generated transport, or typed error union is claimed.
+## Authentication and authorization
 
-Run `node --test tests/contract.test.js` for focused regression coverage and `npm test` for the full suite.
+`std/auth` supplies scrypt password hashing with random salts and constant-time
+verification, HS256 bearer tokens with `exp`/`nbf`/`iss`/`aud` validation, `bearer`
+extraction from plain or `Headers` requests, and reusable policies. The flagship demo:
 
+- creates `tasks` and `users` through a versioned migration;
+- seeds a development user with a scrypt hash;
+- exposes `POST /api/auth/login` and signs a one-hour token;
+- verifies tokens on every task route and passes the user through the authorization
+  callback;
+- returns a typed `NOT_FOUND` failure from `/api/tasks/get` with status 404.
 
-## Developer-experience comparison (qualitative, not a benchmark)
+`AUTH_SECRET` should be set in production. The checked-in fallback exists only so the demo
+can start immediately; it is clearly a development credential.
 
-| Concern | PlainScript demo | TypeScript + Zod + tRPC |
-| --- | --- | --- |
-| Runtime model validation | `std/contract.object` derives the parsed record type and validates at runtime | Zod schema plus `z.infer` gives the corresponding validated runtime/type pair |
-| Operation/client typing | `operation` + `implement` + `createClient`; shared PlainScript module types both sides | tRPC router procedures infer input/output types through the router and generated client |
-| App language/toolchain | PlainScript source compiles to ESM; React and SQLite are existing JS packages | TypeScript source plus Zod/tRPC libraries, framework adapters and TS build tooling |
-| Production completeness | Proof-of-concept transport/router mapping; basic demo bearer auth; no migrations or typed errors | Mature ecosystem with broad integrations, middleware, batching/transformers and extensive docs |
+## Compile-time behavior
 
-The meaningful potential advantage shown here is a first-party schema-to-client type path with no parallel model declarations and no TypeScript type-query layer in the app source. This does **not** establish superiority: Zod+tRPC already provides a highly capable version of the same core experience, while PlainScript still lacks generated transports, typed error contracts, database migrations and comparable ecosystem maturity. No performance or developer-study benchmark was run.
+The module graph shares the schema-derived operation types. Incompatible client inputs,
+handler outputs and typed error codes are rejected before runtime (`PS3343`/`PS3404`). The
+negative tests include a wrong enum literal, an incompatible backend result and a
+`failure({ code: "INVALID" })` that is not in the declared error union. Enum literal
+unions also drive exhaustive `match` checking.
+
+## Evidence and limitations
+
+Verified by:
+
+- `tests/contract-demo.test.js` — compiled sources; login, 401/403, invalid input, create,
+  toggle, typed 404 failure, API restart and persistence;
+- `tests/contract-errors.test.js` — enum inference, exhaustiveness, typed results, router,
+  negative error union, authorization failure validation;
+- `tests/contract-typecheck.test.js` and `tests/shared-contract-modules.test.js` — existing
+  cross-module contract enforcement;
+- `tests/db.test.js` — schema-derived tables, persistence, invalid migration rollback,
+  duplicate versions, rollback requirements and identifier/row rejection.
+
+Not implemented: compiler-owned operation syntax, generated OpenAPI/docs, automatic
+frontend code generation beyond the typed runtime client, a database driver abstraction
+beyond Node SQLite, and a production identity provider (OIDC/SAML). `std/auth` is real
+cryptography, not a full identity product. See [ROADMAP](ROADMAP.md).

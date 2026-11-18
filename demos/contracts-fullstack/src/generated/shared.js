@@ -1,6 +1,8 @@
-import { object, text, number, boolean, array, operation } from "../../../../stdlib/contract.js";
+import { object, text, number, boolean, array, literal, oneOf, operation, fallibleOperation } from "../../../../stdlib/contract.js";
 export const TaskSchema = object({ id: number(), title: text({ minLength: 1 }), done: boolean() });
+export const TaskError = oneOf([object({ code: literal("NOT_FOUND"), message: text() }), object({ code: literal("INVALID"), message: text() }), object({ code: literal("FORBIDDEN"), message: text() })]);
 export const ListTasks = operation("tasks.list", object({  }), array(TaskSchema));
 export const CreateTask = operation("tasks.create", object({ title: text({ minLength: 1 }) }), TaskSchema);
 export const ToggleTask = operation("tasks.toggle", object({ id: number() }), TaskSchema);
+export const GetTask = fallibleOperation("tasks.get", object({ id: number() }), TaskSchema, TaskError);
 //# sourceMappingURL=shared.js.map

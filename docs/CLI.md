@@ -59,6 +59,26 @@ paths or the package name. This is how a browser build points at URLs the server
 plainscript build src/client.pln --std-base=/std
 ```
 
+### `plainscript watch [files…]`
+
+Builds the project, then watches the source root and rebuilds after `.pln` changes. The
+in-process module cache is invalidated for the changed module and its reverse dependency
+closure; unrelated modules are reused. Outputs whose JavaScript and source map are
+byte-identical are not rewritten.
+
+```
+plainscript watch
+```
+
+Stop it with Ctrl+C or `SIGTERM`.
+
+### `plainscript lsp`
+
+Starts the dependency-free language server over stdio. Advertised capabilities are
+diagnostics, completion, hover, definition, references, rename, document symbols and
+whole-document formatting. Workspace references and rename follow imported PlainScript
+symbols. See [`editors/vscode`](../editors/vscode) for the editor extension.
+
 ### `plainscript check [files…]`
 
 Runs the lexer, parser and checker over the graph and prints diagnostics. Emits nothing.
@@ -116,6 +136,12 @@ codegen bug.
 ### `plainscript version` / `plainscript help`
 
 Print the compiler version and the help text.
+
+### `npm run bench`
+
+Runs the reproducible synthetic compiler benchmark in `scripts/benchmark.js`. It reports
+cold compile and typecheck timings and makes no TypeScript comparison unless a pinned
+TypeScript toolchain is installed separately; see [BENCHMARKS](BENCHMARKS.md).
 
 ## Options
 

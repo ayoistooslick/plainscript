@@ -1,0 +1,32 @@
+{
+  "Function": {
+    "prefix": "function",
+    "body": ["function ${1:name}(${2:value}: ${3:number}) -> ${4:number}", "    return ${5:value}", "end"],
+    "description": "Declare a typed function"
+  },
+  "Type record": {
+    "prefix": "type",
+    "body": ["type ${1:Name}", "    ${2:field}: ${3:text}", "end"],
+    "description": "Declare a structural record type"
+  },
+  "Variant": {
+    "prefix": "variant",
+    "body": ["type ${1:Shape} = ${2:Circle}(radius: number) or ${3:Empty}"],
+    "description": "Declare a variant union"
+  },
+  "Import": {
+    "prefix": "import",
+    "body": ["import { ${1:name} } from \"${2:./module}\""],
+    "description": "Import named values"
+  },
+  "Match": {
+    "prefix": "match",
+    "body": ["match ${1:value}", "    case ${2:_}", "        ${3:return nothing}", "end"],
+    "description": "Match a value"
+  },
+  "Async function": {
+    "prefix": "async function",
+    "body": ["async function ${1:name}(${2:value}: ${3:text}) -> ${4:text}", "    return ${5:value}", "end"],
+    "description": "Declare an async function"
+  }
+}

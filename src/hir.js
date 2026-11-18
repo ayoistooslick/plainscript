@@ -431,7 +431,7 @@ function containsAwait(statements) {
     if (value.kind === 'FunctionDecl' || value.kind === 'FunctionExpression') return;
     if (value.kind === 'Await') { found = true; return; }
     for (const [key, child] of Object.entries(value)) {
-      if (key === 'line' || key === 'col' || key === 'kind') continue;
+      if (key === 'line' || key === 'col' || key === 'kind' || key.startsWith('__')) continue;
       walk(child);
     }
   };

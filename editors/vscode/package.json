@@ -1,0 +1,54 @@
+{
+  "name": "plainscript-language",
+  "displayName": "PlainScript Language",
+  "description": "PlainScript language support powered by the PlainScript language server",
+  "version": "2.0.0",
+  "publisher": "ayoistooslick",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ayoistooslick/plainscript.git"
+  },
+  "engines": {
+    "vscode": "^1.70.0"
+  },
+  "categories": ["Programming Languages"],
+  "activationEvents": ["onLanguage:plainscript"],
+  "main": "./extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "plainscript",
+        "aliases": ["PlainScript", "plainscript"],
+        "extensions": [".pln"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "plainscript",
+        "scopeName": "source.plainscript",
+        "path": "./syntaxes/plainscript.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "plainscript",
+        "path": "./snippets/plainscript.code-snippets"
+      }
+    ],
+    "commands": [
+      {
+        "command": "plainscript.restartServer",
+        "title": "PlainScript: Restart Language Server"
+      }
+    ]
+  },
+  "dependencies": {
+    "plainscript-lang": "^2.0.0",
+    "vscode-languageclient": "^9.0.1"
+  },
+  "scripts": {
+    "vscode:prepublish": "echo 'No build step required'"
+  }
+}

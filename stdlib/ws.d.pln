@@ -1,0 +1,19 @@
+# RFC 6455 WebSocket server. Text, binary, ping/pong and close frames are
+# supported; fragmentation and extensions are not.
+
+export type Connection
+    id: text
+    request: any
+    send: (value: any) -> nothing
+    sendJson: (value: any) -> nothing
+    onMessage: ((message: any) -> nothing) -> (() -> nothing)
+    onClose: ((code: number, reason: text) -> nothing) -> (() -> nothing)
+    close: (code?: number, reason?: text) -> nothing
+end
+
+export type Server
+    port: number
+    close: () -> Promise of nothing
+end
+
+export declare function serve(port: number, handler: (connection: Connection) -> any, options?: any) -> Promise of Server

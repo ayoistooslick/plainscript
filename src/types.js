@@ -45,14 +45,19 @@ function deref(t, seen = new Set()) {
   return current;
 }
 
-const typeVar = (name) => ({ k: 'var', name: name || `T${nextVarId}`, id: nextVarId++ });
+const typeVar = (name, constraint = null) => ({ k: 'var', name: name || `T${nextVarId}`, id: nextVarId++, constraint });
 const listOf = (elem) => ({ k: 'list', elem });
+const tupleOf = (elements) => ({ k: 'tuple', elements });
 const mapOf = (key, value) => ({ k: 'map', key, value });
 const promiseOf = (value) => ({ k: 'promise', value });
 const fnType = (params, ret, typeParams) => ({ k: 'fn', params, ret, typeParams: typeParams || [] });
 const record = (fields, options = {}) => ({ k: 'record', fields, name: options.name, open: options.open !== false });
 const variant = (name, fields, unionName) => ({ k: 'variant', name, fields, unionName });
 const unitVariant = (name, unionName) => ({ k: 'unit', name, unionName });
+// Literal types are used by schema-derived model fields (enumeration/literal).
+// They deliberately stay narrow so a model field cannot accept an arbitrary
+// text value that the runtime validator would reject.
+const literalType = (value, base) => ({ k: 'literal', value, base });
 
 function union(members) {
   const flat = [];
@@ -120,6 +125,8 @@ function showType(t, seen = new Set()) {
       return t.name;
     case 'list':
       return `list of ${showType(t.elem, seen)}`;
+    case 'tuple':
+      return `[${t.elements.map((element) => showType(element, seen)).join(', ')}]`;
     case 'map':
       return `map of ${showType(t.key, seen)} to ${showType(t.value, seen)}`;
     case 'promise':
@@ -146,6 +153,8 @@ function showType(t, seen = new Set()) {
     }
     case 'unit':
       return t.name;
+    case 'literal':
+      return typeof t.value === 'string' ? JSON.stringify(t.value) : String(t.value);
     case 'named':
       return t.name;
     default:
@@ -170,6 +179,11 @@ function assignable(from, to, seen = new Set()) {
   if (from.k === 'prim' && from.name === 'unknown') return to.k === 'prim' && to.name === 'unknown';
   if (from.k === 'prim' && from.name === 'never') return true;
   if (from.k === 'var' || to.k === 'var') return true; // unresolved generics are permissive
+  if (from.k === 'literal') {
+    if (to.k === 'literal') return from.value === to.value;
+    if (to.k === 'prim') return assignable(from.base, to, seen);
+  }
+  if (to.k === 'literal') return from.k === 'literal' && from.value === to.value;
 
   const key = `${showType(from)}=>${showType(to)}`;
   if (seen.has(key)) return true;
@@ -188,6 +202,13 @@ function assignable(from, to, seen = new Set()) {
   }
 
   if (from.k === 'list' && to.k === 'list') return assignable(from.elem, to.elem, seen);
+  if (from.k === 'tuple' && to.k === 'tuple') {
+    return from.elements.length === to.elements.length
+      && from.elements.every((element, index) => assignable(element, to.elements[index], seen));
+  }
+  if (from.k === 'tuple' && to.k === 'list') {
+    return from.elements.every((element) => assignable(element, to.elem, seen));
+  }
   if (from.k === 'map' && to.k === 'map') {
     return assignable(from.key, to.key, seen) && assignable(from.value, to.value, seen);
   }
@@ -239,11 +260,12 @@ function assignable(from, to, seen = new Set()) {
 // One-pass inference for generic functions: matches a declared parameter type
 // (which may contain type variables) against an argument type, recording
 // substitutions. Conflicting bindings are joined into a union.
-function infer(pattern, actual, subst) {
-  if (!pattern || !actual) return true;
+function infer(pattern, actual, subst, depth = 0) {
+  if (!pattern || !actual || depth > 40) return true;
   pattern = deref(pattern, new Set());
   actual = deref(actual, new Set());
   if (pattern.k === 'var') {
+    if (pattern.constraint && !assignable(actual, substitute(pattern.constraint, subst))) return false;
     const existing = subst.get(pattern.name);
     if (!existing) subst.set(pattern.name, actual);
     else if (!assignable(actual, existing)) subst.set(pattern.name, union([existing, actual]));
@@ -254,20 +276,27 @@ function infer(pattern, actual, subst) {
     if (!existing) subst.set(actual.name, pattern);
     return true;
   }
-  if (pattern.k === 'list' && actual.k === 'list') return infer(pattern.elem, actual.elem, subst);
-  if (pattern.k === 'map' && actual.k === 'map') {
-    return infer(pattern.key, actual.key, subst) && infer(pattern.value, actual.value, subst);
+  if (pattern.k === 'list' && actual.k === 'list') return infer(pattern.elem, actual.elem, subst, depth + 1);
+  if (pattern.k === 'tuple' && actual.k === 'tuple') {
+    let ok = true;
+    for (let i = 0; i < Math.min(pattern.elements.length, actual.elements.length); i += 1) {
+      ok = infer(pattern.elements[i], actual.elements[i], subst, depth + 1) && ok;
+    }
+    return ok;
   }
-  if (pattern.k === 'promise' && actual.k === 'promise') return infer(pattern.value, actual.value, subst);
+  if (pattern.k === 'map' && actual.k === 'map') {
+    return infer(pattern.key, actual.key, subst, depth + 1) && infer(pattern.value, actual.value, subst, depth + 1);
+  }
+  if (pattern.k === 'promise' && actual.k === 'promise') return infer(pattern.value, actual.value, subst, depth + 1);
   if (pattern.k === 'fn' && actual.k === 'fn') {
     let ok = true;
     for (let i = 0; i < Math.min(pattern.params.length, actual.params.length); i += 1) {
-      ok = infer(pattern.params[i].type, actual.params[i].type, subst) && ok;
+      ok = infer(pattern.params[i].type, actual.params[i].type, subst, depth + 1) && ok;
     }
-    return infer(pattern.ret, actual.ret, subst) && ok;
+    return infer(pattern.ret, actual.ret, subst, depth + 1) && ok;
   }
   if (pattern.k === 'union') {
-    return pattern.members.some((m) => infer(m, actual, subst));
+    return pattern.members.some((m) => infer(m, actual, subst, depth + 1));
   }
   if (pattern.k === 'record' && (actual.k === 'record' || actual.k === 'variant')) {
     const fields = actual.k === 'variant'
@@ -277,7 +306,7 @@ function infer(pattern, actual, subst) {
     for (const [name, field] of pattern.fields) {
       const found = fields.get(name);
       if (!found) continue;
-      ok = infer(field.type, found.type, subst) && ok;
+      ok = infer(field.type, found.type, subst, depth + 1) && ok;
     }
     return ok;
   }
@@ -288,9 +317,11 @@ function substitute(t, subst) {
   if (!t) return t;
   switch (t.k) {
     case 'var':
-      return subst.has(t.name) ? subst.get(t.name) : t;
+      return subst.has(t.name) ? subst.get(t.name) : (t.constraint ? { ...t, constraint: substitute(t.constraint, subst) } : t);
     case 'list':
       return listOf(substitute(t.elem, subst));
+    case 'tuple':
+      return tupleOf(t.elements.map((element) => substitute(element, subst)));
     case 'map':
       return mapOf(substitute(t.key, subst), substitute(t.value, subst));
     case 'promise':
@@ -311,6 +342,8 @@ function substitute(t, subst) {
       );
     case 'variant':
       return variant(t.name, t.fields.map((f) => ({ name: f.name, type: substitute(f.type, subst) })), t.unionName);
+    case 'literal':
+      return t;
     default:
       return t;
   }
@@ -320,12 +353,14 @@ module.exports = {
   PRIM,
   typeVar,
   listOf,
+  tupleOf,
   mapOf,
   promiseOf,
   fnType,
   record,
   variant,
   unitVariant,
+  literalType,
   union,
   optionalOf,
   isNothing,

@@ -34,8 +34,15 @@ async function startApi(port, databasePath) {
   while (Date.now() < deadline) {
     if (child.exitCode !== null) throw new Error(`demo API exited early: ${logs}`);
     try {
-      const response = await fetch(`${origin}/api/tasks`, { headers: { authorization: 'Bearer plainscript-demo' } });
-      if (response.status === 200) return { child, origin };
+      const response = await fetch(`${origin}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ username: 'demo', password: 'plainscript-demo' }),
+      });
+      if (response.status === 200) {
+        const payload = await response.json();
+        return { child, origin, token: payload.token };
+      }
     } catch { /* server is still starting */ }
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
@@ -73,10 +80,15 @@ test('SQLite contract API validates, authorizes, mutates, and persists operation
     let api = await startApi(port, databasePath);
     server = api.child;
     const origin = api.origin;
-    const authorized = { authorization: 'Bearer plainscript-demo' };
+    const authorized = { authorization: `Bearer ${api.token}` };
 
     const denied = await fetch(`${origin}/api/tasks`);
     assert.equal(denied.status, 403);
+    const badLogin = await fetch(`${origin}/api/auth/login`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ username: 'demo', password: 'wrong' }),
+    });
+    assert.equal(badLogin.status, 401);
     const invalid = await fetch(`${origin}/api/tasks`, {
       method: 'POST', headers: { ...authorized, 'content-type': 'application/json' }, body: '{}',
     });
@@ -93,12 +105,22 @@ test('SQLite contract API validates, authorizes, mutates, and persists operation
       method: 'POST', headers: { ...authorized, 'content-type': 'application/json' }, body: JSON.stringify({ id: 1 }),
     });
     assert.deepEqual(await toggled.json(), { id: 1, title: 'contract integration', done: true });
+    const found = await fetch(`${origin}/api/tasks/get`, {
+      method: 'POST', headers: { ...authorized, 'content-type': 'application/json' }, body: JSON.stringify({ id: 1 }),
+    });
+    assert.deepEqual(await found.json(), { ok: true, value: { id: 1, title: 'contract integration', done: true } });
+    const missing = await fetch(`${origin}/api/tasks/get`, {
+      method: 'POST', headers: { ...authorized, 'content-type': 'application/json' }, body: JSON.stringify({ id: 999 }),
+    });
+    assert.equal(missing.status, 404);
+    assert.equal((await missing.json()).error.code, 'NOT_FOUND');
     await stopApi(server);
     server = null;
 
     api = await startApi(port, databasePath);
     server = api.child;
-    const listed = await fetch(`${api.origin}/api/tasks`, { headers: authorized });
+    const authorizedAfterRestart = { authorization: `Bearer ${api.token}` };
+    const listed = await fetch(`${api.origin}/api/tasks`, { headers: authorizedAfterRestart });
     assert.deepEqual(await listed.json(), [{ id: 1, title: 'contract integration', done: true }]);
   } finally {
     if (server) await stopApi(server);

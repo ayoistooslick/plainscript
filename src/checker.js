@@ -106,6 +106,10 @@ class Checker {
       this.report('PS3308', `"${name}" is already declared in this module.`, node);
       return;
     }
+    entry.name = name;
+    entry.declFile = this.file;
+    if (node && !entry.declNode) entry.declNode = node;
+    if (!entry.references) entry.references = [];
     this.scope.define(name, entry);
   }
 
@@ -114,6 +118,16 @@ class Checker {
   }
 
   // --------------------------------------------------------------- type layer
+
+  typeEnvironment(typeParams, constraints = {}) {
+    const environment = new Map();
+    for (const name of typeParams) environment.set(name, T.typeVar(name));
+    for (const [name, constraintNode] of Object.entries(constraints || {})) {
+      const variable = environment.get(name);
+      if (variable && constraintNode) variable.constraint = this.resolveType(constraintNode, environment);
+    }
+    return environment;
+  }
 
   resolveType(node, typeEnv = new Map()) {
     if (!node) return T.PRIM.any;
@@ -124,6 +138,7 @@ class Checker {
         if (PRIMITIVES.has(name)) return T.PRIM[name];
         if (name === 'error') return T.PRIM.error;
         const declaration = this.typeDecls.get(name);
+        if (declaration) node.__typeDecl = declaration;
         if (!declaration) {
           const suggestion = closest(name, [...PRIMITIVES, ...this.typeDecls.keys()]);
           this.report('PS3201', `Unknown type "${name}".`, node, suggestion ? `Did you mean "${suggestion}"?` : null);
@@ -165,6 +180,28 @@ class Checker {
       }
       case 'ListType':
         return T.listOf(this.resolveType(node.elem, typeEnv));
+      case 'TupleType':
+        return T.tupleOf(node.elements.map((element) => this.resolveType(element, typeEnv)));
+      case 'KeyofType': {
+        const target = T.deref(this.resolveType(node.target, typeEnv));
+        if (target.k === 'record') {
+          return T.union([...target.fields.keys()].map((name) => T.literalType(name, T.PRIM.text)));
+        }
+        if (target.k === 'map') return target.key;
+        if (target.k === 'union') {
+          const keys = [];
+          for (const member of target.members) {
+            const resolved = T.deref(member);
+            if (resolved.k === 'record') {
+              for (const name of resolved.fields.keys()) keys.push(T.literalType(name, T.PRIM.text));
+            }
+          }
+          return keys.length ? T.union(keys) : T.PRIM.text;
+        }
+        return T.PRIM.text;
+      }
+      case 'TypeofType':
+        return this.typeOf(node.value);
       case 'MapType':
         return T.mapOf(this.resolveType(node.key, typeEnv), this.resolveType(node.value, typeEnv));
       case 'PromiseType':
@@ -217,8 +254,9 @@ class Checker {
       const key = this.aliasKey(name);
       // Place the indirection first so recursive aliases can refer to it.
       T.registerAlias(key, T.PRIM.any);
-      const typeEnv = new Map(declaration.typeParams.map((param) => [param, T.typeVar(param)]));
+      const typeEnv = this.typeEnvironment(declaration.typeParams, declaration.typeParamConstraints);
       const resolved = this.resolveTypeDeclarationBody(declaration, typeEnv);
+      declaration.__type = resolved;
       T.registerAlias(key, resolved);
       // Only exported types cross a module boundary; local aliases stay local.
       if (declaration.exported) {
@@ -310,11 +348,45 @@ class Checker {
     }
   }
 
+  // A function imported from another module can expose a variant type without
+  // the importing module also naming that type in an import. The checker still
+  // needs constructor field names for lowering and exhaustive matches.
+  registerVariantsDeep(type, seen = new Set()) {
+    if (!type || typeof type !== 'object') return;
+    if (seen.has(type)) return;
+    seen.add(type);
+    const resolved = T.deref(type);
+    if (resolved !== type) this.registerVariantsDeep(resolved, seen);
+    if (resolved.k === 'variant' || resolved.k === 'unit') {
+      this.registerImportedVariants(resolved);
+      for (const field of resolved.fields || []) this.registerVariantsDeep(field.type, seen);
+      return;
+    }
+    if (resolved.k === 'union') {
+      for (const member of resolved.members) this.registerVariantsDeep(member, seen);
+      return;
+    }
+    if (resolved.k === 'list' || resolved.k === 'promise') return this.registerVariantsDeep(resolved.elem || resolved.value, seen);
+    if (resolved.k === 'map') {
+      this.registerVariantsDeep(resolved.key, seen);
+      this.registerVariantsDeep(resolved.value, seen);
+      return;
+    }
+    if (resolved.k === 'record') {
+      for (const field of resolved.fields.values()) this.registerVariantsDeep(field.type, seen);
+      return;
+    }
+    if (resolved.k === 'fn') {
+      for (const parameter of resolved.params) this.registerVariantsDeep(parameter.type, seen);
+      this.registerVariantsDeep(resolved.ret, seen);
+    }
+  }
+
   // ------------------------------------------------------------- value layer
 
   signatureOf(node) {
     if (node.__signature) return node.__signature;
-    const typeEnv = new Map(node.typeParams.map((param) => [param, T.typeVar(param)]));
+    const typeEnv = this.typeEnvironment(node.typeParams, node.typeParamConstraints);
     const params = node.params.map((parameter) => ({
       name: parameter.name,
       type: this.resolveType(parameter.type, typeEnv),
@@ -327,7 +399,10 @@ class Checker {
     const ret = node.async
       ? (declared && declared.k === 'promise' ? declared : T.promiseOf(declared || T.PRIM.any))
       : (declared || null);
-    const signature = { params, ret, declaredReturn: declared, typeParams: node.typeParams, typeEnv, async: Boolean(node.async) };
+    const signature = {
+      params, ret, declaredReturn: declared, typeParams: node.typeParams,
+      typeParamConstraints: node.typeParamConstraints || {}, typeEnv, async: Boolean(node.async),
+    };
     node.__signature = signature;
     return signature;
   }
@@ -349,6 +424,7 @@ class Checker {
         node: statement,
         mutable: false,
       }, statement);
+      statement.__symbol = this.lookup(statement.name);
       if (statement.exported) this.exportedNames.add(statement.name);
     }
   }
@@ -364,20 +440,43 @@ class Checker {
             const entry = values && values.get('default');
             this.define(statement.defaultName, {
               kind: 'const',
+              name: statement.defaultName,
+              nameLine: statement.defaultLine,
+              nameCol: statement.defaultCol,
               type: entry ? entry.type : T.PRIM.any,
               importType: true,
+              importSpec: statement.spec,
+              importedName: 'default',
               node: statement,
             }, statement);
           }
           if (statement.namespace) {
-            this.define(statement.namespace, { kind: 'const', type: T.PRIM.any, node: statement }, statement);
+            this.define(statement.namespace, {
+              kind: 'const',
+              name: statement.namespace,
+              nameLine: statement.namespaceLine,
+              nameCol: statement.namespaceCol,
+              type: T.PRIM.any,
+              node: statement,
+            }, statement);
           }
           for (const name of statement.names) {
             const entry = values ? values.get(name.imported) : null;
             const importedType = types ? types.get(name.imported) : null;
 
             if (importedType) {
-              this.typeDecls.set(name.local, { name: name.local, typeParams: [], value: null, recordFields: null, importedType });
+              this.typeDecls.set(name.local, {
+                name: name.local,
+                typeParams: [],
+                value: null,
+                recordFields: null,
+                importedType,
+                importNode: statement,
+                importSpec: statement.spec,
+                importedName: name.imported,
+                nameLine: name.line,
+                nameCol: name.col,
+              });
               T.registerAlias(this.aliasKey(name.local), importedType);
               // A variant alias carries its constructors: importing the type is
               // what makes `case Published(views)` (and `Published(3)`)
@@ -397,10 +496,15 @@ class Checker {
             }
             this.define(name.local, {
               kind: entry && entry.kind ? entry.kind : 'const',
+              name: name.local,
+              nameLine: name.line,
+              nameCol: name.col,
               type: entry ? entry.type : T.PRIM.any,
               importType: true,
               importSpec: statement.spec,
               importedName: name.imported,
+              importedLine: name.importedLine,
+              importedCol: name.importedCol,
               node: statement,
             }, statement);
           }
@@ -598,10 +702,17 @@ class Checker {
     if (node.pattern.kind === 'NamePattern') {
       this.define(node.pattern.name, {
         kind: 'var',
+        name: node.pattern.name,
+        nameLine: node.pattern.line,
+        nameCol: node.pattern.col,
         type,
         mutable: node.declKind === 'let',
         node,
       }, node);
+      node.pattern.__symbol = this.lookup(node.pattern.name);
+      node.pattern.__type = type;
+      node.__symbol = node.pattern.__symbol;
+      node.__type = type;
       if (node.exported) this.exportedNames.add(node.pattern.name);
       return;
     }
@@ -614,15 +725,25 @@ class Checker {
     if (pattern.kind === 'NamePattern') {
       this.define(pattern.name, {
         kind: 'var',
+        name: pattern.name,
+        nameLine: pattern.line,
+        nameCol: pattern.col,
         type,
         mutable: options.mutable !== false,
         node: pattern,
       }, pattern);
+      pattern.__symbol = this.lookup(pattern.name);
+      pattern.__type = type;
       return;
     }
     if (pattern.kind === 'TuplePattern') {
-      const element = elementTypeOf(type);
-      for (const item of pattern.items) this.bindPattern(item, element, options);
+      const resolved = T.deref(type);
+      if (resolved.k === 'tuple') {
+        pattern.items.forEach((item, index) => this.bindPattern(item, resolved.elements[index] || T.PRIM.nothing, options));
+      } else {
+        const element = elementTypeOf(type);
+        for (const item of pattern.items) this.bindPattern(item, element, options);
+      }
       return;
     }
     if (pattern.kind === 'RecordPattern') {
@@ -648,10 +769,20 @@ class Checker {
     for (const parameter of signature.params) {
       this.scope.define(parameter.name, {
         kind: 'param',
+        name: parameter.name,
+        declFile: this.file,
+        declNode: parameter.node,
+        nameLine: parameter.node && parameter.node.nameLine,
+        nameCol: parameter.node && parameter.node.nameCol,
+        references: [],
         type: parameter.type,
         mutable: true,
         node: parameter.node,
       });
+      if (parameter.node) {
+        parameter.node.__symbol = this.scope.lookup(parameter.name);
+        parameter.node.__type = parameter.type;
+      }
       if (parameter.defaultValue) {
         const defaultType = this.typeOf(parameter.defaultValue, parameter.type);
         if (!T.assignable(defaultType, parameter.type)) {
@@ -846,12 +977,16 @@ class Checker {
       case 'LiteralPattern': {
         const value = pattern.value;
         if (value.kind === 'Nothing') coverage.add('nothing');
-        else if (value.kind === 'Boolean') coverage.add(String(value.value));
-        else if (value.kind === 'Text') coverage.add(`text:${value.v || value.value}`);
-        else coverage.add('literal');
+        else if (value.kind === 'Boolean') {
+          coverage.add(String(value.value));
+          coverage.add(`literal:${JSON.stringify(value.value)}`);
+        }
+        else if (value.kind === 'Text') coverage.add(`literal:${JSON.stringify(value.v || value.value)}`);
+        else coverage.add(`literal:${String(value.value)}`);
         const literalType = value.kind === 'Nothing' ? T.PRIM.nothing
-          : value.kind === 'Boolean' ? T.PRIM.boolean
-            : value.kind === 'Text' ? T.PRIM.text : T.PRIM.number;
+          : value.kind === 'Boolean' ? T.literalType(value.value, T.PRIM.boolean)
+            : value.kind === 'Text' ? T.literalType(value.v || value.value, T.PRIM.text)
+              : T.literalType(value.value, T.PRIM.number);
         if (!T.assignable(literalType, subjectType)) {
           this.report('PS3322', `This case can never match: ${T.showType(literalType)} is not a ${T.showType(subjectType)}.`, pattern);
         }
@@ -865,6 +1000,8 @@ class Checker {
         }
         if (pattern.name === '_') { info.catchAll = true; return info; }
         this.define(pattern.name, { kind: 'var', type: subjectType, mutable: false, node: pattern }, pattern);
+        pattern.__symbol = this.lookup(pattern.name);
+        pattern.__type = subjectType;
         info.catchAll = true;
         return info;
       }
@@ -946,9 +1083,9 @@ class Checker {
   }
 
   checkReturn(node) {
-    const valueType = this.typeOf(node.value);
-    node.__type = valueType;
     const frame = this.functionStack[this.functionStack.length - 1];
+    const valueType = this.typeOf(node.value, frame ? frame.declaredReturn : null);
+    node.__type = valueType;
     if (!frame) {
       this.report('PS3403', '"return" can only be used inside a function.', node);
       return;
@@ -971,9 +1108,9 @@ class Checker {
   typeOf(node, expected) {
     if (!node) return T.PRIM.nothing;
     switch (node.kind) {
-      case 'Number': return T.PRIM.number;
-      case 'Text': return T.PRIM.text;
-      case 'Boolean': return T.PRIM.boolean;
+      case 'Number': return this.primitiveOrLiteral(T.PRIM.number, node.value, expected);
+      case 'Text': return this.primitiveOrLiteral(T.PRIM.text, node.value, expected);
+      case 'Boolean': return this.primitiveOrLiteral(T.PRIM.boolean, node.value, expected);
       case 'Nothing': return T.PRIM.nothing;
       case 'Template': {
         for (const part of node.parts) {
@@ -983,21 +1120,33 @@ class Checker {
       }
       case 'Name': return this.nameType(node);
       case 'ListLiteral': {
-        const expectedElement = expected && T.deref(expected).k === 'list' ? T.deref(expected).elem : null;
+        const expectedType = expected ? T.deref(expected) : null;
+        const expectedElement = expectedType && expectedType.k === 'list' ? expectedType.elem : null;
+        const expectedTuple = expectedType && expectedType.k === 'tuple' ? expectedType.elements : null;
         const types = [];
+        let hasSpread = false;
         for (const item of node.items) {
           if (item.kind === 'Spread') {
+            hasSpread = true;
             const spreadType = T.deref(this.typeOf(item.value));
             if (spreadType.k === 'list') types.push(spreadType.elem);
+            else if (spreadType.k === 'tuple') types.push(...spreadType.elements);
             else if (!T.isAny(spreadType)) this.report('PS3325', `Only a list can be spread into a list, found ${T.showType(spreadType)}.`, item);
           } else {
-            types.push(this.typeOf(item, expectedElement));
+            const index = types.length;
+            types.push(this.typeOf(item, expectedTuple ? expectedTuple[index] : expectedElement));
           }
         }
+        if (expectedTuple && !hasSpread) return T.tupleOf(types);
         return T.listOf(types.length ? T.union(types) : (expectedElement || T.PRIM.any));
       }
       case 'RecordLiteral': {
         const fields = new Map();
+        const expectedResolved = expected ? T.deref(expected) : null;
+        const expectedRecord = expectedResolved && expectedResolved.k === 'record' ? expectedResolved : null;
+        const expectedRecords = expectedResolved && expectedResolved.k === 'union'
+          ? expectedResolved.members.map((member) => T.deref(member)).filter((member) => member.k === 'record')
+          : [];
         for (const field of node.fields) {
           if (field.spread) {
             const spreadType = T.deref(this.typeOf(field.spread));
@@ -1008,7 +1157,17 @@ class Checker {
             }
             continue;
           }
-          fields.set(field.key, { type: this.typeOf(field.value), optional: false });
+          let expectedFieldType = expectedRecord && expectedRecord.fields.get(field.key)
+            ? expectedRecord.fields.get(field.key).type
+            : null;
+          if (!expectedFieldType && expectedRecords.length) {
+            const fieldTypes = expectedRecords
+              .map((record) => record.fields.get(field.key))
+              .filter(Boolean)
+              .map((fieldInfo) => fieldInfo.type);
+            if (fieldTypes.length) expectedFieldType = fieldTypes.length === 1 ? fieldTypes[0] : T.union(fieldTypes);
+          }
+          fields.set(field.key, { type: this.typeOf(field.value, expectedFieldType), optional: false });
         }
         return T.record(fields);
       }
@@ -1078,11 +1237,36 @@ class Checker {
     }
   }
 
+  primitiveOrLiteral(base, value, expected) {
+    if (!expected) return base;
+    const target = T.deref(expected);
+    if (target.k === 'literal' && target.value === value) return target;
+    if (target.k === 'union') {
+      const match = target.members.find((member) => {
+        const resolved = T.deref(member);
+        return resolved.k === 'literal' && resolved.value === value;
+      });
+      if (match) return match;
+    }
+    return base;
+  }
+
   nameType(node) {
     const entry = this.lookup(node.name);
-    if (entry) return entry.type;
+    if (entry) {
+      node.__symbol = entry;
+      node.__type = entry.type;
+      node.__file = this.file;
+      if (!entry.references) entry.references = [];
+      entry.references.push({ file: this.file, line: node.line, col: node.col, name: node.name });
+      return entry.type;
+    }
     const constructor = this.variantCtors.get(node.name);
-    if (constructor) return constructor.type;
+    if (constructor) {
+      node.__type = constructor.type;
+      node.__variant = constructor;
+      return constructor.type;
+    }
     this.report('PS3301', `Unknown name "${node.name}".`, node, this.suggestionFor(node.name));
     return T.PRIM.error;
   }
@@ -1093,7 +1277,8 @@ class Checker {
   }
 
   memberType(node, forAssignment) {
-    const objectType = T.deref(this.typeOf(node.object));
+    let objectType = T.deref(this.typeOf(node.object));
+    if (objectType.k === 'var' && objectType.constraint) objectType = T.deref(objectType.constraint);
     if (T.isAny(objectType)) return T.PRIM.any;
     if (objectType.k === 'record') {
       const field = objectType.fields.get(node.property);
@@ -1162,7 +1347,8 @@ class Checker {
   }
 
   indexType(node, forAssignment) {
-    const objectType = T.deref(this.typeOf(node.object));
+    let objectType = T.deref(this.typeOf(node.object));
+    if (objectType.k === 'var' && objectType.constraint) objectType = T.deref(objectType.constraint);
     const indexType = this.typeOf(node.index);
     if (T.isAny(objectType)) return T.PRIM.any;
     if (objectType.k === 'list') {
@@ -1170,6 +1356,19 @@ class Checker {
         this.report('PS3337', `A list index must be a number, found ${T.showType(indexType)}.`, node.index);
       }
       return node.optional || !forAssignment ? T.union([objectType.elem, T.PRIM.nothing]) : objectType.elem;
+    }
+    if (objectType.k === 'tuple') {
+      if (!T.assignable(indexType, T.PRIM.number) && !T.isAny(indexType)) {
+        this.report('PS3337', `A tuple index must be a number, found ${T.showType(indexType)}.`, node.index);
+      }
+      const indexNode = node.index;
+      if (indexNode && indexNode.kind === 'Number') {
+        const element = objectType.elements[indexNode.value];
+        if (element) return element;
+        this.report('PS3340', `Tuple index ${indexNode.value} is out of range.`, node.index);
+        return T.PRIM.nothing;
+      }
+      return T.union([...objectType.elements, T.PRIM.nothing]);
     }
     if (objectType.k === 'map') {
       if (!T.assignable(indexType, objectType.key)) {
@@ -1223,6 +1422,7 @@ class Checker {
       this.report('PS3342', `Expected at most ${resolved.params.length} argument(s) but got ${node.args.length}.`, node);
     }
 
+    const contractCall = node.callee.kind === 'Name' ? this.lookup(node.callee.name) : null;
     const argumentTypes = [];
     node.args.forEach((argument, index) => {
       const parameter = resolved.params[index] || resolved.params[resolved.params.length - 1];
@@ -1241,7 +1441,15 @@ class Checker {
       // Earlier arguments can bind generic variables used by a later callback.
       // Contextual typing must see those substitutions before checking the body;
       // otherwise a lambda body like `request.id` is checked against unresolved I.
-      const contextualType = expectedType ? T.substitute(expectedType, subst) : expectedType;
+      let contextualType = expectedType ? T.substitute(expectedType, subst) : expectedType;
+      if (contractCall && contractCall.importSpec === 'std/contract' && index === 0
+        && (contractCall.importedName === 'failure' || contractCall.importedName === 'success')) {
+        const variantName = contractCall.importedName === 'failure' ? 'Failure' : 'Success';
+        const fieldName = contractCall.importedName === 'failure' ? 'error' : 'value';
+        const expectedVariant = expectedVariantOf(expected, variantName);
+        const payloadField = expectedVariant && expectedVariant.fields.find((field) => field.name === fieldName);
+        if (payloadField) contextualType = payloadField.type;
+      }
       const argumentType = this.typeOf(argument, contextualType);
       argumentTypes[index] = argumentType;
       if (parameter) {
@@ -1256,7 +1464,13 @@ class Checker {
             argument,
           );
         } else {
-          T.infer(expectedType, argumentType, subst);
+          if (!T.infer(expectedType, argumentType, subst)) {
+            this.report(
+              'PS3343',
+              `Argument ${index + 1} does not satisfy the generic constraint on ${T.showType(expectedType)}.`,
+              argument,
+            );
+          }
           if (!T.assignable(argumentType, T.substitute(expectedType, subst))) {
             this.report(
               'PS3343',
@@ -1268,11 +1482,43 @@ class Checker {
       }
     });
 
+    for (const name of resolved.typeParams || []) {
+      const variable = resolved.typeEnv && resolved.typeEnv.get(name);
+      if (!variable || !variable.constraint || !subst.has(name)) continue;
+      const constraint = T.substitute(variable.constraint, subst);
+      if (!T.assignable(subst.get(name), constraint)) {
+        this.report('PS3343', `Type argument ${T.showType(subst.get(name))} for "${name}" must satisfy ${T.showType(constraint)}.`, node);
+      }
+    }
     const resultType = T.substitute(resolved.ret, subst);
+    this.registerVariantsDeep(resultType);
     if (node.callee.kind === 'Name') {
-      const entry = this.lookup(node.callee.name);
-      if (entry && entry.importSpec === 'std/contract' && entry.importedName === 'object') {
-        return this.schemaForRecord(argumentTypes[0], resultType);
+      const entry = contractCall;
+      if (entry && entry.importSpec === 'std/contract') {
+        if (entry.importedName === 'object') return this.schemaForRecord(argumentTypes[0], resultType);
+        if (entry.importedName === 'literal') {
+          const value = literalValueOf(node.args[0]);
+          if (value !== null) return this.schemaWithOutput(resultType, value.type);
+        }
+        if (entry.importedName === 'enumeration') {
+          const members = [];
+          for (const item of (node.args[0] && node.args[0].kind === 'ListLiteral' ? node.args[0].items : [])) {
+            const value = literalValueOf(item);
+            if (value) members.push(value.type);
+          }
+          return this.schemaWithOutput(resultType, members.length ? T.union(members) : T.PRIM.any);
+        }
+        if (entry.importedName === 'oneOf') {
+          const members = [];
+          for (const schemaType of argumentTypes[0] && T.deref(argumentTypes[0]).k === 'list'
+            ? T.deref(argumentTypes[0]).elem ? [T.deref(argumentTypes[0]).elem] : []
+            : []) {
+            const parse = T.deref(schemaType).k === 'record' ? T.deref(schemaType).fields.get('parse') : null;
+            const parser = parse && T.deref(parse.type);
+            if (parser && parser.k === 'fn') members.push(parser.ret);
+          }
+          return this.schemaWithOutput(resultType, members.length ? T.union(members) : T.PRIM.any);
+        }
       }
     }
     return resultType;
@@ -1294,7 +1540,10 @@ class Checker {
       const optional = T.containsNothing(output);
       fields.set(name, { type: optional ? T.withoutNothing(output) : output, optional });
     }
-    const outputType = T.record(fields);
+    return this.schemaWithOutput(schemaTemplate, T.record(fields));
+  }
+
+  schemaWithOutput(schemaTemplate, outputType) {
     const template = T.deref(schemaTemplate);
     if (!template || template.k !== 'record') return schemaTemplate;
     const schemaFields = new Map(template.fields);
@@ -1385,7 +1634,7 @@ class Checker {
 
   functionExpressionType(node, expected) {
     const expectedFn = expected ? T.deref(expected) : null;
-    const localEnv = new Map();
+    const localEnv = this.typeEnvironment(node.typeParams || [], node.typeParamConstraints);
     const params = node.params.map((parameter, index) => {
       let type;
       if (parameter.type) {
@@ -1407,11 +1656,16 @@ class Checker {
     // A lambda is its own function frame: `await` inside it belongs to the
     // lambda, not to the enclosing function. An async lambda is an async
     // function, so its result type is the Promise of the values it returns.
-    this.functionStack.push({ node, declaredReturn: null, async: Boolean(node.async), inferred: null });
+    const expectedReturn = expectedFn && expectedFn.k === 'fn' ? expectedFn.ret : null;
+    const resolvedExpected = expectedReturn ? T.deref(expectedReturn) : null;
+    const concreteReturn = node.async && resolvedExpected && resolvedExpected.k === 'promise'
+      ? resolvedExpected.value
+      : expectedReturn;
+    this.functionStack.push({ node, declaredReturn: concreteReturn, async: Boolean(node.async), inferred: null });
     if (node.async) this.asyncDepth += 1;
     let ret;
     if (node.expression) {
-      ret = this.typeOf(node.expression, expectedFn && expectedFn.k === 'fn' ? expectedFn.ret : null);
+      ret = this.typeOf(node.expression, expectedReturn);
     } else {
       this.checkStatements(node.body);
       const info = inspectReturns(node.body);
@@ -1421,6 +1675,9 @@ class Checker {
     this.functionStack.pop();
     this.scope = previous;
     if (node.async && T.deref(ret).k !== 'promise') ret = T.promiseOf(ret);
+    if (expectedReturn && !T.assignable(ret, expectedReturn)) {
+      this.report('PS3404', `This lambda returns ${T.showType(ret)}, but the expected result is ${T.showType(expectedReturn)}.`, node);
+    }
     return T.fnType(params, ret);
   }
 }
@@ -1584,6 +1841,25 @@ function alwaysReturns(statements) {
   return false;
 }
 
+function expectedVariantOf(expected, name) {
+  if (!expected) return null;
+  const resolved = T.deref(expected);
+  const members = resolved.k === 'union' ? resolved.members.map((member) => T.deref(member)) : [resolved];
+  return members.find((member) => member.k === 'variant' && member.name === name) || null;
+}
+
+function literalValueOf(node) {
+  if (!node) return null;
+  if (node.kind === 'Text') return { value: node.v || node.value, type: T.literalType(node.v || node.value, T.PRIM.text) };
+  if (node.kind === 'Number') return { value: node.value, type: T.literalType(node.value, T.PRIM.number) };
+  if (node.kind === 'Boolean') return { value: node.value, type: T.literalType(node.value, T.PRIM.boolean) };
+  if (node.kind === 'Unary' && node.operator === '-' && node.operand.kind === 'Number') {
+    const value = -node.operand.value;
+    return { value, type: T.literalType(value, T.PRIM.number) };
+  }
+  return null;
+}
+
 function missingCoverage(subjectType, covered, catchAll) {
   if (catchAll) return [];
   const resolved = T.deref(subjectType);
@@ -1596,6 +1872,9 @@ function missingCoverage(subjectType, covered, catchAll) {
       if (!covered.has('false')) missing.push('false');
     } else if (member.k === 'prim' && member.name === 'nothing') {
       if (!covered.has('nothing')) missing.push('nothing');
+    } else if (member.k === 'literal') {
+      const key = `literal:${JSON.stringify(member.value)}`;
+      if (!covered.has(key)) missing.push(T.showType(member));
     } else if (member.k === 'variant' || member.k === 'unit') {
       if (!covered.has('variant:' + member.name)) missing.push(member.name);
     } else if (member.k === 'record' && hasVariantUnion(members)) {
@@ -1612,6 +1891,7 @@ function hasVariantUnion(members) {
 function elementTypeOf(type) {
   const resolved = T.deref(type);
   if (resolved.k === 'list') return resolved.elem;
+  if (resolved.k === 'tuple') return T.union(resolved.elements);
   return T.PRIM.any;
 }
 

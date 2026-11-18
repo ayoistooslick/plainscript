@@ -16,6 +16,24 @@ export type OperationError
     cause: any
 end
 export type Transport = (name: text, input: any) -> Promise of any
+
+# A typed success/failure union. Handlers construct these with success() and
+# failure(); match on the constructors like any other PlainScript variant.
+export type OperationSuccess<T> = Success(value: T)
+export type OperationFailure<E> = Failure(error: E)
+export type OperationResult<T, E> = OperationSuccess<T> or OperationFailure<E>
+export type FallibleOperation<I, O, E>
+    name: text
+    input: Schema<I>
+    output: Schema<O>
+    errors: Schema<E>
+    fallible: boolean
+end
+export type Router
+    names: () -> list of text
+    has: (name: text) -> boolean
+    handle: (name: text, input: any, context?: any) -> Promise of any
+end
 export type Validation<T>
     success: boolean
     data: T?
@@ -26,6 +44,7 @@ export declare function number(options?: any) -> Schema<number>
 export declare function boolean() -> Schema<boolean>
 export declare function literal<T>(expected: T) -> Schema<T>
 export declare function enumeration<T>(values: list of T) -> Schema<T>
+export declare function oneOf<T>(schemas: list of Schema<T>) -> Schema<T>
 export declare function optional<T>(inner: Schema<T>) -> Schema<T?>
 export declare function array<T>(inner: Schema<T>, options?: any) -> Schema<list of T>
 export declare function object<T>(shape: map of text to any, options?: any) -> Schema<T>
@@ -34,6 +53,15 @@ export declare function safeParse<T>(schema: Schema<T>, value: any) -> Validatio
 export declare function operation<I, O>(name: text, input: Schema<I>, output: Schema<O>) -> Operation<I, O>
 export declare function implement<I, O>(contract: Operation<I, O>, handler: (input: I) -> Promise of O, options?: any) -> (input: any, context?: any) -> Promise of O
 export declare function createClient<I, O>(contract: Operation<I, O>, transport: Transport) -> (input: I) -> Promise of O
+export declare function success<T>(value: T) -> OperationSuccess<T>
+export declare function failure<E>(error: E) -> OperationFailure<E>
+export declare function fallibleOperation<I, O, E>(name: text, input: Schema<I>, output: Schema<O>, errors: Schema<E>) -> FallibleOperation<I, O, E>
+export declare function implementFallible<I, O, E>(contract: FallibleOperation<I, O, E>, handler: (input: I) -> Promise of OperationResult<O, E>, options?: any) -> (input: any, context?: any) -> Promise of OperationResult<O, E>
+export declare function createFallibleClient<I, O, E>(contract: FallibleOperation<I, O, E>, transport: Transport) -> (input: I) -> Promise of OperationResult<O, E>
+export declare function resultToWire(result: any) -> any
+export declare function resultFromWire<I, O, E>(wire: any, contract: FallibleOperation<I, O, E>) -> OperationResult<O, E>
+export declare function router(endpoints: any) -> Router
+export declare function httpTransport(baseUrl: text, options?: any) -> Transport
 export type ContractError
     name: text
     message: text

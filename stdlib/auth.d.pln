@@ -1,0 +1,27 @@
+# Password hashing, signed bearer tokens and authorization policies.
+# Password hashes use scrypt; tokens use HS256 with exp/nbf/iss/aud checks.
+
+export type TokenCheck
+    valid: boolean
+    payload: any?
+    error: text?
+end
+
+export type Policy = (context: any, input?: any) -> Promise of boolean
+
+export type AuthError
+    name: text
+    message: text
+    code: text
+end
+
+export declare function hashPassword(password: text, options?: any) -> Promise of text
+export declare function verifyPassword(password: text, stored: text) -> Promise of boolean
+export declare function signToken(payload: any, secret: text, options?: any) -> text
+export declare function verifyToken(token: text, secret: text, options?: any) -> TokenCheck
+export declare function bearer(request: any) -> text?
+export declare function requireBearer(request: any, secret: text, options?: any) -> any
+export declare function policy(callback: (context: any, input?: any) -> Promise of boolean) -> Policy
+export declare function authorize(policy: Policy, context: any, input?: any) -> Promise of boolean
+export declare function enforce(policy: Policy, context: any, input?: any) -> Promise of nothing
+export declare function hasRole(context: any, role: text) -> boolean

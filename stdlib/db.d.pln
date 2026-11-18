@@ -1,0 +1,51 @@
+# SQLite persistence, schema-derived tables and versioned migrations.
+# Requires Node 22's built-in node:sqlite.
+
+export type TableSchema<T>
+    parse: (value: any, path?: text) -> T
+end
+
+export type Column
+    name: text
+    sqlType: text
+    optional: boolean
+end
+
+export type Database
+    file: text
+    raw: any
+    exec: (sql: text, params?: list of any) -> any
+    query: (sql: text, params?: list of any) -> list of any
+    run: (sql: text, params?: list of any) -> any
+    transaction: (work: (database: Database) -> Promise of any) -> Promise of any
+    close: () -> nothing
+end
+
+export type Table<T>
+    name: text
+    schema: TableSchema<T>
+    columns: list of Column
+    primaryKey: text
+    autoIncrement: boolean
+    createSql: () -> text
+    create: () -> nothing
+    list: () -> list of T
+    get: (id: any) -> T?
+    insert: (value: T) -> T
+    update: (id: any, value: T) -> T?
+    remove: (id: any) -> nothing
+end
+
+export type Migration
+    version: number
+    name: text
+    up: (database: Database) -> Promise of nothing
+    down?: (database: Database) -> Promise of nothing
+end
+
+export declare function open(file?: text, options?: any) -> Promise of Database
+export declare function table<T>(database: Database, name: text, schema: TableSchema<T>, options?: any) -> Table<T>
+export declare function tableFor<T>(database: Database, name: text, schema: TableSchema<T>, options?: any) -> Table<T>
+export declare function columns<T>(schema: TableSchema<T>) -> list of Column
+export declare function migrate(database: Database, migrations: list of Migration, options?: any) -> Promise of list of number
+export declare function rollback(database: Database, migrations: list of Migration, targetVersion?: number, options?: any) -> Promise of list of number

@@ -1,4 +1,4 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Language specification — PlainScript documentation."><title>Language specification · PlainScript</title><link rel="stylesheet" href="style.css"></head><body><div class="site-shell"><aside class="sidebar"><a class="brand" href="index.html"><span class="brand-mark">PS</span><span><span class="brand-name">PlainScript</span><span class="brand-meta">Language docs · 2.0</span></span></a><div class="nav-group"><div class="nav-label">Start here</div><a class="nav-link " href="index.html">PlainScript</a><a class="nav-link " href="cli.html">CLI reference</a><a class="nav-link " href="templates.html">Application templates</a></div><div class="nav-group"><div class="nav-label">Language</div><a class="nav-link active" href="spec.html">Language specification</a><a class="nav-link " href="syntax-design.html">Syntax design</a></div><div class="nav-group"><div class="nav-label">Compiler</div><a class="nav-link " href="architecture.html">Compiler architecture</a><a class="nav-link " href="interop.html">JavaScript interoperability</a></div><div class="nav-group"><div class="nav-label">Guides</div><a class="nav-link " href="migration.html">Migration guide</a></div><div class="nav-group"><div class="nav-label">Project</div><a class="nav-link " href="progress.html">Engineering progress</a><a class="nav-link " href="audit.html">Audit</a><a class="nav-link " href="decisions.html">Decisions</a></div><div class="sidebar-footer">Open source under MIT.<br><a href="https://github.com/ayoistooslick/Plainscript">View on GitHub ↗</a></div></aside><main class="main"><header class="topbar"><div class="search-wrap"><label class="search" aria-label="Search documentation"><span>⌕</span><input id="doc-search" type="search" placeholder="Search the docs…" autocomplete="off"><kbd>/</kbd></label><div id="search-results" class="search-results" role="listbox"></div></div><nav class="top-links"><a href="index.html">Docs</a><a href="https://github.com/ayoistooslick/Plainscript">GitHub ↗</a></nav></header><div class="content"><article class="page-layout"><div class="prose"><h1 id="the-plainscript-2-0-language-specification">The PlainScript 2.0 Language Specification</h1>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Language specification — PlainScript documentation."><title>Language specification · PlainScript</title><link rel="stylesheet" href="style.css"></head><body><div class="site-shell"><aside class="sidebar"><a class="brand" href="index.html"><span class="brand-mark">PS</span><span><span class="brand-name">PlainScript</span><span class="brand-meta">Language docs · 2.0</span></span></a><div class="nav-group"><div class="nav-label">Start here</div><a class="nav-link " href="index.html">PlainScript</a><a class="nav-link " href="cli.html">CLI reference</a><a class="nav-link " href="templates.html">Application templates</a></div><div class="nav-group"><div class="nav-label">Language</div><a class="nav-link active" href="spec.html">Language specification</a><a class="nav-link " href="syntax-design.html">Syntax design</a><a class="nav-link " href="type-system.html">Type system</a></div><div class="nav-group"><div class="nav-label">Compiler</div><a class="nav-link " href="architecture.html">Compiler architecture</a><a class="nav-link " href="interop.html">JavaScript interoperability</a><a class="nav-link " href="benchmarks.html">Benchmarks</a></div><div class="nav-group"><div class="nav-label">Guides</div><a class="nav-link " href="contracts.html">Unified contracts</a><a class="nav-link " href="concurrency.html">Concurrency</a><a class="nav-link " href="migration.html">Migration guide</a><a class="nav-link " href="comparison.html">Comparison with TypeScript</a></div><div class="nav-group"><div class="nav-label">Project</div><a class="nav-link " href="progress.html">Engineering progress</a><a class="nav-link " href="audit.html">Audit</a><a class="nav-link " href="decisions.html">Decisions</a></div><div class="sidebar-footer">Open source under MIT.<br><a href="https://github.com/ayoistooslick/Plainscript">View on GitHub ↗</a></div></aside><main class="main"><header class="topbar"><div class="search-wrap"><label class="search" aria-label="Search documentation"><span>⌕</span><input id="doc-search" type="search" placeholder="Search the docs…" autocomplete="off"><kbd>/</kbd></label><div id="search-results" class="search-results" role="listbox"></div></div><nav class="top-links"><a href="index.html">Docs</a><a href="https://github.com/ayoistooslick/Plainscript">GitHub ↗</a></nav></header><div class="content"><article class="page-layout"><div class="prose"><h1 id="the-plainscript-2-0-language-specification">The PlainScript 2.0 Language Specification</h1>
 <p>This document defines the language implemented by the compiler in <code>src/</code>. When this document and the compiler disagree, the compiler is authoritative and the document is a bug.</p>
 <p>PlainScript is statically typed, expression-oriented where it helps readability, and compiles to ECMAScript modules. Types exist at compile time only; they are erased from the output except for the small runtime checks described in <a href="#13-runtime-semantics">Runtime semantics</a>.</p>
 <p>---</p>
@@ -113,6 +113,8 @@ end</code></pre>
 <p><code>return</code> always takes a value; use <code>return nothing</code> for an early exit (<code>PS3402</code>).</p>
 <li>Generic parameters are introduced with <code>&lt;T, U&gt;</code> after the name and are inferred at call</li>
 <p>sites.</p>
+<li>Exported generic aliases preserve their parameter list across module boundaries. An</li>
+<p>importing module must provide the declared number of type arguments, and those arguments are substituted recursively through record fields, lists, optionals, functions and unions just as they are within the declaring module.</p>
 <li>A parameter type annotation is required on a function declaration. A lambda may omit it</li>
 <p>only when an expected function type supplies the parameter type (§4.3).</p>
 <li>A function declared directly as a default export may omit its name:</li>
@@ -163,10 +165,13 @@ T?                        # T or nothing
 Promise of T              # awaited value is T
 (A, B) -&gt; R               # function value
 { name: text, age: number }   # anonymous record
+[A, B]                    # fixed-length tuple
 A or B                    # union
+keyof { name: text }      # literal union of field names
+typeof value              # type of a declared value
 T&lt;...&gt;                    # named generic instantiation</code></pre>
 <p><code>map of text to V</code> is the only map form with field syntax: when a value&#39;s type is a map, <code>value.field</code> reads a key (with <code>T?</code> when the key may be absent). Lists do not have methods or a <code>.length</code> property; use <code>std/list</code>.</p>
-<p>There are no tuple types (<code>(number, text)</code>), no <code>readonly</code> field modifiers, and no <code>keyof</code>/<code>typeof</code> type queries. Use records, lists and explicit unions instead; these are deliberate omissions rather than unsound checking.</p>
+<p>Tuple types use brackets: <code>[number, text]</code>. A literal numeric index selects that element; destructuring and assignment are checked element by element. <code>keyof</code> produces a literal union of the record&#39;s field names, and <code>typeof</code> reuses the type of a hoisted value. Conditional/mapped/indexed-access types and <code>readonly</code> field modifiers are not implemented; these remain deliberate omissions rather than unsound checking.</p>
 <h3 id="5-3-assignability">5.3 Assignability</h3>
 <p>A value of type <code>S</code> is assignable to <code>T</code> when:</p>
 <ul>
@@ -177,6 +182,8 @@ T&lt;...&gt;                    # named generic instantiation</code></pre>
 <p>parameters (contravariant) and assignable results;</p>
 <li>records are structurally assignable: every required field of <code>T</code> exists in <code>S</code> with an</li>
 <p>assignable type; extra fields in <code>S</code> are allowed; optional fields may be absent;</p>
+<li>both are tuples of equal length with pairwise-assignable elements;</li>
+<li>literal types are assignable to their primitive base and to the same literal;</li>
 <li><code>S</code> is a member of union <code>T</code>, or every member of union <code>S</code> is assignable to <code>T</code>;</li>
 <li><code>T</code> is a named alias that dereferences to a matching type.</li>
 </ul>
@@ -199,7 +206,16 @@ if x == &quot;yes&quot;                             # literal equality narrows u
 end
 
 let value = first([1, 2, 3])     # value: number?</code></pre>
-<p>An unresolvable type parameter falls back to <code>any</code>. Generic constraints are not supported in 2.0.</p>
+<p>An unresolvable type parameter falls back to <code>any</code>. Generic constraints are written after a colon and are checked at call sites:</p>
+<pre><code>type Named
+    name: text
+end
+
+function label&lt;T: Named&gt;(value: T) -&gt; text
+    return value.name
+end</code></pre>
+<p><code>label({ name: &quot;Ada&quot; })</code> compiles and can read <code>value.name</code>; <code>label({ age: 37 })</code> reports <code>PS3343</code>. Constraints on type aliases use the same syntax.</p>
+<p><code>std/contract.object</code> is checker-aware: when its shape is a record literal whose values are contract schemas, the result&#39;s <code>Schema&lt;T&gt;</code> parse result is inferred recursively from those schema outputs. Primitive schemas, nested object schemas, arrays and optional schemas are supported. An optional schema field becomes an optional property in <code>T</code>. This lets an operation&#39;s input and output model flow from schema values into its implementation and client signature without a separate model declaration. The check is based on the schema expression; arbitrary JavaScript validators are not inferred. <code>enumeration</code> and <code>literal</code> schemas derive literal unions, so <code>&quot;open&quot; or &quot;done&quot;</code> fields reject other values at compile time and are exhaustively matchable.</p>
 <p>---</p>
 <h2 id="6-expressions">6. Expressions</h2>
 <h3 id="6-1-precedence">6.1 Precedence</h3>
@@ -346,7 +362,7 @@ end</code></pre>
 <li>Top-level <code>await</code> is allowed, because output is an ES module.</li>
 <li>Async lambdas are supported: <code>async (x: number) =&gt; await work(x)</code>.</li>
 </ul>
-<p>There is no structured concurrency, no cancellation type and no worker syntax.</p>
+<p>The language has no task/cancellation syntax of its own. Import <code>std/task</code> for task groups, cooperative cancellation, timeouts, channels and worker handles. These primitives wrap the host event loop and cannot preempt hostile synchronous code. See <a href="CONCURRENCY.html">CONCURRENCY.md</a>.</p>
 <p>---</p>
 <h2 id="9-diagnostics">9. Diagnostics</h2>
 <p>Every diagnostic has a stable code, a file, a line and a column, and a source excerpt. Errors are never downgraded to warnings; <code>check</code> exits non-zero when any diagnostic is reported. Compilation failure writes nothing.</p>
