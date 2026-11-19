@@ -3,9 +3,38 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
+const http = require('node:http');
 const { pathToFileURL } = require('node:url');
 
 const ROOT = path.resolve(__dirname, '..');
+
+test('WebSocket authorization rejects an upgrade before the handshake', async () => {
+  const ws = await import(pathToFileURL(path.join(ROOT, 'stdlib', 'ws.js')).toString());
+  const server = await ws.serve(0, () => {}, {
+    authorize: (request) => request.headers.authorization === 'Bearer secret',
+  });
+  try {
+    const status = await new Promise((resolve, reject) => {
+      const request = http.request({
+        host: '127.0.0.1',
+        port: server.port,
+        headers: {
+          Connection: 'Upgrade',
+          Upgrade: 'websocket',
+          'Sec-WebSocket-Version': '13',
+          'Sec-WebSocket-Key': 'dGhlIHNhbXBsZSBub25jZQ==',
+        },
+      });
+      request.on('response', (response) => { response.resume(); resolve(response.statusCode); });
+      request.on('upgrade', () => resolve(101));
+      request.on('error', reject);
+      request.end();
+    });
+    assert.equal(status, 401);
+  } finally {
+    await server.close();
+  }
+});
 
 test('WebSocket server upgrades, echoes text, handles JSON and closes cleanly', async () => {
   const ws = await import(pathToFileURL(path.join(ROOT, 'stdlib', 'ws.js')).toString());

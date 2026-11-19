@@ -10,7 +10,7 @@ async function readBody(request) {
   return Buffer.concat(chunks);
 }
 
-export async function serve(port, handler) {
+export async function serve(port, handler, options = {}) {
   const server = http.createServer(async (request, response) => {
     try {
       const body = ['GET', 'HEAD'].includes(request.method) ? undefined : await readBody(request);
@@ -56,7 +56,12 @@ export async function serve(port, handler) {
       }
     } catch (failure) {
       response.writeHead(500, { 'content-type': 'text/plain; charset=utf-8' });
-      response.end(`Internal error: ${failure && failure.message ? failure.message : String(failure)}`);
+      // Do not leak exception text to clients by default. Pass
+      // { exposeErrors: true } only in a trusted development environment.
+      const detail = options.exposeErrors
+        ? `Internal error: ${failure && failure.message ? failure.message : String(failure)}`
+        : 'Internal server error';
+      response.end(detail);
     }
   });
 
@@ -100,6 +105,59 @@ export function css(body, status = 200) {
     status,
     headers: { 'content-type': 'text/css; charset=utf-8' },
   });
+}
+
+function sseChunk(event) {
+  if (typeof event === 'string' || event instanceof Uint8Array) {
+    const text = typeof event === 'string' ? event : new TextDecoder().decode(event);
+    return `${String(text).split('\n').map((line) => `data: ${line}`).join('\n')}\n\n`;
+  }
+  if (!event || typeof event !== 'object') return `data: ${String(event)}\n\n`;
+  let chunk = '';
+  if (event.id !== undefined) chunk += `id: ${event.id}\n`;
+  if (event.event !== undefined) chunk += `event: ${event.event}\n`;
+  if (event.retry !== undefined) chunk += `retry: ${Number(event.retry)}\n`;
+  const data = typeof event.data === 'string' ? event.data : JSON.stringify(event.data === undefined ? event : event.data);
+  for (const line of String(data).split('\n')) chunk += `data: ${line}\n`;
+  return `${chunk}\n`;
+}
+
+// Create a Server-Sent Events response from an async iterable of event objects
+// (or strings). The stream is cancelled when the client disconnects, and the
+// iterable's return() hook is called so producers can clean up.
+export function sse(source, options = {}) {
+  if (!source || typeof source[Symbol.asyncIterator] !== 'function') {
+    throw new TypeError('sse() expects an async iterable source');
+  }
+  const encoder = new TextEncoder();
+  const iterator = source[Symbol.asyncIterator]();
+  let cancelled = false;
+  const body = new ReadableStream({
+    async pull(controller) {
+      if (cancelled) { controller.close(); return; }
+      try {
+        const next = await iterator.next();
+        if (next.done) { controller.close(); return; }
+        controller.enqueue(encoder.encode(sseChunk(next.value)));
+      } catch (failure) {
+        controller.error(failure);
+      }
+    },
+    async cancel() {
+      cancelled = true;
+      if (typeof iterator.return === 'function') {
+        try { await iterator.return(); } catch { /* client already disconnected */ }
+      }
+    },
+  });
+  const headers = {
+    'content-type': 'text/event-stream; charset=utf-8',
+    'cache-control': 'no-cache, no-transform',
+    connection: 'keep-alive',
+    'x-accel-buffering': 'no',
+    ...(options.headers || {}),
+  };
+  return new Response(body, { status: options.status || 200, headers });
 }
 
 export function redirect(location, status = 302) {

@@ -1,0 +1,17 @@
+{
+  "name": "plainscript-express",
+  "version": "0.1.0",
+  "description": "Express-compatible HTTP API written in PlainScript",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "plainscript check",
+    "start": "plainscript run src/main.pln"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "plainscript-lang": "^2.0.0"
+  }
+}

@@ -2,13 +2,24 @@
 
 All notable changes to PlainScript are documented here.
 
-## Unreleased — syntax migration (breaking; release version TBD)
+## Unreleased — V2 completion (breaking; release version TBD)
 
 - Replace conditional `when`/`otherwise` with `if`/`else if`/`else`, and use `if` for
   match guards. Retired words remain reserved so old branch syntax fails clearly.
 - Keep `end` block terminators and existing type-checking/runtime semantics.
-- Add the researched design comparison and migration guidance in `docs/SYNTAX_DESIGN.md`
-  and `docs/MIGRATION.md`.
+- Add conditional types, mapped types, generic/deferred indexed access, function overloads
+  (including imported and `.d.pln` overloads), user-defined type predicates, recursive type
+  tests and a documented structural variance model.
+- Add `std/jobs` (bounded in-process queue, retries/backoff, timeouts, cancellation, drain),
+  SSE responses in `std/http`, WebSocket authorization before the upgrade handshake, and
+  buffered-close/nested-group semantics in `std/task`.
+- LSP: semantic tokens and quick-fix code actions in addition to diagnostics, completion,
+  hover, navigation, rename, symbols and formatting.
+- CLI: conservative `plainscript migrate` scanner (`--check`, `--json`) and five new
+  starters (`react-vite`, `next`, `express`, `cli`, `library`).
+- HTTP handler exceptions are no longer echoed to clients unless `exposeErrors` is set.
+- Add database, jobs, security and debugging documentation; synchronize SPEC, type-system,
+  CLI, templates, roadmap and progress docs with the implementation.
 - No npm package has been published for this change.
 
 ## [2.0.0]  -  2026-11-14

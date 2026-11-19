@@ -8,7 +8,8 @@ structured layer on top of that runtime; it does not introduce a second schedule
 - **Task group ownership.** `group()` creates an owner. Every `run(group, task)` registers
   a task. `close(group)` waits for all started tasks, rejects with the first failure after
   siblings have observed cancellation, or returns results in start order. `close` is
-  idempotent and rejects new work once closing begins.
+  idempotent and rejects new work once closing begins. `group({ parent: outer })` accepts
+  either a signal or another group and inherits its cancellation.
 - **Cooperative cancellation.** `cancel(signal, reason)` is idempotent, runs registered
   callbacks synchronously and propagates to child signals. `throwIfCancelled` throws
   `CancellationError`. Cancellation cannot preempt synchronous user code or host promises
@@ -21,7 +22,8 @@ structured layer on top of that runtime; it does not introduce a second schedule
   failure does not become an unhandled rejection.
 - **Channels.** `channel(capacity)` supports buffered and unbuffered sends, cancellation of
   pending send/receive operations, and `ChannelClosedError` on closed operations. A
-  capacity of zero is a rendezvous.
+  capacity of zero is a rendezvous. Closing preserves already-buffered values for normal
+  receives; later receives fail once the buffer is empty.
 - **Workers.** `spawnWorker(source)` uses the browser `Worker` when present and Node's
   `worker_threads` otherwise. The handle exposes `post`, `onMessage`, `onError`,
   `terminate` and `join`.
@@ -46,9 +48,11 @@ end
 ## Verified
 
 `tests/task.test.js` covers ordered completion, failure-triggered sibling cancellation,
-cancellation idempotence/listener behavior, timeouts, buffered backpressure, channel close
-errors and a real Node worker message/termination round trip. The language-level tests
-compile and run these programs.
+cancellation idempotence/listener behavior, timeouts, buffered backpressure, buffered close
+delivery, nested-group cancellation, worker startup failure and a real Node worker
+message/termination round trip. The language-level tests compile and run these programs.
+
+Background work has a separate in-process scheduler: see [JOBS](JOBS.md).
 
 ## Limits
 

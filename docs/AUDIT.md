@@ -166,7 +166,7 @@ language unspecifiable.
 | Types | advisory spec checker | assignability, inference, generics, narrowing, exhaustiveness |
 | Middle end | unused 62-line IR | typed HIR consumed by the emitter |
 | Services | grammar + generator code | not in the language; packages instead |
-| Stdlib | intrinsic keywords and helpers | 11 explicit modules with `.d.pln` declarations |
+| Stdlib | intrinsic keywords and helpers | 17 explicit modules with `.d.pln` declarations |
 | Output | AST-driven generator, optional bundler | ESM per file, source maps, no bundler |
-| Tests | 427 assertions incl. aliases | 127 tests per compiler layer + built demos |
+| Tests | 427 assertions incl. aliases | compiler/type/contract/ecosystem suite; see `docs/PROGRESS.md` |
 | Docs | mixed versions and claims | specification, audit, decisions, migration |

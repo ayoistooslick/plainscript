@@ -1,0 +1,21 @@
+{
+  "name": "plainscript-library",
+  "version": "0.1.0",
+  "description": "Typed PlainScript library starter",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.pln",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.pln",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "check": "plainscript check",
+    "build": "plainscript build --declarations"
+  },
+  "devDependencies": {
+    "plainscript-lang": "^2.0.0"
+  }
+}

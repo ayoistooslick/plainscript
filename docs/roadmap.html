@@ -1,0 +1,34 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Roadmap — PlainScript documentation."><title>Roadmap · PlainScript</title><link rel="stylesheet" href="style.css"></head><body><div class="site-shell"><aside class="sidebar"><a class="brand" href="index.html"><span class="brand-mark">PS</span><span><span class="brand-name">PlainScript</span><span class="brand-meta">Language docs · 2.0</span></span></a><div class="nav-group"><div class="nav-label">Start here</div><a class="nav-link " href="index.html">PlainScript</a><a class="nav-link " href="cli.html">CLI reference</a><a class="nav-link " href="templates.html">Application templates</a></div><div class="nav-group"><div class="nav-label">Language</div><a class="nav-link " href="spec.html">Language specification</a><a class="nav-link " href="syntax-design.html">Syntax design</a><a class="nav-link " href="type-system.html">Type system</a></div><div class="nav-group"><div class="nav-label">Compiler</div><a class="nav-link " href="architecture.html">Compiler architecture</a><a class="nav-link " href="interop.html">JavaScript interoperability</a><a class="nav-link " href="benchmarks.html">Benchmarks</a></div><div class="nav-group"><div class="nav-label">Guides</div><a class="nav-link " href="contracts.html">Unified contracts</a><a class="nav-link " href="concurrency.html">Concurrency</a><a class="nav-link " href="jobs.html">Background jobs</a><a class="nav-link " href="databases.html">Databases</a><a class="nav-link " href="security.html">Security</a><a class="nav-link " href="debugging.html">Debugging</a><a class="nav-link " href="migration.html">Migration guide</a><a class="nav-link " href="comparison.html">Comparison with TypeScript</a></div><div class="nav-group"><div class="nav-label">Project</div><a class="nav-link " href="progress.html">Engineering progress</a><a class="nav-link active" href="roadmap.html">Roadmap</a><a class="nav-link " href="audit.html">Audit</a><a class="nav-link " href="decisions.html">Decisions</a></div><div class="sidebar-footer">Open source under MIT.<br><a href="https://github.com/ayoistooslick/Plainscript">View on GitHub ↗</a></div></aside><main class="main"><header class="topbar"><div class="search-wrap"><label class="search" aria-label="Search documentation"><span>⌕</span><input id="doc-search" type="search" placeholder="Search the docs…" autocomplete="off"><kbd>/</kbd></label><div id="search-results" class="search-results" role="listbox"></div></div><nav class="top-links"><a href="index.html">Docs</a><a href="https://github.com/ayoistooslick/Plainscript">GitHub ↗</a></nav></header><div class="content"><article class="page-layout"><div class="prose"><h1 id="roadmap">Roadmap</h1>
+<p>This roadmap reports status; it is not a promise of dates.</p>
+<h2 id="available-and-verified-now">Available and verified now</h2>
+<ul>
+<li>Compiler pipeline: lexer, parser, type checker, typed HIR, JavaScript emitter and source</li>
+<p>maps; deterministic ESM output and <code>.d.pln</code> declaration generation.</p>
+<li>Structural types, generics with constraints, inference, narrowing, variants,</li>
+<p>exhaustiveness, literal enum unions, tuples, <code>keyof</code>, <code>typeof</code>, conditional/mapped types, deferred generic indexed access, function overloads, user predicates and a documented structural variance model.</p>
+<li>Unified contracts: schema-derived records, typed operation errors, validated fallible</li>
+<p>endpoints, client result decoding, operation router/HTTP transport, SQLite model mapping, versioned migrations/rollback and a scrypt/HS256 authentication flow.</p>
+<li>Structured concurrency through <code>std/task</code>; WebSockets through <code>std/ws</code>; SSE and HTTP in</li>
+<p><code>std/http</code>; in-process background jobs in <code>std/jobs</code>; React/Vite/Next/Node/npm interop.</p>
+<li>Language server with diagnostics, completion, hover, definitions, workspace references,</li>
+<p>rename, symbols, formatting, semantic tokens and quick-fix code actions; VS Code extension under <code>editors/vscode</code>.</p>
+<li>Watch mode, module-cache invalidation, unchanged-output skipping, benchmark script, and</li>
+<p>end-to-end contract/database/auth/WebSocket/concurrency tests.</p>
+<li>Conservative <code>plainscript migrate</code> scanning for JavaScript/TypeScript blockers without</li>
+<p>rewriting user code, plus eight tested starters.</p>
+</ul>
+<h2 id="next-engineering-priorities">Next engineering priorities</h2>
+<ol>
+<li>First-class adapters (or a dialect layer) for PostgreSQL, MySQL and MongoDB behind the</li>
+<p><code>std/db</code> model/migration surface. Direct npm drivers are usable today; see <a href="databases.html">DATABASES</a>.</p>
+<li>Persisted/durable background jobs and a worker process story beyond the in-process</li>
+<p><code>std/jobs</code> queue.</p>
+<li>Debug Adapter Protocol support and broader refactors beyond symbol rename. Source maps</li>
+<p>and Node&#39;s inspector work today; see <a href="debugging.html">DEBUGGING</a>.</p>
+<li>Generated API documentation/OpenAPI from operation descriptors and a production</li>
+<p>identity-provider adapter.</p>
+<li>Cross-language benchmark fixture with a pinned TypeScript toolchain, published with</li>
+<p>reproducible results.</p>
+</ol>
+<h2 id="explicit-limitations">Explicit limitations</h2>
+<p>WebSocket fragmentation/extensions, non-SQLite <code>std/db</code> drivers, OIDC/SAML, a built-in browser bundler, task syntax in the grammar, variadic tuple types, and arbitrary TypeScript <code>.d.ts</code> parsing are not implemented. Deeply nested deferred conditional/mapped combinations may remain deferred rather than produce an early diagnostic. None of these is described as available elsewhere in the documentation.</p></div><aside class="toc"><div class="toc-title">On this page</div><a class="toc-h2" href="#available-and-verified-now">Available and verified now</a><a class="toc-h2" href="#next-engineering-priorities">Next engineering priorities</a><a class="toc-h2" href="#explicit-limitations">Explicit limitations</a></aside></article><footer class="page-footer"><span>PlainScript 2.0 documentation</span><a href="https://github.com/ayoistooslick/Plainscript/issues">Report a documentation issue ↗</a></footer></div></main></div><script src="app.js"></script></body></html>

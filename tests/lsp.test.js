@@ -117,6 +117,8 @@ test('language server publishes diagnostics, hover, definitions, references, ren
     assert.equal(initialize.result.capabilities.definitionProvider, true);
     assert.equal(initialize.result.capabilities.renameProvider, true);
     assert.equal(initialize.result.capabilities.documentFormattingProvider, true);
+    assert.equal(initialize.result.capabilities.codeActionProvider.codeActionKinds[0], 'quickfix');
+    assert.equal(initialize.result.capabilities.semanticTokensProvider.full, true);
     client.notify('initialized', {});
 
     const brokenFile = path.join(ROOT, 'tests', 'fixtures', 'lsp', 'broken.pln');
@@ -176,6 +178,23 @@ test('language server publishes diagnostics, hover, definitions, references, ren
       options: { tabSize: 4 },
     });
     assert.ok(Array.isArray(formatting.result));
+
+    const semantic = await client.request('textDocument/semanticTokens/full', { textDocument: { uri: cleanUri } });
+    assert.ok(Array.isArray(semantic.result.data));
+    assert.ok(semantic.result.data.length > 0);
+    assert.equal(semantic.result.data.length % 5, 0);
+
+    const typoFile = path.join(ROOT, 'tests', 'fixtures', 'lsp', 'typo.pln');
+    const typoUri = await client.open(typoFile);
+    const typoDiagnostics = await client.diagnosticsFor(typoUri);
+    const withHint = typoDiagnostics.find((diagnostic) => diagnostic.data && diagnostic.data.hint);
+    assert.ok(withHint, JSON.stringify(typoDiagnostics));
+    const actions = await client.request('textDocument/codeAction', {
+      textDocument: { uri: typoUri },
+      range: withHint.range,
+      context: { diagnostics: [withHint] },
+    });
+    assert.ok(actions.result.some((action) => action.kind === 'quickfix' && /greet/.test(action.title)));
 
     const libFile = path.join(ROOT, 'tests', 'fixtures', 'lsp', 'lib.pln');
     const consumerFile = path.join(ROOT, 'tests', 'fixtures', 'lsp', 'consumer.pln');

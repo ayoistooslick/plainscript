@@ -1,0 +1,22 @@
+export type Job
+    id: number
+    name: text
+    state: text
+    attempts: number
+    promise: Promise of any
+    cancel: (reason: text) -> boolean
+end
+
+export type Queue
+    add: (name: text, work: (payload: any, signal: any) -> Promise of any, payload?: any, options?: any) -> Job
+    start: () -> Queue
+    drain: () -> Promise of nothing
+    close: (reason?: text) -> Promise of nothing
+    stats: () -> any
+    on: (event: text, handler: (job: Job) -> nothing) -> () -> nothing
+    closed: boolean
+end
+
+export declare function queue(options?: any) -> Queue
+export declare function createQueue(options?: any) -> Queue
+export declare function runJobs(jobs: Queue) -> Promise of nothing

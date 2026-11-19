@@ -32,10 +32,10 @@ and invalid-row rejection. These are executable checks, not API-shape claims.
 | Database mapping and migrations | Schema-derived columns, versioned SQL migrations, transactional rollback, SQLite only | Prisma/Drizzle: mature schema DSL, multiple databases, migration tooling, introspection | **TypeScript stack wins** on database breadth and operations |
 | Typed client transport | Built-in runtime client + JSON HTTP transport + operation router | tRPC: mature generated client, batching, subscriptions, React Query integration | tRPC wins on client ecosystem; PlainScript's is deliberately small |
 | Authentication | scrypt/HS256 primitives and policies in `std/auth`; demo login | Auth.js/Clerk/Passport or custom; far more providers and production integrations | **TypeScript ecosystem wins** |
-| Editor/tooling | LSP diagnostics, completion, hover, definitions, workspace references, rename, symbols, format; VS Code extension | TypeScript LSP is decades more mature, with refactors, inlay hints, debugging and framework plugins | **TypeScript wins decisively** |
-| Language type system | Structural records, generics/constraints, narrowing, variants, literal unions, tuples, record intersections, concrete indexed access, `keyof`/`typeof` | Conditional/mapped/generic indexed types, overloads, predicates, huge declaration ecosystem, advanced inference | **TypeScript wins** |
+| Editor/tooling | LSP diagnostics, completion, hover, definitions, workspace references, rename, symbols, format, semantic tokens and quick fixes; VS Code extension | TypeScript LSP is decades more mature, with refactors, inlay hints, debugging and framework plugins | **TypeScript wins decisively** |
+| Language type system | Structural records, generics/constraints, narrowing, variants, literal unions, tuples, intersections, conditional/mapped types, deferred indexed access, overloads, predicates, recursive types and documented structural variance | Enormous declaration ecosystem, more mature inference, distributive conditional types, variadic tuples, classes/nominal tooling | **TypeScript wins on breadth and ecosystem**; core structural features are now comparable |
 | Ecosystem and hiring | npm interop, but a new language and small library/tooling ecosystem | Enormous ecosystem, frameworks, hosting support, community | **TypeScript wins** |
-| Build performance | Synthetic PlainScript-only benchmark: 40 modules, median cold compile 16.97 ms | No pinned cross-language benchmark in this repository | **Unproven**; no speed claim |
+| Build performance | Synthetic PlainScript-only benchmark: 40 modules, median cold compile 16.95 ms | No pinned cross-language benchmark in this repository | **Unproven**; no speed claim |
 | JSX/React | `render` blocks lower to `createElement`; no JSX/fragments/automatic keys | First-class JSX and the entire React tooling ecosystem | **TypeScript wins** |
 | Operational maturity | Small compiler/runtime; SQLite/Node focus; no bundler; partial LSP | Mature compilers, debuggers, profilers, deployment tooling | **TypeScript wins** |
 
@@ -53,10 +53,10 @@ and invalid-row rejection. These are executable checks, not API-shape claims.
 
 ## What it does not offer
 
-Conditional/mapped types, overloads, predicates, a complete debugger, Prisma-level database
-support, a mature auth provider integration, JSX, a bundler, a large ecosystem, or a measured
-speed advantage over TypeScript. Any claim that PlainScript is universally better would be
-false.
+Prisma-level database support, a mature auth provider integration, JSX, a bundler, a debug
+adapter, a large ecosystem, or a measured speed advantage over TypeScript. Variadic tuples,
+readonly modifiers and distributive conditional types are not implemented. Any claim that
+PlainScript is universally better would be false.
 
 ## Reproduce the checks
 

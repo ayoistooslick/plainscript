@@ -1,0 +1,21 @@
+{
+  "name": "plainscript-react-vite",
+  "version": "0.1.0",
+  "description": "React + Vite starter written in PlainScript",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "plainscript build && vite build",
+    "check": "plainscript check",
+    "dev": "plainscript build && vite --host 0.0.0.0",
+    "start": "plainscript build && vite --host 0.0.0.0"
+  },
+  "dependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "plainscript-lang": "^2.0.0",
+    "vite": "^6.0.0"
+  }
+}

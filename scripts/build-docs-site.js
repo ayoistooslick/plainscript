@@ -19,10 +19,15 @@ const pages = [
   { slug: 'type-system', title: 'Type system', source: path.join(DOCS, 'TYPE_SYSTEM.md'), group: 'Language' },
   { slug: 'contracts', title: 'Unified contracts', source: path.join(DOCS, 'UNIFIED_CONTRACTS.md'), group: 'Guides' },
   { slug: 'concurrency', title: 'Concurrency', source: path.join(DOCS, 'CONCURRENCY.md'), group: 'Guides' },
+  { slug: 'jobs', title: 'Background jobs', source: path.join(DOCS, 'JOBS.md'), group: 'Guides' },
+  { slug: 'databases', title: 'Databases', source: path.join(DOCS, 'DATABASES.md'), group: 'Guides' },
+  { slug: 'security', title: 'Security', source: path.join(DOCS, 'SECURITY.md'), group: 'Guides' },
+  { slug: 'debugging', title: 'Debugging', source: path.join(DOCS, 'DEBUGGING.md'), group: 'Guides' },
   { slug: 'migration', title: 'Migration guide', source: path.join(DOCS, 'MIGRATION.md'), group: 'Guides' },
   { slug: 'comparison', title: 'Comparison with TypeScript', source: path.join(DOCS, 'COMPARISON.md'), group: 'Guides' },
   { slug: 'benchmarks', title: 'Benchmarks', source: path.join(DOCS, 'BENCHMARKS.md'), group: 'Compiler' },
   { slug: 'progress', title: 'Engineering progress', source: path.join(DOCS, 'PROGRESS.md'), group: 'Project' },
+  { slug: 'roadmap', title: 'Roadmap', source: path.join(DOCS, 'ROADMAP.md'), group: 'Project' },
   { slug: 'audit', title: 'Audit', source: path.join(DOCS, 'AUDIT.md'), group: 'Project' },
   { slug: 'decisions', title: 'Decisions', source: path.join(DOCS, 'DECISIONS.md'), group: 'Project' },
 ];
@@ -117,7 +122,8 @@ function inline(value) {
   text = text.replace(/href="docs\/DEMOS\.md"/g, 'href="interop.html"');
   text = text.replace(/href="(CHANGELOG|CONTRIBUTION|LICENSE)(?:\.md)?"/g, 'href="https://github.com/ayoistooslick/Plainscript/blob/main/$1"');
   text = text.replace(/href="(demos\/[^\"]+)"/g, 'href="https://github.com/ayoistooslick/Plainscript/tree/main/$1"');
-  const pageSlugs = ['MIGRATION', 'SPEC', 'SYNTAX_DESIGN', 'CLI', 'INTEROP', 'PROGRESS', 'DECISIONS', 'AUDIT'];
+  const pageSlugs = ['MIGRATION', 'SPEC', 'SYNTAX_DESIGN', 'CLI', 'INTEROP', 'PROGRESS', 'DECISIONS', 'AUDIT', 'JOBS', 'DATABASES', 'SECURITY', 'DEBUGGING', 'CONCURRENCY', 'UNIFIED_CONTRACTS', 'TYPE_SYSTEM', 'TEMPLATES', 'BENCHMARKS', 'ROADMAP'];
+  text = text.replace(/href="UNIFIED_CONTRACTS\.html"/g, 'href="contracts.html"');
   for (const pageSlug of pageSlugs) text = text.replace(new RegExp(`href="${pageSlug}\\.html"`, 'g'), `href="${pageSlug.toLowerCase().replace('_', '-')}.html"`);
   text = text.replace(/href="DEMOS\.html"/g, 'href="interop.html"');
   text = text.replace(/href="CHANGELOG\.html"/g, 'href="https://github.com/ayoistooslick/Plainscript/blob/main/CHANGELOG.md"');
@@ -134,18 +140,26 @@ function markdown(source) {
   let list = null;
   let table = null;
   let code = null;
+  let codeIndent = 0;
   const flushParagraph = () => { if (paragraph.length) { out.push(`<p>${inline(paragraph.join(' '))}</p>`); paragraph = []; } };
   const flushList = () => { if (list) { out.push(`</${list}>`); list = null; } };
   const flushTable = () => { if (table) { out.push('</tbody></table>'); table = null; } };
   for (const raw of lines) {
     const line = raw.trimEnd();
-    if (line.startsWith('```')) {
+    if (line.trimStart().startsWith('```')) {
       flushParagraph(); flushList(); flushTable();
-      if (code === null) { code = []; out.push('<pre><code>'); }
-      else { out[out.length - 1] += `${esc(code.join('\n'))}</code></pre>`; code = null; }
+      if (code === null) {
+        code = [];
+        codeIndent = line.match(/^\s*/)[0].length;
+        out.push('<pre><code>');
+      } else {
+        out[out.length - 1] += `${esc(code.join('\n'))}</code></pre>`;
+        code = null;
+        codeIndent = 0;
+      }
       continue;
     }
-    if (code !== null) { code.push(line); continue; }
+    if (code !== null) { code.push(raw.slice(codeIndent)); continue; }
     if (!line.trim()) { flushParagraph(); flushList(); flushTable(); continue; }
     const heading = line.match(/^(#{1,3})\s+(.+)$/);
     if (heading) { flushParagraph(); flushList(); flushTable(); const level = heading[1].length; const text = heading[2].replace(/\s+#+$/, ''); const id = slug(text); headings.push({ level, text, id }); out.push(`<h${level} id="${id}">${inline(text)}</h${level}>`); continue; }

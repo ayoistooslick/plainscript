@@ -1,0 +1,16 @@
+{
+  "name": "plainscript-cli",
+  "version": "0.1.0",
+  "description": "Command-line starter written in PlainScript",
+  "private": true,
+  "type": "module",
+  "bin": { "plainscript-cli-starter": "./dist/main.js" },
+  "scripts": {
+    "build": "plainscript build",
+    "check": "plainscript check",
+    "start": "plainscript run src/main.pln"
+  },
+  "devDependencies": {
+    "plainscript-lang": "^2.0.0"
+  }
+}

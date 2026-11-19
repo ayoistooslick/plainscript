@@ -50,7 +50,7 @@ const listOf = (elem) => ({ k: 'list', elem });
 const tupleOf = (elements) => ({ k: 'tuple', elements });
 const mapOf = (key, value) => ({ k: 'map', key, value });
 const promiseOf = (value) => ({ k: 'promise', value });
-const fnType = (params, ret, typeParams) => ({ k: 'fn', params, ret, typeParams: typeParams || [] });
+const fnType = (params, ret, typeParams, predicate = null) => ({ k: 'fn', params, ret, typeParams: typeParams || [], predicate });
 const record = (fields, options = {}) => ({ k: 'record', fields, name: options.name, open: options.open !== false });
 const variant = (name, fields, unionName) => ({ k: 'variant', name, fields, unionName });
 const unitVariant = (name, unionName) => ({ k: 'unit', name, unionName });
@@ -58,6 +58,10 @@ const unitVariant = (name, unionName) => ({ k: 'unit', name, unionName });
 // They deliberately stay narrow so a model field cannot accept an arbitrary
 // text value that the runtime validator would reject.
 const literalType = (value, base) => ({ k: 'literal', value, base });
+const conditionalType = (check, extendsType, trueType, falseType) => ({ k: 'conditional', check, extends: extendsType, trueType, falseType });
+const keyofType = (target) => ({ k: 'keyof', target });
+const indexedAccessType = (target, index) => ({ k: 'indexed', target, index });
+const mappedType = (variable, key, value, optional = false) => ({ k: 'mapped', variable, key, value, optional });
 
 function union(members) {
   const flat = [];
@@ -155,6 +159,14 @@ function showType(t, seen = new Set()) {
       return t.name;
     case 'literal':
       return typeof t.value === 'string' ? JSON.stringify(t.value) : String(t.value);
+    case 'conditional':
+      return `${showType(t.check, seen)} extends ${showType(t.extends, seen)} ? ${showType(t.trueType, seen)} : ${showType(t.falseType, seen)}`;
+    case 'keyof':
+      return `keyof ${showType(t.target, seen)}`;
+    case 'indexed':
+      return `${showType(t.target, seen)}[${showType(t.index, seen)}]`;
+    case 'mapped':
+      return `{ [${t.variable} in ${showType(t.key, seen)}]${t.optional ? '?' : ''}: ${showType(t.value, seen)} }`;
     case 'named':
       return t.name;
     default:
@@ -166,13 +178,177 @@ function sameType(a, b) {
   return showType(a) === showType(b);
 }
 
+const DEFERRED_KINDS = new Set(['conditional', 'keyof', 'indexed', 'mapped']);
+
+function isDeferred(t) {
+  return Boolean(t) && DEFERRED_KINDS.has(t.k);
+}
+
+// Does a type contain an unresolved type variable or a deferred type-level
+// expression? Named aliases are followed once, with a seen set so recursive
+// aliases terminate.
+function containsVariable(t, seen = new Set()) {
+  if (!t || typeof t !== 'object') return false;
+  if (t.k === 'var') return true;
+  if (DEFERRED_KINDS.has(t.k)) return true;
+  if (t.k === 'named') {
+    if (seen.has(t.name)) return false;
+    seen.add(t.name);
+    const target = aliasRegistry.get(t.name);
+    return target ? containsVariable(target, seen) : false;
+  }
+  if (seen.has(t)) return false;
+  seen.add(t);
+  switch (t.k) {
+    case 'list': return containsVariable(t.elem, seen);
+    case 'tuple': return t.elements.some((element) => containsVariable(element, seen));
+    case 'map': return containsVariable(t.key, seen) || containsVariable(t.value, seen);
+    case 'promise': return containsVariable(t.value, seen);
+    case 'union': return t.members.some((member) => containsVariable(member, seen));
+    case 'record': {
+      for (const field of t.fields.values()) if (containsVariable(field.type, seen)) return true;
+      return false;
+    }
+    case 'fn': return t.params.some((parameter) => containsVariable(parameter.type, seen)) || containsVariable(t.ret, seen);
+    case 'variant': return t.fields.some((field) => containsVariable(field.type, seen));
+    default: return false;
+  }
+}
+
+function literalValueOfKey(t) {
+  return t && t.k === 'literal' ? t.value : null;
+}
+
+function recordKeys(target) {
+  const resolved = deref(target);
+  if (resolved.k === 'record') return union([...resolved.fields.keys()].map((name) => literalType(name, PRIM.text)));
+  if (resolved.k === 'map') return resolved.key;
+  if (resolved.k === 'union') {
+    const keys = [];
+    for (const member of resolved.members) {
+      const memberType = deref(member);
+      if (memberType.k === 'record') {
+        for (const name of memberType.fields.keys()) keys.push(literalType(name, PRIM.text));
+      }
+    }
+    if (keys.length) return union(keys);
+  }
+  return null;
+}
+
+function indexOnce(target, index) {
+  const source = deref(target);
+  if (source.k === 'record' && isDeferred(index)) {
+    if (index.k === 'keyof') return union([...source.fields.values()].map((field) => field.optional ? union([field.type, PRIM.nothing]) : field.type));
+  }
+  if (source.k === 'record') {
+    const value = literalValueOfKey(index);
+    if (value !== null) {
+      const field = source.fields.get(String(value));
+      if (!field) return PRIM.never;
+      return field.optional ? union([field.type, PRIM.nothing]) : field.type;
+    }
+    if (index.k === 'keyof') return union([...source.fields.values()].map((field) => field.optional ? union([field.type, PRIM.nothing]) : field.type));
+    if (index.k === 'prim' && index.name === 'text') return union([...source.fields.values()].map((field) => field.type));
+  }
+  if (source.k === 'tuple') {
+    const value = literalValueOfKey(index);
+    if (typeof value === 'number') return source.elements[value] || PRIM.never;
+    if (index.k === 'prim' && index.name === 'number') return union([...source.elements, PRIM.nothing]);
+  }
+  if (source.k === 'list' && index.k === 'prim' && index.name === 'number') return union([source.elem, PRIM.nothing]);
+  if (source.k === 'map') {
+    if (index.k === 'prim' && index.name === 'text') return source.value;
+    if (literalValueOfKey(index) !== null) return source.value;
+  }
+  return null;
+}
+
+// Evaluate the deferred type-level constructs introduced by conditional,
+// mapped and indexed-access syntax. Types that still mention an unresolved
+// variable stay deferred until generic arguments are substituted.
+function evaluate(t, seen = new Set()) {
+  if (!t || typeof t !== 'object') return t;
+  if (!containsVariable(t) && !isDeferred(t)) return t;
+  if (t.k === 'named') return evaluate(deref(t), seen);
+  if (t.k === 'var') return t;
+  if (seen.has(t)) return t;
+  seen.add(t);
+
+  if (t.k === 'keyof') {
+    const target = evaluate(t.target, seen);
+    const keys = recordKeys(target);
+    if (keys) return keys;
+    if (target.k === 'var' && target.constraint) return evaluate(keyofType(target.constraint), seen);
+    return keyofType(target);
+  }
+
+  if (t.k === 'indexed') {
+    const target = evaluate(t.target, seen);
+    const index = evaluate(t.index, seen);
+    if (index.k === 'union') return union(index.members.map((member) => evaluate(indexedAccessType(target, member), seen)));
+    const direct = indexOnce(target, index);
+    if (direct !== null) return evaluate(direct, seen);
+    if (target.k === 'var' && target.constraint) return evaluate(indexedAccessType(target.constraint, index), seen);
+    return indexedAccessType(target, index);
+  }
+
+  if (t.k === 'conditional') {
+    const check = evaluate(t.check, seen);
+    const extendsType = evaluate(t.extends, seen);
+    if (!containsVariable(check) && !containsVariable(extendsType)) {
+      return evaluate(assignable(check, extendsType) ? t.trueType : t.falseType, seen);
+    }
+    return conditionalType(check, extendsType, evaluate(t.trueType, seen), evaluate(t.falseType, seen));
+  }
+
+  if (t.k === 'mapped') {
+    const key = evaluate(t.key, seen);
+    let members = [];
+    if (key.k === 'union') members = key.members;
+    else if (key.k === 'literal') members = [key];
+    if (members.length && members.every((member) => literalValueOfKey(member) !== null)) {
+      const fields = new Map();
+      for (const member of members) {
+        const keyValue = literalValueOfKey(member);
+        const replacement = new Map([[t.variable, member]]);
+        fields.set(String(keyValue), { type: evaluate(substituteRaw(t.value, replacement), seen), optional: Boolean(t.optional) });
+      }
+      return record(fields);
+    }
+    return mappedType(t.variable, key, t.value, t.optional);
+  }
+
+  if (t.k === 'union') return union(t.members.map((member) => evaluate(member, seen)));
+  if (t.k === 'list') return listOf(evaluate(t.elem, seen));
+  if (t.k === 'tuple') return tupleOf(t.elements.map((element) => evaluate(element, seen)));
+  if (t.k === 'map') return mapOf(evaluate(t.key, seen), evaluate(t.value, seen));
+  if (t.k === 'promise') return promiseOf(evaluate(t.value, seen));
+  if (t.k === 'fn') {
+    return fnType(
+      t.params.map((parameter) => ({ ...parameter, type: evaluate(parameter.type, seen) })),
+      evaluate(t.ret, seen),
+      t.typeParams,
+      t.predicate ? { ...t.predicate, type: evaluate(t.predicate.type, seen) } : null,
+    );
+  }
+  if (t.k === 'record') {
+    const fields = new Map();
+    for (const [name, field] of t.fields) fields.set(name, { type: evaluate(field.type, seen), optional: field.optional });
+    return record(fields, { name: t.name, open: t.open });
+  }
+  if (t.k === 'variant') return variant(t.name, t.fields.map((field) => ({ name: field.name, type: evaluate(field.type, seen) })), t.unionName);
+  return t;
+}
+
 // Structural assignability. `from` is the value's type, `to` the expected one.
 // Any at the boundary is bidirectional on purpose: npm and browser APIs are
 // untyped, and PlainScript refuses to pretend otherwise.
 function assignable(from, to, seen = new Set()) {
   if (!from || !to) return true;
-  from = deref(from, new Set());
-  to = deref(to, new Set());
+  from = deref(evaluate(from), new Set());
+  to = deref(evaluate(to), new Set());
+  if (isDeferred(from) || isDeferred(to)) return true;
   if (isError(from) || isError(to)) return true;
   if (isAny(from) || isAny(to)) return true;
   if (to.k === 'prim' && to.name === 'unknown') return true;
@@ -262,8 +438,9 @@ function assignable(from, to, seen = new Set()) {
 // substitutions. Conflicting bindings are joined into a union.
 function infer(pattern, actual, subst, depth = 0) {
   if (!pattern || !actual || depth > 40) return true;
-  pattern = deref(pattern, new Set());
-  actual = deref(actual, new Set());
+  pattern = deref(evaluate(pattern), new Set());
+  actual = deref(evaluate(actual), new Set());
+  if (isDeferred(pattern) || isDeferred(actual)) return true;
   if (pattern.k === 'var') {
     if (pattern.constraint && !assignable(actual, substitute(pattern.constraint, subst))) return false;
     const existing = subst.get(pattern.name);
@@ -313,40 +490,59 @@ function infer(pattern, actual, subst, depth = 0) {
   return true;
 }
 
-function substitute(t, subst) {
+function substituteRaw(t, subst) {
   if (!t) return t;
   switch (t.k) {
     case 'var':
-      return subst.has(t.name) ? subst.get(t.name) : (t.constraint ? { ...t, constraint: substitute(t.constraint, subst) } : t);
+      return subst.has(t.name) ? subst.get(t.name) : (t.constraint ? { ...t, constraint: substituteRaw(t.constraint, subst) } : t);
     case 'list':
-      return listOf(substitute(t.elem, subst));
+      return listOf(substituteRaw(t.elem, subst));
     case 'tuple':
-      return tupleOf(t.elements.map((element) => substitute(element, subst)));
+      return tupleOf(t.elements.map((element) => substituteRaw(element, subst)));
     case 'map':
-      return mapOf(substitute(t.key, subst), substitute(t.value, subst));
+      return mapOf(substituteRaw(t.key, subst), substituteRaw(t.value, subst));
     case 'promise':
-      return promiseOf(substitute(t.value, subst));
+      return promiseOf(substituteRaw(t.value, subst));
     case 'union':
-      return union(t.members.map((m) => substitute(m, subst)));
+      return union(t.members.map((m) => substituteRaw(m, subst)));
+    case 'conditional':
+      return conditionalType(
+        substituteRaw(t.check, subst),
+        substituteRaw(t.extends, subst),
+        substituteRaw(t.trueType, subst),
+        substituteRaw(t.falseType, subst),
+      );
+    case 'keyof':
+      return keyofType(substituteRaw(t.target, subst));
+    case 'indexed':
+      return indexedAccessType(substituteRaw(t.target, subst), substituteRaw(t.index, subst));
+    case 'mapped':
+      return mappedType(t.variable, substituteRaw(t.key, subst), substituteRaw(t.value, subst), t.optional);
     case 'record': {
       const fields = new Map();
       for (const [name, field] of t.fields) {
-        fields.set(name, { type: substitute(field.type, subst), optional: field.optional });
+        fields.set(name, { type: substituteRaw(field.type, subst), optional: field.optional });
       }
       return record(fields, { name: t.name, open: t.open });
     }
     case 'fn':
       return fnType(
-        t.params.map((p) => ({ ...p, type: substitute(p.type, subst) })),
-        substitute(t.ret, subst),
+        t.params.map((p) => ({ ...p, type: substituteRaw(p.type, subst) })),
+        substituteRaw(t.ret, subst),
+        t.typeParams,
+        t.predicate ? { ...t.predicate, type: substituteRaw(t.predicate.type, subst) } : null,
       );
     case 'variant':
-      return variant(t.name, t.fields.map((f) => ({ name: f.name, type: substitute(f.type, subst) })), t.unionName);
+      return variant(t.name, t.fields.map((f) => ({ name: f.name, type: substituteRaw(f.type, subst) })), t.unionName);
     case 'literal':
       return t;
     default:
       return t;
   }
+}
+
+function substitute(t, subst) {
+  return evaluate(substituteRaw(t, subst));
 }
 
 module.exports = {
@@ -361,6 +557,13 @@ module.exports = {
   variant,
   unitVariant,
   literalType,
+  conditionalType,
+  keyofType,
+  indexedAccessType,
+  mappedType,
+  isDeferred,
+  containsVariable,
+  evaluate,
   union,
   optionalOf,
   isNothing,

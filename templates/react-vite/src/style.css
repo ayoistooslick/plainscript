@@ -1,0 +1,7 @@
+:root { color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+body { margin: 0; background: #f4f7f3; color: #16332c; }
+.app { max-width: 34rem; margin: 12vh auto; padding: 2.5rem; background: #fff; border: 1px solid #dce7df; border-radius: 18px; box-shadow: 0 24px 60px rgba(22, 51, 44, .08); }
+h1 { margin: 0 0 .5rem; letter-spacing: -.045em; font-size: clamp(2rem, 6vw, 3.4rem); }
+p { color: #537066; line-height: 1.6; }
+button { border: 0; border-radius: 10px; padding: .8rem 1.15rem; background: #176b52; color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+button:hover { background: #0f533f; }

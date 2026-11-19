@@ -115,7 +115,9 @@ export function onCancel(signal, callback) {
 
 export function group(options = {}) {
   const settings = typeof options === 'string' ? { label: options } : (options || {});
-  const parent = settings.parent || settings.signal || null;
+  const requestedParent = settings.parent || settings.signal || null;
+  // Callers may pass either a signal or another task group as the parent.
+  const parent = requestedParent && requestedParent.signal ? requestedParent.signal : requestedParent;
   const g = {
     label: settings.label || 'task group',
     signal: makeSignal(parent),
@@ -342,9 +344,10 @@ function channelReceive(state, signal) {
 function channelClose(state) {
   if (state.closed) return;
   state.closed = true;
+  // Buffered values remain receivable after close. Waiters with no buffered
+  // value observe the closure immediately; pending sends cannot complete.
   for (const receiver of state.receivers.splice(0)) rejectWaiter(receiver, new ChannelClosedError());
   for (const sender of state.senders.splice(0)) rejectWaiter(sender, new ChannelClosedError('channel closed before send completed'));
-  state.values.length = 0;
 }
 
 export async function spawnWorker(source, options = {}) {

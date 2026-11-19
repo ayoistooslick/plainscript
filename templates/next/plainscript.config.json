@@ -1,0 +1,7 @@
+{
+  "compilerOptions": {
+    "rootDir": "app",
+    "outDir": "app/generated",
+    "exclude": ["app/generated"]
+  }
+}

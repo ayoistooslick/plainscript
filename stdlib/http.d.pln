@@ -1,12 +1,13 @@
 # Declarations for std/http. Requests and Responses are the Web-standard
 # objects, so their members are typed `any` at this boundary.
 
-export declare function serve(port: number, handler: (request: any) -> any) -> Promise of any
+export declare function serve(port: number, handler: (request: any) -> any, options?: any) -> Promise of any
 export declare function json(data: any, status?: number) -> any
 export declare function text(body: text, status?: number) -> any
 export declare function html(body: text, status?: number) -> any
 export declare function javascript(body: text, status?: number) -> any
 export declare function css(body: text, status?: number) -> any
+export declare function sse(source: any, options?: any) -> any
 export declare function redirect(location: text, status?: number) -> any
 export declare function notFound(body?: text) -> any
 export declare function requestJson(request: any) -> Promise of any

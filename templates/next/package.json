@@ -1,0 +1,21 @@
+{
+  "name": "plainscript-next",
+  "version": "0.1.0",
+  "description": "Next.js App Router starter with a PlainScript server component",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "npm run build:plain && next build",
+    "build:plain": "plainscript build",
+    "check": "plainscript check",
+    "dev": "npm run build:plain && next dev"
+  },
+  "dependencies": {
+    "next": "^15.1.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "plainscript-lang": "^2.0.0"
+  }
+}

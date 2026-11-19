@@ -136,6 +136,10 @@ class Parser {
   statement() {
     const token = this.peek();
 
+    if (token.t === 'ident' && token.v === 'overload' && this.peek(1).t === 'kw' && this.peek(1).v === 'function') {
+      return this.overloadDeclaration({ exported: false });
+    }
+
     if (token.t === 'kw') {
       switch (token.v) {
         case 'import': return this.importDeclaration();
@@ -296,6 +300,9 @@ class Parser {
       if (!this.atKw('function')) this.fail('PS2003', 'Expected "function" after "async".');
       return this.functionDeclaration({ exported: true, async: true, token: start });
     }
+    if (this.atIdent() && this.peek().v === 'overload' && this.peek(1).t === 'kw' && this.peek(1).v === 'function') {
+      return this.overloadDeclaration({ exported: true, token: start });
+    }
     if (this.atKw('function')) return this.functionDeclaration({ exported: true, token: start });
     if (this.atKw('let') || this.atKw('const')) return this.variableDeclaration({ exported: true, token: start });
     this.fail('PS2005', 'Expected a declaration after "export".', start);
@@ -353,7 +360,7 @@ class Parser {
       let returnType = null;
       if (this.atPunct('->')) {
         this.next();
-        returnType = this.typeExpression();
+        returnType = this.returnAnnotation();
       }
       const node = this.node('DeclareFunction', fnToken, { name, nameLine: nameToken.line, nameCol: nameToken.col, typeParams, params, returnType, exported: false, line: start.line, col: start.col });
       if (Object.keys(typeParameterInfo.constraints).length) node.typeParamConstraints = typeParameterInfo.constraints;
@@ -394,27 +401,42 @@ class Parser {
   // of element, not a list-or-text. Parenthesise to group: `(number or text)?`.
   typeExpression() {
     const start = this.peek();
-    const members = [this.typeIntersection()];
+    const check = this.typeUnion();
+    if (this.atIdent() && this.peek().v === 'extends') {
+      this.next();
+      const extendsType = this.typeUnion(false);
+      this.expectPunct('?');
+      const trueType = this.typeExpression();
+      this.expectPunct(':');
+      const falseType = this.typeExpression();
+      return this.node('ConditionalType', start, { check, extendsType, trueType, falseType });
+    }
+    return check;
+  }
+
+  typeUnion(allowOptional = true) {
+    const start = this.peek();
+    const members = [this.typeIntersection(allowOptional)];
     while (this.atKw('or')) {
       this.next();
-      members.push(this.typeIntersection());
+      members.push(this.typeIntersection(allowOptional));
     }
     if (members.length > 1) return this.node('UnionType', start, { members });
     return members[0];
   }
 
-  typeIntersection() {
+  typeIntersection(allowOptional = true) {
     const start = this.peek();
-    const members = [this.typeOptional()];
+    const members = [this.typeOptional(allowOptional)];
     while (this.atPunct('&')) {
       this.next();
-      members.push(this.typeOptional());
+      members.push(this.typeOptional(allowOptional));
     }
     if (members.length > 1) return this.node('IntersectionType', start, { members });
     return members[0];
   }
 
-  typeOptional() {
+  typeOptional(allowOptional = true) {
     const start = this.peek();
     let type = this.typePrimary();
     while (this.atPunct('[')) {
@@ -423,7 +445,7 @@ class Parser {
       this.expectPunct(']');
       type = this.node('IndexedAccessType', start, { target: type, index });
     }
-    if (this.atPunct('?')) {
+    if (allowOptional && this.atPunct('?')) {
       this.next();
       return this.node('OptionalType', start, { inner: type });
     }
@@ -503,6 +525,19 @@ class Parser {
     }
     if (token.t === 'punct' && token.v === '{') {
       this.next();
+      if (this.atPunct('[')) {
+        this.next();
+        const keyName = this.expectIdent('a mapped-type key').v;
+        this.expectKw('in', 'PS2007');
+        const keyType = this.typeExpression();
+        this.expectPunct(']');
+        const optional = this.atPunct('?');
+        if (optional) this.next();
+        this.expectPunct(':');
+        const valueType = this.typeExpression();
+        this.expectPunct('}');
+        return this.node('MappedType', token, { keyName, keyType, valueType, optional });
+      }
       const fields = [];
       while (!this.atPunct('}')) {
         const name = this.expectIdent('a field name').v;
@@ -589,6 +624,16 @@ class Parser {
 
   // --------------------------------------------------------------- functions
 
+  returnAnnotation() {
+    if (this.atIdent() && this.peek(1).t === 'kw' && this.peek(1).v === 'is') {
+      const token = this.next();
+      const parameter = token.v;
+      this.next();
+      return this.node('PredicateType', token, { parameter, target: this.typeExpression() });
+    }
+    return this.typeExpression();
+  }
+
   parameterList() {
     this.expectPunct('(');
     const params = [];
@@ -614,6 +659,27 @@ class Parser {
     return params;
   }
 
+  overloadDeclaration(options = {}) {
+    const start = options.token || this.peek();
+    if (this.atIdent() && this.peek().v === 'overload') this.next();
+    this.expectKw('function');
+    const nameToken = this.expectIdent('an overloaded function name');
+    const typeParameterInfo = this.typeParameterList();
+    const params = this.parameterList();
+    let returnType = null;
+    if (this.atPunct('->')) {
+      this.next();
+      returnType = this.returnAnnotation();
+    }
+    const node = this.node('OverloadDecl', start, {
+      name: nameToken.v, nameLine: nameToken.line, nameCol: nameToken.col,
+      typeParams: typeParameterInfo.params, params, returnType,
+      async: false, exported: Boolean(options.exported),
+    });
+    if (Object.keys(typeParameterInfo.constraints).length) node.typeParamConstraints = typeParameterInfo.constraints;
+    return node;
+  }
+
   functionDeclaration(options = {}) {
     const token = options.token || this.peek();
     this.expectKw('function');
@@ -627,7 +693,7 @@ class Parser {
     let returnType = null;
     if (this.atPunct('->')) {
       this.next();
-      returnType = this.typeExpression();
+      returnType = this.returnAnnotation();
     }
     const body = this.blockBody('function');
     const node = this.node('FunctionDecl', token, {
@@ -1276,7 +1342,7 @@ class Parser {
     let returnType = null;
     if (this.atPunct('->')) {
       this.next();
-      returnType = this.typeExpression();
+      returnType = this.returnAnnotation();
     }
     const body = this.blockBody('function expression');
     const node = this.node('FunctionExpression', token, { typeParams, params, returnType, body, async: false });

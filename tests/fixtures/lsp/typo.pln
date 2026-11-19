@@ -1,0 +1,5 @@
+function greet(name: text) -> text
+    return "Hello, {name}"
+end
+
+grert("Ada")

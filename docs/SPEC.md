@@ -136,9 +136,10 @@ other expression (`export default main`, `export default { ... }`) is emitted as
 A compiled module can ship its surface as a declaration file.
 `plainscript build --declarations` writes `<name>.d.pln` next to every emitted
 `<name>.js`. A declaration file contains only exported type declarations, `declare
-function` signatures (inferred return types included), `declare const` values,
-re-exports, and the imports those signatures use; private types referenced by public
-signatures are kept without `export`.
+function` signatures (inferred return types included), overload signatures, `declare
+const` values, re-exports, and the imports those signatures use; private types referenced
+by public signatures are kept without `export`. Conditional, mapped, indexed, tuple and
+literal types are printed in their source form.
 
 A relative import of `./x.js` reads `./x.d.pln` for its types, so a project can compile
 and run against built JavaScript without the library's sources. JavaScript imported
@@ -215,6 +216,29 @@ end
   declaration requires one.
 - Functions are values: passing one where a function type is expected checks arity and
   parameter/return assignability.
+- **Overloads** declare one or more call signatures followed by exactly one implementation:
+
+  ```plainscript
+  overload function format(value: text) -> text
+  overload function format(value: number) -> text
+  function format(value: any) -> text
+      return "value:{value}"
+  end
+  ```
+
+  A call selects the first signature whose arguments are inferable/assignable. No match is
+  `PS3354`; an incompatible or missing implementation is `PS3355`. Overloads survive
+  imports and generated `.d.pln` declarations.
+- **Type predicates** narrow the first argument when the function is called in a condition:
+
+  ```plainscript
+  function isPerson(value: any) -> value is Person
+      return value != nothing and value.name is text
+  end
+  ```
+
+  A predicate must name a parameter and cannot be async (`PS3353`). The positive branch
+  has the target type; the negative branch removes it from unions and optionals.
 
 ### 4.3 Lambdas
 
@@ -294,6 +318,10 @@ keyof { name: text }      # literal union of field names
 typeof value              # type of a declared value
 Person["name"]            # indexed access to a field
 Pair[0]                   # indexed access to a tuple element
+T[K]                      # deferred indexed access while T/K are generic
+A extends B ? C : D       # conditional type
+{ [K in keyof T]: T[K] }  # mapped type
+{ [K in keyof T]?: V }    # optional mapped fields
 "open"                    # literal type
 T<...>                    # named generic instantiation
 ```
@@ -305,10 +333,16 @@ methods or a `.length` property; use `std/list`.
 Tuple types use brackets: `[number, text]`. A literal numeric index selects that element;
 destructuring and assignment are checked element by element. `keyof` produces a literal
 union of the record's field names, and `typeof` reuses the type of a hoisted value. Indexed
-access is supported for record field literals, tuple indexes and map keys; a field key that
-does not exist is `PS3207`. `A & B` merges record fields, with conflicting required fields
-intersected (usually `never`). Conditional/mapped types, generic deferred indexed access,
-`readonly` field modifiers and overloads are not implemented.
+access is supported for record field literals, tuple indexes, list elements, map keys and
+`keyof` of a known record; a missing field is `PS3207`. `A & B` merges record fields, with
+conflicting required fields intersected (usually `never`).
+
+Conditional types are non-distributive and evaluate when their check no longer contains an
+unresolved type parameter. Mapped types expand when the key set is a concrete literal union
+(commonly `keyof` of a known record); otherwise they stay deferred. Deferred indexed access
+such as `T[0]` resolves after generic substitution. While a construct is deferred the
+checker is intentionally permissive, like an unresolved generic; concrete instantiation is
+the enforcement point. Variadic tuples and `readonly` field modifiers are not implemented.
 
 ### 5.3 Assignability
 
@@ -318,15 +352,20 @@ A value of type `S` is assignable to `T` when:
 - primitives are identical;
 - both are lists with assignable elements, or maps with assignable values;
 - both are functions with equal parameter counts (optional and rest handled), assignable
-  parameters (contravariant) and assignable results;
+  parameters (contravariant) and assignable results (covariant);
 - records are structurally assignable: every required field of `T` exists in `S` with an
   assignable type; extra fields in `S` are allowed; optional fields may be absent;
 - both are tuples of equal length with pairwise-assignable elements;
 - literal types are assignable to their primitive base and to the same literal;
 - `S` is a member of union `T`, or every member of union `S` is assignable to `T`;
+- a conditional type resolves to its selected branch, a mapped type to its expanded
+  record, and an indexed access to the selected field/element, before assignability is
+  decided;
 - `T` is a named alias that dereferences to a matching type.
 
-Nominal typing is not used. Two records with the same fields are the same type.
+Nominal typing is not used. Two records with the same fields are the same type. Variance is
+derived structurally: function parameters are contravariant, results and containers are
+covariant, and records are width-subtyped. There are no `in`/`out` variance annotations.
 
 ### 5.4 Narrowing
 
@@ -620,9 +659,10 @@ Notable type codes: `PS3205` missing export, `PS3301` unknown name, `PS3304` not
 `PS3307` immutable assignment, `PS3311` bad initialiser, `PS3317` bad assignment,
 `PS3327` await non-Promise, `PS3333` unknown field, `PS3341`/`PS3342` arity,
 `PS3343` argument type, `PS3344` arithmetic on non-numbers, `PS3345` non-exhaustive match,
-`PS3350` maybe-nothing access, `PS3351` union missing field, `PS3401` missing return,
-`PS3402` `return` without a value, `PS3404` return type mismatch, `PS3406` await outside
-async.
+`PS3350` maybe-nothing access, `PS3351` union missing field, `PS3353` invalid type
+predicate, `PS3354` no overload matches, `PS3355` overload/implementation mismatch,
+`PS3401` missing return, `PS3402` `return` without a value, `PS3404` return type mismatch,
+`PS3406` await outside async.
 
 ---
 

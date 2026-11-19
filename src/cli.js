@@ -32,19 +32,23 @@ Commands
   fmt [files...]             normalise indentation and blank lines
   test [files...]            run *.test.pln files
   new <name> [--template <id>]  scaffold a new project, optionally from a bundled template
-                              templates: project-management, ecommerce, realtime-chat
+                              templates: project-management, ecommerce, realtime-chat,
+                              react-vite, next, express, cli, library
   watch [files...]           rebuild the project when a .pln file changes
   ir <file.pln>              print the high-level IR as JSON
   lsp                        start the language server over stdio
+  migrate [files...]         scan JavaScript/TypeScript for migration blockers
   version                    print the compiler version
   help                       show this message
 
 Options
   --quiet       only print errors
   --verbose     print every compilation stage
-  --check       with fmt: report unformatted files instead of writing
+  --check       with fmt: report unformatted files; with migrate: exit 1 on findings
   --std-base=<url>  browser build: import std modules from <url>/<name>.js
   --declarations    with build: also write <name>.d.pln for every module
+  --template=<id>   with new: choose a bundled starter
+  --json        with migrate: print a machine-readable report
   --help        show this message
 
 Exit codes
@@ -52,7 +56,7 @@ Exit codes
 `;
 
 function parseArguments(argv) {
-  const flags = { quiet: false, verbose: false, check: false, help: false, stdBase: null, template: null, declarations: false };
+  const flags = { quiet: false, verbose: false, check: false, help: false, stdBase: null, template: null, declarations: false, json: false };
   const positional = [];
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
@@ -60,6 +64,7 @@ function parseArguments(argv) {
     else if (argument === '--verbose') flags.verbose = true;
     else if (argument === '--check') flags.check = true;
     else if (argument === '--declarations') flags.declarations = true;
+    else if (argument === '--json') flags.json = true;
     else if (argument === '--help' || argument === '-h') flags.help = true;
     else if (argument.startsWith('--std-base=')) flags.stdBase = argument.slice('--std-base='.length);
     else if (argument === '--template' || argument === '-t') {
@@ -536,6 +541,64 @@ function copyTemplate(from, to) {
   }
 }
 
+const MIGRATION_CHECKS = [
+  { code: 'COMMONJS_REQUIRE', pattern: /\brequire\s*\(/, message: 'CommonJS require() must be replaced with an ES import.' },
+  { code: 'COMMONJS_EXPORT', pattern: /\bmodule\.exports\b|\bexports\.[A-Za-z_$]/, message: 'CommonJS exports must be replaced with export declarations.' },
+  { code: 'TS_INTERFACE', pattern: /\binterface\s+[A-Za-z_]/, message: 'TypeScript interfaces need a PlainScript type declaration.' },
+  { code: 'TS_ENUM', pattern: /\benum\s+[A-Za-z_]/, message: 'TypeScript enums should become a PlainScript variant or literal union.' },
+  { code: 'TS_NAMESPACE', pattern: /\bnamespace\s+[A-Za-z_]/, message: 'TypeScript namespaces are not part of PlainScript; use modules.' },
+  { code: 'CLASS_SYNTAX', pattern: /\bclass\s+[A-Za-z_]/, message: 'Classes are JavaScript-boundary values; move the class into a .js module or rewrite it as records and functions.' },
+  { code: 'JSX_SYNTAX', pattern: /<\/?[A-Z][A-Za-z0-9]*(?:\s|>)/, message: 'JSX syntax must move to a JavaScript/JSX module reachable through the JavaScript boundary.' },
+  { code: 'JS_COMMENT', pattern: /^\s*\/\//, message: 'PlainScript comments start with #.' },
+];
+
+function migrationFiles(paths) {
+  const results = [];
+  const visit = (target) => {
+    let stat;
+    try { stat = fs.statSync(target); } catch { return; }
+    if (stat.isDirectory()) {
+      for (const entry of fs.readdirSync(target, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+        if (entry.name === 'node_modules' || entry.name === 'dist' || entry.name === 'legacy' || entry.name.startsWith('.')) continue;
+        visit(path.join(target, entry.name));
+      }
+      return;
+    }
+    if (stat.isFile() && /\.(?:js|jsx|ts|tsx)$/.test(target)) results.push(target);
+  };
+  for (const target of paths.length ? paths : ['.']) visit(path.resolve(target));
+  return results.sort();
+}
+
+function commandMigrate(positional, flags = {}) {
+  const files = migrationFiles(positional);
+  const findings = [];
+  for (const file of files) {
+    let source;
+    try { source = fs.readFileSync(file, 'utf8'); } catch { continue; }
+    const lines = source.split('\n');
+    lines.forEach((line, index) => {
+      for (const check of MIGRATION_CHECKS) {
+        if (!check.pattern.test(line)) continue;
+        findings.push({ file: path.relative(process.cwd(), file), line: index + 1, code: check.code, message: check.message });
+      }
+    });
+    if (/\.(?:jsx|tsx)$/.test(file)) {
+      findings.push({ file: path.relative(process.cwd(), file), line: 1, code: 'JSX_FILE', message: 'Keep JSX files as JavaScript modules and call them from PlainScript.' });
+    }
+  }
+  if (flags.json) {
+    process.stdout.write(`${JSON.stringify({ files: files.length, findings }, null, 2)}\n`);
+  } else {
+    process.stdout.write(`Migration scan: ${files.length} file(s), ${findings.length} finding(s).\n`);
+    for (const finding of findings) {
+      process.stdout.write(`${finding.file}:${finding.line}: ${finding.code}: ${finding.message}\n`);
+    }
+    if (!findings.length) process.stdout.write('No mechanical migration blockers found. Review syntax before renaming files to .pln.\n');
+  }
+  return flags.check && findings.length ? 1 : 0;
+}
+
 function commandNew(positional, flags = {}) {
   if (!positional.length) {
     process.stderr.write('plainscript new needs a project name.\n');
@@ -649,6 +712,7 @@ function main(argv) {
     test: commandTest,
     ir: commandIr,
     lsp: commandLsp,
+    migrate: commandMigrate,
     new: commandNew,
     version: () => { process.stdout.write(`${VERSION}\n`); return 0; },
   };

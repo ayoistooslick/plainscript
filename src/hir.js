@@ -75,6 +75,7 @@ class Lowerer {
       case 'TypeDecl':
       case 'DeclareFunction':
       case 'DeclareValue':
+      case 'OverloadDecl':
         return null;
       case 'FunctionDecl':
         return this.functionDeclaration(node);

@@ -130,6 +130,10 @@ class Checker {
   }
 
   resolveType(node, typeEnv = new Map()) {
+    return T.evaluate(this.resolveTypeRaw(node, typeEnv));
+  }
+
+  resolveTypeRaw(node, typeEnv = new Map()) {
     if (!node) return T.PRIM.any;
     switch (node.kind) {
       case 'NamedType': {
@@ -184,6 +188,7 @@ class Checker {
         return T.tupleOf(node.elements.map((element) => this.resolveType(element, typeEnv)));
       case 'KeyofType': {
         const target = T.deref(this.resolveType(node.target, typeEnv));
+        if (target.k === 'var' || T.isDeferred(target)) return T.keyofType(target);
         if (target.k === 'record') {
           return T.union([...target.fields.keys()].map((name) => T.literalType(name, T.PRIM.text)));
         }
@@ -213,6 +218,24 @@ class Checker {
           ? T.PRIM.text
           : typeof node.value === 'number' ? T.PRIM.number : T.PRIM.boolean;
         return T.literalType(node.value, base);
+      }
+      case 'ConditionalType':
+        return T.conditionalType(
+          this.resolveType(node.check, typeEnv),
+          this.resolveType(node.extendsType, typeEnv),
+          this.resolveType(node.trueType, typeEnv),
+          this.resolveType(node.falseType, typeEnv),
+        );
+      case 'MappedType': {
+        const keyType = T.typeVar(node.keyName);
+        const localEnv = new Map(typeEnv);
+        localEnv.set(node.keyName, keyType);
+        return T.mappedType(
+          node.keyName,
+          this.resolveType(node.keyType, typeEnv),
+          this.resolveType(node.valueType, localEnv),
+          Boolean(node.optional),
+        );
       }
       case 'UnionType':
         return T.union(node.members.map((member) => this.resolveType(member, typeEnv)));
@@ -292,6 +315,9 @@ class Checker {
     let target = T.deref(targetType);
     if (target.k === 'var' && target.constraint) target = T.deref(target.constraint);
     const index = T.deref(indexType);
+    if (target.k === 'var' || index.k === 'var' || T.isDeferred(target) || T.isDeferred(index)) {
+      return T.indexedAccessType(target, index);
+    }
     if (index.k === 'union') {
       return T.union(index.members.map((member) => this.indexedAccessType(target, member, node)));
     }
@@ -482,32 +508,61 @@ class Checker {
       defaultValue: parameter.defaultValue,
       node: parameter,
     }));
-    const declared = node.returnType ? this.resolveType(node.returnType, typeEnv) : null;
+    const predicateNode = node.returnType && node.returnType.kind === 'PredicateType' ? node.returnType : null;
+    const declared = node.returnType && !predicateNode ? this.resolveType(node.returnType, typeEnv) : null;
+    let predicate = null;
+    if (predicateNode) {
+      const parameter = node.params.find((item) => item.name === predicateNode.parameter);
+      if (!parameter) {
+        this.report('PS3353', `Type predicate refers to \"${predicateNode.parameter}\", which is not a parameter of this function.`, predicateNode);
+      } else if (node.async) {
+        this.report('PS3353', 'A type predicate function cannot be async.', predicateNode);
+      } else {
+        predicate = { parameter: predicateNode.parameter, type: this.resolveType(predicateNode.target, typeEnv) };
+      }
+    }
+    const declaredReturn = predicate ? T.PRIM.boolean : declared;
     const ret = node.async
-      ? (declared && declared.k === 'promise' ? declared : T.promiseOf(declared || T.PRIM.any))
-      : (declared || null);
+      ? (declaredReturn && declaredReturn.k === 'promise' ? declaredReturn : T.promiseOf(declaredReturn || T.PRIM.any))
+      : (declaredReturn || null);
     const signature = {
-      params, ret, declaredReturn: declared, typeParams: node.typeParams,
-      typeParamConstraints: node.typeParamConstraints || {}, typeEnv, async: Boolean(node.async),
+      params, ret, declaredReturn, predicate, typeParams: node.typeParams,
+      typeParamConstraints: node.typeParamConstraints || {}, typeEnv, async: Boolean(node.async), node,
     };
     node.__signature = signature;
     return signature;
   }
 
+  overloadsFrom(statements) {
+    const overloads = new Map();
+    for (const statement of statements) {
+      if (statement.kind !== 'OverloadDecl') continue;
+      if (!overloads.has(statement.name)) overloads.set(statement.name, []);
+      overloads.get(statement.name).push(statement);
+    }
+    return overloads;
+  }
+
   // Function declarations are hoisted within the block that contains them, so
   // a function body may call a sibling declared further down.
-  hoistFunctions(statements) {
+  hoistFunctions(statements, knownOverloads = null) {
+    const overloads = knownOverloads || this.overloadsFrom(statements);
     for (const statement of statements) {
       if (statement.kind !== 'FunctionDecl') continue;
       // An anonymous `export default function () ... end` has no local name.
       if (!statement.name) continue;
       if (this.scope.names.has(statement.name)) continue;
       const signature = this.signatureOf(statement);
+      const declarations = overloads.get(statement.name);
+      if (declarations && declarations.length) {
+        signature.overloads = declarations.map((declaration) => this.signatureOf(declaration));
+      }
       statement.__signature = signature;
       this.define(statement.name, {
         kind: 'function',
-        type: T.fnType(signature.params, signature.ret, signature.typeParams),
+        type: T.fnType(signature.params, signature.ret, signature.typeParams, signature.predicate),
         signature,
+        overloads: signature.overloads || null,
         node: statement,
         mutable: false,
       }, statement);
@@ -517,6 +572,7 @@ class Checker {
   }
 
   hoist() {
+    const topLevelOverloads = this.overloadsFrom(this.program.body);
     for (const statement of this.program.body) {
       switch (statement.kind) {
         case 'Import': {
@@ -583,6 +639,7 @@ class Checker {
             }
             this.define(name.local, {
               kind: entry && entry.kind ? entry.kind : 'const',
+              overloads: entry && entry.overloads ? entry.overloads : null,
               name: name.local,
               nameLine: name.line,
               nameCol: name.col,
@@ -598,14 +655,17 @@ class Checker {
           break;
         }
         case 'FunctionDecl':
-          this.hoistFunctions([statement]);
+          this.hoistFunctions([statement], topLevelOverloads);
           break;
         case 'DeclareFunction': {
           const signature = this.signatureOf(statement);
+          const declarations = topLevelOverloads.get(statement.name);
+          if (declarations && declarations.length) signature.overloads = declarations.map((declaration) => this.signatureOf(declaration));
           this.define(statement.name, {
             kind: 'function',
-            type: T.fnType(signature.params, signature.ret, signature.typeParams),
+            type: T.fnType(signature.params, signature.ret, signature.typeParams, signature.predicate),
             signature,
+            overloads: signature.overloads || null,
             node: statement,
             mutable: false,
           }, statement);
@@ -649,6 +709,14 @@ class Checker {
     // so a `type` declaration can name a type that was imported from another
     // module (`type Entry = { task: Task }`).
     this.hoist();
+    if (!/\.d\.pln$/.test(this.file)) {
+      for (const [name, declarations] of this.overloadsFrom(this.program.body)) {
+        const entry = this.lookup(name);
+        if (!entry || entry.kind !== 'function') {
+          this.report('PS3355', `Overloads for \"${name}\" have no function implementation.`, declarations[0]);
+        }
+      }
+    }
     this.resolveAllTypes();
     this.checkStatements(this.program.body);
     this.collectExports();
@@ -684,12 +752,12 @@ class Checker {
     for (const exported of this.exportedNames) {
       const entry = this.lookup(exported);
       if (!entry) continue;
-      values.set(exported, { kind: entry.kind, type: entry.type });
+      values.set(exported, { kind: entry.kind, type: entry.type, overloads: entry.overloads || null });
     }
     for (const [exported, local] of this.exports) {
       const entry = this.lookup(local);
       if (!entry) continue;
-      values.set(exported, { kind: entry.kind, type: entry.type });
+      values.set(exported, { kind: entry.kind, type: entry.type, overloads: entry.overloads || null });
     }
     if (this.defaultExportType) {
       values.set('default', { kind: 'const', type: this.defaultExportType });
@@ -720,6 +788,7 @@ class Checker {
       case 'TypeDecl':
       case 'DeclareFunction':
       case 'DeclareValue':
+      case 'OverloadDecl':
       case 'ExportNamed':
         return;
       case 'ExportDefault':
@@ -917,12 +986,35 @@ class Checker {
       node.__signature.ret = ret;
       node.__signature.inferred = true;
       const entry = node.name ? this.global.names.get(node.name) : null;
-      if (entry && entry.kind === 'function') entry.type = T.fnType(signature.params, ret, signature.typeParams);
+      if (entry && entry.kind === 'function') entry.type = T.fnType(signature.params, ret, signature.typeParams, signature.predicate);
       if (node.name) this.inferredFunctions.set(node.name, ret);
     }
 
+    if (signature.overloads) {
+      for (const overload of signature.overloads) {
+        const overloadRequired = overload.params.filter((parameter) => !parameter.optional && !parameter.rest).length;
+        const implementationRequired = signature.params.filter((parameter) => !parameter.optional && !parameter.rest).length;
+        if (overloadRequired < implementationRequired) {
+          this.report('PS3355', `Overload of \"${node.name}\" requires ${overloadRequired} argument(s), but its implementation requires ${implementationRequired}.`, node);
+        }
+        for (let index = 0; index < overload.params.length; index += 1) {
+          const implementation = signature.params[index];
+          if (!implementation) {
+            this.report('PS3355', `Overload parameter ${index + 1} of \"${node.name}\" has no matching implementation parameter.`, overload.node || node);
+            break;
+          }
+          if (!implementation.rest && !T.assignable(overload.params[index].type, implementation.type)) {
+            this.report('PS3355', `Overload parameter ${index + 1} of \"${node.name}\" is ${T.showType(overload.params[index].type)}, which the implementation parameter ${T.showType(implementation.type)} does not accept.`, node);
+          }
+        }
+        if (!T.assignable(overload.ret, signature.ret)) {
+          this.report('PS3355', `Overload of \"${node.name}\" returns ${T.showType(overload.ret)}, but the implementation returns ${T.showType(signature.ret)}.`, node);
+        }
+      }
+    }
+
     if (node.defaultExport) {
-      this.defaultExportType = T.fnType(signature.params, signature.ret, signature.typeParams);
+      this.defaultExportType = T.fnType(signature.params, signature.ret, signature.typeParams, signature.predicate);
     }
 
     this.scope = previous;
@@ -1479,6 +1571,42 @@ class Checker {
     return T.PRIM.error;
   }
 
+  callOverloads(node, overloads) {
+    const argumentTypes = node.args.map((argument) => this.typeOf(argument));
+    for (const signature of overloads) {
+      const required = signature.params.filter((parameter) => !parameter.optional && !parameter.rest).length;
+      const hasRest = signature.params.some((parameter) => parameter.rest);
+      if (node.args.length < required || (!hasRest && node.args.length > signature.params.length)) continue;
+      const subst = new Map();
+      let matches = true;
+      for (let index = 0; index < node.args.length; index += 1) {
+        const parameter = signature.params[index] || signature.params[signature.params.length - 1];
+        if (!parameter) { matches = false; break; }
+        const expectedType = parameter.rest ? elementTypeOf(parameter.type) : parameter.type;
+        if (!T.infer(expectedType, argumentTypes[index], subst)
+          || !T.assignable(argumentTypes[index], T.substitute(expectedType, subst))) {
+          matches = false;
+          break;
+        }
+      }
+      if (!matches) continue;
+      if (signature.predicate) {
+        const predicateIndex = signature.params.findIndex((parameter) => parameter.name === signature.predicate.parameter);
+        if (predicateIndex >= 0 && node.args[predicateIndex]) {
+          node.__predicate = { argument: node.args[predicateIndex], type: T.substitute(signature.predicate.type, subst) };
+        }
+      }
+      const result = T.substitute(signature.ret, subst);
+      this.registerVariantsDeep(result);
+      return result;
+    }
+    const expected = overloads
+      .map((signature) => `(${signature.params.map((parameter) => T.showType(parameter.type)).join(', ')}) -> ${T.showType(signature.ret)}`)
+      .join(' or ');
+    this.report('PS3354', `No overload matches this call; expected ${expected}.`, node);
+    return T.PRIM.any;
+  }
+
   callType(node, expected) {
     let calleeType;
 
@@ -1489,6 +1617,10 @@ class Checker {
     }
 
     const resolved = T.deref(calleeType);
+    const overloadEntry = node.callee.kind === 'Name' ? this.lookup(node.callee.name) : null;
+    if (overloadEntry && overloadEntry.overloads && overloadEntry.overloads.length) {
+      return this.callOverloads(node, overloadEntry.overloads);
+    }
     if (T.isAny(resolved)) {
       for (const argument of node.args) this.typeOf(argument);
       return T.PRIM.any;
@@ -1575,6 +1707,14 @@ class Checker {
       const constraint = T.substitute(variable.constraint, subst);
       if (!T.assignable(subst.get(name), constraint)) {
         this.report('PS3343', `Type argument ${T.showType(subst.get(name))} for "${name}" must satisfy ${T.showType(constraint)}.`, node);
+      }
+    }
+    if (resolved.predicate) {
+      const index = resolved.params.findIndex((parameter) => parameter.name === resolved.predicate.parameter);
+      if (index >= 0 && node.args[index]) {
+        node.__predicate = { argument: node.args[index], type: T.substitute(resolved.predicate.type, subst) };
+      } else {
+        this.report('PS3353', `A type predicate for \"${resolved.predicate.parameter}\" needs that argument at the call site.`, node);
       }
     }
     const resultType = T.substitute(resolved.ret, subst);
@@ -1795,6 +1935,10 @@ function narrowFacts(condition) {
     const path = pathOf(condition.value);
     if (path) facts.push({ path, type: condition.type, negative: false });
   }
+  if (condition.kind === 'Call' && condition.__predicate) {
+    const path = pathOf(condition.__predicate.argument);
+    if (path) facts.push({ path, type: condition.__predicate.type, negative: false });
+  }
   if (condition.kind === 'Binary') {
     if (condition.operator === 'and') {
       facts.push(...narrowFacts(condition.left), ...narrowFacts(condition.right));
@@ -1814,6 +1958,15 @@ function narrowFacts(condition) {
     for (const fact of narrowFacts(condition.operand)) facts.push({ ...fact, negative: !fact.negative });
   }
   return facts;
+}
+
+function removeType(type, target) {
+  const resolved = T.deref(type);
+  if (resolved.k === 'union') {
+    const kept = resolved.members.filter((member) => !T.assignable(member, target));
+    return kept.length ? T.union(kept) : T.PRIM.never;
+  }
+  return T.assignable(resolved, target) ? T.PRIM.never : type;
 }
 
 function narrowMember(type, segments, replacement, negative) {
@@ -1857,14 +2010,17 @@ function applyFacts(scope, facts) {
     const entry = scope.lookup(fact.path[0]);
     if (!entry) continue;
     const rest = fact.path.slice(1);
-    const isNothingFact = fact.type.kind === 'NamedType' && fact.type.name === 'nothing';
+    const resolvedFact = fact.type && fact.type.k !== undefined && fact.type.kind === undefined;
+    const isNothingFact = resolvedFact
+      ? fact.type.k === 'prim' && fact.type.name === 'nothing'
+      : fact.type.kind === 'NamedType' && fact.type.name === 'nothing';
     const replacement = isNothingFact
       ? T.PRIM.nothing
-      : (checker ? checker.resolveType(fact.type) : T.PRIM.any);
+      : (resolvedFact ? fact.type : (checker ? checker.resolveType(fact.type) : T.PRIM.any));
 
     let type;
     if (!rest.length) {
-      type = fact.negative ? T.withoutNothing(entry.type) : replacement;
+      type = fact.negative ? removeType(entry.type, replacement) : replacement;
     } else {
       type = narrowMember(entry.type, rest, replacement, fact.negative);
     }

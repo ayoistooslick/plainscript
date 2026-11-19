@@ -1,0 +1,19 @@
+import { createElement, useState } from "react"
+
+export function App() -> any
+    let (count, setCount) = useState(0)
+
+    render
+        element "main" with className: "app"
+            element "h1"
+                "PlainScript + React + Vite"
+            end
+            element "p"
+                "Count: {count}"
+            end
+            element "button" with onClick: () => setCount(count + 1)
+                "Increment"
+            end
+        end
+    end
+end

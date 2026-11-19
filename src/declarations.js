@@ -29,6 +29,26 @@ function printTypeNode(node) {
       return node.members
         .map((member) => (member.kind === 'FunctionType' ? `(${printTypeNode(member)})` : printTypeNode(member)))
         .join(' or ');
+    case 'IntersectionType':
+      return node.members
+        .map((member) => (member.kind === 'UnionType' || member.kind === 'FunctionType' ? `(${printTypeNode(member)})` : printTypeNode(member)))
+        .join(' & ');
+    case 'TupleType':
+      return `[${node.elements.map(printTypeNode).join(', ')}]`;
+    case 'LiteralType':
+      return typeof node.value === 'string' ? JSON.stringify(node.value) : String(node.value);
+    case 'ConditionalType':
+      return `${printTypeNode(node.check)} extends ${printTypeNode(node.extendsType)} ? ${printTypeNode(node.trueType)} : ${printTypeNode(node.falseType)}`;
+    case 'MappedType':
+      return `{ [${node.keyName} in ${printTypeNode(node.keyType)}]${node.optional ? '?' : ''}: ${printTypeNode(node.valueType)} }`;
+    case 'KeyofType':
+      return `keyof ${printTypeNode(node.target)}`;
+    case 'IndexedAccessType':
+      return `${printTypeNode(node.target)}[${printTypeNode(node.index)}]`;
+    case 'TypeofType':
+      return node.value && node.value.kind === 'Name' ? `typeof ${node.value.name}` : 'any';
+    case 'PredicateType':
+      return `${node.parameter} is ${printTypeNode(node.target)}`;
     case 'FunctionType': {
       const params = node.params.map((parameter) => {
         const rest = parameter.rest ? '...' : '';
@@ -67,6 +87,18 @@ function printType(type) {
       return type.name;
     case 'list':
       return `list of ${atomType(type.elem)}`;
+    case 'tuple':
+      return `[${(type.elements || []).map(printType).join(', ')}]`;
+    case 'literal':
+      return typeof type.value === 'string' ? JSON.stringify(type.value) : String(type.value);
+    case 'conditional':
+      return `${printType(type.check)} extends ${printType(type.extends)} ? ${printType(type.trueType)} : ${printType(type.falseType)}`;
+    case 'keyof':
+      return `keyof ${atomType(type.target)}`;
+    case 'indexed':
+      return `${atomType(type.target)}[${printType(type.index)}]`;
+    case 'mapped':
+      return `{ [${type.variable || 'K'} in ${printType(type.key)}]${type.optional ? '?' : ''}: ${printType(type.value)} }`;
     case 'map':
       return `map of ${atomType(type.key)} to ${atomType(type.value)}`;
     case 'promise':
@@ -120,10 +152,7 @@ function declareType(statement) {
   return `${head} = ${printTypeNode(statement.value)}`;
 }
 
-function declareFunction(statement) {
-  const signature = statement.__signature;
-  if (!signature) return null;
-
+function functionLine(statement, signature, prefix) {
   // Prefer the written annotation: it keeps imported aliases by name
   // (`status: Status`) instead of expanding them structurally. Inferred
   // return types fall back to the checker's resolved type.
@@ -137,9 +166,18 @@ function declareFunction(statement) {
   const result = statement.returnType ? printTypeNode(statement.returnType) : printType(signature.ret);
   const params_ = typeParamsOf(signature.typeParams);
   const name = statement.name || '__defaultExport';
+  return `${prefix} ${name}${params_}(${params}) -> ${result}`;
+}
+
+function declareFunction(statement) {
+  const signature = statement.__signature;
+  if (!signature) return null;
   const lines = [];
-  lines.push(`export declare function ${name}${params_}(${params}) -> ${result}`);
-  if (statement.defaultExport) lines.push(`export default ${name}`);
+  for (const overload of signature.overloads || []) {
+    if (overload.node) lines.push(functionLine(overload.node, overload, 'export overload function'));
+  }
+  lines.push(functionLine(statement, signature, 'export declare function'));
+  if (statement.defaultExport) lines.push(`export default ${statement.name || '__defaultExport'}`);
   return lines.join('\n');
 }
 

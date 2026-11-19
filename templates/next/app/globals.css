@@ -1,0 +1,4 @@
+body { margin: 0; font-family: system-ui, sans-serif; background: #f7f8fa; color: #17212b; }
+.page { max-width: 44rem; margin: 0 auto; padding: 4rem 1.5rem; }
+h1 { letter-spacing: -0.04em; font-size: clamp(2rem, 6vw, 4rem); }
+p { line-height: 1.7; color: #52606d; }

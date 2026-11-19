@@ -75,9 +75,10 @@ Stop it with Ctrl+C or `SIGTERM`.
 ### `plainscript lsp`
 
 Starts the dependency-free language server over stdio. Advertised capabilities are
-diagnostics, completion, hover, definition, references, rename, document symbols and
-whole-document formatting. Workspace references and rename follow imported PlainScript
-symbols. See [`editors/vscode`](../editors/vscode) for the editor extension.
+diagnostics, completion, hover, definition, references, rename, document symbols,
+whole-document formatting, semantic tokens and quick-fix code actions. Workspace references
+and rename follow imported PlainScript symbols. See [`editors/vscode`](../editors/vscode)
+for the editor extension.
 
 ### `plainscript check [files…]`
 
@@ -105,9 +106,7 @@ files failed. Inside a test file, use `std/test`:
 ```plainscript
 import { test, equals, isTrue } from "std/test"
 
-test("addition", () => {
-    equals(1 + 1, 2)
-})
+test("addition", () => equals(1 + 1, 2))
 ```
 
 `std/test` throws on failure, so a failing assertion fails the file and therefore the
@@ -121,12 +120,34 @@ commands to install and run. Refuses to write into a non-empty directory.
 `--template <id>` (or `--template=<id>`) copies a bundled application instead of the default
 starter. The available templates are:
 
-- `project-management` — SQLite-backed projects, tasks, comments-ready domain model, dashboard API, and browser client.
+- `project-management` — SQLite-backed projects, tasks, dashboard API, and browser client.
 - `ecommerce` — SQLite-backed catalogue, inventory-safe simulated checkout, orders, and browser client.
 - `realtime-chat` — SQLite-backed conversations/messages and live Server-Sent Events delivery.
+- `react-vite` — React component written in PlainScript, bundled by Vite.
+- `next` — Next.js App Router page rendered by a PlainScript server component.
+- `express` — Express-compatible HTTP API using the real `express` package.
+- `cli` — command-line program using `std/io.args`.
+- `library` — typed package built with `.d.pln` declarations.
 
 For example: `plainscript new my-store --template ecommerce`. An unknown id lists the
 available templates and exits with the usage code.
+
+### `plainscript migrate [files…]`
+
+Scans JavaScript and TypeScript files for constructs that cannot be renamed to `.pln`
+safely: CommonJS `require`/`module.exports`, TypeScript interfaces/enums/namespaces,
+classes, JSX and `//` comments. It reports file, line, code and a suggested replacement. It
+**does not rewrite source files**; conversion remains a reviewable manual step.
+
+```bash
+plainscript migrate src --check     # exit 1 when any finding exists
+plainscript migrate src --json      # machine-readable report
+```
+
+With no paths it scans the current directory, skipping `node_modules`, `dist`, `legacy` and
+dot-directories. `--check` is a CI gate; without it the command reports findings and exits
+0. Transform one file at a time, keep JavaScript modules at the boundary, and run
+`plainscript check` after each conversion. See [MIGRATION](MIGRATION.md).
 
 ### `plainscript ir <file.pln>`
 
@@ -149,7 +170,10 @@ TypeScript toolchain is installed separately; see [BENCHMARKS](BENCHMARKS.md).
 | --- | --- |
 | `--quiet` | Suppress progress output; errors still print. |
 | `--verbose` | Print each compilation stage. |
-| `--check` | With `fmt`: report instead of write. |
+| `--check` | With `fmt`: report instead of write; with `migrate`: exit 1 on findings. |
+| `--declarations` | With `build`: also emit `<name>.d.pln`. |
+| `--json` | With `migrate`: print a JSON report. |
+| `--template=<id>`, `-t <id>` | With `new`: select a bundled starter. |
 | `--std-base=<url>` | With `build`: browser base URL for `std` imports. |
 | `--help`, `-h` | Show help. |
 

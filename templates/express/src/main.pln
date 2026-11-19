@@ -1,0 +1,23 @@
+import express from "express"
+import { print } from "std/io"
+
+const app = express()
+app.use(express.json())
+let hits = 0
+
+app.get("/health", (request: any, response: any) => do
+    hits += 1
+    response.json({ ok: true, hits: hits })
+end)
+
+app.get("/users/:id", (request: any, response: any) => do
+    response.json({ id: request.params.id, source: "plainscript" })
+end)
+
+app.post("/echo", (request: any, response: any) => do
+    response.status(201).json({ received: request.body })
+end)
+
+app.listen(4501, () => do
+    print("PlainScript Express API listening on http://localhost:4501")
+end)

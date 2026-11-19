@@ -1,4 +1,4 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Migration guide — PlainScript documentation."><title>Migration guide · PlainScript</title><link rel="stylesheet" href="style.css"></head><body><div class="site-shell"><aside class="sidebar"><a class="brand" href="index.html"><span class="brand-mark">PS</span><span><span class="brand-name">PlainScript</span><span class="brand-meta">Language docs · 2.0</span></span></a><div class="nav-group"><div class="nav-label">Start here</div><a class="nav-link " href="index.html">PlainScript</a><a class="nav-link " href="cli.html">CLI reference</a><a class="nav-link " href="templates.html">Application templates</a></div><div class="nav-group"><div class="nav-label">Language</div><a class="nav-link " href="spec.html">Language specification</a><a class="nav-link " href="syntax-design.html">Syntax design</a><a class="nav-link " href="type-system.html">Type system</a></div><div class="nav-group"><div class="nav-label">Compiler</div><a class="nav-link " href="architecture.html">Compiler architecture</a><a class="nav-link " href="interop.html">JavaScript interoperability</a><a class="nav-link " href="benchmarks.html">Benchmarks</a></div><div class="nav-group"><div class="nav-label">Guides</div><a class="nav-link " href="contracts.html">Unified contracts</a><a class="nav-link " href="concurrency.html">Concurrency</a><a class="nav-link active" href="migration.html">Migration guide</a><a class="nav-link " href="comparison.html">Comparison with TypeScript</a></div><div class="nav-group"><div class="nav-label">Project</div><a class="nav-link " href="progress.html">Engineering progress</a><a class="nav-link " href="audit.html">Audit</a><a class="nav-link " href="decisions.html">Decisions</a></div><div class="sidebar-footer">Open source under MIT.<br><a href="https://github.com/ayoistooslick/Plainscript">View on GitHub ↗</a></div></aside><main class="main"><header class="topbar"><div class="search-wrap"><label class="search" aria-label="Search documentation"><span>⌕</span><input id="doc-search" type="search" placeholder="Search the docs…" autocomplete="off"><kbd>/</kbd></label><div id="search-results" class="search-results" role="listbox"></div></div><nav class="top-links"><a href="index.html">Docs</a><a href="https://github.com/ayoistooslick/Plainscript">GitHub ↗</a></nav></header><div class="content"><article class="page-layout"><div class="prose"><h1 id="migration-from-plainscript-v1-to-v2">Migration from PlainScript v1 to v2</h1>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Migration guide — PlainScript documentation."><title>Migration guide · PlainScript</title><link rel="stylesheet" href="style.css"></head><body><div class="site-shell"><aside class="sidebar"><a class="brand" href="index.html"><span class="brand-mark">PS</span><span><span class="brand-name">PlainScript</span><span class="brand-meta">Language docs · 2.0</span></span></a><div class="nav-group"><div class="nav-label">Start here</div><a class="nav-link " href="index.html">PlainScript</a><a class="nav-link " href="cli.html">CLI reference</a><a class="nav-link " href="templates.html">Application templates</a></div><div class="nav-group"><div class="nav-label">Language</div><a class="nav-link " href="spec.html">Language specification</a><a class="nav-link " href="syntax-design.html">Syntax design</a><a class="nav-link " href="type-system.html">Type system</a></div><div class="nav-group"><div class="nav-label">Compiler</div><a class="nav-link " href="architecture.html">Compiler architecture</a><a class="nav-link " href="interop.html">JavaScript interoperability</a><a class="nav-link " href="benchmarks.html">Benchmarks</a></div><div class="nav-group"><div class="nav-label">Guides</div><a class="nav-link " href="contracts.html">Unified contracts</a><a class="nav-link " href="concurrency.html">Concurrency</a><a class="nav-link " href="jobs.html">Background jobs</a><a class="nav-link " href="databases.html">Databases</a><a class="nav-link " href="security.html">Security</a><a class="nav-link " href="debugging.html">Debugging</a><a class="nav-link active" href="migration.html">Migration guide</a><a class="nav-link " href="comparison.html">Comparison with TypeScript</a></div><div class="nav-group"><div class="nav-label">Project</div><a class="nav-link " href="progress.html">Engineering progress</a><a class="nav-link " href="roadmap.html">Roadmap</a><a class="nav-link " href="audit.html">Audit</a><a class="nav-link " href="decisions.html">Decisions</a></div><div class="sidebar-footer">Open source under MIT.<br><a href="https://github.com/ayoistooslick/Plainscript">View on GitHub ↗</a></div></aside><main class="main"><header class="topbar"><div class="search-wrap"><label class="search" aria-label="Search documentation"><span>⌕</span><input id="doc-search" type="search" placeholder="Search the docs…" autocomplete="off"><kbd>/</kbd></label><div id="search-results" class="search-results" role="listbox"></div></div><nav class="top-links"><a href="index.html">Docs</a><a href="https://github.com/ayoistooslick/Plainscript">GitHub ↗</a></nav></header><div class="content"><article class="page-layout"><div class="prose"><h1 id="migration-from-plainscript-v1-to-v2">Migration from PlainScript v1 to v2</h1>
 <p>PlainScript 2.0 is a ground-up rebuild. This guide documents the changes from v1 to v2 and what you need to update in your v1 code to make it work with v2.</p>
 <h2 id="conditional-syntax-update-after-the-2-0-0-snapshot">Conditional syntax update after the 2.0.0 snapshot</h2>
 <p>The current source grammar replaces the earlier 2.0.0 conditional spellings with one canonical form. This is a breaking source change; it is not an alias period and must not be published as a patch-compatible release. A release number for it has not been selected.</p>
@@ -67,18 +67,24 @@
 <li>Import React (or another library) if you use render blocks</li>
 </ul>
 <h2 id="standard-library-changes">Standard Library Changes</h2>
-<p>The v2 standard library has 11 explicit modules:</p>
-<table><thead><tr><th>Module</th><th>Replaces v1 equivalent</th></tr></thead><tbody>
-<tr><td><code>std/io</code></td><td><code>print</code>, <code>read</code>, <code>readFile</code>, <code>write</code>, <code>writeFile</code></td></tr>
+<p>The v2 standard library is organized as explicit modules with <code>.d.pln</code> declarations:</p>
+<table><thead><tr><th>Module</th><th>Purpose</th></tr></thead><tbody>
+<tr><td><code>std/io</code></td><td><code>print</code>, <code>read</code>, <code>args</code>, file helpers</td></tr>
 <tr><td><code>std/text</code></td><td>String operations, interpolation <code>&quot;{expr}&quot;</code></td></tr>
 <tr><td><code>std/list</code></td><td>List operations: <code>cons</code>, <code>count</code>, <code>append</code>, <code>filter</code>, <code>map</code>, <code>reduce</code></td></tr>
 <tr><td><code>std/map</code></td><td>Map operations: <code>get</code>, <code>set</code>, <code>has</code>, <code>keys</code>, <code>values</code>, <code>delete</code></td></tr>
-<tr><td><code>std/math</code></td><td>Math operations: <code>min</code>, <code>max</code>, <code>abs</code>, <code>clamp</code>, <code>lerp</code>, <code>deg2rad</code>, <code>rad2deg</code></td></tr>
+<tr><td><code>std/math</code></td><td><code>min</code>, <code>max</code>, <code>abs</code>, <code>clamp</code>, <code>lerp</code>, <code>deg2rad</code>, <code>rad2deg</code></td></tr>
 <tr><td><code>std/json</code></td><td><code>parse</code>, <code>stringify</code></td></tr>
 <tr><td><code>std/time</code></td><td><code>now</code>, <code>format</code>, <code>parse</code>, <code>add</code>, <code>diff</code></td></tr>
 <tr><td><code>std/fs</code></td><td><code>mkdir</code>, <code>mkDir</code>, <code>readDir</code>, <code>readFile</code>, <code>writeFile</code>, <code>appendFile</code>, <code>exists</code></td></tr>
-<tr><td><code>std/http</code></td><td>Server creation, routing, request/response helpers</td></tr>
-<tr><td><code>std/test</code></td><td><code>assert</code>, <code>describe</code>, <code>it</code>, <code>beforeEach</code>, <code>afterEach</code></td></tr>
+<tr><td><code>std/http</code></td><td>Fetch-style server, JSON/text responses, SSE, request helpers</td></tr>
+<tr><td><code>std/ws</code></td><td>WebSocket server with authorization-before-upgrade</td></tr>
+<tr><td><code>std/task</code></td><td>Structured concurrency: groups, cancellation, channels, workers</td></tr>
+<tr><td><code>std/jobs</code></td><td>In-process bounded job queue with retries, timeouts and drain</td></tr>
+<tr><td><code>std/db</code></td><td>SQLite tables and versioned migrations (Node 22)</td></tr>
+<tr><td><code>std/auth</code></td><td>scrypt passwords, HS256 tokens, policies</td></tr>
+<tr><td><code>std/contract</code></td><td>Runtime schemas, operations, typed results, router/transport</td></tr>
+<tr><td><code>std/test</code></td><td>Test declarations and assertions</td></tr>
 <tr><td><code>std/dom</code></td><td>DOM utilities for browser environments</td></tr>
 </tbody></table>
 <p>v1 modules like <code>std/date</code> are consolidated into <code>std/time</code>.</p>
@@ -91,10 +97,37 @@
 <tr><td><code>plainscript fmt</code></td><td>same</td></tr>
 <tr><td><code>plainscript new</code></td><td>same</td></tr>
 <tr><td><code>plainscript ir</code></td><td>same</td></tr>
+<tr><td><code>plainscript watch</code></td><td>new: rebuild on <code>.pln</code> changes</td></tr>
+<tr><td><code>plainscript lsp</code></td><td>new: stdio language server</td></tr>
+<tr><td><code>plainscript migrate</code></td><td>new: scan JS/TS for migration blockers</td></tr>
 <tr><td><code>plainscript version</code></td><td>same</td></tr>
 <tr><td><code>plainscript help</code></td><td>same</td></tr>
 </tbody></table>
-<p>Options updated: <code>--quiet/--verbose/--check/--std-base</code>.</p>
+<p>Options updated: <code>--quiet/--verbose/--check/--std-base/--declarations/--template/--json</code>. See <a href="cli.html">CLI</a>.</p>
+<h2 id="javascript-and-typescript-migration">JavaScript and TypeScript migration</h2>
+<p><code>plainscript migrate [paths…]</code> is a conservative scanner, not a transpiler. It reports:</p>
+<ul>
+<li>CommonJS <code>require</code>/<code>module.exports</code>;</li>
+<li>TypeScript <code>interface</code>, <code>enum</code> and <code>namespace</code> declarations;</li>
+<li>class declarations (move them to a JavaScript boundary or rewrite as records/functions);</li>
+<li>JSX/TSX syntax and files;</li>
+<li><code>//</code> comments (PlainScript uses <code>#</code>).</li>
+</ul>
+<pre><code>plainscript migrate src --check
+plainscript migrate src --json</code></pre>
+<p>A finding is a review item, not an automatic error in the old file. Recommended incremental path:</p>
+<ol>
+<li>Keep the existing JavaScript application running.</li>
+<li>Add PlainScript modules for new, self-contained logic; import them from JavaScript or</li>
+<p>compile them and import the emitted <code>.js</code>.</p>
+<li>Move a file at a time, starting with pure functions and types. Keep React/JSX components,</li>
+<p>Express middleware and third-party class-shaped APIs in <code>.js</code> modules at the boundary.</p>
+<li>Declare the JavaScript surfaces you call with <code>declare function</code>/<code>declare const</code> or a</li>
+<p><code>.d.pln</code> wrapper.</p>
+<li>Run <code>plainscript check</code> after each move and keep the existing test suite green.</li>
+<li>Only then replace entry points/build scripts.</li>
+</ol>
+<p>There is no automatic TypeScript type-annotation conversion and no <code>.d.ts</code> parser. Types cross the boundary as <code>.d.pln</code> declarations or explicit <code>any</code>/<code>declare</code> shapes. A mixed project is supported: <code>.pln</code> modules compile to ESM and <code>.js</code> modules remain ordinary JavaScript consumed through interop. See <a href="interop.html">INTEROP</a>.</p>
 <h2 id="migration-checklist">Migration Checklist</h2>
 <ul>
 <li>[ ] Remove all keyword alias usage; use the one correct spelling</li>
@@ -106,6 +139,7 @@
 <li>[ ] Update <code>ListPattern</code> to use <code>count</code> instead of <code>.length</code></li>
 <li>[ ] Update <code>render</code>/<code>element</code> blocks to lower to <code>createElement</code> calls</li>
 <li>[ ] Update module imports: <code>std/&lt;name&gt;</code> resolves to declarations</li>
+<li>[ ] Run <code>plainscript migrate src --check</code> and review every finding</li>
 <li>[ ] Run <code>npm test</code> to verify no regressions</li>
 <li>[ ] Consult <code>docs/SPEC.md</code> for the complete v2 language specification</li>
 </ul>
@@ -117,4 +151,4 @@
 <li><code>docs/CLI.md</code> — CLI reference</li>
 <li><code>docs/INTEROP.md</code> — JavaScript ecosystem interop guide</li>
 <li>Run <code>plainscript check path/to/file.pln</code> to diagnose specific issues</li>
-</ul></div><aside class="toc"><div class="toc-title">On this page</div><a class="toc-h2" href="#conditional-syntax-update-after-the-2-0-0-snapshot">Conditional syntax update after the 2.0.0 snapshot</a><a class="toc-h2" href="#core-language-changes">Core Language Changes</a><a class="toc-h3" href="#keyword-aliases-removed">Keyword aliases removed</a><a class="toc-h3" href="#block-closers">Block closers</a><a class="toc-h3" href="#service-constructs-removed">Service constructs removed</a><a class="toc-h3" href="#type-system-changes">Type system changes</a><a class="toc-h3" href="#module-resolution">Module resolution</a><a class="toc-h3" href="#render-element-blocks">`render`/`element` blocks</a><a class="toc-h2" href="#standard-library-changes">Standard Library Changes</a><a class="toc-h2" href="#cli-changes">CLI Changes</a><a class="toc-h2" href="#migration-checklist">Migration Checklist</a><a class="toc-h2" href="#where-to-find-help">Where to find help</a></aside></article><footer class="page-footer"><span>PlainScript 2.0 documentation</span><a href="https://github.com/ayoistooslick/Plainscript/issues">Report a documentation issue ↗</a></footer></div></main></div><script src="app.js"></script></body></html>
+</ul></div><aside class="toc"><div class="toc-title">On this page</div><a class="toc-h2" href="#conditional-syntax-update-after-the-2-0-0-snapshot">Conditional syntax update after the 2.0.0 snapshot</a><a class="toc-h2" href="#core-language-changes">Core Language Changes</a><a class="toc-h3" href="#keyword-aliases-removed">Keyword aliases removed</a><a class="toc-h3" href="#block-closers">Block closers</a><a class="toc-h3" href="#service-constructs-removed">Service constructs removed</a><a class="toc-h3" href="#type-system-changes">Type system changes</a><a class="toc-h3" href="#module-resolution">Module resolution</a><a class="toc-h3" href="#render-element-blocks">`render`/`element` blocks</a><a class="toc-h2" href="#standard-library-changes">Standard Library Changes</a><a class="toc-h2" href="#cli-changes">CLI Changes</a><a class="toc-h2" href="#javascript-and-typescript-migration">JavaScript and TypeScript migration</a><a class="toc-h2" href="#migration-checklist">Migration Checklist</a><a class="toc-h2" href="#where-to-find-help">Where to find help</a></aside></article><footer class="page-footer"><span>PlainScript 2.0 documentation</span><a href="https://github.com/ayoistooslick/Plainscript/issues">Report a documentation issue ↗</a></footer></div></main></div><script src="app.js"></script></body></html>

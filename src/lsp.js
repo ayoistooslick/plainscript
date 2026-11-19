@@ -99,6 +99,15 @@ class PlainScriptLanguageServer {
             renameProvider: true,
             documentSymbolProvider: true,
             documentFormattingProvider: true,
+            codeActionProvider: { codeActionKinds: ['quickfix'] },
+            semanticTokensProvider: {
+              legend: {
+                tokenTypes: ['keyword', 'type', 'function', 'variable', 'string', 'number', 'comment', 'operator'],
+                tokenModifiers: ['declaration'],
+              },
+              full: true,
+              range: false,
+            },
           },
           serverInfo: { name: 'plainscript-lsp', version: VERSION },
         });
@@ -158,6 +167,14 @@ class PlainScriptLanguageServer {
       }
       if (message.method === 'textDocument/formatting') {
         this.respond(message.id, this.formatting(this.uriOf(message), message.params.options || {}));
+        return;
+      }
+      if (message.method === 'textDocument/semanticTokens/full') {
+        this.respond(message.id, { data: this.semanticTokens(this.uriOf(message)) });
+        return;
+      }
+      if (message.method === 'textDocument/codeAction') {
+        this.respond(message.id, this.codeActions(this.uriOf(message), message.params));
         return;
       }
       if (message.id !== undefined) this.fail(message.id, -32601, `Unsupported method ${message.method}`);
@@ -553,6 +570,92 @@ class PlainScriptLanguageServer {
       }));
   }
 
+  codeActions(uri, params) {
+    const diagnostics = (params && params.context && params.context.diagnostics) || this.diagnosticsByFile.get(uri) || [];
+    const actions = [];
+    for (const diagnostic of diagnostics) {
+      const hint = diagnostic.data && diagnostic.data.hint;
+      const match = typeof hint === 'string' ? /Did you mean "([^"]+)"/.exec(hint) : null;
+      if (!match) continue;
+      actions.push({
+        title: `Replace with "${match[1]}"`,
+        kind: 'quickfix',
+        diagnostics: [diagnostic],
+        edit: {
+          changes: {
+            [uri]: [{ range: diagnostic.range, newText: match[1] }],
+          },
+        },
+      });
+    }
+    return actions;
+  }
+
+  semanticTokens(uri) {
+    const record = this.recordFor(uri);
+    const source = this.sourceFor(uri, record);
+    if (!source) return [];
+    const tokenized = tokenize(source, this.documentPath(uri) || '<editor>');
+    const checker = record && record.check ? record.check.checker : null;
+    const symbols = new Map();
+    if (checker) {
+      for (const [name, entry] of checker.global.names) symbols.set(name, entry);
+      for (const [name, declaration] of checker.typeDecls) {
+        if (!symbols.has(name)) symbols.set(name, { kind: declaration.importedType ? 'type' : 'type' });
+      }
+    }
+    const candidates = record && record.ast ? collectCandidates(record.ast) : [];
+    const declarations = new Set(candidates
+      .filter((candidate) => candidate.line && candidate.col)
+      .map((candidate) => `${candidate.line}:${candidate.col}`));
+    const entries = [];
+    for (const token of tokenized.tokens || []) {
+      if (token.t === 'eof') continue;
+      let type = -1;
+      if (token.t === 'kw') type = 0;
+      else if (token.t === 'text' || token.t === 'template') type = 4;
+      else if (token.t === 'number') type = 5;
+      else if (token.t === 'punct') type = 7;
+      else if (token.t === 'ident') {
+        const entry = symbols.get(token.v);
+        if (entry && entry.kind === 'type') type = 1;
+        else if (entry && entry.kind === 'function') type = 2;
+        else type = 3;
+      }
+      if (type < 0) continue;
+      const length = tokenLength(source, token);
+      if (length <= 0) continue;
+      entries.push({
+        line: token.line - 1,
+        character: token.col - 1,
+        length,
+        type,
+        modifiers: declarations.has(`${token.line}:${token.col}`) ? 1 : 0,
+      });
+    }
+    for (const comment of tokenized.comments || []) {
+      entries.push({
+        line: comment.line - 1,
+        character: comment.col - 1,
+        length: Math.max(1, String(comment.raw || '').length),
+        type: 6,
+        modifiers: 0,
+      });
+    }
+    entries.sort((a, b) => a.line - b.line || a.character - b.character);
+    const data = [];
+    let previousLine = 0;
+    let previousCharacter = 0;
+    for (const entry of entries) {
+      const deltaLine = entry.line - previousLine;
+      const deltaCharacter = deltaLine === 0 ? entry.character - previousCharacter : entry.character;
+      data.push(deltaLine, deltaCharacter, entry.length, entry.type, entry.modifiers);
+      previousLine = entry.line;
+      previousCharacter = entry.character;
+    }
+    return data;
+  }
+
   formatting(uri, options) {
     const source = this.documentText(uri);
     if (!source) return [];
@@ -699,7 +802,30 @@ function protocolDiagnostic(diagnostic) {
     code: diagnostic.code,
     source: 'plainscript',
     message: diagnostic.hint ? `${diagnostic.message} (${diagnostic.hint})` : diagnostic.message,
+    data: diagnostic.hint ? { hint: diagnostic.hint } : undefined,
   };
+}
+
+function tokenLength(source, token) {
+  const line = String(source).split('\n')[token.line - 1] || '';
+  if (token.t === 'text') {
+    const start = token.col - 1;
+    const quote = line[start];
+    if (quote === '"' || quote === "'") {
+      const triple = line.slice(start, start + 3) === quote.repeat(3);
+      const marker = triple ? quote.repeat(3) : quote;
+      const close = line.indexOf(marker, start + marker.length);
+      if (close >= 0) return close + marker.length - start;
+    }
+    return Math.max(1, String(token.v || '').length + 2);
+  }
+  if (token.t === 'template') {
+    const start = token.col - 1;
+    const close = line.indexOf('`', start + 1);
+    if (close >= 0) return close + 1 - start;
+    return Math.max(1, line.length - start);
+  }
+  return Math.max(1, String(token.v || token.t).length);
 }
 
 function rangeFrom(position, length) {

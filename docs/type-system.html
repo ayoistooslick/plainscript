@@ -1,29 +1,66 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Type system — PlainScript documentation."><title>Type system · PlainScript</title><link rel="stylesheet" href="style.css"></head><body><div class="site-shell"><aside class="sidebar"><a class="brand" href="index.html"><span class="brand-mark">PS</span><span><span class="brand-name">PlainScript</span><span class="brand-meta">Language docs · 2.0</span></span></a><div class="nav-group"><div class="nav-label">Start here</div><a class="nav-link " href="index.html">PlainScript</a><a class="nav-link " href="cli.html">CLI reference</a><a class="nav-link " href="templates.html">Application templates</a></div><div class="nav-group"><div class="nav-label">Language</div><a class="nav-link " href="spec.html">Language specification</a><a class="nav-link " href="syntax-design.html">Syntax design</a><a class="nav-link active" href="type-system.html">Type system</a></div><div class="nav-group"><div class="nav-label">Compiler</div><a class="nav-link " href="architecture.html">Compiler architecture</a><a class="nav-link " href="interop.html">JavaScript interoperability</a><a class="nav-link " href="benchmarks.html">Benchmarks</a></div><div class="nav-group"><div class="nav-label">Guides</div><a class="nav-link " href="contracts.html">Unified contracts</a><a class="nav-link " href="concurrency.html">Concurrency</a><a class="nav-link " href="migration.html">Migration guide</a><a class="nav-link " href="comparison.html">Comparison with TypeScript</a></div><div class="nav-group"><div class="nav-label">Project</div><a class="nav-link " href="progress.html">Engineering progress</a><a class="nav-link " href="audit.html">Audit</a><a class="nav-link " href="decisions.html">Decisions</a></div><div class="sidebar-footer">Open source under MIT.<br><a href="https://github.com/ayoistooslick/Plainscript">View on GitHub ↗</a></div></aside><main class="main"><header class="topbar"><div class="search-wrap"><label class="search" aria-label="Search documentation"><span>⌕</span><input id="doc-search" type="search" placeholder="Search the docs…" autocomplete="off"><kbd>/</kbd></label><div id="search-results" class="search-results" role="listbox"></div></div><nav class="top-links"><a href="index.html">Docs</a><a href="https://github.com/ayoistooslick/Plainscript">GitHub ↗</a></nav></header><div class="content"><article class="page-layout"><div class="prose"><h1 id="type-system">Type system</h1>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Type system — PlainScript documentation."><title>Type system · PlainScript</title><link rel="stylesheet" href="style.css"></head><body><div class="site-shell"><aside class="sidebar"><a class="brand" href="index.html"><span class="brand-mark">PS</span><span><span class="brand-name">PlainScript</span><span class="brand-meta">Language docs · 2.0</span></span></a><div class="nav-group"><div class="nav-label">Start here</div><a class="nav-link " href="index.html">PlainScript</a><a class="nav-link " href="cli.html">CLI reference</a><a class="nav-link " href="templates.html">Application templates</a></div><div class="nav-group"><div class="nav-label">Language</div><a class="nav-link " href="spec.html">Language specification</a><a class="nav-link " href="syntax-design.html">Syntax design</a><a class="nav-link active" href="type-system.html">Type system</a></div><div class="nav-group"><div class="nav-label">Compiler</div><a class="nav-link " href="architecture.html">Compiler architecture</a><a class="nav-link " href="interop.html">JavaScript interoperability</a><a class="nav-link " href="benchmarks.html">Benchmarks</a></div><div class="nav-group"><div class="nav-label">Guides</div><a class="nav-link " href="contracts.html">Unified contracts</a><a class="nav-link " href="concurrency.html">Concurrency</a><a class="nav-link " href="jobs.html">Background jobs</a><a class="nav-link " href="databases.html">Databases</a><a class="nav-link " href="security.html">Security</a><a class="nav-link " href="debugging.html">Debugging</a><a class="nav-link " href="migration.html">Migration guide</a><a class="nav-link " href="comparison.html">Comparison with TypeScript</a></div><div class="nav-group"><div class="nav-label">Project</div><a class="nav-link " href="progress.html">Engineering progress</a><a class="nav-link " href="roadmap.html">Roadmap</a><a class="nav-link " href="audit.html">Audit</a><a class="nav-link " href="decisions.html">Decisions</a></div><div class="sidebar-footer">Open source under MIT.<br><a href="https://github.com/ayoistooslick/Plainscript">View on GitHub ↗</a></div></aside><main class="main"><header class="topbar"><div class="search-wrap"><label class="search" aria-label="Search documentation"><span>⌕</span><input id="doc-search" type="search" placeholder="Search the docs…" autocomplete="off"><kbd>/</kbd></label><div id="search-results" class="search-results" role="listbox"></div></div><nav class="top-links"><a href="index.html">Docs</a><a href="https://github.com/ayoistooslick/Plainscript">GitHub ↗</a></nav></header><div class="content"><article class="page-layout"><div class="prose"><h1 id="type-system">Type system</h1>
 <p>PlainScript uses structural types. Types are erased from emitted JavaScript; the checker is the enforcer, and untyped JavaScript boundaries remain <code>any</code> deliberately.</p>
 <h2 id="implemented-and-tested">Implemented and tested</h2>
 <ul>
 <li>Primitives, records, optional fields, lists, maps, promises, functions, unions, named</li>
-<p>aliases and recursive variant types.</p>
-<li>Generic functions and generic type aliases, including imported aliases. Arguments are</li>
-<p>inferred structurally, callback parameters are contextually typed, and callback return types are checked against the expected result.</p>
-<li>Generic constraints: <code>function label&lt;T: Named&gt;(value: T) -&gt; text</code>. Constraint fields are</li>
-<p>available in the function body, and a non-matching argument is rejected.</p>
-<li>Record intersections (<code>Named &amp; Aged</code>) merge fields into one structural record. Indexed</li>
-<p>access reads a field or tuple element (<code>Person[&quot;name&quot;]</code>, <code>Pair[0]</code>); a missing field or out-of-range index is rejected. Intersections of non-record types are currently diagnosed rather than approximated.</p>
-<li>Control-flow narrowing for <code>is</code>, <code>== nothing</code>/<code>!= nothing</code>, optional chains and</li>
-<p>discriminant checks; exhaustiveness checking for booleans, variants and literal unions.</p>
+<p>aliases, recursive record/variant types and fixed-length tuples.</p>
+<li>Generic functions and aliases, imported aliases, constraints and structural inference.</li>
+<p>Callback parameters are contextually typed, callback return types are checked against the expected result, and generic substitution is recursive.</p>
+<li>Record intersections (<code>Named &amp; Aged</code>) merge fields. Concrete indexed access reads a</li>
+<p>record field, tuple element, list element or map value. Missing record fields and out-of-range tuple indexes are rejected.</p>
+<li><strong>Conditional types</strong>: <code>T extends U ? X : Y</code>. A concrete check chooses a branch; a check</li>
+<p>that still mentions an unresolved type parameter stays deferred until substitution.</p>
+<li><strong>Mapped types</strong>: <code>{ [K in keyof T]: T[K] }</code> and <code>{ [K in keyof T]?: boolean }</code>.</li>
+<p>Mapped evaluation expands when the key set is concrete; otherwise it remains deferred.</p>
+<li><strong>Generic deferred indexed access</strong>: <code>type Elem&lt;T&gt; = T[0]</code>, <code>type Field&lt;T&gt; = T[keyof T]</code>.</li>
+<p>Deferred access is resolved after generic arguments are substituted.</p>
+<li><strong>Function overloads</strong>:</li>
+</ul>
+<pre><code>overload function format(value: text) -&gt; text
+overload function format(value: number) -&gt; text
+function format(value: any) -&gt; text
+    return &quot;value:{value}&quot;
+end</code></pre>
+<p>Calls select the first matching signature by argument inference/assignability. A call with no match is <code>PS3354</code>; an implementation that cannot accept a signature, or an overload with no implementation, is <code>PS3355</code>. Overload signatures survive module import and <code>.d.pln</code> declaration generation.</p>
+<ul>
+<li><strong>User-defined type predicates</strong>: <code>function isPerson(value: any) -&gt; value is Person</code>.</li>
+<p>Positive branch narrowing selects the target type; negative branches remove the target from union/optional types. Predicates must name a parameter and cannot be async (<code>PS3353</code>).</p>
+<li><strong>Literal types</strong>: text, number and boolean literals are valid types, including in</li>
+<p>unions, mapped values and conditional branches.</p>
+<li>Control-flow narrowing for <code>is</code>, predicates, <code>== nothing</code>/<code>!= nothing</code>, optional chains,</li>
+<p>discriminant checks and literal equality; exhaustiveness checking for booleans, variants and literal unions.</p>
 <li>Literal enum unions derived from <code>std/contract.enumeration</code>/<code>literal</code>. A model field</li>
-<p>inferred as <code>&quot;open&quot; or &quot;done&quot;</code> rejects <code>&quot;maybe&quot;</code> at compile time and is exhaustively matched with <code>case &quot;open&quot;</code> / <code>case &quot;done&quot;</code>.</p>
-<li>Tuple types with fixed elements, precise literal indexes, destructuring and assignment</li>
-<p>checking: <code>[number, text]</code>.</p>
+<p>inferred as <code>&quot;open&quot; or &quot;done&quot;</code> rejects <code>&quot;maybe&quot;</code> and is exhaustively matchable.</p>
 <li><code>keyof RecordType</code> produces a literal union of field names. <code>typeof value</code> reuses the</li>
-<p>type of a value (function/import/value declarations are hoisted before type resolution).</p>
+<p>type of a hoisted value.</p>
 <li>Schema-derived records from <code>std/contract.object</code>, including nested objects, arrays,</li>
-<p>optional fields, enum literal fields and operation input/output types.</p>
+<p>optional fields, enum fields and operation input/output types.</p>
 <li>Typed operation results: <code>OperationSuccess&lt;T&gt; or OperationFailure&lt;E&gt;</code>, built with</li>
 <p><code>success</code>/<code>failure</code> and checked by <code>implementFallible</code>/<code>createFallibleClient</code>.</p>
 </ul>
+<h2 id="variance">Variance</h2>
+<p>Variance is derived from structure, not declared with <code>in</code>/<code>out</code> annotations:</p>
+<ul>
+<li>function parameters are contravariant (<code>(any) -&gt; number</code> is assignable to</li>
+<p><code>(number) -&gt; number</code>, not the reverse);</p>
+<li>function results are covariant (<code>() -&gt; number</code> is assignable to <code>() -&gt; number or text</code>);</li>
+<li>records are width-subtyped (extra fields are allowed);</li>
+<li>lists, maps, promises and tuples are covariant in their element/value types;</li>
+<li>a generic alias inherits the variance of its expanded body after substitution.</li>
+</ul>
+<p>Containers are covariant even though JavaScript arrays are mutable. PlainScript&#39;s collection functions return new values and the grammar does not provide a mutating array method surface, so the practical risk is confined to aliasing a JavaScript array at an <code>any</code> boundary. This is a documented structural choice, not a nominal ownership system.</p>
+<h2 id="conditional-and-mapped-semantics">Conditional and mapped semantics</h2>
+<ul>
+<li>Conditional checks are <strong>non-distributive</strong>: a union check is compared as a whole, so</li>
+<p><code>list of number or text extends list of number ? A : B</code> chooses <code>B</code>. Write a separate alias or overload for each union member when per-member behavior is needed.</p>
+<li>Mapped types require a concrete key union of text/number literal types (usually</li>
+<p><code>keyof</code> of a known record). A mapped type whose key or value still mentions a type variable remains deferred.</p>
+<li>Deferred constructs are permissive while unresolved, as are unresolved generics and</li>
+<p><code>any</code>. Concrete instantiation is the enforcement point; a deferred type must not be treated as a proof of assignability in a generic body.</p>
+<li>Conditional, mapped and indexed constructs cannot yet be nested in every combination;</li>
+<p>the checker may leave a construct deferred rather than report a false incompatibility. Negative tests cover concrete misuse; deeply deferred combinations remain a limitation.</p>
+</ul>
 <h2 id="still-absent">Still absent</h2>
-<p>Conditional types, mapped types, generic/deferred indexed access (<code>T[K]</code> where both are unresolved type parameters), general function overloads, user-defined type predicates/refinement signatures and a complete model of function variance remain future work. Intersections are supported for records, not arbitrary unions/functions. Declaration interoperability is PlainScript&#39;s <code>.d.pln</code> format; arbitrary TypeScript <code>.d.ts</code> syntax is not parsed. Unresolved generics and <code>any</code> are permissive by design at untyped boundaries.</p>
+<p>Arbitrary intersections of unions/functions, variadic tuple types, readonly field modifiers, nominal classes/declarations, distributive conditional types, and parsing arbitrary TypeScript <code>.d.ts</code> syntax. Declaration interoperability is PlainScript&#39;s <code>.d.pln</code> format. Unresolved generics and <code>any</code> are permissive by design at untyped boundaries.</p>
 <p><code>std/contract</code> is a runtime validator in addition to a checker type. The compiler derives model types from the known constructors; it does not verify arbitrary hand-written <code>Schema&lt;T&gt;</code> values against an unrelated <code>T</code>. Use <code>object(...)</code>, <code>enumeration(...)</code>, <code>array(...)</code>, <code>optional(...)</code> and <code>literal(...)</code> when you want derivation.</p>
-<p>See <a href="UNIFIED_CONTRACTS.html">Unified Contracts</a> for the end-to-end path.</p></div><aside class="toc"><div class="toc-title">On this page</div><a class="toc-h2" href="#implemented-and-tested">Implemented and tested</a><a class="toc-h2" href="#still-absent">Still absent</a></aside></article><footer class="page-footer"><span>PlainScript 2.0 documentation</span><a href="https://github.com/ayoistooslick/Plainscript/issues">Report a documentation issue ↗</a></footer></div></main></div><script src="app.js"></script></body></html>
+<p>See <a href="contracts.html">Unified Contracts</a> for the end-to-end path and <a href="../tests/type-level.test.js">tests</a>, <a href="../tests/overloads.test.js">overloads</a>, <a href="../tests/predicates.test.js">predicates</a>, <a href="../tests/variance.test.js">variance</a> and <a href="../tests/recursive-types.test.js">recursive types</a> for executable coverage.</p></div><aside class="toc"><div class="toc-title">On this page</div><a class="toc-h2" href="#implemented-and-tested">Implemented and tested</a><a class="toc-h2" href="#variance">Variance</a><a class="toc-h2" href="#conditional-and-mapped-semantics">Conditional and mapped semantics</a><a class="toc-h2" href="#still-absent">Still absent</a></aside></article><footer class="page-footer"><span>PlainScript 2.0 documentation</span><a href="https://github.com/ayoistooslick/Plainscript/issues">Report a documentation issue ↗</a></footer></div></main></div><script src="app.js"></script></body></html>

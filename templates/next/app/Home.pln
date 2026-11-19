@@ -1,0 +1,14 @@
+import { createElement } from "react"
+
+export function Home() -> any
+    render
+        element "main" with className: "page"
+            element "h1"
+                "PlainScript inside Next.js"
+            end
+            element "p"
+                "This React Server Component is compiled from PlainScript."
+            end
+        end
+    end
+end

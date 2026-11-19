@@ -84,6 +84,42 @@ test('build --declarations emits a .d.pln beside every compiled module', () => {
   assert.ok(!store.includes('$match'));
 });
 
+test('declarations preserve conditional, mapped, indexed, tuple and keyof types', () => {
+  const directory = sandbox();
+  writeFiles(directory, {
+    'src/types.pln': `export type User
+    id: number
+    name: text
+end
+
+export type Keys<T> = keyof T
+export type UserKey = keyof User
+export type IsText<T> = T extends text ? "yes" : "no"
+export type Flags<T> = { [K in keyof T]?: boolean }
+export type First<T> = T[0]
+export type Pair = [number, text]
+
+export function flag<T>(values: Flags<T>) -> Flags<T>
+    return values
+end
+`,
+  });
+  const build = cli(['build', '--declarations'], directory);
+  assert.strictEqual(build.status, 0, build.stderr);
+  const declaration = fs.readFileSync(path.join(directory, 'dist/types.d.pln'), 'utf8');
+  assert.match(declaration, /export type Keys<T> = keyof T/);
+  assert.match(declaration, /export type IsText<T> = T extends text \? "yes" : "no"/);
+  assert.match(declaration, /export type Flags<T> = \{ \[K in keyof T\]\?: boolean \}/);
+  assert.match(declaration, /export type First<T> = T\[0\]/);
+  assert.match(declaration, /export type Pair = \[number, text\]/);
+
+  writeFiles(directory, {
+    'main.pln': `import { flag } from "./dist/types.js"\nlet value = flag({ id: true })\n`,
+  });
+  const check = cli(['check', 'main.pln'], directory);
+  assert.strictEqual(check.status, 0, check.stderr);
+});
+
 test('build without the flag writes no declarations', () => {
   const directory = sandbox();
   writeFiles(directory, library());

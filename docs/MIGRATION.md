@@ -79,20 +79,26 @@ The following v1 service-related constructs are removed and must be replaced wit
 
 ## Standard Library Changes
 
-The v2 standard library has 11 explicit modules:
+The v2 standard library is organized as explicit modules with `.d.pln` declarations:
 
-| Module | Replaces v1 equivalent |
+| Module | Purpose |
 | --- | --- |
-| `std/io` | `print`, `read`, `readFile`, `write`, `writeFile` |
+| `std/io` | `print`, `read`, `args`, file helpers |
 | `std/text` | String operations, interpolation `"{expr}"` |
 | `std/list` | List operations: `cons`, `count`, `append`, `filter`, `map`, `reduce` |
 | `std/map` | Map operations: `get`, `set`, `has`, `keys`, `values`, `delete` |
-| `std/math` | Math operations: `min`, `max`, `abs`, `clamp`, `lerp`, `deg2rad`, `rad2deg` |
+| `std/math` | `min`, `max`, `abs`, `clamp`, `lerp`, `deg2rad`, `rad2deg` |
 | `std/json` | `parse`, `stringify` |
 | `std/time` | `now`, `format`, `parse`, `add`, `diff` |
 | `std/fs` | `mkdir`, `mkDir`, `readDir`, `readFile`, `writeFile`, `appendFile`, `exists` |
-| `std/http` | Server creation, routing, request/response helpers |
-| `std/test` | `assert`, `describe`, `it`, `beforeEach`, `afterEach` |
+| `std/http` | Fetch-style server, JSON/text responses, SSE, request helpers |
+| `std/ws` | WebSocket server with authorization-before-upgrade |
+| `std/task` | Structured concurrency: groups, cancellation, channels, workers |
+| `std/jobs` | In-process bounded job queue with retries, timeouts and drain |
+| `std/db` | SQLite tables and versioned migrations (Node 22) |
+| `std/auth` | scrypt passwords, HS256 tokens, policies |
+| `std/contract` | Runtime schemas, operations, typed results, router/transport |
+| `std/test` | Test declarations and assertions |
 | `std/dom` | DOM utilities for browser environments |
 
 v1 modules like `std/date` are consolidated into `std/time`.
@@ -108,10 +114,47 @@ v1 modules like `std/date` are consolidated into `std/time`.
 | `plainscript fmt` | same |
 | `plainscript new` | same |
 | `plainscript ir` | same |
+| `plainscript watch` | new: rebuild on `.pln` changes |
+| `plainscript lsp` | new: stdio language server |
+| `plainscript migrate` | new: scan JS/TS for migration blockers |
 | `plainscript version` | same |
 | `plainscript help` | same |
 
-Options updated: `--quiet/--verbose/--check/--std-base`.
+Options updated: `--quiet/--verbose/--check/--std-base/--declarations/--template/--json`.
+See [CLI](CLI.md).
+
+## JavaScript and TypeScript migration
+
+`plainscript migrate [paths…]` is a conservative scanner, not a transpiler. It reports:
+
+- CommonJS `require`/`module.exports`;
+- TypeScript `interface`, `enum` and `namespace` declarations;
+- class declarations (move them to a JavaScript boundary or rewrite as records/functions);
+- JSX/TSX syntax and files;
+- `//` comments (PlainScript uses `#`).
+
+```bash
+plainscript migrate src --check
+plainscript migrate src --json
+```
+
+A finding is a review item, not an automatic error in the old file. Recommended incremental
+path:
+
+1. Keep the existing JavaScript application running.
+2. Add PlainScript modules for new, self-contained logic; import them from JavaScript or
+   compile them and import the emitted `.js`.
+3. Move a file at a time, starting with pure functions and types. Keep React/JSX components,
+   Express middleware and third-party class-shaped APIs in `.js` modules at the boundary.
+4. Declare the JavaScript surfaces you call with `declare function`/`declare const` or a
+   `.d.pln` wrapper.
+5. Run `plainscript check` after each move and keep the existing test suite green.
+6. Only then replace entry points/build scripts.
+
+There is no automatic TypeScript type-annotation conversion and no `.d.ts` parser. Types
+cross the boundary as `.d.pln` declarations or explicit `any`/`declare` shapes. A mixed
+project is supported: `.pln` modules compile to ESM and `.js` modules remain ordinary
+JavaScript consumed through interop. See [INTEROP](INTEROP.md).
 
 ## Migration Checklist
 
@@ -124,6 +167,7 @@ Options updated: `--quiet/--verbose/--check/--std-base`.
 - [ ] Update `ListPattern` to use `count` instead of `.length`
 - [ ] Update `render`/`element` blocks to lower to `createElement` calls
 - [ ] Update module imports: `std/<name>` resolves to declarations
+- [ ] Run `plainscript migrate src --check` and review every finding
 - [ ] Run `npm test` to verify no regressions
 - [ ] Consult `docs/SPEC.md` for the complete v2 language specification
 

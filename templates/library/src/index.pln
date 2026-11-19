@@ -1,0 +1,13 @@
+export type Task
+    id: number
+    title: text
+    done: boolean
+end
+
+export function createTask(id: number, title: text) -> Task
+    return { id: id, title: title, done: false }
+end
+
+export function complete(task: Task) -> Task
+    return { id: task.id, title: task.title, done: true }
+end

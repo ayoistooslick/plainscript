@@ -46,13 +46,24 @@ export async function serve(port, handler, options = {}) {
     response.end('This endpoint accepts WebSocket upgrades.\n');
   });
 
-  server.on('upgrade', (request, socket) => {
+  server.on('upgrade', async (request, socket) => {
     const key = request.headers['sec-websocket-key'];
     const upgrade = String(request.headers.upgrade || '').toLowerCase();
     if (upgrade !== 'websocket' || typeof key !== 'string') {
       socket.write('HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n');
       socket.destroy();
       return;
+    }
+    // Authentication must happen before the 101 response, otherwise the client
+    // is already speaking the WebSocket protocol on an unauthorized socket.
+    if (typeof options.authorize === 'function') {
+      let allowed = false;
+      try { allowed = Boolean(await options.authorize(request)); } catch { allowed = false; }
+      if (!allowed) {
+        socket.write('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\nContent-Length: 0\r\n\r\n');
+        socket.destroy();
+        return;
+      }
     }
     const accept = crypto.createHash('sha1').update(key + GUID).digest('base64');
     socket.write([

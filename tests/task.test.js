@@ -117,6 +117,55 @@ end
   assert.equal(result.stdout, '1\n2\nChannelClosedError\n');
 });
 
+test('nested groups inherit cancellation from a parent group', () => {
+  const result = runSource(`import { group, run, close, cancelGroup, delay } from "std/task"
+import { print } from "std/io"
+
+let parent = group("parent")
+let child = group({ parent: parent, label: "child" })
+run(child, async (signal: any) => do
+    await delay(1000, signal)
+    return "finished"
+end)
+cancelGroup(parent)
+try
+    await close(child)
+catch error
+    print(error.name)
+end
+`);
+  assert.equal(result.status, 0, `${result.stderr}${result.stdout}`);
+  assert.equal(result.stdout, 'CancellationError\n');
+});
+
+test('closing a channel still delivers its buffered values', () => {
+  const result = runSource(`import { channel, Channel } from "std/task"
+import { print } from "std/io"
+
+let values: Channel<number> = channel(2)
+await values.send(1)
+await values.send(2)
+values.close()
+print(await values.receive())
+print(await values.receive())
+try
+    await values.receive()
+catch error
+    print(error.name)
+end
+`);
+  assert.equal(result.status, 0, `${result.stderr}${result.stdout}`);
+  assert.equal(result.stdout, '1\n2\nChannelClosedError\n');
+});
+
+test('worker startup failures reject the join promise', async () => {
+  const module = await import(pathToFileURL(path.join(ROOT, 'stdlib', 'task.js')).toString());
+  const source = 'data:text/javascript,' + encodeURIComponent('throw new Error("worker boom");');
+  const worker = await module.spawnWorker(source);
+  await assert.rejects(worker.join, /worker boom/);
+  await worker.terminate();
+});
+
 test('worker handles exchange messages and terminate cleanly in Node', async () => {
   const module = await import(pathToFileURL(path.join(ROOT, 'stdlib', 'task.js')).toString());
   const source = 'data:text/javascript,' + encodeURIComponent(`

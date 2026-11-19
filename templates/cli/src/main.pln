@@ -1,0 +1,11 @@
+import { args, print } from "std/io"
+
+let values = args()
+let command = values[0] ?? "help"
+
+if command == "hello"
+    let name = values[1] ?? "world"
+    print("Hello, {name}!")
+else
+    print("Usage: cli hello [name]")
+end

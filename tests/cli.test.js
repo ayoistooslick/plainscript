@@ -36,6 +36,30 @@ test('unknown commands exit with a usage error', () => {
   assert.match(result.stderr, /Unknown command/);
 });
 
+test('migrate reports JavaScript and TypeScript blockers without rewriting files', () => {
+  const directory = sandbox();
+  writeFiles(directory, {
+    'legacy.js': 'const fs = require("node:fs")\nmodule.exports = fs\n',
+    'component.tsx': 'interface Props { name: string }\nexport const View = () => <div>{name}</div>\n',
+  });
+  const result = cli(['migrate', '--check', '.'], directory);
+  assert.strictEqual(result.status, 1);
+  assert.match(result.stdout, /COMMONJS_REQUIRE/);
+  assert.match(result.stdout, /TS_INTERFACE/);
+  assert.match(result.stdout, /JSX_FILE/);
+  assert.strictEqual(fs.existsSync(path.join(directory, 'legacy.pln')), false);
+});
+
+test('migrate can emit machine-readable findings', () => {
+  const directory = sandbox();
+  writeFiles(directory, { 'plain.js': 'export const answer = 42\n' });
+  const result = cli(['migrate', '--json', '.'], directory);
+  assert.strictEqual(result.status, 0);
+  const report = JSON.parse(result.stdout);
+  assert.equal(report.files, 1);
+  assert.deepEqual(report.findings, []);
+});
+
 test('run compiles and executes a program', () => {
   const directory = sandbox();
   writeFiles(directory, {
@@ -153,6 +177,19 @@ test('new --template scaffolds each bundled application', () => {
     assert.strictEqual(packageJson.name, name);
     assert.ok(packageJson.devDependencies['plainscript-lang']);
     const check = cli(['check', 'src/app.pln', 'src/client.pln', 'src/shared.pln'], project);
+    assert.strictEqual(check.status, 0, `${template}: ${check.stderr}`);
+  }
+});
+
+test('new scaffolds the framework and library templates', () => {
+  const directory = sandbox();
+  for (const template of ['react-vite', 'next', 'express', 'cli', 'library']) {
+    const name = `${template}-starter`;
+    const result = cli(['new', name, '--template', template], directory);
+    assert.strictEqual(result.status, 0, result.stderr);
+    const project = path.join(directory, name);
+    assert.ok(fs.existsSync(path.join(project, 'README.md')), `${template}: README missing`);
+    const check = cli(['check'], project);
     assert.strictEqual(check.status, 0, `${template}: ${check.stderr}`);
   }
 });
