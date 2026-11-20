@@ -29,15 +29,15 @@ and invalid-row rejection. These are executable checks, not API-shape claims.
 | One definition drives model, validation, DB columns, server, client | `std/contract.object` schemas; `std/db.table`; operation descriptors | Zod schema + `z.infer`; Prisma/Drizzle has a **separate** schema and generated types; tRPC router connects procedures | PlainScript avoids the second schema; Prisma/Drizzle still have stronger migration tooling and database breadth |
 | Compile-time input/output/error checking | Checker derives operation types; negative tests cover input, output and error codes | tRPC infers router input/output; error shape is usually not a closed union unless hand-modelled; Zod schema/type drift is possible with manually written interfaces | PlainScript is more closed by default; TypeScript has a richer type system |
 | Runtime validation | Same schema validates client input, server input and both outcomes | Zod at chosen boundaries; tRPC does not validate unless the procedure does; Prisma validates DB types, not HTTP payloads | Equivalent when a TS team wires every boundary; PlainScript makes it the default |
-| Database mapping and migrations | Schema-derived columns, versioned SQL migrations, transactional rollback, SQLite only | Prisma/Drizzle: mature schema DSL, multiple databases, migration tooling, introspection | **TypeScript stack wins** on database breadth and operations |
+| Database mapping and migrations | Schema-derived columns, versioned SQL migrations, transactional rollback; SQLite, plus pg/MySQL adapters driven by application-installed packages | Prisma/Drizzle: mature schema DSL, multiple databases, migration tooling, introspection | **TypeScript stack wins** on database breadth, live integration testing and operations; PlainScript's PostgreSQL/MySQL adapters are not server-tested in this repository |
 | Typed client transport | Built-in runtime client + JSON HTTP transport + operation router | tRPC: mature generated client, batching, subscriptions, React Query integration | tRPC wins on client ecosystem; PlainScript's is deliberately small |
-| Authentication | scrypt/HS256 primitives and policies in `std/auth`; demo login | Auth.js/Clerk/Passport or custom; far more providers and production integrations | **TypeScript ecosystem wins** |
-| Editor/tooling | LSP diagnostics, completion, hover, definitions, workspace references, rename, symbols, format, semantic tokens and quick fixes; VS Code extension | TypeScript LSP is decades more mature, with refactors, inlay hints, debugging and framework plugins | **TypeScript wins decisively** |
-| Language type system | Structural records, generics/constraints, narrowing, variants, literal unions, tuples, intersections, conditional/mapped types, deferred indexed access, overloads, predicates, recursive types and documented structural variance | Enormous declaration ecosystem, more mature inference, distributive conditional types, variadic tuples, classes/nominal tooling | **TypeScript wins on breadth and ecosystem**; core structural features are now comparable |
+| Authentication | scrypt/HS256 primitives and policies in `std/auth`; optional OIDC/SAML wrapper modules over application-installed libraries | Auth.js/Clerk/Passport or custom; far more providers, conformance testing and production integrations | **TypeScript ecosystem wins** on provider breadth and operational maturity |
+| Editor/tooling | LSP diagnostics, completion, hover, definitions, workspace references, rename, symbols, format, semantic tokens and quick fixes; minimal DAP source-map debug adapter; VS Code extension | TypeScript LSP is decades more mature, with refactors, inlay hints, debugging and framework plugins | **TypeScript wins decisively** |
+| Language type system | Structural records, generics/constraints, narrowing, variants, literal unions, fixed/variadic tuples, readonly fields, intersections, conditional/mapped types with naked-parameter distribution, deferred indexed access, overloads, predicates, recursive types and documented structural variance | Enormous declaration ecosystem, more mature inference, conditional `infer`, classes/nominal tooling, optional tuple elements | **TypeScript wins on breadth and ecosystem**; core structural features are now comparable |
 | Ecosystem and hiring | npm interop, but a new language and small library/tooling ecosystem | Enormous ecosystem, frameworks, hosting support, community | **TypeScript wins** |
 | Build performance | Synthetic PlainScript-only benchmark: 40 modules, median cold compile 16.95 ms | No pinned cross-language benchmark in this repository | **Unproven**; no speed claim |
 | JSX/React | `render` blocks lower to `createElement`; no JSX/fragments/automatic keys | First-class JSX and the entire React tooling ecosystem | **TypeScript wins** |
-| Operational maturity | Small compiler/runtime; SQLite/Node focus; no bundler; partial LSP | Mature compilers, debuggers, profilers, deployment tooling | **TypeScript wins** |
+| Operational maturity | Small compiler/runtime; SQLite/PostgreSQL/MySQL focus; no bundler; partial LSP and minimal DAP | Mature compilers, debuggers, profilers, deployment tooling | **TypeScript wins** |
 
 ## What PlainScript genuinely offers
 
@@ -53,10 +53,11 @@ and invalid-row rejection. These are executable checks, not API-shape claims.
 
 ## What it does not offer
 
-Prisma-level database support, a mature auth provider integration, JSX, a bundler, a debug
-adapter, a large ecosystem, or a measured speed advantage over TypeScript. Variadic tuples,
-readonly modifiers and distributive conditional types are not implemented. Any claim that
-PlainScript is universally better would be false.
+Prisma-level multi-database operations, live-server-tested PostgreSQL/MySQL adapters, a
+MongoDB adapter, distributed workers, a mature auth provider integration, JSX, a bundler, a
+large ecosystem, or a measured speed advantage over TypeScript. The DAP debugger is minimal
+and the VS Code integration is not UI-automated; arbitrary TypeScript `.d.ts` parsing is
+not supported. Any claim that PlainScript is universally better would be false.
 
 ## Reproduce the checks
 

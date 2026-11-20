@@ -47,7 +47,7 @@ function deref(t, seen = new Set()) {
 
 const typeVar = (name, constraint = null) => ({ k: 'var', name: name || `T${nextVarId}`, id: nextVarId++, constraint });
 const listOf = (elem) => ({ k: 'list', elem });
-const tupleOf = (elements) => ({ k: 'tuple', elements });
+const tupleOf = (elements, rest = null) => ({ k: 'tuple', elements, rest });
 const mapOf = (key, value) => ({ k: 'map', key, value });
 const promiseOf = (value) => ({ k: 'promise', value });
 const fnType = (params, ret, typeParams, predicate = null) => ({ k: 'fn', params, ret, typeParams: typeParams || [], predicate });
@@ -58,7 +58,7 @@ const unitVariant = (name, unionName) => ({ k: 'unit', name, unionName });
 // They deliberately stay narrow so a model field cannot accept an arbitrary
 // text value that the runtime validator would reject.
 const literalType = (value, base) => ({ k: 'literal', value, base });
-const conditionalType = (check, extendsType, trueType, falseType) => ({ k: 'conditional', check, extends: extendsType, trueType, falseType });
+const conditionalType = (check, extendsType, trueType, falseType, distributive = false) => ({ k: 'conditional', check, extends: extendsType, trueType, falseType, distributive });
 const keyofType = (target) => ({ k: 'keyof', target });
 const indexedAccessType = (target, index) => ({ k: 'indexed', target, index });
 const mappedType = (variable, key, value, optional = false) => ({ k: 'mapped', variable, key, value, optional });
@@ -129,8 +129,11 @@ function showType(t, seen = new Set()) {
       return t.name;
     case 'list':
       return `list of ${showType(t.elem, seen)}`;
-    case 'tuple':
-      return `[${t.elements.map((element) => showType(element, seen)).join(', ')}]`;
+    case 'tuple': {
+      const fixed = t.elements.map((element) => showType(element, seen));
+      if (t.rest) fixed.push(`...${showType(t.rest, seen)}`);
+      return `[${fixed.join(', ')}]`;
+    }
     case 'map':
       return `map of ${showType(t.key, seen)} to ${showType(t.value, seen)}`;
     case 'promise':
@@ -139,7 +142,7 @@ function showType(t, seen = new Set()) {
       return t.name;
     case 'record': {
       const fields = [...t.fields.entries()]
-        .map(([name, field]) => `${name}${field.optional ? '?' : ''}: ${showType(field.type, seen)}`)
+        .map(([name, field]) => `${field.readonly ? 'readonly ' : ''}${name}${field.optional ? '?' : ''}: ${showType(field.type, seen)}`)
         .join(', ');
       return t.name ? t.name : `{ ${fields} }`;
     }
@@ -201,7 +204,7 @@ function containsVariable(t, seen = new Set()) {
   seen.add(t);
   switch (t.k) {
     case 'list': return containsVariable(t.elem, seen);
-    case 'tuple': return t.elements.some((element) => containsVariable(element, seen));
+    case 'tuple': return t.elements.some((element) => containsVariable(element, seen)) || containsVariable(t.rest, seen);
     case 'map': return containsVariable(t.key, seen) || containsVariable(t.value, seen);
     case 'promise': return containsVariable(t.value, seen);
     case 'union': return t.members.some((member) => containsVariable(member, seen));
@@ -253,8 +256,8 @@ function indexOnce(target, index) {
   }
   if (source.k === 'tuple') {
     const value = literalValueOfKey(index);
-    if (typeof value === 'number') return source.elements[value] || PRIM.never;
-    if (index.k === 'prim' && index.name === 'number') return union([...source.elements, PRIM.nothing]);
+    if (typeof value === 'number') return source.elements[value] || source.rest || PRIM.never;
+    if (index.k === 'prim' && index.name === 'number') return union([...source.elements, source.rest || PRIM.nothing, PRIM.nothing]);
   }
   if (source.k === 'list' && index.k === 'prim' && index.name === 'number') return union([source.elem, PRIM.nothing]);
   if (source.k === 'map') {
@@ -296,10 +299,16 @@ function evaluate(t, seen = new Set()) {
   if (t.k === 'conditional') {
     const check = evaluate(t.check, seen);
     const extendsType = evaluate(t.extends, seen);
+    // A conditional whose checked type is a naked type parameter distributes
+    // over a union after substitution: `T extends U ? A : B` becomes
+    // `(T1 extends U ? A : B) or (T2 extends U ? A : B)`.
+    if (t.distributive && check.k === 'union') {
+      return union(check.members.map((member) => evaluate(conditionalType(member, extendsType, t.trueType, t.falseType, false), seen)));
+    }
     if (!containsVariable(check) && !containsVariable(extendsType)) {
       return evaluate(assignable(check, extendsType) ? t.trueType : t.falseType, seen);
     }
-    return conditionalType(check, extendsType, evaluate(t.trueType, seen), evaluate(t.falseType, seen));
+    return conditionalType(check, extendsType, evaluate(t.trueType, seen), evaluate(t.falseType, seen), Boolean(t.distributive));
   }
 
   if (t.k === 'mapped') {
@@ -321,7 +330,7 @@ function evaluate(t, seen = new Set()) {
 
   if (t.k === 'union') return union(t.members.map((member) => evaluate(member, seen)));
   if (t.k === 'list') return listOf(evaluate(t.elem, seen));
-  if (t.k === 'tuple') return tupleOf(t.elements.map((element) => evaluate(element, seen)));
+  if (t.k === 'tuple') return tupleOf(t.elements.map((element) => evaluate(element, seen)), t.rest ? evaluate(t.rest, seen) : null);
   if (t.k === 'map') return mapOf(evaluate(t.key, seen), evaluate(t.value, seen));
   if (t.k === 'promise') return promiseOf(evaluate(t.value, seen));
   if (t.k === 'fn') {
@@ -334,7 +343,7 @@ function evaluate(t, seen = new Set()) {
   }
   if (t.k === 'record') {
     const fields = new Map();
-    for (const [name, field] of t.fields) fields.set(name, { type: evaluate(field.type, seen), optional: field.optional });
+    for (const [name, field] of t.fields) fields.set(name, { type: evaluate(field.type, seen), optional: field.optional, readonly: Boolean(field.readonly) });
     return record(fields, { name: t.name, open: t.open });
   }
   if (t.k === 'variant') return variant(t.name, t.fields.map((field) => ({ name: field.name, type: evaluate(field.type, seen) })), t.unionName);
@@ -379,11 +388,27 @@ function assignable(from, to, seen = new Set()) {
 
   if (from.k === 'list' && to.k === 'list') return assignable(from.elem, to.elem, seen);
   if (from.k === 'tuple' && to.k === 'tuple') {
-    return from.elements.length === to.elements.length
-      && from.elements.every((element, index) => assignable(element, to.elements[index], seen));
+    for (let index = 0; index < to.elements.length; index += 1) {
+      if (index < from.elements.length) {
+        if (!assignable(from.elements[index], to.elements[index], seen)) return false;
+      } else if (from.rest) {
+        if (!assignable(from.rest, to.elements[index], seen)) return false;
+      } else {
+        return false;
+      }
+    }
+    for (let index = to.elements.length; index < from.elements.length; index += 1) {
+      if (!to.rest || !assignable(from.elements[index], to.rest, seen)) return false;
+    }
+    if (from.rest) {
+      if (!to.rest) return false;
+      if (!assignable(from.rest, to.rest, seen)) return false;
+    }
+    return true;
   }
   if (from.k === 'tuple' && to.k === 'list') {
-    return from.elements.every((element) => assignable(element, to.elem, seen));
+    return from.elements.every((element) => assignable(element, to.elem, seen))
+      && (!from.rest || assignable(from.rest, to.elem, seen));
   }
   if (from.k === 'map' && to.k === 'map') {
     return assignable(from.key, to.key, seen) && assignable(from.value, to.value, seen);
@@ -459,6 +484,14 @@ function infer(pattern, actual, subst, depth = 0) {
     for (let i = 0; i < Math.min(pattern.elements.length, actual.elements.length); i += 1) {
       ok = infer(pattern.elements[i], actual.elements[i], subst, depth + 1) && ok;
     }
+    if (pattern.rest) {
+      for (let i = pattern.elements.length; i < actual.elements.length; i += 1) {
+        ok = infer(pattern.rest, actual.elements[i], subst, depth + 1) && ok;
+      }
+      if (actual.rest) ok = infer(pattern.rest, actual.rest, subst, depth + 1) && ok;
+    } else if (actual.rest && actual.elements.length <= pattern.elements.length) {
+      ok = infer(pattern.elements[actual.elements.length], actual.rest, subst, depth + 1) && ok;
+    }
     return ok;
   }
   if (pattern.k === 'map' && actual.k === 'map') {
@@ -498,7 +531,7 @@ function substituteRaw(t, subst) {
     case 'list':
       return listOf(substituteRaw(t.elem, subst));
     case 'tuple':
-      return tupleOf(t.elements.map((element) => substituteRaw(element, subst)));
+      return tupleOf(t.elements.map((element) => substituteRaw(element, subst)), t.rest ? substituteRaw(t.rest, subst) : null);
     case 'map':
       return mapOf(substituteRaw(t.key, subst), substituteRaw(t.value, subst));
     case 'promise':
@@ -511,6 +544,7 @@ function substituteRaw(t, subst) {
         substituteRaw(t.extends, subst),
         substituteRaw(t.trueType, subst),
         substituteRaw(t.falseType, subst),
+        Boolean(t.distributive),
       );
     case 'keyof':
       return keyofType(substituteRaw(t.target, subst));
@@ -521,7 +555,7 @@ function substituteRaw(t, subst) {
     case 'record': {
       const fields = new Map();
       for (const [name, field] of t.fields) {
-        fields.set(name, { type: substituteRaw(field.type, subst), optional: field.optional });
+        fields.set(name, { type: substituteRaw(field.type, subst), optional: field.optional, readonly: Boolean(field.readonly) });
       }
       return record(fields, { name: t.name, open: t.open });
     }

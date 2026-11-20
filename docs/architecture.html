@@ -116,9 +116,9 @@
 <p>surrounding project is not already ESM.</p>
 </ul>
 <h2 id="standard-library-interface">Standard library interface</h2>
-<p>Each module is a hand-written JavaScript file plus a <code>.d.pln</code> declaration file that the checker parses like any other PlainScript module. This keeps runtime and types in one reviewable place, with no build step and no <code>.d.ts</code> tooling, and it means a standard library signature bug is a compiler-visible bug rather than a documentation problem.</p>
+<p>Each module is a hand-written JavaScript file plus a <code>.d.pln</code> declaration file that the checker parses like any other PlainScript module. This keeps runtime and types in one reviewable place, with no build step, and it means a standard-library signature bug is a compiler-visible bug rather than a documentation problem. Applications that consume a TypeScript package can run <code>plainscript interop</code> to translate the supported <code>.d.ts</code> subset; the standard library itself stays in native <code>.d.pln</code> declarations.</p>
 <h2 id="diagnostics">Diagnostics</h2>
-<p><code>src/diagnostics.js</code> defines <code>CompileError</code> and the reporting helpers. Diagnostics carry a stable code, message, file, line, column and optional source excerpt. The CLI prints code frames, counts errors and exits non-zero. Warnings do not exist as a category; anything worth reporting is an error, and everything reported is fixed before emission.</p>
+<p><code>src/diagnostics.js</code> defines <code>CompileError</code> and the reporting helpers. Diagnostics carry a stable code, message, file, line, column, severity and optional source excerpt. The CLI prints code frames, counts errors and exits non-zero. Compiler errors are fixed before emission. The TypeScript declaration importer also emits warnings (for example <code>PS7004</code> for an omitted generic default); those do not by themselves prevent a declaration file from being written, so review them explicitly.</p>
 <h2 id="testing-strategy">Testing strategy</h2>
 <table><thead><tr><th>File</th><th>Layer</th></tr></thead><tbody>
 <tr><td><code>tests/lexer.test.js</code></td><td>tokens, interpolation, escapes, errors</td></tr>
@@ -128,6 +128,10 @@
 <tr><td><code>tests/runtime.test.js</code></td><td>executed programs, async, errors, stdlib behaviour</td></tr>
 <tr><td><code>tests/cli.test.js</code></td><td>run/build/check/fmt/test/new, exit codes, files written</td></tr>
 <tr><td><code>tests/interop.test.js</code></td><td>npm packages, Node builtins, ambient declarations, JS consumers</td></tr>
+<tr><td><code>tests/typescript-interop.test.js</code></td><td><code>.d.ts</code> subset translation, unsupported constructs, CLI output</td></tr>
+<tr><td><code>tests/db.test.js</code>, <code>tests/db-adapters.test.js</code></td><td>SQLite persistence and PostgreSQL/MySQL adapter SQL/driver fakes</td></tr>
+<tr><td><code>tests/jobs.test.js</code>, <code>tests/durable-jobs.test.js</code></td><td>queue lifecycle and memory/SQLite recovery</td></tr>
+<tr><td><code>tests/dap.test.js</code>, <code>tests/ws-protocol.test.js</code></td><td>debug-adapter source mapping and WebSocket protocol behavior</td></tr>
 <tr><td><code>tests/formatter.test.js</code></td><td>idempotence, token preservation, invalid input</td></tr>
 <tr><td><code>tests/package.test.js</code></td><td>package metadata and exports</td></tr>
 </tbody></table>

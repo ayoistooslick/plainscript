@@ -1,0 +1,15 @@
+# SAML 2.0 service-provider helpers backed by @node-saml/node-saml.
+# XML signature, audience and assertion-condition checks are performed by the
+# library; the application owns local users and session cookies.
+
+export type SamlConnection
+    config: any
+    saml: any
+    library: any
+end
+
+export declare function createServiceProvider(options?: any, library?: any) -> Promise of SamlConnection
+export declare function beginLogin(connection: SamlConnection, options?: any) -> Promise of any
+export declare function validateCallback(connection: SamlConnection, request: any, session?: any) -> Promise of any
+export declare function metadata(connection: SamlConnection, options?: any) -> any
+export declare function beginLogout(connection: SamlConnection, profile: any, options?: any) -> Promise of text

@@ -1,7 +1,14 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Databases — PlainScript documentation."><title>Databases · PlainScript</title><link rel="stylesheet" href="style.css"></head><body><div class="site-shell"><aside class="sidebar"><a class="brand" href="index.html"><span class="brand-mark">PS</span><span><span class="brand-name">PlainScript</span><span class="brand-meta">Language docs · 2.0</span></span></a><div class="nav-group"><div class="nav-label">Start here</div><a class="nav-link " href="index.html">PlainScript</a><a class="nav-link " href="cli.html">CLI reference</a><a class="nav-link " href="templates.html">Application templates</a></div><div class="nav-group"><div class="nav-label">Language</div><a class="nav-link " href="spec.html">Language specification</a><a class="nav-link " href="syntax-design.html">Syntax design</a><a class="nav-link " href="type-system.html">Type system</a></div><div class="nav-group"><div class="nav-label">Compiler</div><a class="nav-link " href="architecture.html">Compiler architecture</a><a class="nav-link " href="interop.html">JavaScript interoperability</a><a class="nav-link " href="benchmarks.html">Benchmarks</a></div><div class="nav-group"><div class="nav-label">Guides</div><a class="nav-link " href="contracts.html">Unified contracts</a><a class="nav-link " href="concurrency.html">Concurrency</a><a class="nav-link " href="jobs.html">Background jobs</a><a class="nav-link active" href="databases.html">Databases</a><a class="nav-link " href="security.html">Security</a><a class="nav-link " href="debugging.html">Debugging</a><a class="nav-link " href="migration.html">Migration guide</a><a class="nav-link " href="comparison.html">Comparison with TypeScript</a></div><div class="nav-group"><div class="nav-label">Project</div><a class="nav-link " href="progress.html">Engineering progress</a><a class="nav-link " href="roadmap.html">Roadmap</a><a class="nav-link " href="audit.html">Audit</a><a class="nav-link " href="decisions.html">Decisions</a></div><div class="sidebar-footer">Open source under MIT.<br><a href="https://github.com/ayoistooslick/Plainscript">View on GitHub ↗</a></div></aside><main class="main"><header class="topbar"><div class="search-wrap"><label class="search" aria-label="Search documentation"><span>⌕</span><input id="doc-search" type="search" placeholder="Search the docs…" autocomplete="off"><kbd>/</kbd></label><div id="search-results" class="search-results" role="listbox"></div></div><nav class="top-links"><a href="index.html">Docs</a><a href="https://github.com/ayoistooslick/Plainscript">GitHub ↗</a></nav></header><div class="content"><article class="page-layout"><div class="prose"><h1 id="databases">Databases</h1>
-<p>PlainScript has no database runtime of its own. Application code imports the same npm driver it would use from JavaScript, passes values as bound parameters, and keeps contract validation at the boundary.</p>
-<h2 id="supported-through-std-db-today">Supported through <code>std/db</code> today</h2>
-<p><code>std/db</code> implements schema-derived tables and versioned migrations on Node 22&#39;s built-in <code>node:sqlite</code>. It is the only driver with a bundled adapter.</p>
+<p>PlainScript has no database runtime of its own. Application code imports an ordinary npm driver, passes values as bound parameters, and keeps contract validation at the boundary. The bundled SQLite, PostgreSQL and MySQL adapters provide schema-derived tables and migrations without making a driver a compiler dependency.</p>
+<h2 id="supported-surfaces">Supported surfaces</h2>
+<table><thead><tr><th>Surface</th><th>Driver</th><th>Table/migration API</th></tr></thead><tbody>
+<tr><td><code>std/db</code></td><td>Node 22 <code>node:sqlite</code></td><td>Synchronous <code>table()</code> and <code>migrate()</code></td></tr>
+<tr><td><code>std/db-postgres</code></td><td>Application-installed <code>pg</code></td><td>Asynchronous <code>table()</code> and <code>migrate()</code> via the same <code>std/db</code> helpers</td></tr>
+<tr><td><code>std/db-mysql</code></td><td>Application-installed <code>mysql2/promise</code></td><td>Asynchronous <code>table()</code> and <code>migrate()</code> via the same <code>std/db</code> helpers</td></tr>
+<tr><td>MongoDB</td><td>Application-installed <code>mongodb</code></td><td>Direct driver interop; no adapter</td></tr>
+</tbody></table>
+<p>The compiler and bundled runtime still have <strong>zero npm dependencies</strong>. Install <code>pg</code> or <code>mysql2</code> in the application that uses the adapter. The adapter loads it dynamically and raises <code>DatabaseError</code> with an installation hint when it is missing.</p>
+<h2 id="sqlite">SQLite</h2>
 <pre><code>import { open, table, migrate, Database } from &quot;std/db&quot;
 
 let database = await open(process.env.DB_PATH ?? &quot;:memory:&quot;)
@@ -12,64 +19,37 @@ await migrate(database, [{
         db.exec(&quot;create table tasks (id integer primary key autoincrement, title text not null, done integer not null)&quot;)
     end,
 }])
-let tasks = table(database, &quot;tasks&quot;, TaskSchema)</code></pre>
+let tasks = table(database, &quot;tasks&quot;, TaskSchema)
+let rows = tasks.list()          # SQLite table methods are synchronous</code></pre>
 <p><code>table</code> derives columns from the same schema used by <code>std/contract</code>, validates every row through that schema and binds every value. <code>migrate</code> records versions in <code>plainscript_migrations</code>, uses <code>BEGIN IMMEDIATE</code>, rolls back a failed migration and refuses duplicate versions or history gaps. <code>rollback</code> requires a <code>down</code> function.</p>
 <p>Node&#39;s <code>node:sqlite</code> is marked experimental by Node 22. The checked-in tests cover it; a production service should verify the exact Node version it deploys.</p>
 <h2 id="postgresql">PostgreSQL</h2>
-<p>Use the <code>pg</code> package directly. This is ordinary JavaScript interop, not a wrapper:</p>
-<pre><code>import pg from &quot;pg&quot;
+<pre><code>import { openPool } from &quot;std/db-postgres&quot;
+import { table, migrate, AsyncDatabase } from &quot;std/db&quot;
+import { env } from &quot;std/io&quot;
 
-declare const process: any
-
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 10 })
-
-async function findTask(id: number) -&gt; any
-    let result = await pool.query(&quot;select * from tasks where id = $1&quot;, [id])
-    return result.rows[0]
-end
-
-async function createTask(title: text) -&gt; any
-    let result = await pool.query(
-        &quot;insert into tasks (title) values ($1) returning *&quot;,
-        [title],
-    )
-    return result.rows[0]
-end
-
-async function withTransaction(work: (client: any) -&gt; Promise of any) -&gt; any
-    let client = await pool.connect()
-    try
-        await client.query(&quot;begin&quot;)
-        let value = await work(client)
-        await client.query(&quot;commit&quot;)
-        return value
-    catch error
-        await client.query(&quot;rollback&quot;)
-        throw error
-    finally
-        client.release()
-    end
-end</code></pre>
-<p>PostgreSQL uses <code>$1</code> placeholders. The built-in <code>std/db.table</code> generates SQLite <code>?</code> placeholders and SQLite type names, so do not combine it with <code>pg</code>; write the table and migration SQL explicitly or add an adapter.</p>
+let database = await openPool(env(&quot;DATABASE_URL&quot;), { client: { max: 10 } })
+await migrate(database, [{
+    version: 1,
+    name: &quot;tasks&quot;,
+    up: async (db: AsyncDatabase) =&gt; do
+        await db.exec(&quot;create table tasks (id bigserial primary key, title text not null, done boolean not null)&quot;)
+    end,
+}])
+let tasks = table(database, &quot;tasks&quot;, TaskSchema)
+let rows = await tasks.list()    # async adapter: await table methods</code></pre>
+<p><code>open()</code> creates one dedicated <code>pg.Client</code>; use <code>openPool()</code> for request-serving applications. <code>openPool().transaction(work)</code> checks out one client, runs <code>BEGIN</code>/<code>COMMIT</code> (or <code>ROLLBACK</code>) on that session and releases it. The adapter translates <code>?</code> placeholders outside quoted strings/comments to <code>$1</code>, <code>$2</code>, … so the SQL generated by <code>std/db.table</code> works unchanged. Generated auto-increment columns use <code>BIGSERIAL</code>, and inserts that omit the key use <code>RETURNING</code> to read it.</p>
+<p>Connection options are passed through <code>options.client</code> to <code>pg</code>; a connection string may be supplied to <code>open</code>/<code>openPool</code> directly. Close the database during shutdown.</p>
 <h2 id="mysql-and-mariadb">MySQL and MariaDB</h2>
-<p>Use <code>mysql2/promise</code>:</p>
-<pre><code>import mysql from &quot;mysql2/promise&quot;
+<pre><code>import { openPool } from &quot;std/db-mysql&quot;
+import { table, migrate, AsyncDatabase } from &quot;std/db&quot;
 
-const pool = mysql.createPool({
-    host: &quot;127.0.0.1&quot;,
-    user: &quot;app&quot;,
-    password: process.env.MYSQL_PASSWORD,
-    database: &quot;app&quot;,
-    connectionLimit: 10,
-})
-
-async function findTask(id: number) -&gt; any
-    let [rows] = await pool.query(&quot;select * from tasks where id = ?&quot;, [id])
-    return rows[0]
-end</code></pre>
-<p>Both <code>?</code> placeholders and <code>execute</code> are supported by <code>mysql2</code>. Use <code>execute</code> for prepared statements when the driver advises it. Transactions follow the same acquire/begin/commit/ rollback/release shape as PostgreSQL.</p>
+let database = await openPool(process.env.MYSQL_URL, { client: { connectionLimit: 10 } })
+let tasks = table(database, &quot;tasks&quot;, TaskSchema)
+let rows = await tasks.list()</code></pre>
+<p>The adapter parses <code>mysql://</code> and <code>mariadb://</code> URLs into <code>host</code>, <code>port</code>, <code>user</code>, <code>password</code>, <code>database</code> and query-string options, then lets explicit <code>options.client</code> values win. Writes use <code>mysql2.execute</code>; reads use <code>query</code>. Generated auto-increment columns use <code>BIGINT AUTO_INCREMENT</code>, booleans use <code>TINYINT(1)</code>, and arrays/objects use native <code>JSON</code> columns. <code>table().insert()</code> reads <code>insertId</code> and fetches the inserted row. Transactions use the driver&#39;s <code>beginTransaction</code>/<code>commit</code>/<code>rollback</code> on a checked-out connection.</p>
 <h2 id="mongodb">MongoDB</h2>
-<p>Use the official driver:</p>
+<p>MongoDB is document-oriented, so it stays direct driver interop rather than pretending to implement the SQL table API:</p>
 <pre><code>import { MongoClient } from &quot;mongodb&quot;
 
 let client = new MongoClient(process.env.MONGODB_URL ?? &quot;mongodb://127.0.0.1:27017&quot;)
@@ -90,15 +70,16 @@ end</code></pre>
 <pre><code>import { parse } from &quot;std/contract&quot;
 
 let input = parse(CreateTaskInput, await requestJson(request))</code></pre>
-<p><code>std/contract</code> strips unknown keys for <code>object</code> schemas, rejects them with <code>unknownKeys: &quot;strict&quot;</code>, and parses nested arrays/objects. Store only validated values. JSON columns are text at the SQLite layer and are encoded/decoded by <code>std/db.table</code>; SQL drivers with native JSON types should receive ordinary objects/arrays.</p>
+<p><code>std/contract</code> strips unknown keys for <code>object</code> schemas, rejects them with <code>unknownKeys: &quot;strict&quot;</code>, and parses nested arrays/objects. Store only validated values. SQLite stores structured values as text and <code>std/db.table</code> encodes/decodes them; the PostgreSQL and MySQL adapters use native JSON transfer. Always use bound parameters; do not build SQL by interpolating request values.</p>
 <h2 id="connection-lifecycle">Connection lifecycle</h2>
 <ul>
 <li>Create one pool/client at process startup; do not open a connection per request.</li>
-<li>Release/clients in <code>finally</code>; roll back before releasing.</li>
+<li>Release clients in <code>finally</code>; roll back before releasing.</li>
 <li>Set pool limits and connect/statement timeouts for the deployment.</li>
 <li>Close the pool on <code>SIGTERM</code> after draining HTTP and jobs.</li>
 <li>Use TLS and a least-privilege database user in production; keep credentials in the</li>
 <p>deployment&#39;s secret store, never in <code>.pln</code> source.</p>
 </ul>
 <h2 id="verified-scope">Verified scope</h2>
-<p><code>tests/db.test.js</code> verifies SQLite tables, persistence, parameter binding, migrations, rollback and failure behavior. PostgreSQL, MySQL and MongoDB examples are integration recipes, not bundled adapters; no live server for those drivers is available in the repository&#39;s test environment, so they are not claimed as automatically tested. Install the driver in the application&#39;s own <code>package.json</code> and run your integration suite against a real instance before deployment.</p></div><aside class="toc"><div class="toc-title">On this page</div><a class="toc-h2" href="#supported-through-std-db-today">Supported through `std/db` today</a><a class="toc-h2" href="#postgresql">PostgreSQL</a><a class="toc-h2" href="#mysql-and-mariadb">MySQL and MariaDB</a><a class="toc-h2" href="#mongodb">MongoDB</a><a class="toc-h2" href="#validation-and-serialization">Validation and serialization</a><a class="toc-h2" href="#connection-lifecycle">Connection lifecycle</a><a class="toc-h2" href="#verified-scope">Verified scope</a></aside></article><footer class="page-footer"><span>PlainScript 2.0 documentation</span><a href="https://github.com/ayoistooslick/Plainscript/issues">Report a documentation issue ↗</a></footer></div></main></div><script src="app.js"></script></body></html>
+<p><code>tests/db.test.js</code> verifies SQLite tables, persistence, parameter binding, migrations, rollback and failure behavior. <code>tests/db-adapters.test.js</code> verifies PostgreSQL and MySQL placeholder translation, SQL/type generation, query binding, transaction statements, connection lifecycle, URI parsing and the asynchronous declaration surface using driver-shaped fakes. <strong>No live PostgreSQL or MySQL server is available in this repository&#39;s test environment</strong>, so those adapters are not claimed as server-integration tested. Install the driver in the application&#39;s own <code>package.json</code> and run your integration suite against a real instance before deployment.</p>
+<p>SQLite table methods are synchronous. The PostgreSQL and MySQL adapters return Promises for <code>table()</code> operations and must be awaited; the type declarations select <code>AsyncTable</code> for an <code>AsyncDatabase</code>. Migrations are asynchronous in both cases because <code>migrate()</code> always returns a Promise.</p></div><aside class="toc"><div class="toc-title">On this page</div><a class="toc-h2" href="#supported-surfaces">Supported surfaces</a><a class="toc-h2" href="#sqlite">SQLite</a><a class="toc-h2" href="#postgresql">PostgreSQL</a><a class="toc-h2" href="#mysql-and-mariadb">MySQL and MariaDB</a><a class="toc-h2" href="#mongodb">MongoDB</a><a class="toc-h2" href="#validation-and-serialization">Validation and serialization</a><a class="toc-h2" href="#connection-lifecycle">Connection lifecycle</a><a class="toc-h2" href="#verified-scope">Verified scope</a></aside></article><footer class="page-footer"><span>PlainScript 2.0 documentation</span><a href="https://github.com/ayoistooslick/Plainscript/issues">Report a documentation issue ↗</a></footer></div></main></div><script src="app.js"></script></body></html>

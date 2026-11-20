@@ -78,11 +78,13 @@
 <tr><td><code>std/time</code></td><td><code>now</code>, <code>format</code>, <code>parse</code>, <code>add</code>, <code>diff</code></td></tr>
 <tr><td><code>std/fs</code></td><td><code>mkdir</code>, <code>mkDir</code>, <code>readDir</code>, <code>readFile</code>, <code>writeFile</code>, <code>appendFile</code>, <code>exists</code></td></tr>
 <tr><td><code>std/http</code></td><td>Fetch-style server, JSON/text responses, SSE, request helpers</td></tr>
-<tr><td><code>std/ws</code></td><td>WebSocket server with authorization-before-upgrade</td></tr>
+<tr><td><code>std/ws</code></td><td>WebSocket server with fragmentation and authorization-before-upgrade</td></tr>
 <tr><td><code>std/task</code></td><td>Structured concurrency: groups, cancellation, channels, workers</td></tr>
-<tr><td><code>std/jobs</code></td><td>In-process bounded job queue with retries, timeouts and drain</td></tr>
+<tr><td><code>std/jobs</code></td><td>Bounded job queue with retries, timeouts, drain and optional durable stores</td></tr>
 <tr><td><code>std/db</code></td><td>SQLite tables and versioned migrations (Node 22)</td></tr>
+<tr><td><code>std/db-postgres</code> / <code>std/db-mysql</code></td><td>Async PostgreSQL/MySQL adapters over application-installed drivers</td></tr>
 <tr><td><code>std/auth</code></td><td>scrypt passwords, HS256 tokens, policies</td></tr>
+<tr><td><code>std/oidc</code> / <code>std/saml</code></td><td>Optional OIDC and SAML service-provider helpers</td></tr>
 <tr><td><code>std/contract</code></td><td>Runtime schemas, operations, typed results, router/transport</td></tr>
 <tr><td><code>std/test</code></td><td>Test declarations and assertions</td></tr>
 <tr><td><code>std/dom</code></td><td>DOM utilities for browser environments</td></tr>
@@ -99,7 +101,9 @@
 <tr><td><code>plainscript ir</code></td><td>same</td></tr>
 <tr><td><code>plainscript watch</code></td><td>new: rebuild on <code>.pln</code> changes</td></tr>
 <tr><td><code>plainscript lsp</code></td><td>new: stdio language server</td></tr>
+<tr><td><code>plainscript dap</code></td><td>new: stdio debug adapter</td></tr>
 <tr><td><code>plainscript migrate</code></td><td>new: scan JS/TS for migration blockers</td></tr>
+<tr><td><code>plainscript interop</code></td><td>new: translate supported <code>.d.ts</code> declarations</td></tr>
 <tr><td><code>plainscript version</code></td><td>same</td></tr>
 <tr><td><code>plainscript help</code></td><td>same</td></tr>
 </tbody></table>
@@ -127,7 +131,7 @@ plainscript migrate src --json</code></pre>
 <li>Run <code>plainscript check</code> after each move and keep the existing test suite green.</li>
 <li>Only then replace entry points/build scripts.</li>
 </ol>
-<p>There is no automatic TypeScript type-annotation conversion and no <code>.d.ts</code> parser. Types cross the boundary as <code>.d.pln</code> declarations or explicit <code>any</code>/<code>declare</code> shapes. A mixed project is supported: <code>.pln</code> modules compile to ESM and <code>.js</code> modules remain ordinary JavaScript consumed through interop. See <a href="interop.html">INTEROP</a>.</p>
+<p>There is no automatic TypeScript <strong>source</strong> conversion. <code>plainscript interop</code> translates a conservative subset of <code>.d.ts</code> declarations to <code>.d.pln</code> and reports unsupported constructs; imported definitions must be checked after translation. Type annotations otherwise cross the boundary as hand-written <code>.d.pln</code> declarations or explicit <code>any</code>/<code>declare</code> shapes. A mixed project is supported: <code>.pln</code> modules compile to ESM and <code>.js</code> modules remain ordinary JavaScript consumed through interop. See <a href="interop.html">INTEROP</a>.</p>
 <h2 id="migration-checklist">Migration Checklist</h2>
 <ul>
 <li>[ ] Remove all keyword alias usage; use the one correct spelling</li>
@@ -140,6 +144,7 @@ plainscript migrate src --json</code></pre>
 <li>[ ] Update <code>render</code>/<code>element</code> blocks to lower to <code>createElement</code> calls</li>
 <li>[ ] Update module imports: <code>std/&lt;name&gt;</code> resolves to declarations</li>
 <li>[ ] Run <code>plainscript migrate src --check</code> and review every finding</li>
+<li>[ ] Run <code>plainscript interop</code> for the <code>.d.ts</code> files you depend on and review warnings</li>
 <li>[ ] Run <code>npm test</code> to verify no regressions</li>
 <li>[ ] Consult <code>docs/SPEC.md</code> for the complete v2 language specification</li>
 </ul>

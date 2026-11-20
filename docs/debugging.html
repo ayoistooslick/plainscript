@@ -14,7 +14,19 @@ node --inspect-brk dist/main.js</code></pre>
   &quot;sourceMaps&quot;: true,
   &quot;outFiles&quot;: [&quot;${workspaceFolder}/dist/**/*.js&quot;]
 }</code></pre>
-<p>There is no Debug Adapter Protocol server in 2.0. The language server (<code>plainscript lsp</code>) provides editing features only; it does not attach to a running process. The Node inspector path above is the supported debugging route, and source-map reliability is covered by the emitter tests rather than by a browser automation suite.</p>
+<h2 id="debug-adapter-protocol">Debug Adapter Protocol</h2>
+<p><code>plainscript dap</code> speaks DAP over stdio. It launches a compiled JavaScript entry with <code>node --inspect-brk</code>, connects to the inspector, loads its <code>.js.map</code>, and translates breakpoints and paused frames through that map. The VS Code extension registers a <code>plainscript</code> debug type, so a workspace launch configuration is:</p>
+<pre><code>{
+  &quot;type&quot;: &quot;plainscript&quot;,
+  &quot;request&quot;: &quot;launch&quot;,
+  &quot;name&quot;: &quot;PlainScript: Debug current file&quot;,
+  &quot;program&quot;: &quot;${workspaceFolder}/dist/main.js&quot;,
+  &quot;cwd&quot;: &quot;${workspaceFolder}&quot;,
+  &quot;args&quot;: [],
+  &quot;env&quot;: {}
+}</code></pre>
+<p>The adapter supports setBreakpoints, stackTrace, scopes, variables, evaluate, continue, next, stepIn, stepOut, pause, terminate and disconnect. Additional <code>sourceMaps</code> paths may be supplied for maps not beside the entry. <code>attach</code> accepts <code>inspectorUrl</code> when you already have an inspector WebSocket URL.</p>
+<p>Limits: the adapter is intentionally small (no conditional breakpoints, watch expressions, data breakpoints or multi-process debugging). It needs a Node runtime with a global <code>WebSocket</code> client (Node 22 provides one) and a generated <code>.js.map</code>; without a map, breakpoints use generated JavaScript lines. The repository exercises the flow through <code>tests/dap.test.js</code>; it does not automate the VS Code UI. The language server (<code>plainscript lsp</code>) still provides editing features only and does not attach to a running process.</p>
 <h2 id="language-server-logs">Language server logs</h2>
 <p>The VS Code extension starts <code>plainscript lsp</code> over stdio. If completion or diagnostics stop updating:</p>
 <ol>
@@ -24,9 +36,9 @@ node --inspect-brk dist/main.js</code></pre>
 <p>diagnostic from an editor transport issue;</p>
 <li>reload the window after changing the extension or compiler path.</li>
 </ol>
-<p>The server is dependency-free and workspace-aware for imports and references. It advertises diagnostics, completion, hover, definition, references, rename, document symbols, formatting, semantic tokens and quick-fix code actions. It does not run a browser preview or a debugger.</p>
+<p>The server is dependency-free and workspace-aware for imports and references. It advertises diagnostics, completion, hover, definition, references, rename, document symbols, formatting, semantic tokens and quick-fix code actions. It does not run a browser preview; debugging is handled by the separate <code>plainscript dap</code> process registered by the extension.</p>
 <h2 id="diagnosing-type-errors">Diagnosing type errors</h2>
 <p>Use <code>plainscript check --verbose</code> to see stage timing, and <code>plainscript ir &lt;file&gt;</code> to inspect the lowered typed HIR. A diagnostic with a stable <code>PS</code> code can be matched to the diagnostics section of <a href="spec.html">SPEC.md</a>; the source excerpt points at the rejected expression. Deferred conditional/mapped types are permissive until instantiation, so if a generic program compiles unexpectedly, add a concrete call site that instantiates the type and check that path.</p>
 <h2 id="runtime-failures">Runtime failures</h2>
 <p>Unhandled promise rejections and process exits come from Node, not a PlainScript runtime. Use <code>process.on(&#39;unhandledRejection&#39;)</code> only at the top level of a server entry point after declaring <code>process: any</code>. <code>std/task</code> errors have stable <code>name</code>/<code>code</code> fields (<code>CancellationError</code>, <code>TaskTimeoutError</code>, <code>ChannelClosedError</code>) and <code>std/jobs</code> adds <code>JobTimeoutError</code>, <code>JobCancelledError</code> and <code>JobError</code>.</p>
-<p>For HTTP failures, <code>std/http</code> returns a generic 500 body by default; log the exception server-side with your own logger, or pass <code>{ exposeErrors: true }</code> only in a trusted local environment.</p></div><aside class="toc"><div class="toc-title">On this page</div><a class="toc-h2" href="#compile-then-inspect">Compile, then inspect</a><a class="toc-h2" href="#language-server-logs">Language server logs</a><a class="toc-h2" href="#diagnosing-type-errors">Diagnosing type errors</a><a class="toc-h2" href="#runtime-failures">Runtime failures</a></aside></article><footer class="page-footer"><span>PlainScript 2.0 documentation</span><a href="https://github.com/ayoistooslick/Plainscript/issues">Report a documentation issue ↗</a></footer></div></main></div><script src="app.js"></script></body></html>
+<p>For HTTP failures, <code>std/http</code> returns a generic 500 body by default; log the exception server-side with your own logger, or pass <code>{ exposeErrors: true }</code> only in a trusted local environment.</p></div><aside class="toc"><div class="toc-title">On this page</div><a class="toc-h2" href="#compile-then-inspect">Compile, then inspect</a><a class="toc-h2" href="#debug-adapter-protocol">Debug Adapter Protocol</a><a class="toc-h2" href="#language-server-logs">Language server logs</a><a class="toc-h2" href="#diagnosing-type-errors">Diagnosing type errors</a><a class="toc-h2" href="#runtime-failures">Runtime failures</a></aside></article><footer class="page-footer"><span>PlainScript 2.0 documentation</span><a href="https://github.com/ayoistooslick/Plainscript/issues">Report a documentation issue ↗</a></footer></div></main></div><script src="app.js"></script></body></html>

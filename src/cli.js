@@ -38,6 +38,8 @@ Commands
   ir <file.pln>              print the high-level IR as JSON
   lsp                        start the language server over stdio
   migrate [files...]         scan JavaScript/TypeScript for migration blockers
+  interop [files...]         translate supported TypeScript .d.ts declarations to .d.pln
+  dap                        run the PlainScript Debug Adapter Protocol server
   version                    print the compiler version
   help                       show this message
 
@@ -48,7 +50,7 @@ Options
   --std-base=<url>  browser build: import std modules from <url>/<name>.js
   --declarations    with build: also write <name>.d.pln for every module
   --template=<id>   with new: choose a bundled starter
-  --json        with migrate: print a machine-readable report
+  --json        with migrate/interop: print a machine-readable report
   --help        show this message
 
 Exit codes
@@ -599,6 +601,63 @@ function commandMigrate(positional, flags = {}) {
   return flags.check && findings.length ? 1 : 0;
 }
 
+function findDeclarationFiles(directory, output = []) {
+  if (!fs.existsSync(directory)) return output;
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+    if (entry.name === 'node_modules' || entry.name === '.git' || entry.name === 'dist' || entry.name === '.plainscript') continue;
+    const full = path.join(directory, entry.name);
+    if (entry.isDirectory()) findDeclarationFiles(full, output);
+    else if (entry.isFile() && entry.name.endsWith('.d.ts')) output.push(full);
+  }
+  return output;
+}
+
+function commandInterop(positional, flags = {}) {
+  const { translateFile } = require('./typescript-declarations');
+  const { formatDiagnostic } = require('./diagnostics');
+  const initial = positional.length ? positional.map((file) => path.resolve(file)) : findDeclarationFiles(process.cwd());
+  const queue = [...initial];
+  const seen = new Set();
+  let written = 0;
+  let errors = 0;
+  const reports = [];
+  while (queue.length) {
+    const file = queue.shift();
+    if (!file || seen.has(file)) continue;
+    seen.add(file);
+    if (!isFile(file)) {
+      process.stderr.write(`No such declaration file: ${file}\n`);
+      errors += 1;
+      continue;
+    }
+    const result = translateFile(file);
+    const output = file.replace(/\.d\.ts$/, '.d.pln').replace(/\.ts$/, '.d.pln');
+    const fileErrors = result.diagnostics.filter((diagnostic) => diagnostic.severity === 'error');
+    errors += fileErrors.length;
+    reports.push({ file: path.relative(process.cwd(), file), output: path.relative(process.cwd(), output), diagnostics: result.diagnostics });
+    if (!fileErrors.length) {
+      fs.writeFileSync(output, result.code);
+      written += 1;
+    }
+    for (const diagnostic of result.diagnostics) {
+      process.stderr.write(`${formatDiagnostic(diagnostic, fs.readFileSync(file, 'utf8'))}\n`);
+    }
+    for (const imported of result.imports) {
+      if (!imported.spec.startsWith('.')) continue;
+      const base = path.resolve(path.dirname(file), imported.normalized);
+      for (const candidate of [`${base}.d.ts`, path.join(base, 'index.d.ts')]) {
+        if (isFile(candidate)) { queue.push(candidate); break; }
+      }
+    }
+  }
+  if (flags.json) {
+    process.stdout.write(`${JSON.stringify({ written, errors, files: reports }, null, 2)}\n`);
+  } else {
+    process.stdout.write(`TypeScript declaration interop: ${written} file(s) written, ${errors} error(s).\n`);
+  }
+  return errors ? 1 : 0;
+}
+
 function commandNew(positional, flags = {}) {
   if (!positional.length) {
     process.stderr.write('plainscript new needs a project name.\n');
@@ -665,6 +724,12 @@ function commandLsp() {
   return 0;
 }
 
+function commandDap() {
+  const { startDebugAdapter } = require('./dap');
+  startDebugAdapter();
+  return 0;
+}
+
 function commandIr(positional, flags) {
   if (!positional.length) {
     process.stderr.write('plainscript ir needs a .pln file.\n');
@@ -712,7 +777,9 @@ function main(argv) {
     test: commandTest,
     ir: commandIr,
     lsp: commandLsp,
+    dap: commandDap,
     migrate: commandMigrate,
+    interop: commandInterop,
     new: commandNew,
     version: () => { process.stdout.write(`${VERSION}\n`); return 0; },
   };

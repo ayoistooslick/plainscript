@@ -185,7 +185,10 @@ class Checker {
       case 'ListType':
         return T.listOf(this.resolveType(node.elem, typeEnv));
       case 'TupleType':
-        return T.tupleOf(node.elements.map((element) => this.resolveType(element, typeEnv)));
+        return T.tupleOf(
+          node.elements.map((element) => this.resolveType(element, typeEnv)),
+          node.rest ? this.resolveType(node.rest, typeEnv) : null,
+        );
       case 'KeyofType': {
         const target = T.deref(this.resolveType(node.target, typeEnv));
         if (target.k === 'var' || T.isDeferred(target)) return T.keyofType(target);
@@ -219,13 +222,16 @@ class Checker {
           : typeof node.value === 'number' ? T.PRIM.number : T.PRIM.boolean;
         return T.literalType(node.value, base);
       }
-      case 'ConditionalType':
+      case 'ConditionalType': {
+        const check = this.resolveType(node.check, typeEnv);
         return T.conditionalType(
-          this.resolveType(node.check, typeEnv),
+          check,
           this.resolveType(node.extendsType, typeEnv),
           this.resolveType(node.trueType, typeEnv),
           this.resolveType(node.falseType, typeEnv),
+          check.k === 'var',
         );
+      }
       case 'MappedType': {
         const keyType = T.typeVar(node.keyName);
         const localEnv = new Map(typeEnv);
@@ -260,7 +266,7 @@ class Checker {
       case 'RecordType': {
         const fields = new Map();
         for (const field of node.fields) {
-          fields.set(field.name, { type: this.resolveType(field.type, typeEnv), optional: field.optional });
+          fields.set(field.name, { type: this.resolveType(field.type, typeEnv), optional: field.optional, readonly: Boolean(field.readonly) });
         }
         return T.record(fields);
       }
@@ -284,7 +290,7 @@ class Checker {
       for (const [name, field] of member.fields) {
         const existing = fields.get(name);
         if (!existing) fields.set(name, field);
-        else fields.set(name, { type: this.intersectField(existing.type, field.type), optional: existing.optional && field.optional });
+        else fields.set(name, { type: this.intersectField(existing.type, field.type), optional: existing.optional && field.optional, readonly: Boolean(existing.readonly || field.readonly) });
       }
     }
     return T.record(fields);
@@ -299,7 +305,7 @@ class Checker {
       for (const [name, field] of b.fields) {
         const existing = fields.get(name);
         fields.set(name, existing
-          ? { type: this.intersectField(existing.type, field.type), optional: existing.optional && field.optional }
+          ? { type: this.intersectField(existing.type, field.type), optional: existing.optional && field.optional, readonly: Boolean(existing.readonly || field.readonly) }
           : field);
       }
       return T.record(fields);
@@ -331,7 +337,7 @@ class Checker {
       return field.optional ? T.union([field.type, T.PRIM.nothing]) : field.type;
     }
     if (target.k === 'tuple' && typeof literal === 'number') {
-      const element = target.elements[literal];
+      const element = target.elements[literal] || (target.rest && literal >= target.elements.length ? target.rest : null);
       if (!element) {
         this.report('PS3207', `Tuple index ${literal} is out of range for ${T.showType(target)}.`, node);
         return T.PRIM.error;
@@ -385,7 +391,11 @@ class Checker {
     if (declaration.recordFields) {
       const fields = new Map();
       for (const field of declaration.recordFields) {
-        fields.set(field.name, { type: this.resolveType(field.type, typeEnv), optional: Boolean(field.optional) });
+        fields.set(field.name, {
+          type: this.resolveType(field.type, typeEnv),
+          optional: Boolean(field.optional),
+          readonly: Boolean(field.readonly),
+        });
       }
       return T.record(fields, { name: declaration.name });
     }
@@ -680,6 +690,36 @@ class Checker {
             node: statement,
           }, statement);
           if (statement.exported) this.exportedNames.add(statement.name);
+          break;
+        }
+        case 'OverloadDecl': {
+          // A declaration file may publish overload signatures without an
+          // implementation, just as a .d.ts file does. The first declaration
+          // defines the imported function; all of them become its overloads.
+          if (!/\.d\.pln$/.test(this.file)) break;
+          const declarations = topLevelOverloads.get(statement.name) || [statement];
+          if (declarations.some((declaration) => declaration.exported)) {
+            this.exportedNames.add(statement.name);
+          }
+          if (this.global.names.has(statement.name)) break;
+          // Generated declarations carry overload signatures plus a
+          // `declare function` implementation signature. Let the implementation
+          // define the symbol and attach the overloads; only declaration-only
+          // overloads define it here.
+          const hasImplementation = this.program.body.some((candidate) =>
+            (candidate.kind === 'DeclareFunction' || candidate.kind === 'FunctionDecl')
+            && candidate.name === statement.name);
+          if (hasImplementation) break;
+          const signature = this.signatureOf(declarations[0]);
+          signature.overloads = declarations.map((declaration) => this.signatureOf(declaration));
+          this.define(statement.name, {
+            kind: 'function',
+            type: T.fnType(signature.params, signature.ret, signature.typeParams, signature.predicate),
+            signature,
+            overloads: signature.overloads,
+            node: statement,
+            mutable: false,
+          }, statement);
           break;
         }
         case 'TypeDecl':
@@ -1465,6 +1505,10 @@ class Checker {
         this.report('PS3333', `Type ${T.showType(objectType)} has no field "${node.property}".`, node);
         return T.PRIM.error;
       }
+      if (forAssignment && field.readonly) {
+        this.report('PS3319', `Field "${node.property}" is readonly and cannot be assigned.`, node);
+        return field.type;
+      }
       if (forAssignment && field.optional) return field.type;
       // An optional field is absent-able, so reading it is a maybe-value.
       if (field.optional || node.optional) return T.union([field.type, T.PRIM.nothing]);
@@ -1489,6 +1533,9 @@ class Checker {
           if (!field) {
             this.report('PS3351', `Not every member of ${T.showType(objectType)} has a field "${node.property}"; narrow the value first.`, node);
             return T.PRIM.error;
+          }
+          if (forAssignment && field.readonly) {
+            this.report('PS3319', `Field "${node.property}" is readonly and cannot be assigned.`, node);
           }
           types.push(field.type);
         } else if (!T.isAny(resolved)) {
@@ -1542,12 +1589,13 @@ class Checker {
       }
       const indexNode = node.index;
       if (indexNode && indexNode.kind === 'Number') {
-        const element = objectType.elements[indexNode.value];
+        const element = objectType.elements[indexNode.value]
+          || (objectType.rest && indexNode.value >= objectType.elements.length ? objectType.rest : null);
         if (element) return element;
         this.report('PS3340', `Tuple index ${indexNode.value} is out of range.`, node.index);
         return T.PRIM.nothing;
       }
-      return T.union([...objectType.elements, T.PRIM.nothing]);
+      return T.union([...objectType.elements, ...(objectType.rest ? [objectType.rest] : []), T.PRIM.nothing]);
     }
     if (objectType.k === 'map') {
       if (!T.assignable(indexType, objectType.key)) {

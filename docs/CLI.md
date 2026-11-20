@@ -80,6 +80,23 @@ whole-document formatting, semantic tokens and quick-fix code actions. Workspace
 and rename follow imported PlainScript symbols. See [`editors/vscode`](../editors/vscode)
 for the editor extension.
 
+### `plainscript dap`
+
+Starts the Debug Adapter Protocol server over stdio. The adapter launches a compiled
+JavaScript entry with Node's inspector, loads its source map, maps `.pln` breakpoints to
+generated lines, and reports paused JavaScript frames back as `.pln` locations. It is a
+minimal adapter rather than a custom runtime debugger; see [DEBUGGING](DEBUGGING.md) for the
+launch configuration and Node WebSocket requirement.
+
+```json
+{
+  "type": "plainscript",
+  "request": "launch",
+  "program": "${workspaceFolder}/dist/main.js",
+  "cwd": "${workspaceFolder}"
+}
+```
+
 ### `plainscript check [files…]`
 
 Runs the lexer, parser and checker over the graph and prints diagnostics. Emits nothing.
@@ -149,6 +166,29 @@ dot-directories. `--check` is a CI gate; without it the command reports findings
 0. Transform one file at a time, keep JavaScript modules at the boundary, and run
 `plainscript check` after each conversion. See [MIGRATION](MIGRATION.md).
 
+### `plainscript interop [files…]`
+
+Translates supported TypeScript `.d.ts` declarations into `.d.pln` declarations. With no
+paths it recursively scans the current directory, skipping `node_modules`, `dist`, `.git`
+and `.plainscript`. Relative imports that resolve to a `.d.ts` file are translated too.
+
+Supported: interfaces, type aliases, object/function/tuple types, unions, intersections,
+`keyof`, indexed access, mapped types, generics without defaults, exported function/value
+declarations and re-exports. Unsupported constructs — `infer`, template-literal types,
+namespaces, classes, optional tuple elements, index signatures and signatures with no direct
+PlainScript equivalent — produce `PS7001` diagnostics; the affected file is **not** written.
+Generic defaults are omitted with a `PS7004` warning. The command never substitutes `any`
+for an unsupported type.
+
+```bash
+plainscript interop types
+plainscript interop types/api.d.ts --json
+```
+
+Without `--json` the command prints a write/error summary. With `--json` it prints the
+per-file diagnostics as machine-readable output. A declaration that already has errors is
+left untouched; review warnings before relying on the output.
+
 ### `plainscript ir <file.pln>`
 
 Prints the lowered, typed HIR as JSON. Useful when working on the emitter or reporting a
@@ -172,7 +212,7 @@ TypeScript toolchain is installed separately; see [BENCHMARKS](BENCHMARKS.md).
 | `--verbose` | Print each compilation stage. |
 | `--check` | With `fmt`: report instead of write; with `migrate`: exit 1 on findings. |
 | `--declarations` | With `build`: also emit `<name>.d.pln`. |
-| `--json` | With `migrate`: print a JSON report. |
+| `--json` | With `migrate` or `interop`: print a JSON report. |
 | `--template=<id>`, `-t <id>` | With `new`: select a bundled starter. |
 | `--std-base=<url>` | With `build`: browser base URL for `std` imports. |
 | `--help`, `-h` | Show help. |

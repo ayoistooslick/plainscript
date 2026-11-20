@@ -24,6 +24,7 @@
   "exports": {
     ".": "./src/index.js",
     "./std/*": "./stdlib/*.js",
+    "./cli": "./src/cli.js",
     "./lsp": "./src/lsp.js",
     "./package.json": "./package.json"
   },

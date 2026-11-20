@@ -22,9 +22,10 @@ Created by **Ayodele Ayokunle David**. PlainScript is MIT licensed.
   `show`/`print`/`log`.
 - **Statically typed, with inference.** Function signatures are checked, not assumed.
   Generics, constraints, unions, narrowing, structural records/variants, exhaustiveness,
-  recursive types, tuples, conditional/mapped types, deferred indexed access, function
-  overloads, type predicates, literal types and `nothing` safety are enforced by the
-  compiler. Variance is structural and documented.
+  recursive types, fixed and variadic tuples, readonly record fields, conditional/mapped
+  types (including distributive checks over a naked type parameter), deferred indexed
+  access, function overloads, type predicates, literal types and `nothing` safety are
+  enforced by the compiler. Variance is structural and documented.
 - **A real compiler.** Lexer → parser → type checker → typed HIR → JavaScript emitter with
   source maps. Types are erased at runtime, so the checker is the enforcer, and JavaScript
   boundaries are typed `any` deliberately rather than accidentally.
@@ -33,23 +34,30 @@ Created by **Ayodele Ayokunle David**. PlainScript is MIT licensed.
   frameworks.
 - **Small and honest.** The standard library covers fundamentals (`text`, `list`, `map`,
   `math`, `json`, `time`, `fs`, `http`, `io`, `dom`, `test`) plus structured concurrency
-  (`std/task`), background jobs (`std/jobs`), WebSockets (`std/ws`), SSE, SQLite
-  persistence and migrations (`std/db`), password/token authentication (`std/auth`) and
-  runtime/schema contracts (`std/contract`). Service SDKs and PostgreSQL/MySQL/MongoDB
-  drivers remain ordinary npm packages, not keywords.
+  (`std/task`), in-process or durable-store background jobs (`std/jobs`), WebSockets with
+  fragmentation and authorization-before-upgrade (`std/ws`), SSE, SQLite persistence and
+  migrations (`std/db`), dependency-injected PostgreSQL/MySQL adapters
+  (`std/db-postgres`, `std/db-mysql`), password/token authentication (`std/auth`),
+  OIDC/SAML service-provider helpers (`std/oidc`, `std/saml`) and runtime/schema contracts
+  (`std/contract`). Drivers and identity libraries remain ordinary npm packages loaded by
+  the application, not compiler dependencies.
 - **Schema-derived full-stack contracts.** `std/contract.object` derives record types from
   runtime schemas. `fallibleOperation` carries a typed error union, `implementFallible`
   validates both outcomes, `router` dispatches by operation name, and `std/db` derives
   table columns and versioned migrations from the same schema. See
   [Unified Contracts](docs/UNIFIED_CONTRACTS.md) and the runnable
   [SQLite + React contracts demo](demos/contracts-fullstack/README.md).
-- **Editor support built in.** `plainscript lsp` speaks LSP over stdio with diagnostics,
-  completion, hover, definitions, workspace references, rename, formatting, semantic
-  tokens and quick-fix code actions. The VS Code extension in
-  [`editors/vscode`](editors/vscode) launches it.
+- **Editor and debugger support built in.** `plainscript lsp` speaks LSP over stdio with
+  diagnostics, completion, hover, definitions, workspace references, rename, formatting,
+  semantic tokens and quick-fix code actions. `plainscript dap` is a DAP server over stdio
+  for launching a compiled entry through Node's inspector and mapping breakpoints/stack
+  frames through source maps. The VS Code extension in [`editors/vscode`](editors/vscode)
+  launches both.
 - **Practical adoption.** `plainscript migrate` scans JavaScript/TypeScript for blockers
-  without rewriting files, npm interop keeps existing dependencies usable, and eight
-  starters cover React, Next.js, Express, CLI, libraries and database/realtime apps.
+  without rewriting files, and `plainscript interop` translates the supported TypeScript
+  declaration subset to `.d.pln` while reporting unsupported constructs. npm interop keeps
+  existing dependencies usable, and eight starters cover React, Next.js, Express, CLI,
+  libraries and database/realtime apps.
 
 ## What PlainScript is not
 
@@ -98,6 +106,8 @@ node src/cli.js new my-ui --template react-vite
 node src/cli.js new my-api --template express
 node src/cli.js new my-lib --template library
 node src/cli.js migrate src --check  # find JavaScript/TypeScript migration blockers
+node src/cli.js interop types        # translate supported .d.ts declarations to .d.pln
+node src/cli.js dap                  # start the DAP server over stdio
 node src/cli.js run                  # compile and run src/main.pln
 ```
 
@@ -175,10 +185,12 @@ consumes.
 | `plainscript watch [files…]` | Rebuild after `.pln` changes, reusing the module cache for unaffected files. |
 | `plainscript check [files…]` | Type-check only; exits non-zero on diagnostics. |
 | `plainscript lsp` | Start the language server over stdio. |
+| `plainscript dap` | Start the Debug Adapter Protocol server over stdio. |
 | `plainscript fmt [files…]` | Normalise indentation and block layout without changing tokens. |
 | `plainscript test [files…]` | Run `std/test` files and report pass/fail. |
 | `plainscript new <dir> [--template <id>]` | Scaffold a default or bundled application. |
 | `plainscript migrate [paths…]` | Report JavaScript/TypeScript migration blockers; `--check` is a CI gate. |
+| `plainscript interop [files…]` | Translate the supported TypeScript `.d.ts` subset to `.d.pln` and report the rest. |
 | `plainscript ir <file>` | Print the typed HIR that code generation consumes. |
 | `plainscript version` | Print the compiler version. |
 
@@ -259,9 +271,11 @@ These are known and deliberate for 2.0.0, not oversights:
   Next to bundle, as the demos do. Importing the standard library in a browser requires
   `--std-base` plus serving those module URLs (see the full-stack demo).
 - **Advanced type limits.** Conditional and mapped types, generic/deferred indexed
-  access, user-defined type predicates and function overloads are implemented. Variadic
-  tuples, readonly field modifiers, distributive conditional types and arbitrary
-  intersections of unions/functions are not. Deferred constructs remain permissive until
+  access, variadic tuples, readonly record fields, distributive conditionals over a naked
+  type parameter, user-defined type predicates and function overloads are implemented.
+  Arbitrary intersections of unions/functions, optional tuple elements and general
+  TypeScript-style conditional inference remain absent. Readonly is a compile-time
+  assignment check, not runtime immutability. Deferred constructs remain permissive until
   instantiated, and deeply nested deferred combinations may not diagnose early.
 - **Concurrency is cooperative.** `std/task` provides task groups, cancellation, timeouts,
   channels and worker handles; it cannot stop JavaScript promises or host calls that
@@ -273,15 +287,30 @@ These are known and deliberate for 2.0.0, not oversights:
   maps and variant tags. `as` is unchecked at runtime.
 - **No exceptions typing.** `catch` binds `any`; typed operational errors use
   `OperationResult`/`OperationFailure` instead.
-- **Database support is SQLite-first.** `std/db` table/migration helpers target Node 22's
-  built-in `node:sqlite`. PostgreSQL (`pg`), MySQL (`mysql2`) and MongoDB (`mongodb`) are
-  usable through direct npm interop with bound queries; they do not use `std/db` helpers
-  yet. See [docs/DATABASES.md](docs/DATABASES.md). WebSocket fragmentation and extensions
-  are not implemented; an `authorize(request)` hook runs before the upgrade handshake.
-- **LSP scope.** Rename and references follow imported PlainScript symbols across the
-  workspace, semantic tokens and quick fixes are implemented, but refactoring is still
-  limited to symbol rename. There is no debug adapter; source maps and Node's inspector
-  are the supported debugging route (see [docs/DEBUGGING.md](docs/DEBUGGING.md)).
+- **Database support requires an installed driver.** `std/db` is SQLite via Node 22's
+  `node:sqlite`. `std/db-postgres` and `std/db-mysql` expose the same schema-derived
+  table/migration surface by dynamically loading application-installed `pg` or
+  `mysql2/promise`; the compiler package keeps zero runtime dependencies. Their table
+  methods return Promises, unlike SQLite's synchronous methods. MongoDB remains direct npm
+  interop. No live PostgreSQL/MySQL server is available in this repository's test
+  environment, so adapter tests use driver-shaped fakes. See
+  [docs/DATABASES.md](docs/DATABASES.md). WebSocket extensions are not implemented;
+  fragmentation, control-frame checks and an `authorize(request)` hook before the upgrade
+  handshake are.
+- **Debugging is adapter-based.** `plainscript dap` is a minimal Debug Adapter Protocol
+  server that launches a compiled JavaScript entry through Node's inspector and maps source
+  positions both ways. It requires Node 22's global `WebSocket` (or an inspector-capable
+  host), and the VS Code integration is test-level rather than UI-automated. LSP rename and
+  references follow imported PlainScript symbols; refactoring is still limited to symbol
+  rename. See [docs/DEBUGGING.md](docs/DEBUGGING.md).
+- **Identity-provider integration is application-tested.** `std/oidc` and `std/saml`
+  provide validated service-provider plumbing over application-installed libraries, but
+  the repository has no live IdP, conformance suite or browser SSO automation. Account
+  linking, session storage, replay prevention and provider metadata remain application
+  responsibilities. See [docs/SECURITY.md](docs/SECURITY.md).
+- **TypeScript interop is a subset.** `plainscript interop` translates declarations with a
+  direct PlainScript equivalent and reports unsupported constructs instead of emitting
+  `any`. It is not an arbitrary `.d.ts` parser or a TypeScript-to-PlainScript compiler.
 - **Benchmarks are PlainScript-only.** `npm run bench` is reproducible, but no pinned
   TypeScript toolchain is installed, so no cross-language speed claim is made.
 - **Not published yet.** npm still serves 1.1.5. Publishing 2.0.0 is a separate, explicit

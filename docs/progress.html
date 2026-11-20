@@ -10,31 +10,34 @@ plainscript check demos/contracts-fullstack/src/App.pln</code></pre>
 <h2 id="what-is-complete">What is complete</h2>
 <ul>
 <li><strong>Contracts through every layer.</strong> Runtime schemas, schema-derived checker types, typed</li>
-<p>success/error results, validation on both sides, authorization callbacks, operation router/HTTP transport, SQLite table mapping, versioned migrations with rollback.</p>
+<p>success/error results, validation on both sides, authorization callbacks, operation router/HTTP transport, SQLite/PostgreSQL/MySQL table mapping, versioned migrations with rollback.</p>
 <li><strong>Authentication.</strong> scrypt password hashing, constant-time verification, HS256 bearer</li>
 <p>tokens with claims validation, policies, and the demo&#39;s login/token flow.</p>
-<li><strong>Type system.</strong> Enum literal unions, tuples, <code>keyof</code>, <code>typeof</code>, generic constraints,</li>
-<p>record intersections, concrete and deferred indexed access, conditional types, mapped types, function overloads (including imported/declaration overloads), user-defined type predicates, recursive types and documented function/container variance.</p>
+<li><strong>Type system.</strong> Enum literal unions, fixed and variadic tuples, readonly record</li>
+<p>fields, <code>keyof</code>, <code>typeof</code>, generic constraints, record intersections, concrete and deferred indexed access, conditional types (including distribution over a naked type parameter), mapped types, function overloads (including imported/declaration overloads), user-defined type predicates, recursive types and documented function/container variance.</p>
 <li><strong>Concurrency.</strong> Task groups (including nested parent groups), cancellation, timeouts,</li>
 <p>channels with buffered-close delivery, worker handles, and cleanup/failure tests.</p>
 <li><strong>Jobs.</strong> Bounded-concurrency in-process queue with retries/backoff, timeouts,</li>
-<p>cooperative cancellation, drain, close and event hooks.</p>
+<p>cooperative cancellation, drain, close, event hooks, memory/SQLite stores, startup recovery, persisted attempt records and missing-handler failure reporting.</p>
 <li><strong>Tooling.</strong> LSP diagnostics/completion/hover/definition/references/rename/symbols/</li>
-<p>formatting, semantic tokens, quick-fix code actions, workspace import handling, VS Code extension, watch mode, module cache invalidation and unchanged-output skipping.</p>
-<li><strong>Ecosystem.</strong> HTTP/SSE (<code>std/http</code>), WebSockets (<code>std/ws</code>), SQLite (<code>std/db</code>), auth</li>
-<p>(<code>std/auth</code>), async/tasks (<code>std/task</code>), jobs (<code>std/jobs</code>), React/Next/Vite/Node interop and eight starters.</p>
-<li><strong>Adoption.</strong> Conservative <code>plainscript migrate</code> reporting, JavaScript/npm interop and</li>
-<p>incremental migration guidance.</p>
+<p>formatting, semantic tokens, quick-fix code actions, workspace import handling, a minimal stdio DAP server backed by Node&#39;s inspector/source maps, VS Code LSP/debugger integration, watch mode, module cache invalidation and unchanged-output skipping.</p>
+<li><strong>Ecosystem.</strong> HTTP/SSE (<code>std/http</code>), WebSockets with fragmentation/control frames</li>
+<p>(<code>std/ws</code>), SQLite (<code>std/db</code>), PostgreSQL/MySQL adapters (<code>std/db-postgres</code>, <code>std/db-mysql</code>), auth (<code>std/auth</code>), OIDC/SAML helpers (<code>std/oidc</code>, <code>std/saml</code>), async/tasks (<code>std/task</code>), jobs (<code>std/jobs</code>), React/Next/Vite/Node interop and eight starters.</p>
+<li><strong>Adoption.</strong> Conservative <code>plainscript migrate</code> reporting, <code>plainscript interop</code> for a</li>
+<p>supported <code>.d.ts</code> subset, JavaScript/npm interop and incremental migration guidance.</p>
 </ul>
 <h2 id="evidence">Evidence</h2>
 <p>Focused files:</p>
 <ul>
 <li><code>tests/contract-errors.test.js</code>, <code>tests/contract-demo.test.js</code>, <code>tests/db.test.js</code></li>
-<li><code>tests/task.test.js</code>, <code>tests/jobs.test.js</code>, <code>tests/http.test.js</code>, <code>tests/ws.test.js</code></li>
-<li><code>tests/lsp.test.js</code>, <code>tests/watch.test.js</code>, <code>tests/cli.test.js</code></li>
+<li><code>tests/task.test.js</code>, <code>tests/jobs.test.js</code>, <code>tests/durable-jobs.test.js</code>,</li>
+<p><code>tests/http.test.js</code>, <code>tests/ws.test.js</code>, <code>tests/ws-protocol.test.js</code></p>
+<li><code>tests/db.test.js</code>, <code>tests/db-adapters.test.js</code>, <code>tests/auth-interop.test.js</code></li>
+<li><code>tests/lsp.test.js</code>, <code>tests/dap.test.js</code>, <code>tests/watch.test.js</code>, <code>tests/cli.test.js</code>,</li>
+<p><code>tests/typescript-interop.test.js</code></p>
 <li><code>tests/type-level.test.js</code>, <code>tests/overloads.test.js</code>, <code>tests/predicates.test.js</code>,</li>
-<p><code>tests/variance.test.js</code>, <code>tests/recursive-types.test.js</code>, <code>tests/declarations.test.js</code></p>
+<p><code>tests/variance.test.js</code>, <code>tests/recursive-types.test.js</code>, <code>tests/declarations.test.js</code>, <code>tests/advanced-v2-types.test.js</code></p>
 <li><code>docs/BENCHMARKS.md</code></li>
 </ul>
 <h2 id="remaining-limitations">Remaining limitations</h2>
-<p>See the README limitation list and <code>docs/ROADMAP.md</code>. In particular, non-SQLite <code>std/db</code> adapters, arbitrary TypeScript <code>.d.ts</code> parsing, WebSocket fragmentation, variadic tuple types, durable background jobs, a debug adapter and a cross-language performance baseline are not implemented. Direct npm database drivers are documented in <a href="databases.html">DATABASES</a>. No package has been published as part of this work.</p></div><aside class="toc"><div class="toc-title">On this page</div><a class="toc-h2" href="#verified-baseline">Verified baseline</a><a class="toc-h2" href="#what-is-complete">What is complete</a><a class="toc-h2" href="#evidence">Evidence</a><a class="toc-h2" href="#remaining-limitations">Remaining limitations</a></aside></article><footer class="page-footer"><span>PlainScript 2.0 documentation</span><a href="https://github.com/ayoistooslick/Plainscript/issues">Report a documentation issue ↗</a></footer></div></main></div><script src="app.js"></script></body></html>
+<p>See the README limitation list and <code>docs/ROADMAP.md</code>. In particular, a MongoDB <code>std/db</code> adapter, live PostgreSQL/MySQL test servers, arbitrary TypeScript <code>.d.ts</code> parsing, WebSocket extensions, distributed/leased job workers, VS Code UI automation for DAP and a cross-language performance baseline are not implemented or not verified here. PostgreSQL and MySQL adapter tests use injected driver fakes; see <a href="databases.html">DATABASES</a>. No package has been published as part of this work.</p></div><aside class="toc"><div class="toc-title">On this page</div><a class="toc-h2" href="#verified-baseline">Verified baseline</a><a class="toc-h2" href="#what-is-complete">What is complete</a><a class="toc-h2" href="#evidence">Evidence</a><a class="toc-h2" href="#remaining-limitations">Remaining limitations</a></aside></article><footer class="page-footer"><span>PlainScript 2.0 documentation</span><a href="https://github.com/ayoistooslick/Plainscript/issues">Report a documentation issue ↗</a></footer></div></main></div><script src="app.js"></script></body></html>

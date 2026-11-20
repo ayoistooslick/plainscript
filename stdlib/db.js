@@ -5,8 +5,9 @@
 // std/contract object schema used by the operation and client, so a model
 // change has one source of truth. Queries always use bound parameters.
 //
-// Supported today: Node 22's built-in node:sqlite. Other drivers can implement
-// the same small Database surface in application code.
+// The bundled open() uses Node 22's built-in node:sqlite. std/db-postgres and
+// std/db-mysql provide the same table/migration surface over application-installed
+// asynchronous drivers; their Database and Table values use the same shapes.
 
 import { parse, optional as optionalSchema } from './contract.js';
 
@@ -49,6 +50,9 @@ export async function open(file = ':memory:', options = {}) {
   const database = {
     raw,
     file,
+    dialect: 'sqlite',
+    booleanAsInteger: true,
+    placeholder: () => '?',
     exec(sql, params = []) {
       if (Array.isArray(params) && params.length) return raw.prepare(sql).run(...params);
       return raw.exec(sql);
@@ -85,19 +89,21 @@ function isOptional(schema) {
   return schema && schema.kind === 'optional';
 }
 
-function sqlType(schema) {
+function sqlType(schema, dialect = 'sqlite') {
   const inner = unwrap(schema);
   if (!inner) return 'TEXT';
-  if (inner.kind === 'number') return 'REAL';
-  if (inner.kind === 'boolean') return 'INTEGER';
+  if (inner.kind === 'number') return dialect === 'postgres' ? 'DOUBLE PRECISION' : dialect === 'mysql' ? 'DOUBLE' : 'REAL';
+  if (inner.kind === 'boolean') return dialect === 'postgres' ? 'BOOLEAN' : dialect === 'mysql' ? 'TINYINT(1)' : 'INTEGER';
   if (inner.kind === 'enum') {
-    return inner.values.length && inner.values.every((value) => typeof value === 'number') ? 'REAL' : 'TEXT';
+    return inner.values.length && inner.values.every((value) => typeof value === 'number')
+      ? (dialect === 'postgres' ? 'DOUBLE PRECISION' : dialect === 'mysql' ? 'DOUBLE' : 'REAL')
+      : 'TEXT';
   }
-  if (inner.kind === 'array' || inner.kind === 'object' || inner.kind === 'oneOf') return 'TEXT';
+  if (inner.kind === 'array' || inner.kind === 'object' || inner.kind === 'oneOf') return dialect === 'postgres' ? 'JSONB' : dialect === 'mysql' ? 'JSON' : 'TEXT';
   return 'TEXT';
 }
 
-function columnsOf(schema) {
+function columnsOf(schema, dialect = 'sqlite') {
   if (!schema || schema.kind !== 'object') throw new DatabaseError('table() expects a std/contract object schema');
   const columns = [];
   for (const [name, fieldSchema] of Object.entries(schema.shape)) {
@@ -106,16 +112,16 @@ function columnsOf(schema) {
       name,
       schema: fieldSchema,
       optional: isOptional(fieldSchema),
-      sqlType: sqlType(fieldSchema),
+      sqlType: sqlType(fieldSchema, dialect),
     });
   }
   return columns;
 }
 
-function encodeColumn(schema, value) {
+function encodeColumn(schema, value, booleanAsInteger = true) {
   if (value === undefined || value === null) return null;
   const inner = unwrap(schema);
-  if (inner.kind === 'boolean') return value ? 1 : 0;
+  if (inner.kind === 'boolean') return booleanAsInteger ? (value ? 1 : 0) : Boolean(value);
   if (inner.kind === 'array' || inner.kind === 'object' || inner.kind === 'oneOf') return JSON.stringify(value);
   return value;
 }
@@ -133,18 +139,24 @@ function decodeColumn(schema, value) {
 export function table(database, name, schema, options = {}) {
   if (!database || typeof database.query !== 'function') throw new DatabaseError('table() expects a database from open()');
   const tableName = identifier(name, 'table');
-  const columns = columnsOf(schema);
+  const dialect = database.dialect || 'sqlite';
+  const columns = columnsOf(schema, dialect);
   const primaryKey = options.primaryKey || 'id';
   if (primaryKey && !columns.some((column) => column.name === primaryKey)) {
     throw new DatabaseError(`primary key ${primaryKey} is not a field in the ${tableName} schema`);
   }
   const primary = columns.find((column) => column.name === primaryKey);
-  const auto = options.autoIncrement !== false && primary && primary.sqlType === 'REAL';
+  const primarySchema = primary ? unwrap(primary.schema) : null;
+  const auto = options.autoIncrement !== false && primary && primarySchema && primarySchema.kind === 'number';
 
   function definition(column) {
+    if (column.name === primaryKey && auto) {
+      if (dialect === 'postgres') return `${column.name} BIGSERIAL PRIMARY KEY`;
+      if (dialect === 'mysql') return `${column.name} BIGINT PRIMARY KEY AUTO_INCREMENT`;
+      return `${column.name} INTEGER PRIMARY KEY AUTOINCREMENT`;
+    }
     let text = `${column.name} ${column.sqlType}`;
     if (column.name === primaryKey) text += ' PRIMARY KEY';
-    if (column.name === primaryKey && auto) text += ' AUTOINCREMENT';
     if (!column.optional && column.name !== primaryKey) text += ' NOT NULL';
     return text;
   }
@@ -154,14 +166,16 @@ export function table(database, name, schema, options = {}) {
     const row = {};
     for (const column of columns) {
       if (!Object.hasOwn(parsed, column.name)) continue;
-      row[column.name] = encodeColumn(column.schema, parsed[column.name]);
+      row[column.name] = encodeColumn(column.schema, parsed[column.name], database.booleanAsInteger !== false);
     }
     return row;
   }
 
+  const mapResult = (result, mapper) => (result && typeof result.then === 'function' ? result.then(mapper) : mapper(result));
   const storage = {
     name: tableName,
     schema,
+    dialect,
     columns: columns.map((column) => ({ name: column.name, sqlType: column.sqlType, optional: column.optional })),
     primaryKey,
     autoIncrement: Boolean(auto),
@@ -169,38 +183,42 @@ export function table(database, name, schema, options = {}) {
       return `CREATE TABLE IF NOT EXISTS ${tableName} (${columns.map(definition).join(', ')})`;
     },
     create() {
-      database.exec(storage.createSql());
-      return storage;
+      return mapResult(database.exec(storage.createSql()), () => storage);
     },
     list() {
-      return database.query(`SELECT * FROM ${tableName} ORDER BY ${primaryKey} ASC`)
-        .map((row) => parse(schema, fromRow(row)));
+      return mapResult(database.query(`SELECT * FROM ${tableName} ORDER BY ${primaryKey} ASC`),
+        (rows) => rows.map((row) => parse(schema, fromRow(row))));
     },
     get(id) {
-      const row = database.query(`SELECT * FROM ${tableName} WHERE ${primaryKey} = ?`, [id])[0];
-      return row ? parse(schema, fromRow(row)) : null;
+      return mapResult(database.query(`SELECT * FROM ${tableName} WHERE ${primaryKey} = ?`, [id]),
+        (rows) => (rows[0] ? parse(schema, fromRow(rows[0])) : null));
     },
     insert(value) {
       const row = rowValue(value);
       // An explicit zero is the conventional placeholder for an auto-increment
-      // primary key in a create input; omitting it lets SQLite assign the id.
+      // primary key in a create input; omitting it lets the database assign it.
       if (auto && (row[primaryKey] === 0 || row[primaryKey] === null)) delete row[primaryKey];
       const names = Object.keys(row);
       const placeholders = names.map(() => '?').join(', ');
-      const result = database.run(`INSERT INTO ${tableName} (${names.join(', ')}) VALUES (${placeholders})`, names.map((key) => row[key]));
-      const insertedId = row[primaryKey] !== undefined && row[primaryKey] !== null ? row[primaryKey] : result.lastInsertRowid;
-      return storage.get(insertedId);
+      const returning = dialect === 'postgres' && auto && !names.includes(primaryKey) ? ` RETURNING ${primaryKey}` : '';
+      return mapResult(database.run(`INSERT INTO ${tableName} (${names.join(', ')}) VALUES (${placeholders})${returning}`, names.map((key) => row[key])), (result) => {
+        const returned = result.lastInsertRowid && typeof result.lastInsertRowid === 'object'
+          ? result.lastInsertRowid[primaryKey]
+          : result.lastInsertRowid;
+        const insertedId = row[primaryKey] !== undefined && row[primaryKey] !== null ? row[primaryKey] : returned;
+        return storage.get(insertedId);
+      });
     },
     update(id, value) {
       const row = rowValue(value);
       const names = Object.keys(row).filter((key) => key !== primaryKey);
       if (!names.length) return storage.get(id);
       const assignments = names.map((key) => `${key} = ?`).join(', ');
-      database.run(`UPDATE ${tableName} SET ${assignments} WHERE ${primaryKey} = ?`, [...names.map((key) => row[key]), id]);
-      return storage.get(id);
+      return mapResult(database.run(`UPDATE ${tableName} SET ${assignments} WHERE ${primaryKey} = ?`, [...names.map((key) => row[key]), id]),
+        () => storage.get(id));
     },
     remove(id) {
-      database.run(`DELETE FROM ${tableName} WHERE ${primaryKey} = ?`, [id]);
+      return database.run(`DELETE FROM ${tableName} WHERE ${primaryKey} = ?`, [id]);
     },
   };
 
@@ -224,8 +242,8 @@ export async function migrate(database, migrations, options = {}) {
   if (!Array.isArray(migrations)) throw new MigrationError(0, '<list>', new TypeError('migrations must be a list'));
   const versionTable = options.versionTable || 'plainscript_migrations';
   identifier(versionTable, 'version table');
-  database.exec(`CREATE TABLE IF NOT EXISTS ${versionTable} (version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TEXT NOT NULL)`);
-  const applied = database.query(`SELECT version FROM ${versionTable} ORDER BY version ASC`).map((row) => row.version);
+  await database.exec(`CREATE TABLE IF NOT EXISTS ${versionTable} (version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TEXT NOT NULL)`);
+  const applied = (await database.query(`SELECT version FROM ${versionTable} ORDER BY version ASC`)).map((row) => row.version);
   const seen = new Set();
   const ordered = [...migrations].sort((a, b) => a.version - b.version);
   for (const migration of ordered) {
@@ -251,19 +269,19 @@ export async function migrate(database, migrations, options = {}) {
   const newlyApplied = [];
   for (const migration of ordered) {
     if (migration.version <= current) continue;
-    database.exec('BEGIN IMMEDIATE');
+    await database.exec('BEGIN IMMEDIATE');
     try {
       await migration.up(database);
-      database.run(`INSERT INTO ${versionTable} (version, name, applied_at) VALUES (?, ?, ?)`, [
+      await database.run(`INSERT INTO ${versionTable} (version, name, applied_at) VALUES (?, ?, ?)`, [
         migration.version,
         migration.name,
         new Date().toISOString(),
       ]);
-      database.exec('COMMIT');
+      await database.exec('COMMIT');
       newlyApplied.push(migration.version);
       current = migration.version;
     } catch (cause) {
-      try { database.exec('ROLLBACK'); } catch { /* keep the migration failure */ }
+      try { await database.exec('ROLLBACK'); } catch { /* keep the migration failure */ }
       throw new MigrationError(migration.version, migration.name, cause);
     }
   }
@@ -274,8 +292,8 @@ export async function rollback(database, migrations, targetVersion = 0, options 
   if (!database || typeof database.exec !== 'function') throw new DatabaseError('rollback() expects a database from open()');
   const versionTable = options.versionTable || 'plainscript_migrations';
   identifier(versionTable, 'version table');
-  database.exec(`CREATE TABLE IF NOT EXISTS ${versionTable} (version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TEXT NOT NULL)`);
-  const applied = database.query(`SELECT version, name FROM ${versionTable} ORDER BY version DESC`);
+  await database.exec(`CREATE TABLE IF NOT EXISTS ${versionTable} (version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TEXT NOT NULL)`);
+  const applied = await database.query(`SELECT version, name FROM ${versionTable} ORDER BY version DESC`);
   const byVersion = new Map(migrations.map((migration) => [migration.version, migration]));
   const rolledBack = [];
   for (const row of applied) {
@@ -283,14 +301,14 @@ export async function rollback(database, migrations, targetVersion = 0, options 
     const migration = byVersion.get(row.version);
     if (!migration) throw new MigrationError(row.version, row.name, new TypeError('no local migration matches an applied version'));
     if (typeof migration.down !== 'function') throw new MigrationError(row.version, row.name, new TypeError('migration has no down function'));
-    database.exec('BEGIN IMMEDIATE');
+    await database.exec('BEGIN IMMEDIATE');
     try {
       await migration.down(database);
-      database.run(`DELETE FROM ${versionTable} WHERE version = ?`, [row.version]);
-      database.exec('COMMIT');
+      await database.run(`DELETE FROM ${versionTable} WHERE version = ?`, [row.version]);
+      await database.exec('COMMIT');
       rolledBack.push(row.version);
     } catch (cause) {
-      try { database.exec('ROLLBACK'); } catch { /* keep the rollback failure */ }
+      try { await database.exec('ROLLBACK'); } catch { /* keep the rollback failure */ }
       throw new MigrationError(row.version, row.name, cause);
     }
   }

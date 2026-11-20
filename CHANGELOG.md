@@ -8,15 +8,24 @@ All notable changes to PlainScript are documented here.
   match guards. Retired words remain reserved so old branch syntax fails clearly.
 - Keep `end` block terminators and existing type-checking/runtime semantics.
 - Add conditional types, mapped types, generic/deferred indexed access, function overloads
-  (including imported and `.d.pln` overloads), user-defined type predicates, recursive type
-  tests and a documented structural variance model.
+  (including imported and declaration-only `.d.pln` overloads), user-defined type predicates,
+  variadic tuples, readonly record fields, distributive conditionals over a naked type
+  parameter, recursive type tests and a documented structural variance model.
 - Add `std/jobs` (bounded in-process queue, retries/backoff, timeouts, cancellation, drain),
-  SSE responses in `std/http`, WebSocket authorization before the upgrade handshake, and
-  buffered-close/nested-group semantics in `std/task`.
+  optional `memoryStore`/`sqliteStore` persistence with startup recovery, SSE responses in
+  `std/http`, WebSocket fragmentation/control-frame handling and authorization before the
+  upgrade handshake, and buffered-close/nested-group semantics in `std/task`.
+- Add dependency-injected PostgreSQL and MySQL adapters (`std/db-postgres`,
+  `std/db-mysql`) with dialect-aware DDL, placeholder translation, transactions and the
+  shared `std/db` table/migration surface. Drivers remain application dependencies.
+- Add optional OIDC and SAML service-provider helpers (`std/oidc`, `std/saml`) built on
+  application-installed `openid-client` and `@node-saml/node-saml`.
 - LSP: semantic tokens and quick-fix code actions in addition to diagnostics, completion,
-  hover, navigation, rename, symbols and formatting.
-- CLI: conservative `plainscript migrate` scanner (`--check`, `--json`) and five new
-  starters (`react-vite`, `next`, `express`, `cli`, `library`).
+  hover, navigation, rename, symbols and formatting; add a minimal stdio DAP debug adapter
+  and VS Code debugger contribution.
+- CLI: conservative `plainscript migrate` scanner (`--check`, `--json`),
+  `plainscript interop` for the supported TypeScript `.d.ts` subset, `plainscript dap`, and
+  five new starters (`react-vite`, `next`, `express`, `cli`, `library`).
 - HTTP handler exceptions are no longer echoed to clients unless `exposeErrors` is set.
 - Add database, jobs, security and debugging documentation; synchronize SPEC, type-system,
   CLI, templates, roadmap and progress docs with the implementation.

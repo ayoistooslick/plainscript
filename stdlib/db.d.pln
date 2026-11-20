@@ -1,5 +1,6 @@
-# SQLite persistence, schema-derived tables and versioned migrations.
-# Requires Node 22's built-in node:sqlite.
+# Persistence, schema-derived tables and versioned migrations.
+# The bundled open() uses Node 22's node:sqlite; std/db-postgres and
+# std/db-mysql expose the same Database surface through their npm drivers.
 
 export type TableSchema<T>
     parse: (value: any, path?: text) -> T
@@ -14,11 +15,23 @@ end
 export type Database
     file: text
     raw: any
+    dialect: text
     exec: (sql: text, params?: list of any) -> any
     query: (sql: text, params?: list of any) -> list of any
     run: (sql: text, params?: list of any) -> any
     transaction: (work: (database: Database) -> Promise of any) -> Promise of any
     close: () -> nothing
+end
+
+export type AsyncDatabase
+    file: text
+    raw: any
+    dialect: text
+    exec: (sql: text, params?: list of any) -> Promise of any
+    query: (sql: text, params?: list of any) -> Promise of list of any
+    run: (sql: text, params?: list of any) -> Promise of any
+    transaction: (work: (database: AsyncDatabase) -> Promise of any) -> Promise of any
+    close: () -> Promise of nothing
 end
 
 export type Table<T>
@@ -28,24 +41,50 @@ export type Table<T>
     primaryKey: text
     autoIncrement: boolean
     createSql: () -> text
-    create: () -> nothing
+    create: () -> any
     list: () -> list of T
     get: (id: any) -> T?
     insert: (value: T) -> T
     update: (id: any, value: T) -> T?
-    remove: (id: any) -> nothing
+    remove: (id: any) -> any
+end
+
+export type AsyncTable<T>
+    name: text
+    schema: TableSchema<T>
+    columns: list of Column
+    primaryKey: text
+    autoIncrement: boolean
+    createSql: () -> text
+    create: () -> Promise of any
+    list: () -> Promise of list of T
+    get: (id: any) -> Promise of T?
+    insert: (value: T) -> Promise of T
+    update: (id: any, value: T) -> Promise of T?
+    remove: (id: any) -> Promise of any
 end
 
 export type Migration
     version: number
     name: text
-    up: (database: Database) -> Promise of nothing
-    down?: (database: Database) -> Promise of nothing
+    # The callback receives either Database or AsyncDatabase, depending on the
+    # adapter. Annotate the parameter explicitly in application code.
+    up: (database: any) -> Promise of nothing
+    down?: (database: any) -> Promise of nothing
 end
 
 export declare function open(file?: text, options?: any) -> Promise of Database
-export declare function table<T>(database: Database, name: text, schema: TableSchema<T>, options?: any) -> Table<T>
-export declare function tableFor<T>(database: Database, name: text, schema: TableSchema<T>, options?: any) -> Table<T>
+
+export overload function table<T>(database: AsyncDatabase, name: text, schema: TableSchema<T>, options?: any) -> AsyncTable<T>
+export overload function table<T>(database: Database, name: text, schema: TableSchema<T>, options?: any) -> Table<T>
+
+export overload function tableFor<T>(database: AsyncDatabase, name: text, schema: TableSchema<T>, options?: any) -> AsyncTable<T>
+export overload function tableFor<T>(database: Database, name: text, schema: TableSchema<T>, options?: any) -> Table<T>
+
 export declare function columns<T>(schema: TableSchema<T>) -> list of Column
-export declare function migrate(database: Database, migrations: list of Migration, options?: any) -> Promise of list of number
-export declare function rollback(database: Database, migrations: list of Migration, targetVersion?: number, options?: any) -> Promise of list of number
+
+export overload function migrate(database: AsyncDatabase, migrations: list of Migration, options?: any) -> Promise of list of number
+export overload function migrate(database: Database, migrations: list of Migration, options?: any) -> Promise of list of number
+
+export overload function rollback(database: AsyncDatabase, migrations: list of Migration, targetVersion?: number, options?: any) -> Promise of list of number
+export overload function rollback(database: Database, migrations: list of Migration, targetVersion?: number, options?: any) -> Promise of list of number

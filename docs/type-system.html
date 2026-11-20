@@ -2,16 +2,20 @@
 <p>PlainScript uses structural types. Types are erased from emitted JavaScript; the checker is the enforcer, and untyped JavaScript boundaries remain <code>any</code> deliberately.</p>
 <h2 id="implemented-and-tested">Implemented and tested</h2>
 <ul>
-<li>Primitives, records, optional fields, lists, maps, promises, functions, unions, named</li>
-<p>aliases, recursive record/variant types and fixed-length tuples.</p>
+<li>Primitives, records, optional and readonly fields, lists, maps, promises, functions,</li>
+<p>unions, named aliases, recursive record/variant types, fixed-length tuples and variadic tuples (<code>[text, ...text]</code>).</p>
 <li>Generic functions and aliases, imported aliases, constraints and structural inference.</li>
 <p>Callback parameters are contextually typed, callback return types are checked against the expected result, and generic substitution is recursive.</p>
 <li>Record intersections (<code>Named &amp; Aged</code>) merge fields. Concrete indexed access reads a</li>
 <p>record field, tuple element, list element or map value. Missing record fields and out-of-range tuple indexes are rejected.</p>
 <li><strong>Conditional types</strong>: <code>T extends U ? X : Y</code>. A concrete check chooses a branch; a check</li>
-<p>that still mentions an unresolved type parameter stays deferred until substitution.</p>
+<p>that still mentions an unresolved type parameter stays deferred until substitution. A conditional whose checked type is a naked type parameter distributes over a union after substitution: <code>Kind&lt;number or text&gt;</code> becomes <code>Kind&lt;number&gt; or Kind&lt;text&gt;</code>.</p>
 <li><strong>Mapped types</strong>: <code>{ [K in keyof T]: T[K] }</code> and <code>{ [K in keyof T]?: boolean }</code>.</li>
 <p>Mapped evaluation expands when the key set is concrete; otherwise it remains deferred.</p>
+<li><strong>Readonly record fields</strong>: <code>readonly id: number</code> in record and inline record types.</li>
+<p>Assignment is rejected (<code>PS3319</code>); structural assignability still ignores readonly. This is a compile-time check, not runtime immutability.</p>
+<li><strong>Variadic tuples</strong>: a fixed prefix followed by one rest type, such as</li>
+<p><code>[text, ...text]</code>. Assignment checks the prefix and every trailing element; indexing after the prefix returns the rest type.</p>
 <li><strong>Generic deferred indexed access</strong>: <code>type Elem&lt;T&gt; = T[0]</code>, <code>type Field&lt;T&gt; = T[keyof T]</code>.</li>
 <p>Deferred access is resolved after generic arguments are substituted.</p>
 <li><strong>Function overloads</strong>:</li>
@@ -51,8 +55,8 @@ end</code></pre>
 <p>Containers are covariant even though JavaScript arrays are mutable. PlainScript&#39;s collection functions return new values and the grammar does not provide a mutating array method surface, so the practical risk is confined to aliasing a JavaScript array at an <code>any</code> boundary. This is a documented structural choice, not a nominal ownership system.</p>
 <h2 id="conditional-and-mapped-semantics">Conditional and mapped semantics</h2>
 <ul>
-<li>Conditional checks are <strong>non-distributive</strong>: a union check is compared as a whole, so</li>
-<p><code>list of number or text extends list of number ? A : B</code> chooses <code>B</code>. Write a separate alias or overload for each union member when per-member behavior is needed.</p>
+<li>A conditional <strong>distributes only when its checked type is a naked type parameter</strong>. After</li>
+<p>generic substitution, <code>T extends U ? A : B</code> distributes over each member of a union <code>T</code>. A written union check is compared as a whole: <code>list of number or text extends list of number ? A : B</code> chooses <code>B</code>. Write a separate alias or overload for each union member when the written check is not a naked parameter.</p>
 <li>Mapped types require a concrete key union of text/number literal types (usually</li>
 <p><code>keyof</code> of a known record). A mapped type whose key or value still mentions a type variable remains deferred.</p>
 <li>Deferred constructs are permissive while unresolved, as are unresolved generics and</li>
@@ -60,7 +64,9 @@ end</code></pre>
 <li>Conditional, mapped and indexed constructs cannot yet be nested in every combination;</li>
 <p>the checker may leave a construct deferred rather than report a false incompatibility. Negative tests cover concrete misuse; deeply deferred combinations remain a limitation.</p>
 </ul>
+<h2 id="declaration-interop">Declaration interop</h2>
+<p><code>plainscript interop</code> translates a conservative TypeScript declaration subset to <code>.d.pln</code>: interfaces, aliases, object/function/tuple types, unions/intersections, mapped types, generics without defaults, and exported function/value declarations. Unsupported constructs (such as <code>infer</code>, template-literal types, namespaces, classes and signatures with no direct PlainScript equivalent) produce <code>PS7001</code> errors and the affected declaration is not written; warnings such as an omitted generic default are reported as <code>PS7004</code>. It is not an arbitrary <code>.d.ts</code> parser. PlainScript&#39;s native declaration format remains <code>.d.pln</code>.</p>
 <h2 id="still-absent">Still absent</h2>
-<p>Arbitrary intersections of unions/functions, variadic tuple types, readonly field modifiers, nominal classes/declarations, distributive conditional types, and parsing arbitrary TypeScript <code>.d.ts</code> syntax. Declaration interoperability is PlainScript&#39;s <code>.d.pln</code> format. Unresolved generics and <code>any</code> are permissive by design at untyped boundaries.</p>
+<p>Arbitrary intersections of unions/functions, optional tuple elements, general conditional <code>infer</code>, nominal classes/declarations and arbitrary TypeScript <code>.d.ts</code> syntax are not implemented. Unresolved generics and <code>any</code> are permissive by design at untyped boundaries.</p>
 <p><code>std/contract</code> is a runtime validator in addition to a checker type. The compiler derives model types from the known constructors; it does not verify arbitrary hand-written <code>Schema&lt;T&gt;</code> values against an unrelated <code>T</code>. Use <code>object(...)</code>, <code>enumeration(...)</code>, <code>array(...)</code>, <code>optional(...)</code> and <code>literal(...)</code> when you want derivation.</p>
-<p>See <a href="contracts.html">Unified Contracts</a> for the end-to-end path and <a href="../tests/type-level.test.js">tests</a>, <a href="../tests/overloads.test.js">overloads</a>, <a href="../tests/predicates.test.js">predicates</a>, <a href="../tests/variance.test.js">variance</a> and <a href="../tests/recursive-types.test.js">recursive types</a> for executable coverage.</p></div><aside class="toc"><div class="toc-title">On this page</div><a class="toc-h2" href="#implemented-and-tested">Implemented and tested</a><a class="toc-h2" href="#variance">Variance</a><a class="toc-h2" href="#conditional-and-mapped-semantics">Conditional and mapped semantics</a><a class="toc-h2" href="#still-absent">Still absent</a></aside></article><footer class="page-footer"><span>PlainScript 2.0 documentation</span><a href="https://github.com/ayoistooslick/Plainscript/issues">Report a documentation issue ↗</a></footer></div></main></div><script src="app.js"></script></body></html>
+<p>See <a href="contracts.html">Unified Contracts</a> for the end-to-end path and <a href="../tests/type-level.test.js">tests</a>, <a href="../tests/overloads.test.js">overloads</a>, <a href="../tests/predicates.test.js">predicates</a>, <a href="../tests/variance.test.js">variance</a>, <a href="../tests/recursive-types.test.js">recursive types</a> and <a href="../tests/advanced-v2-types.test.js">advanced V2 types</a> for executable coverage.</p></div><aside class="toc"><div class="toc-title">On this page</div><a class="toc-h2" href="#implemented-and-tested">Implemented and tested</a><a class="toc-h2" href="#variance">Variance</a><a class="toc-h2" href="#conditional-and-mapped-semantics">Conditional and mapped semantics</a><a class="toc-h2" href="#declaration-interop">Declaration interop</a><a class="toc-h2" href="#still-absent">Still absent</a></aside></article><footer class="page-footer"><span>PlainScript 2.0 documentation</span><a href="https://github.com/ayoistooslick/Plainscript/issues">Report a documentation issue ↗</a></footer></div></main></div><script src="app.js"></script></body></html>

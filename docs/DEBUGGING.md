@@ -29,10 +29,37 @@ VS Code's built-in Node debugger can launch a compiled entry:
 }
 ```
 
-There is no Debug Adapter Protocol server in 2.0. The language server (`plainscript lsp`)
-provides editing features only; it does not attach to a running process. The Node inspector
-path above is the supported debugging route, and source-map reliability is covered by the
-emitter tests rather than by a browser automation suite.
+## Debug Adapter Protocol
+
+`plainscript dap` speaks DAP over stdio. It launches a compiled JavaScript entry with
+`node --inspect-brk`, connects to the inspector, loads its `.js.map`, and translates
+breakpoints and paused frames through that map. The VS Code extension registers a
+`plainscript` debug type, so a workspace launch configuration is:
+
+```json
+{
+  "type": "plainscript",
+  "request": "launch",
+  "name": "PlainScript: Debug current file",
+  "program": "${workspaceFolder}/dist/main.js",
+  "cwd": "${workspaceFolder}",
+  "args": [],
+  "env": {}
+}
+```
+
+The adapter supports setBreakpoints, stackTrace, scopes, variables, evaluate, continue,
+next, stepIn, stepOut, pause, terminate and disconnect. Additional `sourceMaps` paths may
+be supplied for maps not beside the entry. `attach` accepts `inspectorUrl` when you already
+have an inspector WebSocket URL.
+
+Limits: the adapter is intentionally small (no conditional breakpoints, watch expressions,
+data breakpoints or multi-process debugging). It needs a Node runtime with a global
+`WebSocket` client (Node 22 provides one) and a generated `.js.map`; without a map,
+breakpoints use generated JavaScript lines. The repository exercises the flow through
+`tests/dap.test.js`; it does not automate the VS Code UI. The language server
+(`plainscript lsp`) still provides editing features only and does not attach to a running
+process.
 
 ## Language server logs
 
@@ -47,7 +74,8 @@ stop updating:
 
 The server is dependency-free and workspace-aware for imports and references. It advertises
 diagnostics, completion, hover, definition, references, rename, document symbols, formatting,
-semantic tokens and quick-fix code actions. It does not run a browser preview or a debugger.
+semantic tokens and quick-fix code actions. It does not run a browser preview; debugging is
+handled by the separate `plainscript dap` process registered by the extension.
 
 ## Diagnosing type errors
 

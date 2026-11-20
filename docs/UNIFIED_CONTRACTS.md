@@ -1,7 +1,7 @@
 # Unified full-stack contracts
 
 **Status: implemented through schemas, typed operations, typed errors, dispatch, SQLite
-models/migrations and a real authentication flow.** The verified application is
+models/migrations, PostgreSQL/MySQL adapter surfaces and a real authentication flow.** The verified application is
 [`demos/contracts-fullstack`](../demos/contracts-fullstack); its integration test logs in,
 validates, mutates, restarts the process and checks persistence.
 
@@ -79,17 +79,22 @@ let tasks = table(database, "tasks", TaskSchema)
 
 `table` derives columns from `TaskSchema` (text, number, boolean, JSON arrays/objects,
 optional fields and primary-key options), validates rows through the same schema, and uses
-bound parameters for every value. `migrate` keeps a `plainscript_migrations` history,
-applies versions in order in `BEGIN IMMEDIATE` transactions, rolls back the whole migration
-on failure, rejects duplicate versions and refuses to apply around a history gap.
-`rollback` runs declared `down` migrations; a migration without `down` cannot be rolled
-back. The schema itself remains a contract, not a replacement for database design review.
+bound parameters for every value. The PostgreSQL and MySQL adapters expose the same
+`table`/`migrate` helpers over application-installed drivers; their table methods are
+asynchronous, while SQLite stays synchronous. `migrate` keeps a `plainscript_migrations`
+history, applies versions in order in `BEGIN IMMEDIATE` transactions (translated to the
+adapter's dialect), rolls back the whole migration on failure, rejects duplicate versions
+and refuses to apply around a history gap. `rollback` runs declared `down` migrations; a
+migration without `down` cannot be rolled back. The schema itself remains a contract, not a
+replacement for database design review. See [DATABASES](DATABASES.md).
 
 ## Authentication and authorization
 
 `std/auth` supplies scrypt password hashing with random salts and constant-time
 verification, HS256 bearer tokens with `exp`/`nbf`/`iss`/`aud` validation, `bearer`
-extraction from plain or `Headers` requests, and reusable policies. The flagship demo:
+extraction from plain or `Headers` requests, and reusable policies. `std/oidc` and
+`std/saml` provide optional service-provider flows over `openid-client` and
+`@node-saml/node-saml`; they do not include a user store or session manager. The flagship demo:
 
 - creates `tasks` and `users` through a versioned migration;
 - seeds a development user with a scrypt hash;
@@ -123,6 +128,8 @@ Verified by:
   duplicate versions, rollback requirements and identifier/row rejection.
 
 Not implemented: compiler-owned operation syntax, generated OpenAPI/docs, automatic
-frontend code generation beyond the typed runtime client, a database driver abstraction
-beyond Node SQLite, and a production identity provider (OIDC/SAML). `std/auth` is real
-cryptography, not a full identity product. See [ROADMAP](ROADMAP.md).
+frontend code generation beyond the typed runtime client, a MongoDB adapter, live
+PostgreSQL/MySQL integration testing in this repository, and full identity-provider
+account/session management. OIDC/SAML wrappers are tested with library-shaped fakes, not a
+live provider; `std/auth` is real cryptography, not a full identity product. See
+[ROADMAP](ROADMAP.md).

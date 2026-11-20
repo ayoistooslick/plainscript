@@ -7,16 +7,48 @@ export type Job
     cancel: (reason: text) -> boolean
 end
 
+export type JobRecord
+    id: number
+    name: text
+    payload: any
+    state: text
+    attempts: number
+    retries: number
+    retryDelay: number
+    retryBackoff: number
+    timeout: number
+    createdAt: number
+    startedAt: number?
+    finishedAt: number?
+    error: text?
+    updatedAt: number
+end
+
+export type JobStore
+    save: (record: JobRecord) -> Promise of nothing
+    load: () -> Promise of list of JobRecord
+    delete: (id: number) -> Promise of nothing
+    close: () -> Promise of nothing
+end
+
 export type Queue
+    ready: Promise of number
     add: (name: text, work: (payload: any, signal: any) -> Promise of any, payload?: any, options?: any) -> Job
+    handle: (name: text, work: (payload: any, signal: any) -> Promise of any) -> Queue
+    recover: () -> Promise of number
     start: () -> Queue
     drain: () -> Promise of nothing
     close: (reason?: text) -> Promise of nothing
+    get: (id: number) -> JobRecord?
+    list: (state?: text) -> list of JobRecord
     stats: () -> any
-    on: (event: text, handler: (job: Job) -> nothing) -> () -> nothing
+    on: (event: text, handler: (job: any) -> nothing) -> () -> nothing
     closed: boolean
+    storageErrors: list of any
 end
 
 export declare function queue(options?: any) -> Queue
 export declare function createQueue(options?: any) -> Queue
 export declare function runJobs(jobs: Queue) -> Promise of nothing
+export declare function memoryStore() -> JobStore
+export declare function sqliteStore(file?: text) -> Promise of JobStore

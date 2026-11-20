@@ -33,8 +33,11 @@ function printTypeNode(node) {
       return node.members
         .map((member) => (member.kind === 'UnionType' || member.kind === 'FunctionType' ? `(${printTypeNode(member)})` : printTypeNode(member)))
         .join(' & ');
-    case 'TupleType':
-      return `[${node.elements.map(printTypeNode).join(', ')}]`;
+    case 'TupleType': {
+      const elements = node.elements.map(printTypeNode);
+      if (node.rest) elements.push(`...${printTypeNode(node.rest)}`);
+      return `[${elements.join(', ')}]`;
+    }
     case 'LiteralType':
       return typeof node.value === 'string' ? JSON.stringify(node.value) : String(node.value);
     case 'ConditionalType':
@@ -60,7 +63,7 @@ function printTypeNode(node) {
     }
     case 'RecordType':
       return node.fields.length
-        ? `{ ${node.fields.map((field) => `${field.name}${field.optional ? '?' : ''}: ${printTypeNode(field.type)}`).join(', ')} }`
+        ? `{ ${node.fields.map((field) => `${field.readonly ? 'readonly ' : ''}${field.name}${field.optional ? '?' : ''}: ${printTypeNode(field.type)}`).join(', ')} }`
         : '{ }';
     case 'VariantType':
       return `${node.name}(${node.fields.map((field) => `${field.name}: ${printTypeNode(field.type)}`).join(', ')})`;
@@ -87,8 +90,11 @@ function printType(type) {
       return type.name;
     case 'list':
       return `list of ${atomType(type.elem)}`;
-    case 'tuple':
-      return `[${(type.elements || []).map(printType).join(', ')}]`;
+    case 'tuple': {
+      const elements = (type.elements || []).map(printType);
+      if (type.rest) elements.push(`...${printType(type.rest)}`);
+      return `[${elements.join(', ')}]`;
+    }
     case 'literal':
       return typeof type.value === 'string' ? JSON.stringify(type.value) : String(type.value);
     case 'conditional':
@@ -119,7 +125,7 @@ function printType(type) {
     case 'record': {
       if (type.name) return type.name;
       const fields = [...type.fields.entries()]
-        .map(([name, field]) => `${name}${field.optional ? '?' : ''}: ${printType(field.type)}`)
+        .map(([name, field]) => `${field.readonly ? 'readonly ' : ''}${name}${field.optional ? '?' : ''}: ${printType(field.type)}`)
         .join(', ');
       return `{ ${fields} }`;
     }
@@ -146,7 +152,7 @@ function declareType(statement) {
   if (statement.recordFields) {
     if (!statement.recordFields.length) return `${head}\nend`;
     const lines = statement.recordFields.map((field) =>
-      `    ${field.name}${field.optional ? '?' : ''}: ${printTypeNode(field.type)}`);
+      `    ${field.readonly ? 'readonly ' : ''}${field.name}${field.optional ? '?' : ''}: ${printTypeNode(field.type)}`);
     return `${head}\n${lines.join('\n')}\nend`;
   }
   return `${head} = ${printTypeNode(statement.value)}`;

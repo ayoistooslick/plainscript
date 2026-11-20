@@ -8,7 +8,7 @@ node scripts/benchmark.js 40 7</code></pre>
 <h2 id="recorded-result">Recorded result</h2>
 <p>Node <code>v22.23.3</code>, 40 modules, 7 iterations (<code>npm run bench</code>):</p>
 <table><thead><tr><th>Measurement</th><th>min</th><th>median</th><th>max</th></tr></thead><tbody>
-<tr><td>Cold compile</td><td>9.76 ms</td><td>16.95 ms</td><td>27.87 ms</td></tr>
-<tr><td>Typecheck</td><td>—</td><td>3.68 ms</td><td>—</td></tr>
+<tr><td>Cold compile</td><td>9.78 ms</td><td>14.65 ms</td><td>28.50 ms</td></tr>
+<tr><td>Typecheck</td><td>—</td><td>4.50 ms</td><td>—</td></tr>
 </tbody></table>
 <p>These numbers cover tiny generated modules and should not be extrapolated to real applications. A TypeScript/Vite baseline is deliberately absent because it would require a pinned dependency installation; adding one without recording its exact versions and configuration would not be a valid comparison. The roadmap tracks that work.</p></div><aside class="toc"><div class="toc-title">On this page</div><a class="toc-h2" href="#reproduce">Reproduce</a><a class="toc-h2" href="#recorded-result">Recorded result</a></aside></article><footer class="page-footer"><span>PlainScript 2.0 documentation</span><a href="https://github.com/ayoistooslick/Plainscript/issues">Report a documentation issue ↗</a></footer></div></main></div><script src="app.js"></script></body></html>

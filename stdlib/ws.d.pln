@@ -1,5 +1,5 @@
-# RFC 6455 WebSocket server. Text, binary, ping/pong and close frames are
-# supported; fragmentation and extensions are not.
+# RFC 6455 WebSocket server. Text, binary, fragmented messages, ping/pong,
+# close handshakes and protocol-error handling are supported; extensions are not.
 
 export type Connection
     id: text
@@ -9,6 +9,7 @@ export type Connection
     onMessage: ((message: any) -> nothing) -> (() -> nothing)
     onClose: ((code: number, reason: text) -> nothing) -> (() -> nothing)
     close: (code?: number, reason?: text) -> nothing
+    terminate: () -> nothing
 end
 
 export type Server

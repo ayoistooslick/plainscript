@@ -121,7 +121,7 @@ function inline(value) {
   text = text.replace(/href="([A-Za-z0-9_-]+)\.md"/g, 'href="$1.html"');
   text = text.replace(/href="docs\/DEMOS\.md"/g, 'href="interop.html"');
   text = text.replace(/href="(CHANGELOG|CONTRIBUTION|LICENSE)(?:\.md)?"/g, 'href="https://github.com/ayoistooslick/Plainscript/blob/main/$1"');
-  text = text.replace(/href="(demos\/[^\"]+)"/g, 'href="https://github.com/ayoistooslick/Plainscript/tree/main/$1"');
+  text = text.replace(/href="((?:demos|editors|templates)\/[^\"]+)"/g, 'href="https://github.com/ayoistooslick/Plainscript/tree/main/$1"');
   const pageSlugs = ['MIGRATION', 'SPEC', 'SYNTAX_DESIGN', 'CLI', 'INTEROP', 'PROGRESS', 'DECISIONS', 'AUDIT', 'JOBS', 'DATABASES', 'SECURITY', 'DEBUGGING', 'CONCURRENCY', 'UNIFIED_CONTRACTS', 'TYPE_SYSTEM', 'TEMPLATES', 'BENCHMARKS', 'ROADMAP'];
   text = text.replace(/href="UNIFIED_CONTRACTS\.html"/g, 'href="contracts.html"');
   for (const pageSlug of pageSlugs) text = text.replace(new RegExp(`href="${pageSlug}\\.html"`, 'g'), `href="${pageSlug.toLowerCase().replace('_', '-')}.html"`);

@@ -1,8 +1,11 @@
 # Background jobs
 
-`std/jobs` is an in-process scheduler for server work that should not block a request:
-sending email, resizing an upload, warming a cache, or retrying a flaky integration. It is
-deliberately small and does not pretend to be a distributed queue.
+`std/jobs` is a scheduler for server work that should not block a request: sending email,
+resizing an upload, warming a cache, or retrying a flaky integration. Its scheduler is
+in-process; an optional store adapter persists job records so pending and interrupted work
+can be recovered after a restart. It is deliberately small and does not pretend to be a
+distributed queue.
+
 
 ## Example
 
@@ -52,11 +55,38 @@ await jobs.close()       # stop accepting work, cancel queued jobs, wait for run
 queue closed, rejects queued and retry-waiting jobs with `JobCancelledError`, and waits for
 already-running handlers to settle. A handler that ignores its signal cannot be forced to
 stop, so `close()` waits for its promise. Register shutdown on `SIGTERM`/`SIGINT` in the
-host process and call `close()` there.
+host process, drain/close there, and let `close()` close the configured store.
 
-Events: `queued`, `completed`, `failed`, `cancelled`. Listener exceptions are swallowed so
-an observer cannot break the queue. `stats()` reports `pending`, `running`, `delayed`,
-`closed` and `total`.
+Events: `queued`, `recovered`, `completed`, `failed`, `cancelled` and `storage-error`.
+Listener exceptions are swallowed so an observer cannot break the queue. `stats()` reports
+`pending`, `running`, `delayed`, `closed`, `total` and `recorded`.
+
+## Durable stores
+
+```plainscript
+import { queue, sqliteStore } from "std/jobs"
+
+let store = await sqliteStore("./jobs.sqlite")
+let jobs = queue({ store, concurrency: 4 })
+jobs.handle("send-welcome", async (payload: any) => await sendEmail(payload.email))
+await jobs.ready             # recover pending/running/delayed records
+jobs.add("send-welcome", async (payload: any) => await sendEmail(payload.email), { email: "ada@example.com" })
+```
+
+`memoryStore()` is useful for deterministic tests but is not crash-durable. `sqliteStore(file)`
+uses Node 22's `node:sqlite`; it is a single-process store and its write errors are reported
+through the `storage-error` event and `queue.storageErrors` rather than silently discarding
+the job. A custom store needs `save(record)`, `load()`, `delete(id)` and `close()` methods.
+
+Recovery runs when `queue({ store })` is created. Register a handler with `handle(name,
+work)` for every persisted job name before awaiting `jobs.ready`; a record whose name has no
+registered handler is marked `failed` instead of disappearing. Recovered jobs keep their
+attempt count, payload, retry settings and timestamps. `queue.get(id)` and `queue.list(state?)`
+expose the persisted record snapshots.
+
+A function cannot be serialized, which is why handlers are registered by name. `add()` also
+registers its handler for convenience, but recovery must not depend on the original call
+site still existing.
 
 ## Errors
 
@@ -69,19 +99,16 @@ timeout. `retryDelay` is multiplied by `retryBackoff^(attempt-1)`.
 
 ## Durability boundary
 
-The queue lives in memory. A process exit loses pending and retry-waiting jobs, and there is
-no cross-process worker or leader election. For work that must survive restarts:
+A store makes records durable, but scheduling is still in-process. There is no distributed
+lease, cross-process worker, leader election or exactly-once delivery. A job that was
+running when the process died is re-enqueued after restart; its handler may have completed
+a side effect before the crash, so make side effects idempotent and persist an idempotency
+key. SQLite is a single-process store; use a server-backed custom store for multiple
+processes. `std/db` migrations and bound-parameter queries are suitable for application
+records; see [DATABASES](DATABASES.md).
 
-1. persist the job record and payload in your database (for example a `jobs` table) before
-   returning success to the caller;
-2. enqueue it again at startup from that table;
-3. mark completion idempotently in the same database;
-4. use a unique key/idempotency token so a redelivered job does not repeat side effects.
-
-`std/db` migrations and bound-parameter queries are suitable for that record. This is
-explicitly an application responsibility in 2.0; see [DATABASES](DATABASES.md).
-
-Verified by `tests/jobs.test.js`: bounded concurrency, retry/final error, timeout
-cancellation, queued cancellation, close during retry, event delivery and use from compiled
-PlainScript. The queue is Node/browser-neutral except for timers; durable scheduling is not
-implemented.
+Verified by `tests/jobs.test.js` and `tests/durable-jobs.test.js`: bounded concurrency,
+retry/final error, timeout cancellation, queued cancellation, close during retry, event
+delivery, use from compiled PlainScript, memory-store recovery, SQLite reopen persistence,
+retry/failure records and missing-handler failure. The queue is Node/browser-neutral except
+for timers; the bundled SQLite store requires Node 22.

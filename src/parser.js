@@ -335,11 +335,13 @@ class Parser {
 
     const fields = [];
     while (!this.atKw('end') && !this.atEof()) {
+      let readonly = false;
+      if (this.atIdent() && this.peek().v === 'readonly' && this.peek(1).t === 'ident') { this.next(); readonly = true; }
       const fieldName = this.expectIdent('a field name');
       const optional = this.atPunct('?');
       if (optional) this.next();
       this.expectPunct(':');
-      fields.push({ name: fieldName.v, optional, type: this.typeExpression() });
+      fields.push({ name: fieldName.v, optional, readonly, type: this.typeExpression() });
       if (this.atPunct(',')) this.next();
     }
     this.expectKw('end');
@@ -438,7 +440,7 @@ class Parser {
 
   typeOptional(allowOptional = true) {
     const start = this.peek();
-    let type = this.typePrimary();
+    let type = this.typePrimary(allowOptional);
     while (this.atPunct('[')) {
       this.next();
       const index = this.typeExpression();
@@ -452,7 +454,7 @@ class Parser {
     return type;
   }
 
-  typePrimary() {
+  typePrimary(allowOptional = true) {
     const token = this.peek();
 
     if (token.t === 'text' || token.t === 'number') {
@@ -515,13 +517,20 @@ class Parser {
     if (token.t === 'punct' && token.v === '[') {
       this.next();
       const elements = [];
+      let rest = null;
       while (!this.atPunct(']')) {
+        if (this.atPunct('...')) {
+          this.next();
+          rest = this.typeExpression();
+          if (!this.atPunct(']')) this.fail('PS2008', 'A tuple rest element must be last.', token);
+          break;
+        }
         elements.push(this.typeExpression());
         if (this.atPunct(',')) this.next();
         else break;
       }
       this.expectPunct(']');
-      return this.node('TupleType', token, { elements });
+      return this.node('TupleType', token, { elements, rest });
     }
     if (token.t === 'punct' && token.v === '{') {
       this.next();
@@ -540,11 +549,13 @@ class Parser {
       }
       const fields = [];
       while (!this.atPunct('}')) {
+        let readonly = false;
+        if (this.atIdent() && this.peek().v === 'readonly' && this.peek(1).t === 'ident') { this.next(); readonly = true; }
         const name = this.expectIdent('a field name').v;
         const optional = this.atPunct('?');
         if (optional) this.next();
         this.expectPunct(':');
-        fields.push({ name, optional, type: this.typeExpression() });
+        fields.push({ name, optional, readonly, type: this.typeExpression() });
         if (this.atPunct(',')) this.next();
         else break;
       }
@@ -556,17 +567,17 @@ class Parser {
       this.next();
       if (token.v === 'list' && this.atKw('of')) {
         this.next();
-        return this.node('ListType', token, { elem: this.typeOptional() });
+        return this.node('ListType', token, { elem: this.typeOptional(allowOptional) });
       }
       if (token.v === 'map' && this.atKw('of')) {
         this.next();
-        const key = this.typeOptional();
+        const key = this.typeOptional(allowOptional);
         this.expectKw('to', 'PS2007');
-        return this.node('MapType', token, { key, value: this.typeOptional() });
+        return this.node('MapType', token, { key, value: this.typeOptional(allowOptional) });
       }
       if (token.v === 'Promise' && this.atKw('of')) {
         this.next();
-        return this.node('PromiseType', token, { value: this.typeOptional() });
+        return this.node('PromiseType', token, { value: this.typeOptional(allowOptional) });
       }
       if (token.v === 'keyof') {
         return this.node('KeyofType', token, { target: this.typePrimary() });

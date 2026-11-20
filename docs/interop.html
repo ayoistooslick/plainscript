@@ -9,7 +9,7 @@ import { helper } from &quot;./helper.pln&quot;                # PlainScript mod
 <pre><code>declare const process: any
 declare function fetch(url: text, options?: any) -&gt; Promise of any
 declare const document: any</code></pre>
-<p>Declaring is how you opt JavaScript values into the checker without a separate declaration language.</p>
+<p>Declaring is how you opt JavaScript values into the checker without a separate declaration language. For a TypeScript library that already ships <code>.d.ts</code> files, <code>plainscript interop</code> can translate the supported declaration subset rather than requiring hand-written ambient declarations.</p>
 <h2 id="node-js">Node.js</h2>
 <p>Target: Node 20+. <code>plainscript run</code> compiles the module graph into <code>.plainscript/run/</code> with an ESM <code>package.json</code> and spawns Node. <code>plainscript build</code> emits ESM files with explicit <code>.js</code> specifiers, so the same output runs under <code>node dist/main.js</code>.</p>
 <p>Verified:</p>
@@ -112,11 +112,16 @@ import { append } from &quot;/std/list.js&quot;;</code></pre>
 <pre><code>declare function fetch(url: text, options?: any) -&gt; Promise of any
 declare const JSON: any</code></pre>
 <p><code>std/dom</code> provides only <code>createElement</code> and <code>mount</code>; it reads <code>document</code> at call time, so it is browser-only and must not be imported by server code.</p>
+<h2 id="typescript-declarations">TypeScript declarations</h2>
+<p><code>plainscript interop</code> reads <code>.d.ts</code> files and writes the supported subset as <code>.d.pln</code> declarations next to them:</p>
+<pre><code>plainscript interop types/api.d.ts
+plainscript interop types --json</code></pre>
+<p>Interfaces, aliases, object/function/tuple types, unions, intersections, <code>keyof</code>, indexed access, mapped types, generics without defaults, exported functions/values and re-exports are translated. <code>infer</code>, template-literal types, namespaces, classes, optional tuple elements, index signatures and other constructs without a direct PlainScript equivalent produce <code>PS7001</code> errors; a file with errors is not written. Omitted generic defaults are a <code>PS7004</code> warning, not a silent substitution. Review warnings and run <code>plainscript check</code> on the generated declaration before publishing it. This is a conservative subset translator, not an arbitrary TypeScript parser or a TypeScript-to-PlainScript source converter.</p>
 <h2 id="npm-packages">npm packages</h2>
 <p>Any package that works in ESM works here. Two practical notes:</p>
 <ul>
-<li><strong>Types</strong>: a package&#39;s values are <code>any</code> unless you declare a shape. There are no</li>
-<p>community type definitions for PlainScript in 2.0.</p>
+<li><strong>Types</strong>: a package&#39;s values are <code>any</code> unless you declare a shape or translate its</li>
+<p><code>.d.ts</code> declarations. There are no community type definitions for PlainScript in 2.0.</p>
 <li><strong>CommonJS</strong>: default imports work in Node (<code>import express from &quot;express&quot;</code>). Named</li>
 <p>imports depend on Node&#39;s static analysis of the CommonJS module; when in doubt, import the default and read members.</p>
 </ul>
@@ -130,8 +135,8 @@ console.log(greet(&quot;world&quot;));</code></pre>
 <h2 id="what-is-not-supported">What is not supported</h2>
 <ul>
 <li>JSX/TSX files, or a <code>.pln</code> file containing JSX.</li>
-<li>Automatic TypeScript declaration (<code>.d.ts</code>) output; the <code>.d.pln</code> declarations are for</li>
-<p>PlainScript only.</p>
+<li>Automatic TypeScript declaration (<code>.d.ts</code>) output; <code>plainscript interop</code> is an input</li>
+<p>translator for a declaration subset, and <code>.d.pln</code> is PlainScript&#39;s native output format.</p>
 <li>Bundling, code splitting or asset handling in the compiler. Use the ecosystem&#39;s tools.</li>
 <li>Decorators, proxies or reflection-based dependency injection.</li>
-</ul></div><aside class="toc"><div class="toc-title">On this page</div><a class="toc-h2" href="#node-js">Node.js</a><a class="toc-h3" href="#express">Express</a><a class="toc-h3" href="#a-node-http-api-without-a-framework">A Node HTTP API without a framework</a><a class="toc-h2" href="#react">React</a><a class="toc-h3" href="#vite">Vite</a><a class="toc-h2" href="#next-js">Next.js</a><a class="toc-h2" href="#browser">Browser</a><a class="toc-h2" href="#npm-packages">npm packages</a><a class="toc-h2" href="#consuming-plainscript-from-javascript">Consuming PlainScript from JavaScript</a><a class="toc-h2" href="#what-is-not-supported">What is not supported</a></aside></article><footer class="page-footer"><span>PlainScript 2.0 documentation</span><a href="https://github.com/ayoistooslick/Plainscript/issues">Report a documentation issue ↗</a></footer></div></main></div><script src="app.js"></script></body></html>
+</ul></div><aside class="toc"><div class="toc-title">On this page</div><a class="toc-h2" href="#node-js">Node.js</a><a class="toc-h3" href="#express">Express</a><a class="toc-h3" href="#a-node-http-api-without-a-framework">A Node HTTP API without a framework</a><a class="toc-h2" href="#react">React</a><a class="toc-h3" href="#vite">Vite</a><a class="toc-h2" href="#next-js">Next.js</a><a class="toc-h2" href="#browser">Browser</a><a class="toc-h2" href="#typescript-declarations">TypeScript declarations</a><a class="toc-h2" href="#npm-packages">npm packages</a><a class="toc-h2" href="#consuming-plainscript-from-javascript">Consuming PlainScript from JavaScript</a><a class="toc-h2" href="#what-is-not-supported">What is not supported</a></aside></article><footer class="page-footer"><span>PlainScript 2.0 documentation</span><a href="https://github.com/ayoistooslick/Plainscript/issues">Report a documentation issue ↗</a></footer></div></main></div><script src="app.js"></script></body></html>

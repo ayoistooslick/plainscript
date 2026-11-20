@@ -21,7 +21,9 @@ declare const document: any
 ```
 
 Declaring is how you opt JavaScript values into the checker without a separate declaration
-language.
+language. For a TypeScript library that already ships `.d.ts` files, `plainscript interop`
+can translate the supported declaration subset rather than requiring hand-written
+ambient declarations.
 
 ## Node.js
 
@@ -211,12 +213,31 @@ declare const JSON: any
 `std/dom` provides only `createElement` and `mount`; it reads `document` at call time, so it
 is browser-only and must not be imported by server code.
 
+## TypeScript declarations
+
+`plainscript interop` reads `.d.ts` files and writes the supported subset as `.d.pln`
+declarations next to them:
+
+```bash
+plainscript interop types/api.d.ts
+plainscript interop types --json
+```
+
+Interfaces, aliases, object/function/tuple types, unions, intersections, `keyof`, indexed
+access, mapped types, generics without defaults, exported functions/values and re-exports
+are translated. `infer`, template-literal types, namespaces, classes, optional tuple
+elements, index signatures and other constructs without a direct PlainScript equivalent
+produce `PS7001` errors; a file with errors is not written. Omitted generic defaults are a
+`PS7004` warning, not a silent substitution. Review warnings and run `plainscript check` on
+the generated declaration before publishing it. This is a conservative subset translator,
+not an arbitrary TypeScript parser or a TypeScript-to-PlainScript source converter.
+
 ## npm packages
 
 Any package that works in ESM works here. Two practical notes:
 
-- **Types**: a package's values are `any` unless you declare a shape. There are no
-  community type definitions for PlainScript in 2.0.
+- **Types**: a package's values are `any` unless you declare a shape or translate its
+  `.d.ts` declarations. There are no community type definitions for PlainScript in 2.0.
 - **CommonJS**: default imports work in Node (`import express from "express"`). Named
   imports depend on Node's static analysis of the CommonJS module; when in doubt, import
   the default and read members.
@@ -241,7 +262,7 @@ checking; the PlainScript side was checked when it was built.
 ## What is not supported
 
 - JSX/TSX files, or a `.pln` file containing JSX.
-- Automatic TypeScript declaration (`.d.ts`) output; the `.d.pln` declarations are for
-  PlainScript only.
+- Automatic TypeScript declaration (`.d.ts`) output; `plainscript interop` is an input
+  translator for a declaration subset, and `.d.pln` is PlainScript's native output format.
 - Bundling, code splitting or asset handling in the compiler. Use the ecosystem's tools.
 - Decorators, proxies or reflection-based dependency injection.

@@ -13,7 +13,7 @@
     "vscode": "^1.70.0"
   },
   "categories": ["Programming Languages"],
-  "activationEvents": ["onLanguage:plainscript"],
+  "activationEvents": ["onLanguage:plainscript", "onDebugResolve:plainscript"],
   "main": "./extension.js",
   "contributes": {
     "languages": [
@@ -41,6 +41,35 @@
       {
         "command": "plainscript.restartServer",
         "title": "PlainScript: Restart Language Server"
+      }
+    ],
+    "debuggers": [
+      {
+        "type": "plainscript",
+        "label": "PlainScript",
+        "languages": ["plainscript"],
+        "configurationAttributes": {
+          "launch": {
+            "required": ["program"],
+            "properties": {
+              "program": { "type": "string", "description": "Compiled JavaScript program to debug" },
+              "cwd": { "type": "string", "description": "Working directory" },
+              "args": { "type": "array", "items": { "type": "string" } },
+              "runtimeArgs": { "type": "array", "items": { "type": "string" }, "description": "Extra Node runtime arguments" },
+              "env": { "type": "object", "description": "Environment variables for the debugged process" },
+              "sourceMaps": { "type": "array", "items": { "type": "string" }, "description": "Additional generated .js.map files" }
+            }
+          }
+        },
+        "initialConfigurations": [
+          {
+            "type": "plainscript",
+            "request": "launch",
+            "name": "PlainScript: Debug current file",
+            "program": "${workspaceFolder}/dist/${fileBasenameNoExtension}.js",
+            "cwd": "${workspaceFolder}"
+          }
+        ]
       }
     ]
   },

@@ -1,0 +1,29 @@
+# OpenID Connect / OAuth 2.0 flows backed by openid-client.
+# Applications must store the returned login session server-side or in a
+# secure, signed cookie; never expose nonce or PKCE verifier in a URL.
+
+export type OidcConnection
+    config: any
+    client: any
+    library: any
+end
+
+export type OidcLogin
+    url: text
+    session: any
+end
+
+export type OidcResult
+    claims: any
+    accessToken: text?
+    idToken: text?
+    refreshToken: text?
+    expiresAt: number?
+end
+
+export declare function createClient(options?: any, library?: any) -> Promise of OidcConnection
+export declare function beginLogin(connection: OidcConnection, options?: any) -> Promise of OidcLogin
+export declare function completeLogin(connection: OidcConnection, callbackUrl: text, session: any) -> Promise of OidcResult
+export declare function refreshAccessToken(connection: OidcConnection, refreshToken: text) -> Promise of any
+export declare function clientCredentials(connection: OidcConnection, scope?: text) -> Promise of any
+export declare function validateClaims(claims: any, config: any, expected?: any) -> any

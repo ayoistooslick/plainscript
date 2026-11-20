@@ -331,18 +331,24 @@ T<...>                    # named generic instantiation
 methods or a `.length` property; use `std/list`.
 
 Tuple types use brackets: `[number, text]`. A literal numeric index selects that element;
-destructuring and assignment are checked element by element. `keyof` produces a literal
-union of the record's field names, and `typeof` reuses the type of a hoisted value. Indexed
-access is supported for record field literals, tuple indexes, list elements, map keys and
-`keyof` of a known record; a missing field is `PS3207`. `A & B` merges record fields, with
-conflicting required fields intersected (usually `never`).
+destructuring and assignment are checked element by element. A tuple may end with a rest
+type: `[text, ...text]` has a required first element and zero or more trailing text
+elements; indexing after the prefix returns the rest type. Record fields may be marked
+`readonly`; assignment to one is `PS3319`, while structural assignability ignores readonly.
+`keyof` produces a literal union of the record's field names, and `typeof` reuses the type
+of a hoisted value. Indexed access is supported for record field literals, tuple indexes,
+list elements, map keys and `keyof` of a known record; a missing field is `PS3207`. `A & B`
+merges record fields, with conflicting required fields intersected (usually `never`).
 
-Conditional types are non-distributive and evaluate when their check no longer contains an
-unresolved type parameter. Mapped types expand when the key set is a concrete literal union
+Conditional types evaluate when their check no longer contains an unresolved type
+parameter. A conditional whose checked type is a naked type parameter distributes over a
+union after substitution; a union written directly in the check is compared as a whole and
+is non-distributive. Mapped types expand when the key set is a concrete literal union
 (commonly `keyof` of a known record); otherwise they stay deferred. Deferred indexed access
 such as `T[0]` resolves after generic substitution. While a construct is deferred the
 checker is intentionally permissive, like an unresolved generic; concrete instantiation is
-the enforcement point. Variadic tuples and `readonly` field modifiers are not implemented.
+the enforcement point. Optional tuple elements and arbitrary intersections of unions or
+functions are not implemented.
 
 ### 5.3 Assignability
 
@@ -355,7 +361,8 @@ A value of type `S` is assignable to `T` when:
   parameters (contravariant) and assignable results (covariant);
 - records are structurally assignable: every required field of `T` exists in `S` with an
   assignable type; extra fields in `S` are allowed; optional fields may be absent;
-- both are tuples of equal length with pairwise-assignable elements;
+- both are tuples whose required prefix and trailing rest elements are compatible; a
+  tuple with a rest type can accept extra values, while a fixed tuple cannot;
 - literal types are assignable to their primitive base and to the same literal;
 - `S` is a member of union `T`, or every member of union `S` is assignable to `T`;
 - a conditional type resolves to its selected branch, a mapped type to its expanded

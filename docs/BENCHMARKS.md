@@ -22,8 +22,8 @@ Node `v22.23.3`, 40 modules, 7 iterations (`npm run bench`):
 
 | Measurement | min | median | max |
 | --- | ---: | ---: | ---: |
-| Cold compile | 9.76 ms | 16.95 ms | 27.87 ms |
-| Typecheck | — | 3.68 ms | — |
+| Cold compile | 9.78 ms | 14.65 ms | 28.50 ms |
+| Typecheck | — | 4.50 ms | — |
 
 These numbers cover tiny generated modules and should not be extrapolated to real
 applications. A TypeScript/Vite baseline is deliberately absent because it would require a

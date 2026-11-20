@@ -92,11 +92,13 @@ The v2 standard library is organized as explicit modules with `.d.pln` declarati
 | `std/time` | `now`, `format`, `parse`, `add`, `diff` |
 | `std/fs` | `mkdir`, `mkDir`, `readDir`, `readFile`, `writeFile`, `appendFile`, `exists` |
 | `std/http` | Fetch-style server, JSON/text responses, SSE, request helpers |
-| `std/ws` | WebSocket server with authorization-before-upgrade |
+| `std/ws` | WebSocket server with fragmentation and authorization-before-upgrade |
 | `std/task` | Structured concurrency: groups, cancellation, channels, workers |
-| `std/jobs` | In-process bounded job queue with retries, timeouts and drain |
+| `std/jobs` | Bounded job queue with retries, timeouts, drain and optional durable stores |
 | `std/db` | SQLite tables and versioned migrations (Node 22) |
+| `std/db-postgres` / `std/db-mysql` | Async PostgreSQL/MySQL adapters over application-installed drivers |
 | `std/auth` | scrypt passwords, HS256 tokens, policies |
+| `std/oidc` / `std/saml` | Optional OIDC and SAML service-provider helpers |
 | `std/contract` | Runtime schemas, operations, typed results, router/transport |
 | `std/test` | Test declarations and assertions |
 | `std/dom` | DOM utilities for browser environments |
@@ -116,7 +118,9 @@ v1 modules like `std/date` are consolidated into `std/time`.
 | `plainscript ir` | same |
 | `plainscript watch` | new: rebuild on `.pln` changes |
 | `plainscript lsp` | new: stdio language server |
+| `plainscript dap` | new: stdio debug adapter |
 | `plainscript migrate` | new: scan JS/TS for migration blockers |
+| `plainscript interop` | new: translate supported `.d.ts` declarations |
 | `plainscript version` | same |
 | `plainscript help` | same |
 
@@ -151,9 +155,11 @@ path:
 5. Run `plainscript check` after each move and keep the existing test suite green.
 6. Only then replace entry points/build scripts.
 
-There is no automatic TypeScript type-annotation conversion and no `.d.ts` parser. Types
-cross the boundary as `.d.pln` declarations or explicit `any`/`declare` shapes. A mixed
-project is supported: `.pln` modules compile to ESM and `.js` modules remain ordinary
+There is no automatic TypeScript **source** conversion. `plainscript interop` translates a
+conservative subset of `.d.ts` declarations to `.d.pln` and reports unsupported constructs;
+imported definitions must be checked after translation. Type annotations otherwise cross
+the boundary as hand-written `.d.pln` declarations or explicit `any`/`declare` shapes. A
+mixed project is supported: `.pln` modules compile to ESM and `.js` modules remain ordinary
 JavaScript consumed through interop. See [INTEROP](INTEROP.md).
 
 ## Migration Checklist
@@ -168,6 +174,7 @@ JavaScript consumed through interop. See [INTEROP](INTEROP.md).
 - [ ] Update `render`/`element` blocks to lower to `createElement` calls
 - [ ] Update module imports: `std/<name>` resolves to declarations
 - [ ] Run `plainscript migrate src --check` and review every finding
+- [ ] Run `plainscript interop` for the `.d.ts` files you depend on and review warnings
 - [ ] Run `npm test` to verify no regressions
 - [ ] Consult `docs/SPEC.md` for the complete v2 language specification
 

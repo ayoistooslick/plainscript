@@ -151,15 +151,19 @@ templates, no patterns and no render forms.
 
 Each module is a hand-written JavaScript file plus a `.d.pln` declaration file that the
 checker parses like any other PlainScript module. This keeps runtime and types in one
-reviewable place, with no build step and no `.d.ts` tooling, and it means a standard
-library signature bug is a compiler-visible bug rather than a documentation problem.
+reviewable place, with no build step, and it means a standard-library signature bug is a
+compiler-visible bug rather than a documentation problem. Applications that consume a
+TypeScript package can run `plainscript interop` to translate the supported `.d.ts` subset;
+the standard library itself stays in native `.d.pln` declarations.
 
 ## Diagnostics
 
 `src/diagnostics.js` defines `CompileError` and the reporting helpers. Diagnostics carry a
-stable code, message, file, line, column and optional source excerpt. The CLI prints code
-frames, counts errors and exits non-zero. Warnings do not exist as a category; anything
-worth reporting is an error, and everything reported is fixed before emission.
+stable code, message, file, line, column, severity and optional source excerpt. The CLI
+prints code frames, counts errors and exits non-zero. Compiler errors are fixed before
+emission. The TypeScript declaration importer also emits warnings (for example `PS7004` for
+an omitted generic default); those do not by themselves prevent a declaration file from
+being written, so review them explicitly.
 
 ## Testing strategy
 
@@ -172,6 +176,10 @@ worth reporting is an error, and everything reported is fixed before emission.
 | `tests/runtime.test.js` | executed programs, async, errors, stdlib behaviour |
 | `tests/cli.test.js` | run/build/check/fmt/test/new, exit codes, files written |
 | `tests/interop.test.js` | npm packages, Node builtins, ambient declarations, JS consumers |
+| `tests/typescript-interop.test.js` | `.d.ts` subset translation, unsupported constructs, CLI output |
+| `tests/db.test.js`, `tests/db-adapters.test.js` | SQLite persistence and PostgreSQL/MySQL adapter SQL/driver fakes |
+| `tests/jobs.test.js`, `tests/durable-jobs.test.js` | queue lifecycle and memory/SQLite recovery |
+| `tests/dap.test.js`, `tests/ws-protocol.test.js` | debug-adapter source mapping and WebSocket protocol behavior |
 | `tests/formatter.test.js` | idempotence, token preservation, invalid input |
 | `tests/package.test.js` | package metadata and exports |
 

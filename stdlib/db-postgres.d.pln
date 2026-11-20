@@ -1,0 +1,13 @@
+# PostgreSQL adapter backed by the application's "pg" dependency.
+# Import std/db for the shared table/migrate helpers.
+
+import { AsyncDatabase } from "std/db"
+
+export type PostgresOptions
+    client?: any
+    driver?: any
+end
+
+export declare function open(connectionString?: text, options?: PostgresOptions) -> Promise of AsyncDatabase
+export declare function openPool(connectionString?: text, options?: PostgresOptions) -> Promise of AsyncDatabase
+export declare function postgresSql(sql: text) -> text

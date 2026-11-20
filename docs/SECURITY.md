@@ -15,7 +15,9 @@ without invalidating old hashes.
 - Never log passwords, hashes or derived keys.
 - Use a unique application secret and rate-limit login endpoints at the deployment edge.
 - `std/auth` is cryptography, not a complete identity product. There is no account lockout,
-  password reset, MFA, OIDC or SAML implementation.
+  password reset, MFA or user directory. `std/oidc` and `std/saml` are optional
+  service-provider helpers, described below; applications still own account linking,
+  sessions and authorization.
 
 ## Tokens
 
@@ -44,6 +46,26 @@ if secret == nothing or secret == ""
 end
 ```
 
+## OIDC and SAML
+
+`std/oidc` wraps `openid-client` and `std/saml` wraps `@node-saml/node-saml`; neither
+library is a compiler dependency. Install the relevant package in the application.
+
+- OIDC configuration requires HTTPS (loopback HTTP is allowed only for local development).
+  `beginLogin` generates state, nonce and PKCE values; keep the returned session server-side
+  and never put the verifier in a URL. `completeLogin` checks state before the code
+  exchange, then validates issuer, audience/azp, expiry, nonce and optional subject.
+  `extraParams` cannot override state, nonce, PKCE or the redirect URI.
+- SAML requires an IdP signing certificate and HTTPS endpoints. `validateCallback` accepts
+  only the HTTP-POST binding, verifies the RelayState against the pre-login session, and
+  delegates XML signature/assertion validation to `@node-saml/node-saml`. `extra` cannot
+  override security-critical options. Applications must still reject replayed assertions,
+  map the NameID to a local user and create/rotate their own session.
+
+The repository tests these wrappers with library-shaped fakes. No live identity provider,
+protocol conformance suite or browser SSO flow is part of the test environment, so review
+provider metadata, clocks, certificate rotation and replay handling before production.
+
 ## Authorization
 
 `std/auth.policy` wraps an authorization callback; `authorize` returns a boolean and
@@ -58,8 +80,9 @@ before invoking it; use that hook for resource ownership checks.
 `object` strips unknown keys by default; `strict` rejects them. `parse` throws a
 `ContractError` with a path, so a handler can map it to a 400 without exposing internals.
 Do not concatenate untrusted strings into SQL, shell commands, HTML or log format strings.
-SQLite helpers in `std/db` bind every value; PostgreSQL/MySQL examples use `$1`/`?`
-parameters. See [DATABASES](DATABASES.md).
+SQLite, PostgreSQL and MySQL helpers in `std/db` bind every value; the PostgreSQL adapter
+translates `?` placeholders to `$1` parameters outside quoted strings/comments, while MySQL
+keeps bound `?` parameters. See [DATABASES](DATABASES.md).
 
 ## HTTP boundaries
 
@@ -74,14 +97,16 @@ Things the server does **not** provide automatically:
 - CORS, CSRF protection, request-body size limits, rate limiting or TLS termination;
 - security headers (CSP, HSTS, frame ancestors);
 - cookies or session management;
-- origin checks or authentication for WebSocket upgrades.
+- automatic origin checks or authentication for WebSocket upgrades (supply an
+  `authorize(request)` callback to `std/ws`; it runs before the handshake).
 
 Put those at a reverse proxy or add explicit middleware. For WebSockets, `std/ws` enforces
-client masking, a maximum payload (1 MiB by default) and close/frame basics, and accepts an
-`authorize(request)` option that runs before the 101 handshake. A rejected upgrade receives
-401 and the socket is destroyed. It does not implement fragmentation or extensions and does
-not enforce origin by itself; check `Origin` inside the authorize callback when browsers are
-not the only client.
+client masking, UTF-8 validation for text, a maximum payload (1 MiB by default), fragmented
+message assembly, control-frame limits and close/protocol-error handling. Its
+`authorize(request)` option runs before the 101 handshake; a rejected upgrade receives 401
+and the socket is destroyed. Extensions are not implemented and origin is not enforced by
+the library itself; check `Origin` inside the authorize callback when browsers are not the
+only client.
 
 ## Migrations
 
@@ -93,10 +118,11 @@ forward/rollback paths against a copy.
 
 ## Background jobs
 
-`std/jobs` is in-process. It has bounded concurrency, retry backoff, per-job timeouts and
-cooperative cancellation, but no durable storage or cross-process delivery. Persist
-idempotency keys before side effects and re-enqueue from the database at startup when work
-must survive restarts. See [JOBS](JOBS.md).
+`std/jobs` schedules in-process and has bounded concurrency, retry backoff, per-job
+timeouts and cooperative cancellation. An optional `memoryStore`/`sqliteStore` persists job
+records and recovers pending or interrupted work at startup, but there is no cross-process
+lease, worker pool or exactly-once delivery. Persist idempotency keys before side effects;
+treat a recovered running job as at-least-once. See [JOBS](JOBS.md).
 
 ## Error information
 
@@ -114,8 +140,8 @@ database/HTTP drivers current. The repository does not vendor a security scanner
 
 ## What is not claimed
 
-No third-party penetration test, SOC 2/ISO certification, OIDC/SAML compatibility, secret
-manager integration, CSRF middleware, or enterprise support contract is included. The
-authentication and database modules are suitable building blocks and are covered by unit and
-integration tests for their documented behavior; production deployment still requires
-application-level review.
+No third-party penetration test, SOC 2/ISO certification, live provider conformance,
+secret-manager integration, CSRF middleware or enterprise support contract is included.
+The authentication, OIDC/SAML wrapper and database modules are suitable building blocks and
+are covered by unit/integration tests for their documented behavior; production deployment
+still requires application-level review and provider-specific testing.

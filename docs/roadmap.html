@@ -5,30 +5,31 @@
 <li>Compiler pipeline: lexer, parser, type checker, typed HIR, JavaScript emitter and source</li>
 <p>maps; deterministic ESM output and <code>.d.pln</code> declaration generation.</p>
 <li>Structural types, generics with constraints, inference, narrowing, variants,</li>
-<p>exhaustiveness, literal enum unions, tuples, <code>keyof</code>, <code>typeof</code>, conditional/mapped types, deferred generic indexed access, function overloads, user predicates and a documented structural variance model.</p>
+<p>exhaustiveness, literal enum unions, fixed/variadic tuples, readonly fields, <code>keyof</code>, <code>typeof</code>, conditional/mapped types, distributive checks over naked type parameters, deferred generic indexed access, function overloads, user predicates and a documented structural variance model.</p>
 <li>Unified contracts: schema-derived records, typed operation errors, validated fallible</li>
-<p>endpoints, client result decoding, operation router/HTTP transport, SQLite model mapping, versioned migrations/rollback and a scrypt/HS256 authentication flow.</p>
-<li>Structured concurrency through <code>std/task</code>; WebSockets through <code>std/ws</code>; SSE and HTTP in</li>
-<p><code>std/http</code>; in-process background jobs in <code>std/jobs</code>; React/Vite/Next/Node/npm interop.</p>
+<p>endpoints, client result decoding, operation router/HTTP transport, SQLite/PostgreSQL/MySQL model mapping, versioned migrations/rollback and a scrypt/HS256 authentication flow.</p>
+<li>Optional OIDC and SAML service-provider wrappers (<code>std/oidc</code>, <code>std/saml</code>) over</li>
+<p>application-installed libraries.</p>
+<li>Structured concurrency through <code>std/task</code>; WebSockets with fragmentation and</li>
+<p>authorization-before-upgrade through <code>std/ws</code>; SSE and HTTP in <code>std/http</code>; in-process jobs with optional memory/SQLite durable stores in <code>std/jobs</code>; React/Vite/Next/Node/npm interop.</p>
 <li>Language server with diagnostics, completion, hover, definitions, workspace references,</li>
-<p>rename, symbols, formatting, semantic tokens and quick-fix code actions; VS Code extension under <code>editors/vscode</code>.</p>
+<p>rename, symbols, formatting, semantic tokens and quick-fix code actions; a minimal Debug Adapter Protocol server (<code>plainscript dap</code>) and VS Code extension under <code>editors/vscode</code>.</p>
 <li>Watch mode, module-cache invalidation, unchanged-output skipping, benchmark script, and</li>
 <p>end-to-end contract/database/auth/WebSocket/concurrency tests.</p>
-<li>Conservative <code>plainscript migrate</code> scanning for JavaScript/TypeScript blockers without</li>
-<p>rewriting user code, plus eight tested starters.</p>
+<li>Conservative <code>plainscript migrate</code> scanning plus <code>plainscript interop</code> for the supported</li>
+<p>TypeScript <code>.d.ts</code> subset, and eight tested starters.</p>
 </ul>
 <h2 id="next-engineering-priorities">Next engineering priorities</h2>
 <ol>
-<li>First-class adapters (or a dialect layer) for PostgreSQL, MySQL and MongoDB behind the</li>
-<p><code>std/db</code> model/migration surface. Direct npm drivers are usable today; see <a href="databases.html">DATABASES</a>.</p>
-<li>Persisted/durable background jobs and a worker process story beyond the in-process</li>
-<p><code>std/jobs</code> queue.</p>
-<li>Debug Adapter Protocol support and broader refactors beyond symbol rename. Source maps</li>
-<p>and Node&#39;s inspector work today; see <a href="debugging.html">DEBUGGING</a>.</p>
-<li>Generated API documentation/OpenAPI from operation descriptors and a production</li>
-<p>identity-provider adapter.</p>
+<li>A MongoDB adapter (or explicitly document remaining direct-driver use) and live</li>
+<p>PostgreSQL/MySQL integration suites. The current adapters are tested with driver-shaped fakes because no database server is available in CI; see <a href="databases.html">DATABASES</a>.</p>
+<li>A distributed worker/lease story beyond the durable in-process job queue, including</li>
+<p>multi-process exactly-once/idempotency guidance.</p>
+<li>Broader refactors beyond symbol rename, VS Code UI automation for the debug adapter, and</li>
+<p>protocol-conformance testing against real identity providers.</p>
+<li>Generated API documentation/OpenAPI from operation descriptors.</li>
 <li>Cross-language benchmark fixture with a pinned TypeScript toolchain, published with</li>
 <p>reproducible results.</p>
 </ol>
 <h2 id="explicit-limitations">Explicit limitations</h2>
-<p>WebSocket fragmentation/extensions, non-SQLite <code>std/db</code> drivers, OIDC/SAML, a built-in browser bundler, task syntax in the grammar, variadic tuple types, and arbitrary TypeScript <code>.d.ts</code> parsing are not implemented. Deeply nested deferred conditional/mapped combinations may remain deferred rather than produce an early diagnostic. None of these is described as available elsewhere in the documentation.</p></div><aside class="toc"><div class="toc-title">On this page</div><a class="toc-h2" href="#available-and-verified-now">Available and verified now</a><a class="toc-h2" href="#next-engineering-priorities">Next engineering priorities</a><a class="toc-h2" href="#explicit-limitations">Explicit limitations</a></aside></article><footer class="page-footer"><span>PlainScript 2.0 documentation</span><a href="https://github.com/ayoistooslick/Plainscript/issues">Report a documentation issue ↗</a></footer></div></main></div><script src="app.js"></script></body></html>
+<p>WebSocket extensions, a MongoDB <code>std/db</code> adapter, arbitrary TypeScript <code>.d.ts</code> parsing, a built-in browser bundler, task syntax in the grammar, optional tuple elements and general conditional <code>infer</code> are not implemented. The debug adapter is a minimal DAP/CDP bridge and is tested at the protocol level, not through a VS Code UI. The PostgreSQL/MySQL adapters are not tested against live servers in this repository. Deeply nested deferred conditional/mapped combinations may remain deferred rather than produce an early diagnostic. None of these is described as available elsewhere in the documentation.</p></div><aside class="toc"><div class="toc-title">On this page</div><a class="toc-h2" href="#available-and-verified-now">Available and verified now</a><a class="toc-h2" href="#next-engineering-priorities">Next engineering priorities</a><a class="toc-h2" href="#explicit-limitations">Explicit limitations</a></aside></article><footer class="page-footer"><span>PlainScript 2.0 documentation</span><a href="https://github.com/ayoistooslick/Plainscript/issues">Report a documentation issue ↗</a></footer></div></main></div><script src="app.js"></script></body></html>

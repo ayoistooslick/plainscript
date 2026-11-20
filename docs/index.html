@@ -8,19 +8,19 @@
 <li><strong>A language with its own semantics.</strong> Blocks close with <code>end</code>. There is exactly one</li>
 <p>spelling for each concept: <code>let</code>/<code>const</code>, <code>function</code>, <code>if</code>/<code>else</code>, <code>match</code>/<code>case</code>, <code>for … in</code>, <code>type</code>, <code>import</code>/<code>export</code>. There are no synonyms such as <code>done</code>/<code>end</code> or <code>show</code>/<code>print</code>/<code>log</code>.</p>
 <li><strong>Statically typed, with inference.</strong> Function signatures are checked, not assumed.</li>
-<p>Generics, constraints, unions, narrowing, structural records/variants, exhaustiveness, recursive types, tuples, conditional/mapped types, deferred indexed access, function overloads, type predicates, literal types and <code>nothing</code> safety are enforced by the compiler. Variance is structural and documented.</p>
+<p>Generics, constraints, unions, narrowing, structural records/variants, exhaustiveness, recursive types, fixed and variadic tuples, readonly record fields, conditional/mapped types (including distributive checks over a naked type parameter), deferred indexed access, function overloads, type predicates, literal types and <code>nothing</code> safety are enforced by the compiler. Variance is structural and documented.</p>
 <li><strong>A real compiler.</strong> Lexer → parser → type checker → typed HIR → JavaScript emitter with</li>
 <p>source maps. Types are erased at runtime, so the checker is the enforcer, and JavaScript boundaries are typed <code>any</code> deliberately rather than accidentally.</p>
 <li><strong>Interoperable first.</strong> React, Next.js, Vite, Node, npm packages, browser APIs and the</li>
 <p>Web <code>Request</code>/<code>Response</code> model are supported by emitting plain modules, not by wrapping frameworks.</p>
 <li><strong>Small and honest.</strong> The standard library covers fundamentals (<code>text</code>, <code>list</code>, <code>map</code>,</li>
-<p><code>math</code>, <code>json</code>, <code>time</code>, <code>fs</code>, <code>http</code>, <code>io</code>, <code>dom</code>, <code>test</code>) plus structured concurrency (<code>std/task</code>), background jobs (<code>std/jobs</code>), WebSockets (<code>std/ws</code>), SSE, SQLite persistence and migrations (<code>std/db</code>), password/token authentication (<code>std/auth</code>) and runtime/schema contracts (<code>std/contract</code>). Service SDKs and PostgreSQL/MySQL/MongoDB drivers remain ordinary npm packages, not keywords.</p>
+<p><code>math</code>, <code>json</code>, <code>time</code>, <code>fs</code>, <code>http</code>, <code>io</code>, <code>dom</code>, <code>test</code>) plus structured concurrency (<code>std/task</code>), in-process or durable-store background jobs (<code>std/jobs</code>), WebSockets with fragmentation and authorization-before-upgrade (<code>std/ws</code>), SSE, SQLite persistence and migrations (<code>std/db</code>), dependency-injected PostgreSQL/MySQL adapters (<code>std/db-postgres</code>, <code>std/db-mysql</code>), password/token authentication (<code>std/auth</code>), OIDC/SAML service-provider helpers (<code>std/oidc</code>, <code>std/saml</code>) and runtime/schema contracts (<code>std/contract</code>). Drivers and identity libraries remain ordinary npm packages loaded by the application, not compiler dependencies.</p>
 <li><strong>Schema-derived full-stack contracts.</strong> <code>std/contract.object</code> derives record types from</li>
 <p>runtime schemas. <code>fallibleOperation</code> carries a typed error union, <code>implementFallible</code> validates both outcomes, <code>router</code> dispatches by operation name, and <code>std/db</code> derives table columns and versioned migrations from the same schema. See <a href="contracts.html">Unified Contracts</a> and the runnable <a href="https://github.com/ayoistooslick/Plainscript/tree/main/demos/contracts-fullstack/README.md">SQLite + React contracts demo</a>.</p>
-<li><strong>Editor support built in.</strong> <code>plainscript lsp</code> speaks LSP over stdio with diagnostics,</li>
-<p>completion, hover, definitions, workspace references, rename, formatting, semantic tokens and quick-fix code actions. The VS Code extension in <a href="editors/vscode"><code>editors/vscode</code></a> launches it.</p>
+<li><strong>Editor and debugger support built in.</strong> <code>plainscript lsp</code> speaks LSP over stdio with</li>
+<p>diagnostics, completion, hover, definitions, workspace references, rename, formatting, semantic tokens and quick-fix code actions. <code>plainscript dap</code> is a DAP server over stdio for launching a compiled entry through Node&#39;s inspector and mapping breakpoints/stack frames through source maps. The VS Code extension in <a href="https://github.com/ayoistooslick/Plainscript/tree/main/editors/vscode"><code>editors/vscode</code></a> launches both.</p>
 <li><strong>Practical adoption.</strong> <code>plainscript migrate</code> scans JavaScript/TypeScript for blockers</li>
-<p>without rewriting files, npm interop keeps existing dependencies usable, and eight starters cover React, Next.js, Express, CLI, libraries and database/realtime apps.</p>
+<p>without rewriting files, and <code>plainscript interop</code> translates the supported TypeScript declaration subset to <code>.d.pln</code> while reporting unsupported constructs. npm interop keeps existing dependencies usable, and eight starters cover React, Next.js, Express, CLI, libraries and database/realtime apps.</p>
 </ul>
 <h2 id="what-plainscript-is-not">What PlainScript is not</h2>
 <ul>
@@ -55,6 +55,8 @@ node src/cli.js new my-ui --template react-vite
 node src/cli.js new my-api --template express
 node src/cli.js new my-lib --template library
 node src/cli.js migrate src --check  # find JavaScript/TypeScript migration blockers
+node src/cli.js interop types        # translate supported .d.ts declarations to .d.pln
+node src/cli.js dap                  # start the DAP server over stdio
 node src/cli.js run                  # compile and run src/main.pln</code></pre>
 <p>Once installed as a package, the same commands are available as <code>plainscript</code>.</p>
 <p>---</p>
@@ -117,10 +119,12 @@ end</code></pre>
 <tr><td><code>plainscript watch [files…]</code></td><td>Rebuild after <code>.pln</code> changes, reusing the module cache for unaffected files.</td></tr>
 <tr><td><code>plainscript check [files…]</code></td><td>Type-check only; exits non-zero on diagnostics.</td></tr>
 <tr><td><code>plainscript lsp</code></td><td>Start the language server over stdio.</td></tr>
+<tr><td><code>plainscript dap</code></td><td>Start the Debug Adapter Protocol server over stdio.</td></tr>
 <tr><td><code>plainscript fmt [files…]</code></td><td>Normalise indentation and block layout without changing tokens.</td></tr>
 <tr><td><code>plainscript test [files…]</code></td><td>Run <code>std/test</code> files and report pass/fail.</td></tr>
 <tr><td><code>plainscript new &lt;dir&gt; [--template &lt;id&gt;]</code></td><td>Scaffold a default or bundled application.</td></tr>
 <tr><td><code>plainscript migrate [paths…]</code></td><td>Report JavaScript/TypeScript migration blockers; <code>--check</code> is a CI gate.</td></tr>
+<tr><td><code>plainscript interop [files…]</code></td><td>Translate the supported TypeScript <code>.d.ts</code> subset to <code>.d.pln</code> and report the rest.</td></tr>
 <tr><td><code>plainscript ir &lt;file&gt;</code></td><td>Print the typed HIR that code generation consumes.</td></tr>
 <tr><td><code>plainscript version</code></td><td>Print the compiler version.</td></tr>
 </tbody></table>
@@ -167,7 +171,7 @@ legacy/v1/  the complete v1 compiler, tests and docs, archived for reference</co
 <li><strong>No bundler.</strong> <code>build</code> emits one module per file. Browser projects use Vite, webpack or</li>
 <p>Next to bundle, as the demos do. Importing the standard library in a browser requires <code>--std-base</code> plus serving those module URLs (see the full-stack demo).</p>
 <li><strong>Advanced type limits.</strong> Conditional and mapped types, generic/deferred indexed</li>
-<p>access, user-defined type predicates and function overloads are implemented. Variadic tuples, readonly field modifiers, distributive conditional types and arbitrary intersections of unions/functions are not. Deferred constructs remain permissive until instantiated, and deeply nested deferred combinations may not diagnose early.</p>
+<p>access, variadic tuples, readonly record fields, distributive conditionals over a naked type parameter, user-defined type predicates and function overloads are implemented. Arbitrary intersections of unions/functions, optional tuple elements and general TypeScript-style conditional inference remain absent. Readonly is a compile-time assignment check, not runtime immutability. Deferred constructs remain permissive until instantiated, and deeply nested deferred combinations may not diagnose early.</p>
 <li><strong>Concurrency is cooperative.</strong> <code>std/task</code> provides task groups, cancellation, timeouts,</li>
 <p>channels and worker handles; it cannot stop JavaScript promises or host calls that ignore a cancellation signal. There is no compiler-level task syntax.</p>
 <li><strong><code>render</code> blocks are not JSX.</strong> Attributes are <code>with name: value</code>, children are</li>
@@ -176,10 +180,14 @@ legacy/v1/  the complete v1 compiler, tests and docs, archived for reference</co
 <p>maps and variant tags. <code>as</code> is unchecked at runtime.</p>
 <li><strong>No exceptions typing.</strong> <code>catch</code> binds <code>any</code>; typed operational errors use</li>
 <p><code>OperationResult</code>/<code>OperationFailure</code> instead.</p>
-<li><strong>Database support is SQLite-first.</strong> <code>std/db</code> table/migration helpers target Node 22&#39;s</li>
-<p>built-in <code>node:sqlite</code>. PostgreSQL (<code>pg</code>), MySQL (<code>mysql2</code>) and MongoDB (<code>mongodb</code>) are usable through direct npm interop with bound queries; they do not use <code>std/db</code> helpers yet. See <a href="databases.html">docs/DATABASES.md</a>. WebSocket fragmentation and extensions are not implemented; an <code>authorize(request)</code> hook runs before the upgrade handshake.</p>
-<li><strong>LSP scope.</strong> Rename and references follow imported PlainScript symbols across the</li>
-<p>workspace, semantic tokens and quick fixes are implemented, but refactoring is still limited to symbol rename. There is no debug adapter; source maps and Node&#39;s inspector are the supported debugging route (see <a href="debugging.html">docs/DEBUGGING.md</a>).</p>
+<li><strong>Database support requires an installed driver.</strong> <code>std/db</code> is SQLite via Node 22&#39;s</li>
+<p><code>node:sqlite</code>. <code>std/db-postgres</code> and <code>std/db-mysql</code> expose the same schema-derived table/migration surface by dynamically loading application-installed <code>pg</code> or <code>mysql2/promise</code>; the compiler package keeps zero runtime dependencies. Their table methods return Promises, unlike SQLite&#39;s synchronous methods. MongoDB remains direct npm interop. No live PostgreSQL/MySQL server is available in this repository&#39;s test environment, so adapter tests use driver-shaped fakes. See <a href="databases.html">docs/DATABASES.md</a>. WebSocket extensions are not implemented; fragmentation, control-frame checks and an <code>authorize(request)</code> hook before the upgrade handshake are.</p>
+<li><strong>Debugging is adapter-based.</strong> <code>plainscript dap</code> is a minimal Debug Adapter Protocol</li>
+<p>server that launches a compiled JavaScript entry through Node&#39;s inspector and maps source positions both ways. It requires Node 22&#39;s global <code>WebSocket</code> (or an inspector-capable host), and the VS Code integration is test-level rather than UI-automated. LSP rename and references follow imported PlainScript symbols; refactoring is still limited to symbol rename. See <a href="debugging.html">docs/DEBUGGING.md</a>.</p>
+<li><strong>Identity-provider integration is application-tested.</strong> <code>std/oidc</code> and <code>std/saml</code></li>
+<p>provide validated service-provider plumbing over application-installed libraries, but the repository has no live IdP, conformance suite or browser SSO automation. Account linking, session storage, replay prevention and provider metadata remain application responsibilities. See <a href="security.html">docs/SECURITY.md</a>.</p>
+<li><strong>TypeScript interop is a subset.</strong> <code>plainscript interop</code> translates declarations with a</li>
+<p>direct PlainScript equivalent and reports unsupported constructs instead of emitting <code>any</code>. It is not an arbitrary <code>.d.ts</code> parser or a TypeScript-to-PlainScript compiler.</p>
 <li><strong>Benchmarks are PlainScript-only.</strong> <code>npm run bench</code> is reproducible, but no pinned</li>
 <p>TypeScript toolchain is installed, so no cross-language speed claim is made.</p>
 <li><strong>Not published yet.</strong> npm still serves 1.1.5. Publishing 2.0.0 is a separate, explicit</li>
