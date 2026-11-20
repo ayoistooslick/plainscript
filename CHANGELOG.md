@@ -2,6 +2,42 @@
 
 All notable changes to PlainScript are documented here.
 
+## [2.1.0] — 2026-11-20
+
+### English-oriented dialect, real integrations and a documentation overhaul
+
+- Add the opt-in 2.1 dialect (`#syntax 2.1`, first line): `value`/`set`/`change` bindings,
+  `define … returns`, `when`/`otherwise when`/`otherwise`, `for each`, `for … from … to`,
+  `otherwise` as a `match` fallback, and six comparison phrases (`is equal to`, `is not
+  equal to`, `is greater than`, `is less than`, `is at least`, `is at most`).
+- The dialect is a surface over the existing AST: normalisation runs before parsing, so the
+  checker, HIR and emitter are unchanged and 2.0/2.1 modules import one another.
+- 2.1 enforces one spelling per concept inside an opted-in file (`PS2030` names the 2.1
+  word); `for x in xs` is rejected in favour of `for each`/`for … from`.
+- Declaration words are contextual, not reserved, so `value`, `set`, `change`, `define`,
+  `returns` and `each` remain valid identifiers. `for each in xs` binds a loop variable named
+  `each`; the marker is recognised only when a binding pattern follows it.
+- Add a project-wide default dialect: `compilerOptions.syntax` (or a top-level `syntax`) in
+  `plainscript.config.json`, plus a `--syntax` flag. Precedence is file pragma, flag,
+  configuration, then 2.0; the language server and formatter read the same setting.
+- `plainscript fmt` understands 2.1 blocks and preserves the pragma; hover, completion,
+  diagnostics and the CLI report dialect errors with source spans.
+- Add eight real integration projects under `integrations/`: Express 5 JSON API, React 19 +
+  Vite, Next.js 15 App Router server component, async `std/http` server+client, SQLite via
+  `node:sqlite`, a typed CLI (arguments, JSON persistence, exit codes), a three-module
+  program built with `--declarations`, and a full-stack Express + SQLite + React app.
+  Express, React SSR, SQLite, HTTP, the CLI, the multi-module build and the full-stack
+  session (HTTP CRUD, restart persistence, SSR) execute in `npm test`; the Vite and Next
+  production builds are checked by `npm run verify:integrations`.
+- Add `docs/GETTING_STARTED.md`, `docs/LANGUAGE_REFERENCE.md`, `docs/COMPILER.md`,
+  `docs/INTEGRATIONS.md` and `docs/MIGRATION_2_1.md`; make the 2.1 dialect the primary
+  presentation in the README, homepage and docs navigation, while documenting every 2.0
+  spelling. Add section 15 (the 2.1 dialect grammar) to `docs/SPEC.md`.
+- Every fenced PlainScript example in the compile-tested documents is compiled by
+  `tests/docs-examples.test.js`.
+- The compiler suite grows to 303+ tests; no 2.0 test was removed or weakened.
+- No npm package has been published for this change.
+
 ## Unreleased — V2 completion (breaking; release version TBD)
 
 - Replace conditional `when`/`otherwise` with `if`/`else if`/`else`, and use `if` for

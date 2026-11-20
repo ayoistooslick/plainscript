@@ -1,0 +1,124 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Migrating from 2.0 — PlainScript documentation."><title>Migrating from 2.0 · PlainScript</title><link rel="stylesheet" href="style.css"></head><body><div class="site-shell"><aside class="sidebar"><a class="brand" href="index.html"><span class="brand-mark">PS</span><span><span class="brand-name">PlainScript</span><span class="brand-meta">Language docs · 2.1</span></span></a><div class="nav-group"><div class="nav-label">Start here</div><a class="nav-link " href="index.html">PlainScript</a><a class="nav-link " href="getting-started.html">Getting started</a><a class="nav-link " href="cli.html">CLI reference</a><a class="nav-link " href="templates.html">Application templates</a></div><div class="nav-group"><div class="nav-label">Language</div><a class="nav-link " href="language-reference.html">Language reference</a><a class="nav-link " href="spec.html">Language specification</a><a class="nav-link " href="syntax-design.html">Syntax design</a><a class="nav-link " href="type-system.html">Type system</a></div><div class="nav-group"><div class="nav-label">Compiler</div><a class="nav-link " href="compiler.html">Compiler</a><a class="nav-link " href="architecture.html">Compiler architecture</a><a class="nav-link " href="interop.html">JavaScript interoperability</a><a class="nav-link " href="benchmarks.html">Benchmarks</a></div><div class="nav-group"><div class="nav-label">Guides</div><a class="nav-link " href="integrations.html">Integrations</a><a class="nav-link active" href="migration-2-1.html">Migrating from 2.0</a><a class="nav-link " href="contracts.html">Unified contracts</a><a class="nav-link " href="concurrency.html">Concurrency</a><a class="nav-link " href="jobs.html">Background jobs</a><a class="nav-link " href="databases.html">Databases</a><a class="nav-link " href="security.html">Security</a><a class="nav-link " href="debugging.html">Debugging</a><a class="nav-link " href="migration.html">Migration guide</a><a class="nav-link " href="comparison.html">Comparison with TypeScript</a></div><div class="nav-group"><div class="nav-label">Project</div><a class="nav-link " href="progress.html">Engineering progress</a><a class="nav-link " href="roadmap.html">Roadmap</a><a class="nav-link " href="audit.html">Audit</a><a class="nav-link " href="decisions.html">Decisions</a></div><div class="sidebar-footer">Open source under MIT.<br><a href="https://github.com/ayoistooslick/Plainscript">View on GitHub ↗</a></div></aside><main class="main"><header class="topbar"><div class="search-wrap"><label class="search" aria-label="Search documentation"><span>⌕</span><input id="doc-search" type="search" placeholder="Search the docs…" autocomplete="off"><kbd>/</kbd></label><div id="search-results" class="search-results" role="listbox"></div></div><nav class="top-links"><a href="index.html">Docs</a><a href="https://github.com/ayoistooslick/Plainscript">GitHub ↗</a></nav></header><div class="content"><article class="page-layout"><div class="prose"><p>&lt;!-- compile-examples --&gt;</p>
+<h1 id="migrating-from-plainscript-2-0-to-2-1">Migrating from PlainScript 2.0 to 2.1</h1>
+<p>2.1 is additive. Every 2.0 file compiles unchanged, and a project can move one file at a time. Nothing in this guide is required to keep shipping on 2.0.</p>
+<p>The migration has two steps: add the pragma, then let the compiler rename.</p>
+<h2 id="1-add-the-pragma">1. Add the pragma</h2>
+<p>Put <code>#syntax 2.1</code> on the first line of a file:</p>
+<pre><code>#syntax 2.1
+
+import { print } from &quot;std/io&quot;
+
+print(&quot;this file is now 2.1&quot;)</code></pre>
+<p>The pragma is a comment to every other tool, so editors, Git and the formatter keep working unchanged.</p>
+<h2 id="2-rename-what-the-compiler-reports">2. Rename what the compiler reports</h2>
+<p>In a 2.1 file the 2.0 declarations are rejected with <code>PS2030</code>, and the message names the 2.1 word. The full mapping:</p>
+<table><thead><tr><th>2.0</th><th>2.1</th><th>Notes</th></tr></thead><tbody>
+<tr><td><code>const x = 1</code></td><td><code>value x is 1</code></td><td>Immutable.</td></tr>
+<tr><td><code>let x = 1</code></td><td><code>set x to 1</code></td><td>Mutable.</td></tr>
+<tr><td><code>x = 2</code></td><td><code>change x to 2</code></td><td>Works for names, members and indexes.</td></tr>
+<tr><td><code>x += 1</code></td><td><code>change x to x + 1</code></td><td><code>+=</code> still parses in expressions; <code>change</code> is the documented 2.1 form.</td></tr>
+<tr><td><code>function f() -&gt; T</code></td><td><code>define f() returns T</code></td><td><code>-&gt;</code> remains the arrow in function types.</td></tr>
+<tr><td><code>async function f()</code></td><td><code>async define f()</code></td><td></td></tr>
+<tr><td><code>if</code></td><td><code>when</code></td><td></td></tr>
+<tr><td><code>else if</code></td><td><code>otherwise when</code></td><td></td></tr>
+<tr><td><code>else</code></td><td><code>otherwise</code></td><td>Also the fallback arm of <code>match</code>.</td></tr>
+<tr><td><code>for x in xs</code></td><td><code>for each x in xs</code></td><td><code>for each</code> is required in 2.1.</td></tr>
+<tr><td><code>for i in 0 to 9</code></td><td><code>for i from 0 to 9</code></td><td>The range stays inclusive.</td></tr>
+<tr><td><code>a == b</code></td><td><code>a is equal to b</code></td><td>Symbols still work; phrases are the documented form.</td></tr>
+<tr><td><code>a != b</code></td><td><code>a is not equal to b</code></td><td></td></tr>
+<tr><td><code>a &gt; b</code></td><td><code>a is greater than b</code></td><td></td></tr>
+<tr><td><code>a &lt; b</code></td><td><code>a is less than b</code></td><td></td></tr>
+<tr><td><code>a &gt;= b</code></td><td><code>a is at least b</code></td><td></td></tr>
+<tr><td><code>a &lt;= b</code></td><td><code>a is at most b</code></td><td></td></tr>
+</tbody></table>
+<p>Unchanged in 2.1: <code>match</code>, <code>case</code>, <code>while</code>, <code>break</code>, <code>continue</code>, <code>try</code>, <code>catch</code>, <code>finally</code>, <code>throw</code>, <code>return</code>, <code>let</code>-free expressions, <code>type</code>, <code>declare</code>, <code>import</code>, <code>export</code>, <code>async</code>, <code>await</code>, <code>and</code>, <code>or</code>, <code>not</code>, <code>is</code> (type test), <code>as</code>, <code>render</code>, <code>element</code>, and all arithmetic operators.</p>
+<p><code>value</code>, <code>set</code>, <code>change</code>, <code>define</code>, <code>returns</code> and <code>each</code> are contextual, so they remain usable as identifiers. <code>when</code> and <code>otherwise</code> are reserved in both dialects.</p>
+<h2 id="3-opt-whole-projects-in">3. Opt whole projects in</h2>
+<p>A pragma in every file is tedious for a new project. Set the default once in <code>plainscript.config.json</code>:</p>
+<pre><code>{
+  &quot;compilerOptions&quot;: {
+    &quot;rootDir&quot;: &quot;src&quot;,
+    &quot;outDir&quot;: &quot;dist&quot;,
+    &quot;syntax&quot;: &quot;2.1&quot;
+  }
+}</code></pre>
+<p>Files without a pragma then compile as 2.1, including imported modules. Migrate incrementally by putting <code>#syntax 2.0</code> at the top of the files you have not converted yet, or pass <code>--syntax=2.1</code> for a one-off build. Precedence is: file pragma, <code>--syntax</code>, the configuration file, then 2.0.</p>
+<p>The language server and <code>plainscript fmt</code> read the same setting, so editor diagnostics and formatting agree with the build.</p>
+<h2 id="4-watch-for-these-edge-cases">4. Watch for these edge cases</h2>
+<ul>
+<li><strong><code>returns</code> is only a declaration keyword.</strong> Function types still use <code>-&gt;</code>:</li>
+<p><code>(number) -&gt; number</code>.</p>
+<li><strong><code>for each</code> is a single loop shape.</strong> <code>for x in xs</code> is a 2.1 syntax error</li>
+<p>(<code>PS2014</code>), which prevents two spellings for the same loop. The one exception is a loop variable literally named <code>each</code>: <code>for each in xs</code> is a foreach loop binding <code>each</code>, because <code>each</code> stays a legal identifier.</p>
+<li><strong><code>otherwise</code> closes <code>match</code>.</strong> A <code>match</code> with an <code>otherwise</code> arm does not need</li>
+<p>a wildcard <code>case</code>.</p>
+<li><strong>Phrases are operators, not keywords.</strong> They have the same precedence as the</li>
+<p>symbol they replace. <code>not</code> still binds tighter than a comparison, so write <code>not (a is greater than b)</code> when you mean the negation.</p>
+<li><strong>Errors point at the 2.1 word.</strong> A <code>PS2030</code> includes the replacement in the</li>
+<p>message.</p>
+</ul>
+<h2 id="5-mixed-projects">5. Mixed projects</h2>
+<p>Dialects are per file and the AST is shared, so migration does not require a big-bang change:</p>
+<ul>
+<li>A 2.0 entry module can import a 2.1 module.</li>
+<li>A 2.1 module can import a 2.0 module and call its functions and use its types.</li>
+<li><code>plainscript build</code>, <code>check</code>, <code>watch</code>, <code>fmt</code>, <code>lsp</code> and <code>dap</code> handle both in</li>
+<p>one project.</p>
+</ul>
+<h2 id="6-format-and-check">6. Format and check</h2>
+<pre><code>plainscript fmt src          # keeps the pragma and formats 2.1 blocks
+plainscript check src        # reports every remaining 2.0 word in 2.1 files
+npm test                     # compiler, runtime and integration suites</code></pre>
+<p>The formatter understands <code>define</code>, <code>when</code> and <code>otherwise</code>, keeps them on their source lines, and never rewrites tokens.</p>
+<h2 id="7-a-converted-file">7. A converted file</h2>
+<p>The 2.0 program:</p>
+<pre><code>#syntax 2.0
+
+import { print } from &quot;std/io&quot;
+
+function label(done: boolean) -&gt; text
+    if done
+        return &quot;done&quot;
+    else
+        return &quot;open&quot;
+    end
+end
+
+let count = 0
+for item in [1, 2, 3]
+    count = count + item
+end
+
+print(label(count &gt;= 6))
+print(count)</code></pre>
+<p>and its 2.1 equivalent:</p>
+<pre><code>#syntax 2.1
+
+import { print } from &quot;std/io&quot;
+
+define label(done: boolean) returns text
+    when done
+        return &quot;done&quot;
+    otherwise
+        return &quot;open&quot;
+    end
+end
+
+set count to 0
+for each item in [1, 2, 3]
+    change count to count + item
+end
+
+print(label(count is at least 6))
+print(count)</code></pre>
+<p>Both programs print <code>done</code> then <code>6</code>.</p>
+<h2 id="8-checklist">8. Checklist</h2>
+<ol>
+<li>Add <code>#syntax 2.1</code> to a leaf module.</li>
+<li>Run <code>plainscript check</code> and rename what <code>PS2030</code> reports.</li>
+<li>Run the module&#39;s tests.</li>
+<li>Repeat outward through the import graph.</li>
+<li>Optionally remove the symbols in favour of phrases for consistency, or keep</li>
+<p>symbols where they read better; both are accepted.</p>
+</ol>
+<p>If a file needs more time, remove its pragma: the file returns to 2.0 semantics with no other change.</p></div><aside class="toc"><div class="toc-title">On this page</div><a class="toc-h2" href="#1-add-the-pragma">1. Add the pragma</a><a class="toc-h2" href="#2-rename-what-the-compiler-reports">2. Rename what the compiler reports</a><a class="toc-h2" href="#3-opt-whole-projects-in">3. Opt whole projects in</a><a class="toc-h2" href="#4-watch-for-these-edge-cases">4. Watch for these edge cases</a><a class="toc-h2" href="#5-mixed-projects">5. Mixed projects</a><a class="toc-h2" href="#6-format-and-check">6. Format and check</a><a class="toc-h2" href="#7-a-converted-file">7. A converted file</a><a class="toc-h2" href="#8-checklist">8. Checklist</a></aside></article><footer class="page-footer"><span>PlainScript 2.1 documentation</span><a href="https://github.com/ayoistooslick/Plainscript/issues">Report a documentation issue ↗</a></footer></div></main></div><script src="app.js"></script></body></html>

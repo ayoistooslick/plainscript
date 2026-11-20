@@ -1,0 +1,110 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Compiler — PlainScript documentation."><title>Compiler · PlainScript</title><link rel="stylesheet" href="style.css"></head><body><div class="site-shell"><aside class="sidebar"><a class="brand" href="index.html"><span class="brand-mark">PS</span><span><span class="brand-name">PlainScript</span><span class="brand-meta">Language docs · 2.1</span></span></a><div class="nav-group"><div class="nav-label">Start here</div><a class="nav-link " href="index.html">PlainScript</a><a class="nav-link " href="getting-started.html">Getting started</a><a class="nav-link " href="cli.html">CLI reference</a><a class="nav-link " href="templates.html">Application templates</a></div><div class="nav-group"><div class="nav-label">Language</div><a class="nav-link " href="language-reference.html">Language reference</a><a class="nav-link " href="spec.html">Language specification</a><a class="nav-link " href="syntax-design.html">Syntax design</a><a class="nav-link " href="type-system.html">Type system</a></div><div class="nav-group"><div class="nav-label">Compiler</div><a class="nav-link active" href="compiler.html">Compiler</a><a class="nav-link " href="architecture.html">Compiler architecture</a><a class="nav-link " href="interop.html">JavaScript interoperability</a><a class="nav-link " href="benchmarks.html">Benchmarks</a></div><div class="nav-group"><div class="nav-label">Guides</div><a class="nav-link " href="integrations.html">Integrations</a><a class="nav-link " href="migration-2-1.html">Migrating from 2.0</a><a class="nav-link " href="contracts.html">Unified contracts</a><a class="nav-link " href="concurrency.html">Concurrency</a><a class="nav-link " href="jobs.html">Background jobs</a><a class="nav-link " href="databases.html">Databases</a><a class="nav-link " href="security.html">Security</a><a class="nav-link " href="debugging.html">Debugging</a><a class="nav-link " href="migration.html">Migration guide</a><a class="nav-link " href="comparison.html">Comparison with TypeScript</a></div><div class="nav-group"><div class="nav-label">Project</div><a class="nav-link " href="progress.html">Engineering progress</a><a class="nav-link " href="roadmap.html">Roadmap</a><a class="nav-link " href="audit.html">Audit</a><a class="nav-link " href="decisions.html">Decisions</a></div><div class="sidebar-footer">Open source under MIT.<br><a href="https://github.com/ayoistooslick/Plainscript">View on GitHub ↗</a></div></aside><main class="main"><header class="topbar"><div class="search-wrap"><label class="search" aria-label="Search documentation"><span>⌕</span><input id="doc-search" type="search" placeholder="Search the docs…" autocomplete="off"><kbd>/</kbd></label><div id="search-results" class="search-results" role="listbox"></div></div><nav class="top-links"><a href="index.html">Docs</a><a href="https://github.com/ayoistooslick/Plainscript">GitHub ↗</a></nav></header><div class="content"><article class="page-layout"><div class="prose"><p>&lt;!-- compile-examples --&gt;</p>
+<h1 id="the-plainscript-compiler">The PlainScript compiler</h1>
+<p>The compiler turns a <code>.pln</code> module graph into JavaScript ES modules. It has six stages, each with its own diagnostics and tests:</p>
+<pre><code>source
+  → lexer        tokens, comments, dialect normalisation
+  → parser       abstract syntax tree
+  → modules      import/export graph, std and npm resolution
+  → checker      types, scopes, exhaustiveness, contracts
+  → HIR          typed intermediate representation
+  → codegen      JavaScript + source map</code></pre>
+<h2 id="1-dialect-resolution">1. Dialect resolution</h2>
+<p>Dialect detection happens before lexing. <code>src/dialect.js</code> reads the first line:</p>
+<ul>
+<li><code>#syntax 2.1</code> selects the 2.1 dialect.</li>
+<li><code>#syntax 2.0</code>, or no pragma, selects 2.0.</li>
+<li>An unknown version produces <code>PS1005</code> and the file is not compiled.</li>
+</ul>
+<p>The lexer then applies the 2.1 normalisation to its token stream:</p>
+<ol>
+<li>Comparison phrases (<code>is greater than</code>, <code>is at most</code>, …) become the</li>
+<p>corresponding operator token.</p>
+<li><code>when</code> and <code>otherwise</code> become <code>if</code> and <code>else</code>, tagged <code>alias: true</code> so the</li>
+<p>parser can still reject the literal 2.0 word.</p>
+<li>Contextual words (<code>value</code>, <code>set</code>, <code>change</code>, <code>define</code>, <code>returns</code>, <code>each</code>) are</li>
+<p>left in place. The parser recognises them only in statement or declaration position, which is why they remain usable as identifiers.</p>
+</ol>
+<p>The parser stores the dialect on every node it builds from a file and passes it to interpolation tokenisation, so a phrase inside <code>&quot;{a is at least b}&quot;</code> is resolved with the same rules.</p>
+<p>Because normalisation happens before parsing, both dialects produce the same AST node kinds and the checker, HIR and backend contain no dialect branches.</p>
+<h2 id="2-lexer">2. Lexer</h2>
+<p><code>src/lexer.js</code> produces tokens for identifiers, keywords, numbers, text and templates, punctuation, and end-of-file. Comments are kept separately so the formatter can preserve them. Text interpolation is lexed as a nested expression and re-tokenised with the file&#39;s dialect by the parser.</p>
+<p>Lexical diagnostics use <code>PS1001</code>–<code>PS1005</code>.</p>
+<h2 id="3-parser">3. Parser</h2>
+<p><code>src/parser.js</code> is a recursive-descent parser with token lookahead. Newlines are insignificant: statements are delimited by grammar and blocks close with <code>end</code>. That is what makes <code>fmt</code> safe — formatting cannot change meaning.</p>
+<p>The parser&#39;s statement entry point handles both dialects. In 2.1 it additionally recognises:</p>
+<ul>
+<li><code>value name is expression</code> and <code>set name to expression</code> as <code>VarDecl</code>.</li>
+<li><code>change target to expression</code> as an <code>Assignment</code>.</li>
+<li><code>define</code> in place of <code>function</code>, and <code>returns</code> in place of a declaration</li>
+<p>arrow.</p>
+<li><code>for each … in …</code> and <code>for … from … to …</code>.</li>
+</ul>
+<p>It reports <code>PS2030</code> when a literal 2.0 word (<code>let</code>, <code>const</code>, <code>function</code>, <code>if</code>, <code>else</code>) appears in a 2.1 file, with the 2.1 word in the message and a hint that points at the pragma.</p>
+<h2 id="4-modules">4. Modules</h2>
+<p><code>src/modules.js</code> builds the import graph:</p>
+<ul>
+<li><code>std/&lt;name&gt;</code> resolves to the bundled runtime and <code>.d.pln</code> declarations.</li>
+<li><code>./x</code> and <code>../x</code> resolve to sibling <code>.pln</code> files and are emitted as <code>.js</code>.</li>
+<li>Bare specifiers (<code>express</code>, <code>node:sqlite</code>) pass through to the JavaScript</li>
+<p>runtime.</p>
+<li>Modules are compiled as a graph; cycles are a compile error (<code>PS4001</code>).</li>
+<li>Type-only imports are erased. A module imported only for types emits no</li>
+<p>runtime import.</p>
+</ul>
+<p>Dialects are independent per module: a 2.0 entry can import a 2.1 library.</p>
+<h2 id="5-checker">5. Checker</h2>
+<p><code>src/checker.js</code> is the enforcer. It performs flow-sensitive type checking with inference, generics, unions, narrowing, structural records and variants, exhaustiveness in <code>match</code>, optional-value safety, variance checks and readonly-field assignment checks. Diagnostics use <code>PS3xxx</code>.</p>
+<p>The checker never inspects the dialect: it sees the same nodes for both surfaces. <code>PS2030</code> is a parser diagnostic, not a type error.</p>
+<h2 id="6-hir-and-code-generation">6. HIR and code generation</h2>
+<p><code>src/hir.js</code> lowers the checked AST to a typed intermediate representation with explicit temporaries. <code>src/codegen.js</code> emits ES modules and a source map. The output contains:</p>
+<ul>
+<li><code>import</code>/<code>export</code> statements, with relative <code>.js</code> specifiers.</li>
+<li>Plain functions, classes, <code>async</code>/<code>await</code>, <code>try</code>/<code>catch</code>.</li>
+<li>Pattern matches lowered to <code>if</code> checks and destructuring.</li>
+<li><code>render</code>/<code>element</code> lowered to <code>createElement</code> calls.</li>
+<li>No runtime type checks beyond <code>is</code> on primitives, lists, maps and variant</li>
+<p>tags.</p>
+</ul>
+<p>For example, this program:</p>
+<pre><code>#syntax 2.1
+
+import { print } from &quot;std/io&quot;
+
+define greet(name: text) returns text
+    return &quot;Hello, {name}!&quot;
+end
+
+print(greet(&quot;world&quot;))</code></pre>
+<p>emits a module shaped like:</p>
+<pre><code>import { print } from &quot;.../stdlib/io.js&quot;;
+
+function greet(name) {
+    return `Hello, ${name}!`;
+}
+
+print(greet(&quot;world&quot;));</code></pre>
+<h2 id="7-configuration-and-output">7. Configuration and output</h2>
+<p><code>plainscript.config.json</code> names the source root and output directory:</p>
+<pre><code>{
+  &quot;compilerOptions&quot;: {
+    &quot;rootDir&quot;: &quot;src&quot;,
+    &quot;outDir&quot;: &quot;dist&quot;,
+    &quot;syntax&quot;: &quot;2.1&quot;
+  }
+}</code></pre>
+<p><code>syntax</code> sets the project&#39;s default dialect for files that carry no pragma. It may also be written as a top-level <code>syntax</code> key. A <code>#syntax 2.0</code> or <code>#syntax 2.1</code> pragma inside a file always wins, so a 2.1 project can keep a legacy module, and the compiler reports <code>PS1005</code> for an unsupported value instead of guessing. Precedence is: file pragma, <code>--syntax</code> flag, the configuration file, then 2.0.</p>
+<p>Each module is written as <code>&lt;name&gt;.js</code> with <code>&lt;name&gt;.js.map</code> beside it, plus a <code>package.json</code> marking the output as ESM. Unchanged outputs are not rewritten. <code>--declarations</code> also writes <code>&lt;name&gt;.d.pln</code> and wires <code>types</code>/<code>exports</code> in the project manifest.</p>
+<h2 id="8-diagnostics">8. Diagnostics</h2>
+<table><thead><tr><th>Range</th><th>Layer</th><th>Examples</th></tr></thead><tbody>
+<tr><td><code>PS1xxx</code></td><td>lexical and dialect</td><td>unexpected character, bad escape, unknown dialect</td></tr>
+<tr><td><code>PS2xxx</code></td><td>syntax</td><td>missing <code>end</code>, 2.0 word in a 2.1 file, bad loop header</td></tr>
+<tr><td><code>PS3xxx</code></td><td>types</td><td>unbound name, type mismatch, non-exhaustive match</td></tr>
+<tr><td><code>PS4xxx</code></td><td>modules</td><td>missing file, import cycle, missing export</td></tr>
+<tr><td><code>PS5xxx</code></td><td>internal</td><td>unexpected compiler failure</td></tr>
+<tr><td><code>PS6xxx</code></td><td>configuration and CLI</td><td>bad config, bad flag</td></tr>
+</tbody></table>
+<p>Every diagnostic has a stable code, a file/line/column span, and often a hint. The formatter renders a caret against the source line, which is what the CLI and the language server display.</p>
+<h2 id="9-testing-the-compiler">9. Testing the compiler</h2>
+<pre><code>npm test</code></pre>
+<p>The suite covers the lexer, both dialects, grammar matrix, type checker, inference, narrowing, generics, variance, HIR, code generation, runtime behaviour, module resolution, CLI, formatter, package contents, documentation examples and real integration projects.</p>
+<p>The documentation examples marked <code>&lt;!-- compile-examples --&gt;</code> are extracted and compiled by <code>tests/docs-examples.test.js</code>, so a guide cannot drift from the compiler.</p></div><aside class="toc"><div class="toc-title">On this page</div><a class="toc-h2" href="#1-dialect-resolution">1. Dialect resolution</a><a class="toc-h2" href="#2-lexer">2. Lexer</a><a class="toc-h2" href="#3-parser">3. Parser</a><a class="toc-h2" href="#4-modules">4. Modules</a><a class="toc-h2" href="#5-checker">5. Checker</a><a class="toc-h2" href="#6-hir-and-code-generation">6. HIR and code generation</a><a class="toc-h2" href="#7-configuration-and-output">7. Configuration and output</a><a class="toc-h2" href="#8-diagnostics">8. Diagnostics</a><a class="toc-h2" href="#9-testing-the-compiler">9. Testing the compiler</a></aside></article><footer class="page-footer"><span>PlainScript 2.1 documentation</span><a href="https://github.com/ayoistooslick/Plainscript/issues">Report a documentation issue ↗</a></footer></div></main></div><script src="app.js"></script></body></html>

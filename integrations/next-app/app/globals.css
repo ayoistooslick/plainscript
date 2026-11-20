@@ -1,0 +1,47 @@
+:root {
+  color-scheme: light;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+body {
+  margin: 0;
+  background: #f5f7f9;
+  color: #17212b;
+}
+.page {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 64px 24px;
+}
+.page h1 {
+  font-size: clamp(2rem, 5vw, 3.4rem);
+  letter-spacing: -0.04em;
+  margin: 0 0 12px;
+}
+.lead {
+  color: #637081;
+  font-size: 1.15rem;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  list-style: none;
+  padding: 0;
+  margin: 32px 0 0;
+}
+.card {
+  padding: 20px;
+  background: #fff;
+  border: 1px solid #dfe6ec;
+  border-radius: 14px;
+}
+.card h2 {
+  margin: 0 0 8px;
+  font-size: 1.05rem;
+}
+.card p {
+  margin: 0;
+  color: #637081;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}

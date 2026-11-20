@@ -1,4 +1,4 @@
-# The PlainScript 2.0 Language Specification
+# The PlainScript 2.1 Language Specification
 
 This document defines the language implemented by the compiler in `src/`. When this
 document and the compiler disagree, the compiler is authoritative and the document is a
@@ -6,7 +6,7 @@ bug.
 
 PlainScript is statically typed, expression-oriented where it helps readability, and
 compiles to ECMAScript modules. Types exist at compile time only; they are erased from the
-output except for the small runtime checks described in [Runtime semantics](#13-runtime-semantics).
+output except for the small runtime checks described in [Runtime semantics](#11-runtime-semantics).
 
 ---
 
@@ -741,6 +741,8 @@ source .pln
 
 ## 14. Reserved words
 
+The 2.0 dialect reserves exactly these words:
+
 ```
 and        as         async      await      break      case       catch
 const      continue   declare    do         element    else       end
@@ -750,8 +752,127 @@ not        or         otherwise  render     return     throw      to
 true       try        type       when       while      with
 ```
 
+The 2.1 dialect reserves the same words and interprets `when` and `otherwise` as branch
+introducers. Its additional declaration words — `value`, `set`, `change`, `define`,
+`returns` and `each` — are **contextual**, not reserved: they introduce a construct only
+in statement or declaration position and remain valid identifiers everywhere else. This is
+deliberate: `value` is a common parameter name, and reserving it would make the dialect
+more awkward than the language it replaces. Section 15 defines the 2.1 surface grammar.
+
 Reserved words cannot be identifiers, including function, parameter, variable and type
-names. `when` and `otherwise` are retained as reserved words only so source using their
-retired branch syntax receives a parser error; they are not accepted as branch introducers.
-Reserved words may be used as fields after `.`, as element property names, and as record
-literal keys.
+names. Reserved words may be used as fields after `.`, as element property names, and as
+record literal keys.
+
+---
+
+## 15. The 2.1 dialect
+
+2.1 is a surface dialect over the same abstract syntax tree as 2.0. It is selected per file
+by a pragma on the first line:
+
+```plainscript
+#syntax 2.1
+```
+
+`#syntax 2.0` selects 2.0 explicitly. A file without a pragma uses the project default from
+`plainscript.config.json` — `compilerOptions.syntax` or a top-level `syntax` — and is 2.0
+when no default is configured. Precedence is: file pragma, the `--syntax` command-line
+option, the configuration file, then 2.0. An unsupported version is a lexical error
+(`PS1005`), never a silent fallback. The pragma is an ordinary comment to other tools and
+is preserved by the formatter.
+
+### 15.1 Normalisation
+
+Before parsing, the 2.1 token stream is normalised:
+
+1. The comparison phrases in 15.3 become the corresponding operator token.
+2. `when` becomes `if` and `otherwise` becomes `else`, tagged as dialect aliases so the
+   parser can still reject a literal 2.0 word.
+3. Contextual words are left in place and interpreted in statement position.
+
+Consequently the checker, HIR and emitter contain no dialect branches. Both dialects
+produce identical node kinds, and modules of either dialect may import one another.
+
+### 15.2 Formal surface grammar
+
+Only the productions that differ from 2.0 are shown. `statement`, `expression`,
+`bindingPattern`, `typeExpression`, `parameterList` and block bodies are otherwise the same
+as in sections 4–7.
+
+```ebnf
+file            = [ dialect-pragma ] , { statement } ;
+dialect-pragma  = "#syntax" , ( "2.0" | "2.1" ) , newline ;
+
+statement       = value-decl | set-decl | change-stmt | define-decl
+                | for-each | for-range | conditional | match-stmt
+                | statement-2-0-except-bindings-and-branches ;
+
+value-decl      = "value" , binding-pattern , [ ":" , typeExpression ] ,
+                  "is" , expression ;
+set-decl        = "set" , binding-pattern , [ ":" , typeExpression ] ,
+                  "to" , expression ;
+change-stmt     = "change" , assignable-expression , "to" , expression ;
+
+define-decl     = [ "async" ] , "define" , [ ident ] , [ type-parameters ] ,
+                  parameter-list , [ "returns" , return-annotation ] ,
+                  block-body ;
+
+conditional     = "when" , expression , { statement } ,
+                  { "otherwise" , "when" , expression , { statement } } ,
+                  [ "otherwise" , { statement } ] , "end" ;
+
+for-each        = "for" , "each" , binding-pattern , "in" , expression ,
+                  block-body ;
+for-range       = "for" , binding-pattern , "from" , expression ,
+                  "to" , expression , block-body ;
+
+match-stmt      = "match" , expression , { case-clause } ,
+                  [ "otherwise" , { statement } ] , "end" ;
+case-clause     = "case" , pattern , [ "when" , expression ] , { statement } ;
+```
+
+### 15.3 Keyword and operator mapping
+
+| Concept | 2.0 | 2.1 |
+| --- | --- | --- |
+| Immutable binding | `const x = e` | `value x is e` |
+| Mutable binding | `let x = e` | `set x to e` |
+| Assignment | `x = e` | `change x to e` |
+| Function declaration | `function f() -> T` | `define f() returns T` |
+| Async declaration | `async function f()` | `async define f()` |
+| Conditional | `if` | `when` |
+| Else-if | `else if` | `otherwise when` |
+| Else | `else` | `otherwise` |
+| Each loop | `for x in xs` | `for each x in xs` |
+| Range loop | `for i in a to b` | `for i from a to b` |
+| Equal | `==` | `is equal to` |
+| Not equal | `!=` | `is not equal to` |
+| Greater than | `>` | `is greater than` |
+| Less than | `<` | `is less than` |
+| At least | `>=` | `is at least` |
+| At most | `<=` | `is at most` |
+
+Unchanged in 2.1: `match`, `case`, `while`, `break`, `continue`, `try`, `catch`,
+`finally`, `throw`, `return`, `type`, `declare`, `import`, `export`, `async`, `await`,
+`and`, `or`, `not`, `is` (type test), `as`, `render`, `element`, `with`, `new`, `do`, and
+all arithmetic operators. `->` remains the arrow inside function types; a declaration may
+use either `returns` or `->` in 2.1, and documentation uses `returns`.
+
+### 15.4 Coherence rules
+
+1. **One spelling per concept inside a 2.1 file.** A literal `let`, `const`, `function`,
+   `if` or `else` in a 2.1 file is a syntax error (`PS2030`) whose message names the 2.1
+   word. `for x in xs` is likewise rejected (`PS2014`); 2.1 loops state `each` or `from`.
+2. **Symbols remain operators.** The phrase and symbol forms in 15.3 lower to the same
+   token, so they have identical precedence and code generation. Phrases are the
+   documented form; symbols remain accepted for migration.
+3. **No speculative vocabulary.** Words are added only where the 2.0 spelling reads
+   poorly aloud or is ambiguous in prose. `async`, `await`, `match`, `try` and `import` are
+   already English and are not renamed.
+4. **Contextual, not reserved.** Declaration words stay usable as identifiers, so the
+   dialect does not take names away from programs.
+5. **Dialects are per file.** A module of either dialect compiles to the same AST and can
+   be imported by the other.
+
+A file that needs more time can remove its pragma and return to 2.0 semantics with no other
+change.

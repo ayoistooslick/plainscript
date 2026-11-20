@@ -42,6 +42,9 @@ class Compiler {
     // When compiling for the browser, standard library imports become URLs
     // relative to the page (for example /std/dom.js) instead of file paths.
     this.stdBase = options.stdBase || null;
+    // Project-wide default syntax dialect. Individual files may override it
+    // with a `#syntax 2.0` / `#syntax 2.1` pragma.
+    this.dialect = options.dialect ? String(options.dialect) : null;
     // Editor and test harnesses can supply unsaved documents without writing
     // them to disk. Keys are absolute paths.
     this.overrides = options.overrides || new Map();
@@ -277,7 +280,7 @@ class Compiler {
     this.modules.set(file, record);
 
     try {
-      record.ast = parse(source, record.display);
+      record.ast = parse(source, record.display, { dialect: this.dialect });
     } catch (failure) {
       if (failure instanceof CompileError) {
         this.diagnostics.push(...failure.diagnostics);
@@ -473,7 +476,7 @@ function tempRunRoot(entry) {
 
 function compileFileOrThrow(source, options = {}) {
   const file = options.file || '<input>';
-  const ast = parse(source, file);
+  const ast = parse(source, file, { dialect: options.dialect || null });
   const checked = checkModule({
     file,
     source,

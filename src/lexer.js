@@ -1,6 +1,7 @@
 'use strict';
 
 const { Span, error } = require('./diagnostics');
+const { detectDialect, applyDialect } = require('./dialect');
 
 // PlainScript 2.0 has exactly one spelling per concept. This set is the
 // complete reserved vocabulary: nothing here is contextual, and nothing
@@ -26,9 +27,13 @@ const SIMPLE_ESCAPES = {
 };
 
 class Lexer {
-  constructor(source, file) {
+  constructor(source, file, options = {}) {
     this.source = source;
     this.file = file || '<input>';
+    // A pragma on the first line overrides the project default, so a single
+    // legacy module can live in a 2.1 project.
+    this.detection = detectDialect(source, this.file, options.dialect || null);
+    this.dialect = this.detection.version;
     this.i = 0;
     this.line = 1;
     this.lineStart = 0;
@@ -121,7 +126,12 @@ class Lexer {
     }
 
     this.push('eof', '', this.line, this.col());
-    return { tokens: this.tokens, comments: this.comments, errors: this.errors };
+    return {
+      tokens: applyDialect(this.tokens, this.dialect),
+      comments: this.comments,
+      errors: [...this.detection.errors, ...this.errors],
+      dialect: this.dialect,
+    };
   }
 
   isDigit(ch) {
@@ -335,8 +345,8 @@ class Lexer {
   }
 }
 
-function tokenize(source, file) {
-  return new Lexer(source, file).tokenize();
+function tokenize(source, file, options) {
+  return new Lexer(source, file, options).tokenize();
 }
 
 module.exports = { tokenize, KEYWORDS, Lexer };

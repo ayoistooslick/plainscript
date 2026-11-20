@@ -1,0 +1,77 @@
+#syntax 2.1
+
+# A SQLite repository over std/db. Rows cross the driver boundary as `any` and
+# are narrowed into the shared `Note` type once, in noteFromRow.
+#
+# `connect` returns a record of closures: the interface is a PlainScript type,
+# so the server cannot call a method the repository does not implement.
+
+import { open } from "std/db"
+import { Note } from "./types.pln"
+import { append, count } from "std/list"
+
+export type NoteRepository
+    list: () -> list of Note
+    find: (id: number) -> Note?
+    add: (body: text) -> Note
+    complete: (id: number) -> Note?
+    remove: (id: number) -> boolean
+    close: () -> nothing
+end
+
+define noteFromRow(row: any) returns Note
+    return { id: row.id as number, body: row.body as text, done: row.done is equal to 1 }
+end
+
+export async define connect(file: text) returns NoteRepository
+    set database to await open(file)
+    database.exec("create table if not exists notes (id integer primary key autoincrement, body text not null, done integer not null default 0)")
+
+    define list() returns list of Note
+        set notes: list of Note to []
+        for each row in database.query("select id, body, done from notes order by id")
+            change notes to append(notes, noteFromRow(row))
+        end
+        return notes
+    end
+
+    define find(id: number) returns Note?
+        set rows to database.query("select id, body, done from notes where id = ?", [id])
+        when count(rows) is equal to 0
+            return nothing
+        end
+        return noteFromRow(rows[0])
+    end
+
+    define add(body: text) returns Note
+        set result to database.run("insert into notes (body, done) values (?, 0)", [body])
+        set id to result.lastInsertRowid as number
+        return { id: id, body: body, done: false }
+    end
+
+    define complete(id: number) returns Note?
+        set result to database.run("update notes set done = 1 where id = ?", [id])
+        when result.changes is equal to 0
+            return nothing
+        end
+        return find(id)
+    end
+
+    define remove(id: number) returns boolean
+        set result to database.run("delete from notes where id = ?", [id])
+        return result.changes is greater than 0
+    end
+
+    define close() returns nothing
+        database.close()
+    end
+
+    return {
+        list: list,
+        find: find,
+        add: add,
+        complete: complete,
+        remove: remove,
+        close: close
+    }
+end

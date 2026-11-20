@@ -45,8 +45,8 @@
     },
     "keywords": {
       "patterns": [
-        { "name": "keyword.control.plainscript", "match": "\\b(if|else|for|in|to|while|match|case|try|catch|finally|throw|return|break|continue|and|or|not|is|new)\\b" },
-        { "name": "keyword.declaration.plainscript", "match": "\\b(import|export|from|as|type|declare|function|async|await|let|const|render|element)\\b" },
+        { "name": "keyword.control.plainscript", "match": "\\b(if|else|when|otherwise|for|each|in|from|to|while|match|case|try|catch|finally|throw|return|break|continue|and|or|not|is|new)\\b" },
+        { "name": "keyword.declaration.plainscript", "match": "\\b(import|export|from|as|type|declare|function|define|value|set|change|returns|async|await|let|const|render|element)\\b" },
         { "name": "constant.language.plainscript", "match": "\\b(true|false|nothing)\\b" }
       ]
     },

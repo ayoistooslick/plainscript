@@ -15,6 +15,7 @@ const {
   isDirectory,
 } = require('./modules');
 const { format } = require('./formatter');
+const { DIALECTS, isDialect } = require('./dialect');
 const { CompileError, Span, error, formatDiagnostics } = require('./diagnostics');
 const { VERSION } = require('./version');
 
@@ -50,6 +51,7 @@ Options
   --std-base=<url>  browser build: import std modules from <url>/<name>.js
   --declarations    with build: also write <name>.d.pln for every module
   --template=<id>   with new: choose a bundled starter
+  --syntax=<v>   compile files without a pragma as syntax <v> (2.0 or 2.1)
   --json        with migrate/interop: print a machine-readable report
   --help        show this message
 
@@ -58,7 +60,7 @@ Exit codes
 `;
 
 function parseArguments(argv) {
-  const flags = { quiet: false, verbose: false, check: false, help: false, stdBase: null, template: null, declarations: false, json: false };
+  const flags = { quiet: false, verbose: false, check: false, help: false, stdBase: null, template: null, declarations: false, json: false, syntax: null };
   const positional = [];
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
@@ -73,6 +75,10 @@ function parseArguments(argv) {
       flags.template = argv[index + 1] || null;
       index += 1;
     } else if (argument.startsWith('--template=')) flags.template = argument.slice('--template='.length);
+    else if (argument === '--syntax') {
+      flags.syntax = argv[index + 1] || null;
+      index += 1;
+    } else if (argument.startsWith('--syntax=')) flags.syntax = argument.slice('--syntax='.length);
     else positional.push(argument);
   }
   return { flags, positional };
@@ -111,11 +117,36 @@ function loadConfig(root) {
   if (!isFile(configPath)) return {};
   try {
     const parsed = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-    return parsed.compilerOptions || {};
+    const compilerOptions = parsed.compilerOptions || {};
+    // `syntax` may be written at the top level or inside compilerOptions;
+    // both mean "the project's default dialect".
+    const syntax = parsed.syntax !== undefined ? parsed.syntax : compilerOptions.syntax;
+    return syntax === undefined
+      ? compilerOptions
+      : { ...compilerOptions, syntax: String(syntax) };
   } catch (failure) {
     process.stderr.write(`plainscript.config.json is not valid JSON: ${failure.message}\n`);
     return {};
   }
+}
+
+// Resolves the dialect for a command: `--syntax` beats the project
+// configuration, and a per-file pragma beats both once parsing starts.
+function dialectFor(root, flags) {
+  if (flags.syntax) {
+    if (!isDialect(flags.syntax)) {
+      process.stderr.write(`Unsupported syntax "${flags.syntax}". Supported dialects are ${DIALECTS.join(' and ')}.\n`);
+      return { value: null, failed: true };
+    }
+    return { value: String(flags.syntax), failed: false };
+  }
+  const { syntax } = loadConfig(root);
+  if (syntax === undefined) return { value: null, failed: false };
+  if (!isDialect(syntax)) {
+    process.stderr.write(`plainscript.config.json: unsupported syntax "${syntax}". Supported dialects are ${DIALECTS.join(' and ')}.\n`);
+    return { value: null, failed: true };
+  }
+  return { value: syntax, failed: false };
 }
 
 function resolveLayout(root) {
@@ -176,7 +207,9 @@ async function commandRun(positional, flags) {
     fs.writeFileSync(path.join(runRoot, 'package.json'), `${JSON.stringify({ type: 'module' }, null, 2)}\n`);
   }
 
-  const compiler = new Compiler({ root: projectRoot });
+  const runDialect = dialectFor(projectRoot, flags);
+  if (runDialect.failed) return 2;
+  const compiler = new Compiler({ root: projectRoot, dialect: runDialect.value });
   const started = Date.now();
   const result = compiler.compileGraph(entry, runRoot, projectRoot);
   const failed = reportDiagnostics(compiler.diagnostics, compiler, flags);
@@ -297,7 +330,9 @@ function commandBuild(positional, flags, options = {}) {
     return path.join(outRoot, relative).replace(/\.pln$/, OUTPUT_EXTENSION);
   };
 
-  const compiler = options.compiler || new Compiler({ root, outputFor, stdBase: flags.stdBase });
+  const buildDialect = dialectFor(root, flags);
+  if (buildDialect.failed) return 2;
+  const compiler = options.compiler || new Compiler({ root, outputFor, stdBase: flags.stdBase, dialect: buildDialect.value });
   compiler.diagnostics.length = 0;
   const outputs = [];
   for (const file of files) {
@@ -382,7 +417,9 @@ function commandWatch(positional, flags) {
     if (relative.startsWith('..')) return file.replace(/\.pln$/, OUTPUT_EXTENSION);
     return path.join(outRoot, relative).replace(/\.pln$/, OUTPUT_EXTENSION);
   };
-  const compiler = new Compiler({ root, outputFor, stdBase: flags.stdBase });
+  const watchDialect = dialectFor(root, flags);
+  if (watchDialect.failed) return 2;
+  const compiler = new Compiler({ root, outputFor, stdBase: flags.stdBase, dialect: watchDialect.value });
   let changed = null;
   let timer = null;
   let building = false;
@@ -435,7 +472,9 @@ function commandCheck(positional, flags) {
     return 1;
   }
 
-  const compiler = new Compiler({ root });
+  const checkDialect = dialectFor(root, flags);
+  if (checkDialect.failed) return 2;
+  const compiler = new Compiler({ root, dialect: checkDialect.value });
   for (const file of files) compiler.load(file);
   const failed = reportDiagnostics(compiler.diagnostics, compiler, flags);
   if (failed) return 1;
@@ -453,13 +492,17 @@ function commandFormat(positional, flags) {
     ? positional.map((entry) => path.resolve(root, entry))
     : discoverSources(srcRoot, outRoot, exclude);
 
+  const formatDialect = dialectFor(root, flags);
+  if (formatDialect.failed) return 2;
+  const formatOptions = { dialect: formatDialect.value };
+
   let changed = 0;
   let unformatted = 0;
   for (const file of files) {
     const source = fs.readFileSync(file, 'utf8');
     let formatted;
     try {
-      formatted = format(source, path.relative(root, file));
+      formatted = format(source, path.relative(root, file), formatOptions);
     } catch (failure) {
       if (failure instanceof CompileError) {
         process.stderr.write(`${formatDiagnostics(failure.diagnostics, new Map([[path.relative(root, file), source]]))}\n`);
@@ -705,10 +748,17 @@ function commandNew(positional, flags = {}) {
   };
   fs.writeFileSync(path.join(directory, 'package.json'), `${JSON.stringify(packageJson, null, 2)}\n`);
   fs.writeFileSync(path.join(directory, '.gitignore'), 'node_modules/\ndist/\n.plainscript/\n');
-  fs.writeFileSync(path.join(directory, 'src', 'app.pln'), `import { print } from "std/io"
+  // The config sets the project dialect once, so every file compiles as 2.1
+  // without a pragma; an individual file can still opt back out.
+  fs.writeFileSync(
+    path.join(directory, 'plainscript.config.json'),
+    `${JSON.stringify({ compilerOptions: { rootDir: 'src', outDir: 'dist', syntax: '2.1' } }, null, 2)}\n`,
+  );
+  fs.writeFileSync(path.join(directory, 'src', 'app.pln'), `
+import { print } from "std/io"
 import { upper } from "std/text"
 
-function greet(name: text) -> text
+define greet(name: text) returns text
     return "Hello, {name}!"
 end
 
@@ -741,7 +791,9 @@ function commandIr(positional, flags) {
     return 2;
   }
   const root = findProjectRoot(entry);
-  const compiler = new Compiler({ root });
+  const irDialect = dialectFor(root, flags);
+  if (irDialect.failed) return 2;
+  const compiler = new Compiler({ root, dialect: irDialect.value });
   const record = compiler.load(entry);
   if (reportDiagnostics(compiler.diagnostics, compiler, flags) || !record.check) return 1;
 

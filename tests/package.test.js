@@ -12,7 +12,7 @@ const packageJson = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 
 
 test('the compiler version and package version agree', () => {
   assert.strictEqual(packageJson.version, VERSION);
-  assert.strictEqual(VERSION, '2.0.0');
+  assert.strictEqual(VERSION, '2.1.0');
 });
 
 test('the package exposes an API entry point and the standard library', () => {
@@ -43,8 +43,12 @@ test('the publish set excludes archived v1 sources and dependencies', () => {
   assert.ok(!packageJson.files.includes('legacy'));
   assert.ok(packageJson.files.includes('src'));
   assert.ok(packageJson.files.includes('stdlib'));
-  assert.deepStrictEqual(packageJson.dependencies, {});
-  assert.deepStrictEqual(packageJson.devDependencies, {});
+  assert.deepStrictEqual(packageJson.dependencies || {}, {});
+  // Framework packages are development-only: they exist so the integration
+  // tests run real Express, React and Vite against compiled output.
+  for (const name of ['express', 'react', 'react-dom', 'vite']) {
+    assert.ok(packageJson.devDependencies[name], `${name} is a development dependency for integrations`);
+  }
 });
 
 test('the v1 implementation is preserved under legacy/ and not imported', () => {

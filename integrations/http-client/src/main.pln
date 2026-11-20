@@ -1,0 +1,37 @@
+#syntax 2.1
+
+# Asynchronous HTTP in PlainScript 2.1: a real server and a real client.
+#
+#   PORT=4502 npm start
+#
+# `serve` starts a Node HTTP server whose handler receives a Web-standard
+# Request and returns a Response. `fetchJson` uses the platform fetch, so the
+# whole program is ordinary async JavaScript after compilation.
+
+import { serve, json, fetchJson } from "std/http"
+import { print, env } from "std/io"
+import { parseNumber } from "std/text"
+
+type Status
+    ok: boolean
+    message: text
+    requestNumber: number
+end
+
+set requests to 0
+set port to parseNumber(env("PORT", "4502"))
+
+async define handler(request: any) returns any
+    change requests to requests + 1
+    return json({ ok: true, message: "hello from std/http", requestNumber: requests })
+end
+
+set server to await serve(port, handler)
+
+set first to await fetchJson("http://127.0.0.1:{port}/status") as Status
+print("{first.message} #{first.requestNumber}")
+
+set second to await fetchJson("http://127.0.0.1:{port}/status") as Status
+print("server handled {second.requestNumber} requests")
+
+server.close()

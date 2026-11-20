@@ -26,9 +26,10 @@ function tokensByLine(tokens) {
   return byLine;
 }
 
-function format(source, file) {
-  const result = tokenize(source, file);
+function format(source, file, options = {}) {
+  const result = tokenize(source, file, options);
   if (result.errors.length) throw new CompileError(result.errors);
+  const dialect = result.dialect;
 
   const byLine = tokensByLine(result.tokens);
   const sourceLines = source.split('\n');
@@ -61,6 +62,7 @@ function format(source, file) {
     const hasEquals = tokens.some((token) => token.t === 'punct' && token.v === '=');
 
     for (const token of tokens) {
+      if (token.t === 'ident' && dialect === '2.1' && token.v === 'define') { openers += 1; continue; }
       if (token.t !== 'kw') continue;
       if (token.v === 'end') closers += 1;
       else if (OPENER_WORDS.has(token.v)) openers += 1;

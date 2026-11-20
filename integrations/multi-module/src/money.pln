@@ -1,0 +1,28 @@
+#syntax 2.1
+
+# A leaf module. Exported types and values are visible to importers, and the
+# 2.1 dialect in this file does not change what importers may write.
+
+export type Money
+    amount: number
+    currency: text
+end
+
+export define money(amount: number, currency: text) returns Money
+    return { amount: amount, currency: currency }
+end
+
+export define add(left: Money, right: Money) returns Money
+    when left.currency is not equal to right.currency
+        throw "cannot add {right.currency} to {left.currency}"
+    end
+    return money(left.amount + right.amount, left.currency)
+end
+
+export define multiply(value: Money, factor: number) returns Money
+    return money(value.amount * factor, value.currency)
+end
+
+export define format(value: Money) returns text
+    return "{value.amount} {value.currency}"
+end

@@ -35,12 +35,122 @@ const STATEMENT_START = new Set([
 ]);
 
 class Parser {
-  constructor(tokens, file, source) {
+  constructor(tokens, file, source, dialect = '2.0') {
     this.tokens = tokens;
     this.file = file || '<input>';
     this.source = source || '';
+    this.dialect = dialect;
     this.index = 0;
     this.errors = [];
+  }
+
+  // ------------------------------------------------------------ 2.1 dialect
+
+  // Contextual 2.1 words. Each introduces a construct only where that
+  // construct can appear, so `value`, `set`, `change`, `define`, `returns` and
+  // `each` remain usable as identifiers elsewhere.
+  atWord(value, offset = 0) {
+    const token = this.peek(offset);
+    return token.t === 'ident' && token.v === value;
+  }
+
+  // Decides whether the identifier at the cursor opens a 2.1 statement. A
+  // call such as `set(handler)` or an expression such as `change + 1` is not a
+  // declaration; `set { a, b } to pair` is.
+  englishStatementKind() {
+    if (this.dialect !== '2.1') return null;
+    const token = this.peek();
+    if (token.t !== 'ident') return null;
+    const next = this.peek(1);
+
+    if (token.v === 'define') {
+      const after = this.peek(2);
+      return next.t === 'ident' && after.t === 'punct' && (after.v === '(' || after.v === '<')
+        ? 'define' : null;
+    }
+    if (token.v === 'change') return next.t === 'ident' ? 'change' : null;
+    if (token.v === 'value' || token.v === 'set') {
+      if (next.t === 'ident') return token.v;
+      if (next.t === 'punct' && (next.v === '{' || next.v === '(')) {
+        const separator = token.v === 'value' ? 'is' : 'to';
+        return this.groupIsFollowedBy(1, separator) ? token.v : null;
+      }
+    }
+    return null;
+  }
+
+  // True when the balanced group starting at `offset` is followed by `separator`.
+  groupIsFollowedBy(offset, separator) {
+    let depth = 0;
+    for (let index = this.index + offset; index < this.tokens.length; index += 1) {
+      const token = this.tokens[index];
+      if (!token || token.t === 'eof') return false;
+      if (token.t === 'punct' && (token.v === '(' || token.v === '[' || token.v === '{')) depth += 1;
+      else if (token.t === 'punct' && (token.v === ')' || token.v === ']' || token.v === '}')) {
+        depth -= 1;
+        if (depth === 0) {
+          const after = this.tokens[index + 1];
+          return Boolean(after) && after.v === separator;
+        }
+      }
+    }
+    return false;
+  }
+
+  englishVariable(token) {
+    const declKind = token.v === 'value' ? 'const' : 'let';
+    this.next();
+    const pattern = this.bindingPattern();
+    let type = null;
+    if (this.atPunct(':')) {
+      this.next();
+      type = this.typeExpression();
+    }
+    const separator = declKind === 'const' ? 'is' : 'to';
+    if (!(this.peek().v === separator && (this.peek().t === 'kw' || this.peek().t === 'ident'))) {
+      this.fail('PS2001', `Expected "${separator}" but found ${describe(this.peek())}.`, this.peek(),
+        `A 2.1 binding reads "${token.v} name ${separator} value".`);
+    }
+    this.next();
+    const init = this.expression();
+    return this.node('VarDecl', token, { declKind, pattern, type, init, exported: false });
+  }
+
+  englishAssignment(token) {
+    this.next();
+    const target = this.expression();
+    if (!isAssignable(target)) {
+      this.fail('PS2020', 'The left side of a "change" must be a name, field, or index.', token);
+    }
+    this.expectKw('to', 'PS2016');
+    const value = this.expression();
+    return this.node('Assignment', token, { target, operator: '=', value });
+  }
+
+  atReturnArrow() {
+    return this.atPunct('->') || (this.dialect === '2.1' && this.atWord('returns'));
+  }
+
+  consumeReturnArrow() {
+    if (this.atPunct('->') || (this.dialect === '2.1' && this.atWord('returns'))) {
+      this.next();
+      return true;
+    }
+    return false;
+  }
+
+  // A 2.1 file has exactly one spelling per concept. Tokens produced by the
+  // dialect normaliser carry `alias: true`, so a literal 2.0 keyword is still
+  // reported with the 2.1 word that the author meant.
+  rejectLegacySpelling(token, suggestion) {
+    if (this.dialect !== '2.1') return;
+    if (!token || token.t !== 'kw' || token.alias) return;
+    this.fail(
+      'PS2030',
+      `In PlainScript 2.1, write "${suggestion}" instead of "${token.v}".`,
+      token,
+      'Remove the ``#syntax 2.1`` pragma to keep the 2.0 spelling, or see docs/MIGRATION_2_1.md.',
+    );
   }
 
   peek(offset = 0) {
@@ -136,6 +246,13 @@ class Parser {
   statement() {
     const token = this.peek();
 
+    if (this.dialect === '2.1' && token.t === 'ident') {
+      const english = this.englishStatementKind();
+      if (english === 'value' || english === 'set') return this.englishVariable(token);
+      if (english === 'change') return this.englishAssignment(token);
+      if (english === 'define') return this.functionDeclaration({ exported: false });
+    }
+
     if (token.t === 'ident' && token.v === 'overload' && this.peek(1).t === 'kw' && this.peek(1).v === 'function') {
       return this.overloadDeclaration({ exported: false });
     }
@@ -149,7 +266,9 @@ class Parser {
         case 'function': return this.functionDeclaration({ exported: false });
         case 'async':
           this.next();
-          if (!this.atKw('function')) this.fail('PS2003', 'Expected "function" after "async".');
+          if (!this.atKw('function') && !(this.dialect === '2.1' && this.atWord('define'))) {
+            this.fail('PS2003', this.dialect === '2.1' ? 'Expected "define" after "async".' : 'Expected "function" after "async".');
+          }
           return this.functionDeclaration({ exported: false, async: true });
         case 'let':
         case 'const': return this.variableDeclaration({ exported: false });
@@ -254,15 +373,17 @@ class Parser {
     const start = this.expectKw('export');
     if (this.atKw('default')) {
       this.next();
-      // `export default function name(...) ... end` is a declaration, not an
+      // `export default define name(...) ... end` is a declaration, not an
       // expression: the name is bound for recursion and the emitter writes a
       // real function declaration. Anonymous default functions are allowed.
-      if (this.atKw('function')) {
+      if (this.atKw('function') || (this.dialect === '2.1' && this.atWord('define'))) {
         return this.functionDeclaration({ exported: false, defaultExport: true, token: start });
       }
       if (this.atKw('async')) {
         this.next();
-        if (!this.atKw('function')) this.fail('PS2003', 'Expected "function" after "async".');
+        if (!this.atKw('function') && !(this.dialect === '2.1' && this.atWord('define'))) {
+          this.fail('PS2003', this.dialect === '2.1' ? 'Expected "define" after "async".' : 'Expected "function" after "async".');
+        }
         return this.functionDeclaration({ exported: false, async: true, defaultExport: true, token: start });
       }
       return this.node('ExportDefault', start, { value: this.expression() });
@@ -290,6 +411,15 @@ class Parser {
       return this.node('ExportNamed', start, { names, spec });
     }
     if (this.atKw('type')) return this.typeDeclaration(true);
+    if (this.dialect === '2.1' && this.peek().t === 'ident') {
+      const english = this.englishStatementKind();
+      if (english === 'value' || english === 'set') {
+        const declaration = this.englishVariable(this.peek());
+        declaration.exported = true;
+        return declaration;
+      }
+      if (english === 'define') return this.functionDeclaration({ exported: true, token: start });
+    }
     if (this.atKw('declare')) {
       const declaration = this.declareDeclaration();
       declaration.exported = true;
@@ -297,13 +427,17 @@ class Parser {
     }
     if (this.atKw('async')) {
       this.next();
-      if (!this.atKw('function')) this.fail('PS2003', 'Expected "function" after "async".');
+      if (!this.atKw('function') && !(this.dialect === '2.1' && this.atWord('define'))) {
+        this.fail('PS2003', this.dialect === '2.1' ? 'Expected "define" after "async".' : 'Expected "function" after "async".');
+      }
       return this.functionDeclaration({ exported: true, async: true, token: start });
     }
     if (this.atIdent() && this.peek().v === 'overload' && this.peek(1).t === 'kw' && this.peek(1).v === 'function') {
       return this.overloadDeclaration({ exported: true, token: start });
     }
-    if (this.atKw('function')) return this.functionDeclaration({ exported: true, token: start });
+    if (this.atKw('function') || (this.dialect === '2.1' && this.atWord('define'))) {
+      return this.functionDeclaration({ exported: true, token: start });
+    }
     if (this.atKw('let') || this.atKw('const')) return this.variableDeclaration({ exported: true, token: start });
     this.fail('PS2005', 'Expected a declaration after "export".', start);
     return null;
@@ -360,7 +494,7 @@ class Parser {
       const typeParams = typeParameterInfo.params;
       const params = this.parameterList();
       let returnType = null;
-      if (this.atPunct('->')) {
+      if (this.atReturnArrow()) {
         this.next();
         returnType = this.returnAnnotation();
       }
@@ -673,12 +807,16 @@ class Parser {
   overloadDeclaration(options = {}) {
     const start = options.token || this.peek();
     if (this.atIdent() && this.peek().v === 'overload') this.next();
-    this.expectKw('function');
+    if (this.dialect === '2.1' && this.atWord('define')) this.next();
+    else {
+      this.rejectLegacySpelling(this.peek(), 'define');
+      this.expectKw('function');
+    }
     const nameToken = this.expectIdent('an overloaded function name');
     const typeParameterInfo = this.typeParameterList();
     const params = this.parameterList();
     let returnType = null;
-    if (this.atPunct('->')) {
+    if (this.atReturnArrow()) {
       this.next();
       returnType = this.returnAnnotation();
     }
@@ -693,7 +831,11 @@ class Parser {
 
   functionDeclaration(options = {}) {
     const token = options.token || this.peek();
-    this.expectKw('function');
+    if (this.dialect === '2.1' && this.atWord('define')) this.next();
+    else {
+      this.rejectLegacySpelling(this.peek(), 'define');
+      this.expectKw('function');
+    }
     let name = null;
     let nameToken = null;
     if (this.atIdent()) { nameToken = this.next(); name = nameToken.v; }
@@ -702,7 +844,7 @@ class Parser {
     const typeParams = typeParameterInfo.params;
     const params = this.parameterList();
     let returnType = null;
-    if (this.atPunct('->')) {
+    if (this.atReturnArrow()) {
       this.next();
       returnType = this.returnAnnotation();
     }
@@ -734,6 +876,7 @@ class Parser {
 
   variableDeclaration(options = {}) {
     const token = options.token || this.peek();
+    this.rejectLegacySpelling(this.peek(), this.peek().v === 'const' ? 'value' : 'set');
     const kindToken = this.next(); // let | const
     const pattern = this.bindingPattern();
     let type = null;
@@ -789,6 +932,7 @@ class Parser {
   // ------------------------------------------------------------- control flow
 
   conditional() {
+    this.rejectLegacySpelling(this.peek(), 'when');
     const start = this.expectKw('if');
     const stoppers = new Set(['else', 'end']);
     const branches = [{ condition: this.expression(), body: null, line: start.line, col: start.col }];
@@ -796,6 +940,7 @@ class Parser {
     let alternate = null;
 
     while (this.atKw('else')) {
+      this.rejectLegacySpelling(this.peek(), 'otherwise');
       this.next();
       if (this.atKw('if')) {
         this.next();
@@ -812,8 +957,44 @@ class Parser {
     return this.node('Conditional', start, { branches, otherwise: alternate });
   }
 
+  eachMarksLoop() {
+    const following = this.peek(1);
+    if (!following || following.t === 'eof') return false;
+    if (following.t === 'ident') return true;
+    return following.t === 'punct' && (following.v === '[' || following.v === '{');
+  }
+
   forLoop() {
     const start = this.expectKw('for');
+
+    // 2.1 loops spell their direction: `for each x in xs` and
+    // `for i from 0 to 9`. The 2.0 `for x in xs` shortcut is not accepted
+    // there, which keeps one spelling per loop shape.
+    if (this.dialect === '2.1') {
+      // `each` introduces a foreach loop only when a binding pattern follows
+      // it. When the next word is `in` or `from`, `each` is the loop variable
+      // itself: `for each in names` binds a variable named `each`.
+      const eachMarker = this.atWord('each') && this.eachMarksLoop();
+      const bindsEach = !eachMarker && this.atWord('each');
+      if (eachMarker) this.next();
+      const pattern = this.bindingPattern();
+      // A foreach loop used the `each` marker, or bound a variable literally
+      // named `each` (where `in` follows directly). Every other loop spells
+      // its direction with `from`, so `for x in xs` stays an error.
+      if (eachMarker || (bindsEach && this.atKw('in'))) {
+        this.expectKw('in');
+        const iterable = this.expression();
+        const body = this.blockBody('loop');
+        return this.node('ForEach', start, { pattern, iterable, body });
+      }
+      this.expectKw('from', 'PS2014');
+      const from = this.expression();
+      this.expectKw('to', 'PS2015');
+      const to = this.expression();
+      const body = this.blockBody('loop');
+      return this.node('ForRange', start, { pattern, from, to, body });
+    }
+
     const pattern = this.bindingPattern();
     this.expectKw('in');
     const iterable = this.expression();
@@ -847,10 +1028,23 @@ class Parser {
         guard = this.expression();
       }
       const body = [];
-      while (!this.atKw('case') && !this.atKw('end') && !this.atEof()) {
+      const stopAtOtherwise = this.dialect === '2.1';
+      while (!this.atKw('case') && !this.atKw('end') && !this.atEof()
+        && !(stopAtOtherwise && this.atKw('else'))) {
         body.push(this.statement());
       }
       cases.push({ pattern, guard, body, line: caseToken.line, col: caseToken.col });
+    }
+    // 2.1 lets `otherwise` close a match, so the fallback arm reads the same as
+    // the fallback branch of `when`.
+    if (this.dialect === '2.1' && this.atKw('else')) {
+      const otherwiseToken = this.next();
+      const body = [];
+      while (!this.atKw('end') && !this.atEof()) body.push(this.statement());
+      cases.push({
+        pattern: { kind: 'WildcardPattern', line: otherwiseToken.line, col: otherwiseToken.col },
+        guard: null, body, line: otherwiseToken.line, col: otherwiseToken.col,
+      });
     }
     this.expectKw('end', 'PS2012');
     if (cases.length === 0) this.fail('PS2013', 'A match needs at least one "case".', start);
@@ -1405,7 +1599,7 @@ class Parser {
         parts.push({ kind: 'TemplateText', value: part.v });
         continue;
       }
-      const sub = tokenize(part.src, this.file);
+      const sub = tokenize(part.src, this.file, { dialect: this.dialect });
       if (sub.errors.length) {
         this.errors.push(...sub.errors);
         continue;
@@ -1415,7 +1609,7 @@ class Parser {
         line: part.line + t.line - 1,
         col: t.line === 1 ? part.col + t.col - 1 : t.col,
       }));
-      const parser = new Parser(shifted, this.file, part.src);
+      const parser = new Parser(shifted, this.file, part.src, this.dialect);
       try {
         const expression = parser.expression();
         if (!parser.atEof()) parser.fail('PS2028', 'Interpolation must contain exactly one expression.');
@@ -1454,9 +1648,9 @@ function withHiddenPositions(value, positions) {
   return value;
 }
 
-function parse(source, file) {
-  const result = tokenize(source, file);
-  const parser = new Parser(result.tokens, file, source);
+function parse(source, file, options = {}) {
+  const result = tokenize(source, file, options);
+  const parser = new Parser(result.tokens, file, source, result.dialect);
   parser.comments = result.comments;
   const program = parser.parseProgram();
   const diagnostics = [...result.errors, ...parser.errors];

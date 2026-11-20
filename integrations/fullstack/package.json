@@ -1,0 +1,16 @@
+{
+  "name": "plainscript-integration-fullstack",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Express, SQLite and React in one PlainScript 2.1 full-stack application",
+  "scripts": {
+    "check": "node ../../src/cli.js check",
+    "build": "node ../../src/cli.js build",
+    "start": "node ../../src/cli.js run src/server.pln"
+  },
+  "dependencies": {
+    "express": "^5.3.0",
+    "react": "^19.2.0"
+  }
+}

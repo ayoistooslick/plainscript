@@ -7,6 +7,22 @@ plainscript <command> [options]
 Exit codes: `0` success, `1` compile or test failure, `2` usage error. Diagnostics go to
 stderr; program output and `ir`/`version` output go to stdout.
 
+## Syntax dialects
+
+A `.pln` file selects its surface dialect on the first line:
+
+```plainscript
+#syntax 2.1
+```
+
+`#syntax 2.0`, or no pragma at all, is the 2.0 dialect. The compiler reads the
+pragma per file, so one project can mix both. `check`, `build`, `watch`, `run`,
+`fmt`, `lsp` and `dap` all handle either dialect; a 2.0 word inside a 2.1 file is
+reported as `PS2030` with the 2.1 spelling in the message. `fmt` preserves the
+pragma and formats 2.1 blocks (`define`, `when`, `otherwise`) with the same
+indentation rules as 2.0 blocks. See
+[Migrating from 2.0](MIGRATION_2_1.md) for the complete mapping.
+
 ## Commands
 
 ### `plainscript run [file.pln] [args…]`
@@ -215,6 +231,7 @@ TypeScript toolchain is installed separately; see [BENCHMARKS](BENCHMARKS.md).
 | `--json` | With `migrate` or `interop`: print a JSON report. |
 | `--template=<id>`, `-t <id>` | With `new`: select a bundled starter. |
 | `--std-base=<url>` | With `build`: browser base URL for `std` imports. |
+| `--syntax=<v>` | Compile files without a pragma as `2.0` or `2.1` for this run. |
 | `--help`, `-h` | Show help. |
 
 ## Project layout and configuration
@@ -227,10 +244,15 @@ Defaults: sources under `src/` when it exists (otherwise the current directory),
   "compilerOptions": {
     "rootDir": "src",
     "outDir": "dist",
-    "exclude": ["src/legacy"]
+    "exclude": ["src/legacy"],
+    "syntax": "2.1"
   }
 }
 ```
+
+`syntax` is the default dialect for files without a pragma. It may also appear at
+the top level of the file. A `#syntax 2.0` or `#syntax 2.1` line in a file takes
+precedence, and `--syntax` overrides the configuration for one command.
 
 Paths are relative to the config file's directory (`rootDir`, `outDir`, `exclude` entries).
 `rootDir` determines output paths: `src/api/server.pln` becomes `dist/api/server.js`.

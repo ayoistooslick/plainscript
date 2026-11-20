@@ -30,17 +30,17 @@ function writeFiles(directory, files) {
 
 // Compiles a project inside the compiler's own tree, which keeps standard
 // library imports resolvable without an npm install.
-function compileProject(files, entry = 'main.pln') {
+function compileProject(files, entry = 'main.pln', options = {}) {
   const directory = sandbox();
   writeFiles(directory, files);
-  const compiler = new Compiler({ root: ROOT });
+  const compiler = new Compiler({ root: ROOT, dialect: options.dialect || null });
   const outRoot = path.join(directory, 'out');
   const result = compiler.compileGraph(path.join(directory, entry), outRoot, directory);
   return { directory, compiler, result, outRoot, entryOut: result.entryOut };
 }
 
-function runProject(files, entry = 'main.pln', args = []) {
-  const project = compileProject(files, entry);
+function runProject(files, entry = 'main.pln', args = [], options = {}) {
+  const project = compileProject(files, entry, options);
   const child = spawnSync(process.execPath, [project.entryOut, ...args], {
     cwd: project.directory,
     encoding: 'utf8',
@@ -55,8 +55,8 @@ function runProject(files, entry = 'main.pln', args = []) {
   };
 }
 
-function runSource(source, args = []) {
-  return runProject({ 'main.pln': source }, 'main.pln', args);
+function runSource(source, args = [], options = {}) {
+  return runProject({ 'main.pln': source }, 'main.pln', args, options);
 }
 
 function diagnosticsOf(source, options = {}) {

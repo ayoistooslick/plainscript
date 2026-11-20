@@ -1,0 +1,19 @@
+{
+  "name": "plainscript-integration-multi-module",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "A three-module PlainScript 2.1 program with cross-module types",
+  "scripts": {
+    "check": "node ../../src/cli.js check src/main.pln",
+    "build": "node ../../src/cli.js build --declarations",
+    "start": "node ../../src/cli.js run src/main.pln"
+  },
+  "types": "./dist/main.d.pln",
+  "exports": {
+    ".": {
+      "types": "./dist/main.d.pln",
+      "import": "./dist/main.js"
+    }
+  }
+}

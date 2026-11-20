@@ -1,0 +1,52 @@
+#syntax 2.1
+
+# A middle module: it imports both a type and values from ./money.pln, re-exports
+# a type of its own, and is imported by main.pln. Type information crosses
+# module boundaries without declarations.
+
+import { add, money, multiply, format, Money } from "./money.pln"
+import { append } from "std/list"
+
+export type LineItem
+    name: text
+    price: Money
+    quantity: number
+end
+
+export type Cart
+    currency: text
+    items: list of LineItem
+end
+
+export define emptyCart(currency: text) returns Cart
+    return { currency: currency, items: [] }
+end
+
+export define addItem(cart: Cart, name: text, price: number, quantity: number) returns Cart
+    set item: LineItem to { name: name, price: money(price, cart.currency), quantity: quantity }
+    return { currency: cart.currency, items: append(cart.items, item) }
+end
+
+export define lineTotal(item: LineItem) returns Money
+    return multiply(item.price, item.quantity)
+end
+
+export define subtotal(cart: Cart) returns Money
+    set total to money(0, cart.currency)
+    for each item in cart.items
+        change total to add(total, lineTotal(item))
+    end
+    return total
+end
+
+export define describe(cart: Cart) returns text
+    set lines: list of text to []
+    for each item in cart.items
+        change lines to append(lines, "  {item.quantity} x {item.name} = {format(lineTotal(item))}")
+    end
+    set body to ""
+    for each line in lines
+        change body to "{body}{line}\n"
+    end
+    return "{body}total: {format(subtotal(cart))}"
+end

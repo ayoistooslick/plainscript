@@ -1,0 +1,15 @@
+{
+  "name": "plainscript-integration-express",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "A real Express 5 JSON API written in PlainScript 2.1",
+  "scripts": {
+    "check": "node ../../src/cli.js check src/main.pln",
+    "build": "node ../../src/cli.js build src/main.pln",
+    "start": "node ../../src/cli.js run src/main.pln"
+  },
+  "dependencies": {
+    "express": "^5.3.0"
+  }
+}

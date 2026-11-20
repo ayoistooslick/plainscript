@@ -1,0 +1,15 @@
+#syntax 2.1
+
+# Shared between the server, the repository and the React component. One type
+# declaration is checked against every importer.
+
+export type Note
+    id: number
+    body: text
+    done: boolean
+end
+
+export type NoteList
+    notes: list of Note
+    remaining: number
+end

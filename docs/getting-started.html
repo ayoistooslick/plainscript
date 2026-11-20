@@ -1,0 +1,160 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Getting started — PlainScript documentation."><title>Getting started · PlainScript</title><link rel="stylesheet" href="style.css"></head><body><div class="site-shell"><aside class="sidebar"><a class="brand" href="index.html"><span class="brand-mark">PS</span><span><span class="brand-name">PlainScript</span><span class="brand-meta">Language docs · 2.1</span></span></a><div class="nav-group"><div class="nav-label">Start here</div><a class="nav-link " href="index.html">PlainScript</a><a class="nav-link active" href="getting-started.html">Getting started</a><a class="nav-link " href="cli.html">CLI reference</a><a class="nav-link " href="templates.html">Application templates</a></div><div class="nav-group"><div class="nav-label">Language</div><a class="nav-link " href="language-reference.html">Language reference</a><a class="nav-link " href="spec.html">Language specification</a><a class="nav-link " href="syntax-design.html">Syntax design</a><a class="nav-link " href="type-system.html">Type system</a></div><div class="nav-group"><div class="nav-label">Compiler</div><a class="nav-link " href="compiler.html">Compiler</a><a class="nav-link " href="architecture.html">Compiler architecture</a><a class="nav-link " href="interop.html">JavaScript interoperability</a><a class="nav-link " href="benchmarks.html">Benchmarks</a></div><div class="nav-group"><div class="nav-label">Guides</div><a class="nav-link " href="integrations.html">Integrations</a><a class="nav-link " href="migration-2-1.html">Migrating from 2.0</a><a class="nav-link " href="contracts.html">Unified contracts</a><a class="nav-link " href="concurrency.html">Concurrency</a><a class="nav-link " href="jobs.html">Background jobs</a><a class="nav-link " href="databases.html">Databases</a><a class="nav-link " href="security.html">Security</a><a class="nav-link " href="debugging.html">Debugging</a><a class="nav-link " href="migration.html">Migration guide</a><a class="nav-link " href="comparison.html">Comparison with TypeScript</a></div><div class="nav-group"><div class="nav-label">Project</div><a class="nav-link " href="progress.html">Engineering progress</a><a class="nav-link " href="roadmap.html">Roadmap</a><a class="nav-link " href="audit.html">Audit</a><a class="nav-link " href="decisions.html">Decisions</a></div><div class="sidebar-footer">Open source under MIT.<br><a href="https://github.com/ayoistooslick/Plainscript">View on GitHub ↗</a></div></aside><main class="main"><header class="topbar"><div class="search-wrap"><label class="search" aria-label="Search documentation"><span>⌕</span><input id="doc-search" type="search" placeholder="Search the docs…" autocomplete="off"><kbd>/</kbd></label><div id="search-results" class="search-results" role="listbox"></div></div><nav class="top-links"><a href="index.html">Docs</a><a href="https://github.com/ayoistooslick/Plainscript">GitHub ↗</a></nav></header><div class="content"><article class="page-layout"><div class="prose"><p>&lt;!-- compile-examples --&gt;</p>
+<h1 id="getting-started-with-plainscript-2-1">Getting started with PlainScript 2.1</h1>
+<p>PlainScript is a statically typed language that compiles to JavaScript. You write a <code>.pln</code> file, the compiler checks it, and you run the emitted ES module with Node, Vite, Next.js or any other JavaScript toolchain.</p>
+<p>This guide uses the 2.1 dialect. If you have a 2.0 codebase, read <a href="migration-2-1.html">Migrating from 2.0</a>; nothing breaks until you add the pragma.</p>
+<h2 id="1-install">1. Install</h2>
+<p>PlainScript needs Node.js 20 or newer. From a clone of the repository:</p>
+<pre><code>node src/cli.js version</code></pre>
+<p>Once the package is installed, the <code>plainscript</code> command replaces <code>node src/cli.js</code>:</p>
+<pre><code>npm install plainscript-lang
+npx plainscript version</code></pre>
+<h2 id="2-your-first-program">2. Your first program</h2>
+<p>Create <code>hello.pln</code>. The first line opts this file into the 2.1 dialect:</p>
+<pre><code>#syntax 2.1
+
+import { print } from &quot;std/io&quot;
+
+define greet(name: text) returns text
+    return &quot;Hello, {name}!&quot;
+end
+
+print(greet(&quot;world&quot;))</code></pre>
+<p>Run it:</p>
+<pre><code>node src/cli.js run hello.pln</code></pre>
+<pre><code>Hello, world!</code></pre>
+<p><code>run</code> compiles in memory and executes the result. To see the JavaScript:</p>
+<pre><code>node src/cli.js build hello.pln</code></pre>
+<p>The emitted module contains a normal <code>function greet(name)</code> and <code>console.log</code>. There is no runtime library.</p>
+<h2 id="3-bindings">3. Bindings</h2>
+<p><code>value</code> binds a name that cannot be reassigned; <code>set</code> binds one that can; <code>change</code> assigns to an existing mutable binding.</p>
+<pre><code>#syntax 2.1
+
+import { print } from &quot;std/io&quot;
+
+value maxAttempts is 3
+set attempts to 0
+
+while attempts is less than maxAttempts
+    change attempts to attempts + 1
+    print(&quot;attempt {attempts} of {maxAttempts}&quot;)
+end</code></pre>
+<p>Locals are checked. Assigning to a <code>value</code> is a compile error, and so is using a name that was never declared.</p>
+<h2 id="4-types-and-functions">4. Types and functions</h2>
+<p>Types are written after a colon in a parameter list, and a function&#39;s result follows <code>returns</code>.</p>
+<pre><code>#syntax 2.1
+
+import { print } from &quot;std/io&quot;
+import { filter } from &quot;std/list&quot;
+
+type Task
+    id: number
+    title: text
+    done: boolean
+end
+
+define openTasks(tasks: list of Task) returns list of Task
+    return tasks
+        |&gt; filter((task: Task) =&gt; not task.done)
+end
+
+value tasks: list of Task is [
+    { id: 1, title: &quot;write the compiler&quot;, done: true },
+    { id: 2, title: &quot;ship 2.1&quot;, done: false },
+]
+
+for each task in openTasks(tasks)
+    print(&quot;{task.id}. {task.title}&quot;)
+end</code></pre>
+<p><code>|&gt;</code> is the pipeline operator: the value on the left becomes the first argument of the call on the right.</p>
+<h2 id="5-conditionals-and-loops">5. Conditionals and loops</h2>
+<pre><code>#syntax 2.1
+
+import { print } from &quot;std/io&quot;
+
+define describe(score: number) returns text
+    when score is at least 90
+        return &quot;excellent&quot;
+    otherwise when score is at least 60
+        return &quot;passing&quot;
+    otherwise
+        return &quot;needs work&quot;
+    end
+end
+
+for i from 1 to 3
+    print(&quot;{i}: {describe(i * 30)}&quot;)
+end
+
+for each word in [&quot;alpha&quot;, &quot;beta&quot;]
+    print(word)
+end</code></pre>
+<p>Every block closes with <code>end</code>. Indentation is for readers; the compiler uses <code>end</code>.</p>
+<h2 id="6-optional-values-and-errors">6. Optional values and errors</h2>
+<p><code>T?</code> is <code>T or nothing</code>. Narrow it with <code>is nothing</code> before using it. Errors are handled with <code>try</code>, <code>catch</code> and <code>finally</code>; <code>throw</code> takes any value.</p>
+<pre><code>#syntax 2.1
+
+import { print } from &quot;std/io&quot;
+import { parseNumber } from &quot;std/text&quot;
+
+define parseAge(raw: text) returns number?
+    set parsed to parseNumber(raw, -1)
+    when parsed is less than 0
+        return nothing
+    end
+    return parsed
+end
+
+define report(raw: text) returns text
+    set age to parseAge(raw)
+    when age is nothing
+        return &quot;not a number: {raw}&quot;
+    end
+    return &quot;age: {age}&quot;
+end
+
+try
+    print(report(&quot;42&quot;))
+    print(report(&quot;forty&quot;))
+    throw &quot;demonstrating catch&quot;
+catch failure
+    print(&quot;caught: {failure}&quot;)
+finally
+    print(&quot;done&quot;)
+end</code></pre>
+<h2 id="7-modules-and-npm-packages">7. Modules and npm packages</h2>
+<p>A <code>.pln</code> file is an ES module. Relative imports use <code>.pln</code> paths and are emitted with <code>.js</code>; package and Node built-in imports pass through unchanged.</p>
+<pre><code>#syntax 2.1
+
+import { print } from &quot;std/io&quot;
+import { join } from &quot;node:path&quot;
+import { existsSync } from &quot;node:fs&quot;
+
+declare const process: any
+
+value here is process.cwd()
+print(join(here, &quot;src&quot;))
+print(existsSync(join(here, &quot;package.json&quot;)))</code></pre>
+<p>Packages without TypeScript declarations are <code>any</code> at the boundary. Add <code>declare</code> statements for the parts you rely on, or keep the values in explicitly typed PlainScript code as soon as possible.</p>
+<h2 id="8-a-project">8. A project</h2>
+<p><code>plainscript new</code> writes a project:</p>
+<pre><code>node src/cli.js new my-app
+cd my-app
+npm install
+npm run build</code></pre>
+<p>The default project has <code>src/main.pln</code>, a <code>package.json</code> with a build script, and a <code>plainscript.config.json</code> that maps <code>src/</code> to <code>dist/</code>.</p>
+<pre><code>my-app/
+  package.json
+  plainscript.config.json
+  src/main.pln        # compiled to dist/main.js</code></pre>
+<p><code>plainscript build</code> reads the config, compiles the module graph and writes one ES module per source file. <code>plainscript watch</code> rebuilds on change.</p>
+<h2 id="9-where-to-go-next">9. Where to go next</h2>
+<ul>
+<li><a href="language-reference.html">Language reference</a> — every construct, with the 2.0</li>
+<p>spelling beside it.</p>
+<li><a href="integrations.html">Integrations</a> — Express, React + Vite, Next.js, HTTP and</li>
+<p>SQLite projects that are built and tested in this repository.</p>
+<li><a href="type-system.html">Type system</a> — generics, unions, narrowing, variants and</li>
+<p>advanced types.</p>
+<li><a href="compiler.html">Compiler</a> — how source becomes JavaScript.</li>
+<li><a href="cli.html">CLI reference</a> — every command and flag.</li>
+</ul></div><aside class="toc"><div class="toc-title">On this page</div><a class="toc-h2" href="#1-install">1. Install</a><a class="toc-h2" href="#2-your-first-program">2. Your first program</a><a class="toc-h2" href="#3-bindings">3. Bindings</a><a class="toc-h2" href="#4-types-and-functions">4. Types and functions</a><a class="toc-h2" href="#5-conditionals-and-loops">5. Conditionals and loops</a><a class="toc-h2" href="#6-optional-values-and-errors">6. Optional values and errors</a><a class="toc-h2" href="#7-modules-and-npm-packages">7. Modules and npm packages</a><a class="toc-h2" href="#8-a-project">8. A project</a><a class="toc-h2" href="#9-where-to-go-next">9. Where to go next</a></aside></article><footer class="page-footer"><span>PlainScript 2.1 documentation</span><a href="https://github.com/ayoistooslick/Plainscript/issues">Report a documentation issue ↗</a></footer></div></main></div><script src="app.js"></script></body></html>

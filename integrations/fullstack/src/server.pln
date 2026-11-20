@@ -1,0 +1,74 @@
+
+# The server half of a full-stack application: Express 5 over a SQLite
+# repository, both behind PlainScript types.
+#
+#   PORT=4510 DATABASE_FILE=notes.db npm start
+#
+# Every handler is an ordinary Express handler. There is no PlainScript runtime
+# in the request path.
+
+import express from "express"
+import { print, env } from "std/io"
+import { parseNumber } from "std/text"
+import { count } from "std/list"
+import { connect } from "./repository.pln"
+
+declare const process: any
+
+set file to env("DATABASE_FILE", "notes.db")
+set port to parseNumber(env("PORT", "4510"))
+
+set repository to await connect(file)
+set app to express()
+app.use(express.json())
+
+app.get("/health", (request: any, response: any) => do
+    response.json({ status: "ok", notes: count(repository.list()) })
+end)
+
+app.get("/notes", (request: any, response: any) => do
+    response.json(repository.list())
+end)
+
+app.post("/notes", (request: any, response: any) => do
+    set body to ""
+    when request.body is map of text to any
+        when request.body["body"] is text
+            change body to request.body["body"] as text
+        end
+    end
+
+    when body is equal to ""
+        response.status(400).json({ error: "body is required" })
+    otherwise
+        response.status(201).json(repository.add(body))
+    end
+end)
+
+app.patch("/notes/:id", (request: any, response: any) => do
+    set id to parseNumber(request.params.id as text, -1)
+    set note to repository.complete(id)
+    when note is nothing
+        response.status(404).json({ error: "note not found" })
+    otherwise
+        response.json(note)
+    end
+end)
+
+app.delete("/notes/:id", (request: any, response: any) => do
+    set id to parseNumber(request.params.id as text, -1)
+    when repository.remove(id)
+        response.json({ deleted: true, id: id })
+    otherwise
+        response.status(404).json({ error: "note not found" })
+    end
+end)
+
+set server to app.listen(port, () => do
+    print("fullstack api listening on {port} with database {file}")
+end)
+
+process.on("SIGTERM", () => do
+    server.close()
+    repository.close()
+end)

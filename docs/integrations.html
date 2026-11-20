@@ -1,0 +1,228 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Integrations — PlainScript documentation."><title>Integrations · PlainScript</title><link rel="stylesheet" href="style.css"></head><body><div class="site-shell"><aside class="sidebar"><a class="brand" href="index.html"><span class="brand-mark">PS</span><span><span class="brand-name">PlainScript</span><span class="brand-meta">Language docs · 2.1</span></span></a><div class="nav-group"><div class="nav-label">Start here</div><a class="nav-link " href="index.html">PlainScript</a><a class="nav-link " href="getting-started.html">Getting started</a><a class="nav-link " href="cli.html">CLI reference</a><a class="nav-link " href="templates.html">Application templates</a></div><div class="nav-group"><div class="nav-label">Language</div><a class="nav-link " href="language-reference.html">Language reference</a><a class="nav-link " href="spec.html">Language specification</a><a class="nav-link " href="syntax-design.html">Syntax design</a><a class="nav-link " href="type-system.html">Type system</a></div><div class="nav-group"><div class="nav-label">Compiler</div><a class="nav-link " href="compiler.html">Compiler</a><a class="nav-link " href="architecture.html">Compiler architecture</a><a class="nav-link " href="interop.html">JavaScript interoperability</a><a class="nav-link " href="benchmarks.html">Benchmarks</a></div><div class="nav-group"><div class="nav-label">Guides</div><a class="nav-link active" href="integrations.html">Integrations</a><a class="nav-link " href="migration-2-1.html">Migrating from 2.0</a><a class="nav-link " href="contracts.html">Unified contracts</a><a class="nav-link " href="concurrency.html">Concurrency</a><a class="nav-link " href="jobs.html">Background jobs</a><a class="nav-link " href="databases.html">Databases</a><a class="nav-link " href="security.html">Security</a><a class="nav-link " href="debugging.html">Debugging</a><a class="nav-link " href="migration.html">Migration guide</a><a class="nav-link " href="comparison.html">Comparison with TypeScript</a></div><div class="nav-group"><div class="nav-label">Project</div><a class="nav-link " href="progress.html">Engineering progress</a><a class="nav-link " href="roadmap.html">Roadmap</a><a class="nav-link " href="audit.html">Audit</a><a class="nav-link " href="decisions.html">Decisions</a></div><div class="sidebar-footer">Open source under MIT.<br><a href="https://github.com/ayoistooslick/Plainscript">View on GitHub ↗</a></div></aside><main class="main"><header class="topbar"><div class="search-wrap"><label class="search" aria-label="Search documentation"><span>⌕</span><input id="doc-search" type="search" placeholder="Search the docs…" autocomplete="off"><kbd>/</kbd></label><div id="search-results" class="search-results" role="listbox"></div></div><nav class="top-links"><a href="index.html">Docs</a><a href="https://github.com/ayoistooslick/Plainscript">GitHub ↗</a></nav></header><div class="content"><article class="page-layout"><div class="prose"><p>&lt;!-- compile-examples --&gt;</p>
+<h1 id="integrations">Integrations</h1>
+<p>PlainScript emits ordinary ES modules. Any JavaScript framework that accepts a module works without a plugin, a runtime shim or a custom bundler.</p>
+<p>This page covers the eight integrations in <a href="../integrations"><code>integrations/</code></a>. Each example is a complete program compiled by the test suite; the full projects are built and executed by <code>npm test</code> and <code>npm run verify:integrations</code>.</p>
+<table><thead><tr><th>Integration</th><th>Verified by</th></tr></thead><tbody>
+<tr><td>Express 5</td><td>HTTP session in <code>npm test</code></td></tr>
+<tr><td>React + Vite</td><td>React SSR in <code>npm test</code>; Vite production build in <code>npm run verify:integrations</code></td></tr>
+<tr><td>Next.js 15</td><td><code>next build</code> and prerendered HTML in <code>npm run verify:integrations</code></td></tr>
+<tr><td>Async HTTP</td><td>real server + client in <code>npm test</code></td></tr>
+<tr><td>SQLite</td><td>inserts, queries, aggregate and rollback in <code>npm test</code></td></tr>
+<tr><td>CLI application</td><td>argument parsing, JSON persistence and exit codes in <code>npm test</code></td></tr>
+<tr><td>Multi-module project</td><td><code>build --declarations</code>, emitted modules and cross-module types in <code>npm test</code></td></tr>
+<tr><td>Full-stack app</td><td>Express + SQLite CRUD, restart persistence and React SSR in <code>npm test</code></td></tr>
+</tbody></table>
+<h2 id="express-5">Express 5</h2>
+<p>Express is an untyped JavaScript package, so the app object and request handlers are <code>any</code> deliberately. Everything else stays typed.</p>
+<pre><code>#syntax 2.1
+
+import express from &quot;express&quot;
+import { print, env } from &quot;std/io&quot;
+import { parseNumber } from &quot;std/text&quot;
+
+set app to express()
+app.use(express.json())
+
+app.get(&quot;/health&quot;, (request: any, response: any) =&gt; do
+    response.json({ status: &quot;ok&quot; })
+end)
+
+app.post(&quot;/items&quot;, (request: any, response: any) =&gt; do
+    set body to request.body
+    when body is map of text to any
+        response.status(201).json({ received: body })
+    otherwise
+        response.status(400).json({ error: &quot;JSON object required&quot; })
+    end
+end)
+
+set port to parseNumber(env(&quot;PORT&quot;, &quot;4501&quot;))
+app.listen(port, () =&gt; do
+    print(&quot;express listening on {port}&quot;)
+end)</code></pre>
+<p>Run the full project:</p>
+<pre><code>cd integrations/express-api
+npm install
+npm start</code></pre>
+<p>The test suite starts the compiled server, checks <code>/health</code>, creates, updates and deletes a note, and asserts the 400 and 404 responses.</p>
+<h2 id="react-vite">React + Vite</h2>
+<p><code>render</code> and <code>element</code> lower to <code>createElement</code>. A PlainScript component is an ordinary React function component, so hooks, event handlers and keys behave exactly as documented by React.</p>
+<pre><code>#syntax 2.1
+
+import { createElement, useState } from &quot;react&quot;
+
+export define Counter() returns any
+    set (count, setCount) to useState(0)
+
+    render
+        element &quot;div&quot; with className: &quot;counter&quot;
+            element &quot;p&quot;
+                &quot;Count: {count}&quot;
+            end
+            element &quot;button&quot; with onClick: () =&gt; setCount(count + 1)
+                &quot;Increment&quot;
+            end
+        end
+    end
+end</code></pre>
+<p>Build the Vite project:</p>
+<pre><code>cd integrations/react-vite
+npm install
+npm run build</code></pre>
+<p>The build compiles <code>src/App.pln</code> to <code>src/generated/App.js</code> and bundles it with Vite. The test suite renders the component through <code>react-dom/server</code> and asserts the produced markup.</p>
+<h2 id="next-js-15">Next.js 15</h2>
+<p>A Next.js server component is the same function component. The project compiles <code>app/Home.pln</code> to <code>app/generated/Home.js</code>; <code>app/page.js</code> imports it.</p>
+<pre><code>#syntax 2.1
+
+import { createElement } from &quot;react&quot;
+
+export define Home() returns any
+    render
+        element &quot;main&quot; with className: &quot;page&quot;
+            element &quot;h1&quot;
+                &quot;Rendered by Next.js&quot;
+            end
+            element &quot;p&quot;
+                &quot;This markup came from a PlainScript component.&quot;
+            end
+        end
+    end
+end</code></pre>
+<p>Build the Next.js project:</p>
+<pre><code>cd integrations/next-app
+npm install
+npm run build</code></pre>
+<p><code>npm run verify:integrations</code> runs the production build and checks that the prerendered HTML contains the component&#39;s markup.</p>
+<h2 id="async-http">Async HTTP</h2>
+<p><code>std/http</code> accepts and returns Web-standard <code>Request</code> and <code>Response</code> objects on top of Node&#39;s HTTP server. <code>fetchJson</code> uses the platform <code>fetch</code>.</p>
+<pre><code>#syntax 2.1
+
+import { serve, json, fetchJson } from &quot;std/http&quot;
+import { print } from &quot;std/io&quot;
+import { parseNumber } from &quot;std/text&quot;
+
+type Status
+    ok: boolean
+    message: text
+end
+
+set port to 4503
+set server to await serve(port, (request: any) =&gt; json({ ok: true, message: &quot;hello&quot; }))
+
+set status to await fetchJson(&quot;http://127.0.0.1:{port}/status&quot;) as Status
+print(status.message)
+
+server.close()</code></pre>
+<p><code>integrations/http-client</code> runs this pattern end to end: it starts a server, performs two asynchronous requests, prints the responses and closes the server.</p>
+<h2 id="sqlite">SQLite</h2>
+<p>Node&#39;s built-in <code>node:sqlite</code> driver is used directly. Prepare statements once, bind every value, and narrow rows into records at the boundary.</p>
+<pre><code>#syntax 2.1
+
+import { print } from &quot;std/io&quot;
+import { DatabaseSync } from &quot;node:sqlite&quot;
+
+type Task
+    id: number
+    title: text
+    done: boolean
+end
+
+set database to new DatabaseSync(&quot;:memory:&quot;)
+database.exec(&quot;create table tasks (id integer primary key autoincrement, title text not null, done integer not null default 0)&quot;)
+
+set insertTask to database.prepare(&quot;insert into tasks (title, done) values (?, ?)&quot;)
+insertTask.run(&quot;write the compiler&quot;, 0)
+insertTask.run(&quot;ship 2.1&quot;, 1)
+
+for each row in database.prepare(&quot;select id, title, done from tasks order by id&quot;).all() as list of any
+    set task: Task to { id: row.id as number, title: row.title as text, done: row.done is equal to 1 }
+    print(&quot;{task.id}. {task.title} — done: {task.done}&quot;)
+end
+
+database.close()</code></pre>
+<p><code>integrations/sqlite</code> also exercises updates, an aggregate query, and a transaction that is rolled back.</p>
+<h2 id="command-line-application">Command-line application</h2>
+<p><code>integrations/cli-app</code> is a typed task tracker. It reads its arguments from <code>std/io</code>, stores JSON through <code>std/fs</code> and <code>std/json</code>, and exits 2 on a usage error and 1 when a task does not exist.</p>
+<pre><code>#syntax 2.1
+
+import { print, eprint, args, exit } from &quot;std/io&quot;
+import { encode } from &quot;std/json&quot;
+import { append, count } from &quot;std/list&quot;
+
+type Task
+    id: number
+    title: text
+    done: boolean
+end
+
+set arguments to args()
+set tasks: list of Task to []
+
+when count(arguments) is equal to 0
+    eprint(&quot;usage: add &lt;title&gt; | list&quot;)
+    exit(2)
+end
+
+when arguments[0] is equal to &quot;add&quot;
+    set rawTitle to arguments[1]
+    set title to &quot;&quot;
+    when rawTitle is text
+        change title to rawTitle
+    end
+    when title is equal to &quot;&quot;
+        eprint(&quot;add needs a title&quot;)
+        exit(2)
+    end
+    change tasks to append(tasks, { id: count(tasks) + 1, title: title, done: false })
+end
+
+print(encode(tasks, 2))</code></pre>
+<p><code>std/io</code>&#39;s <code>args()</code> returns <code>list of text</code>, so the element access is optional and is narrowed once with <code>is text</code>; that is the same rule as any other optional value.</p>
+<h2 id="multi-module-project">Multi-module project</h2>
+<p><code>integrations/multi-module</code> is a three-module program (<code>main.pln</code>, <code>cart.pln</code>, <code>money.pln</code>) with types crossing every boundary. A type travels with the value import; there is no separate type-import syntax, and the emitter drops imports that are only used in type positions.</p>
+<pre><code>#syntax 2.1
+
+# money.pln — the leaf module.
+export type Money
+    amount: number
+    currency: text
+end
+
+export define money(amount: number, currency: text) returns Money
+    return { amount: amount, currency: currency }
+end
+
+export define add(left: Money, right: Money) returns Money
+    when left.currency is not equal to right.currency
+        throw &quot;cannot add {right.currency} to {left.currency}&quot;
+    end
+    return money(left.amount + right.amount, left.currency)
+end</code></pre>
+<p><code>plainscript build --declarations</code> writes one <code>.js</code> and one <code>.d.pln</code> per module, so <code>cart.d.pln</code> describes <code>LineItem</code> in terms of <code>Money</code> for other tools.</p>
+<h2 id="full-stack-application">Full-stack application</h2>
+<p><code>integrations/fullstack</code> is one application with four modules: shared types, a SQLite repository, an Express server and a React client. The server and the repository are ordinary modules; the client imports the same <code>Note</code> type.</p>
+<pre><code>#syntax 2.1
+
+import { open } from &quot;std/db&quot;
+import { print } from &quot;std/io&quot;
+
+type Note
+    id: number
+    body: text
+    done: boolean
+end
+
+set database to await open(&quot;:memory:&quot;)
+database.exec(&quot;create table notes (id integer primary key autoincrement, body text not null, done integer not null default 0)&quot;)
+database.run(&quot;insert into notes (body, done) values (?, 0)&quot;, [&quot;ship 2.1&quot;])
+
+for each row in database.query(&quot;select id, body, done from notes&quot;)
+    set note: Note to { id: row.id as number, body: row.body as text, done: row.done is equal to 1 }
+    print(&quot;{note.id}. {note.body} (done: {note.done})&quot;)
+end
+
+database.close()</code></pre>
+<p>The repository exposes a <code>NoteRepository</code> record of closures, so the server cannot call a method the repository does not implement. The test suite starts the server, creates, completes and deletes notes over HTTP, restarts it against the same database file to confirm persistence, and renders the React component through <code>react-dom/server</code>.</p>
+<h2 id="other-frameworks">Other frameworks</h2>
+<p>The rule is the same for every framework: if it can import an ES module that exports functions, it can use PlainScript. Build the <code>.pln</code> files first (<code>plainscript build</code>), point the framework at the generated <code>.js</code>, and keep the framework&#39;s own configuration and entry points in JavaScript.</p>
+<p>The templates in <code>templates/</code> cover React + Vite, Next.js, Express, a CLI and a library; <code>demos/</code> contains larger examples, including a contracts demo shared between a SQLite-backed API and a React client.</p></div><aside class="toc"><div class="toc-title">On this page</div><a class="toc-h2" href="#express-5">Express 5</a><a class="toc-h2" href="#react-vite">React + Vite</a><a class="toc-h2" href="#next-js-15">Next.js 15</a><a class="toc-h2" href="#async-http">Async HTTP</a><a class="toc-h2" href="#sqlite">SQLite</a><a class="toc-h2" href="#command-line-application">Command-line application</a><a class="toc-h2" href="#multi-module-project">Multi-module project</a><a class="toc-h2" href="#full-stack-application">Full-stack application</a><a class="toc-h2" href="#other-frameworks">Other frameworks</a></aside></article><footer class="page-footer"><span>PlainScript 2.1 documentation</span><a href="https://github.com/ayoistooslick/Plainscript/issues">Report a documentation issue ↗</a></footer></div></main></div><script src="app.js"></script></body></html>

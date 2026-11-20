@@ -1,0 +1,49 @@
+#syntax 2.1
+
+# SQLite through Node's built-in driver, written in PlainScript 2.1.
+#
+#   npm start
+#
+# Every value is bound through a prepared statement. Rows come back as `any`
+# and are narrowed into the declared record type at the boundary.
+
+import { print } from "std/io"
+import { DatabaseSync } from "node:sqlite"
+
+type Task
+    id: number
+    title: text
+    done: boolean
+end
+
+set database to new DatabaseSync(":memory:")
+database.exec("create table tasks (id integer primary key autoincrement, title text not null, done integer not null default 0)")
+
+set insertTask to database.prepare("insert into tasks (title, done) values (?, ?)")
+set firstResult to insertTask.run("write the compiler", 0)
+set secondResult to insertTask.run("ship 2.1", 0)
+
+print("inserted ids: {firstResult.lastInsertRowid}, {secondResult.lastInsertRowid}")
+
+set markDone to database.prepare("update tasks set done = ? where id = ?")
+markDone.run(1, 2)
+
+set selectAll to database.prepare("select id, title, done from tasks order by id")
+for each row in selectAll.all() as list of any
+    set task: Task to { id: row.id as number, title: row.title as text, done: row.done is equal to 1 }
+    print("{task.id}. {task.title} (done: {task.done})")
+end
+
+set aggregate to database.prepare("select count(*) as total, sum(done) as done from tasks")
+set summary to aggregate.get()
+print("summary: {summary.total} tasks, {summary.done} done")
+
+# A rolled-back transaction leaves no partial state behind.
+database.exec("begin")
+database.exec("insert into tasks (title, done) values ('rollback me', 0)")
+database.exec("rollback")
+
+set afterRollback to database.prepare("select count(*) as total from tasks").get()
+print("after rollback: {afterRollback.total} tasks")
+
+database.close()

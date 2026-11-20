@@ -1,0 +1,146 @@
+#syntax 2.1
+
+# A command-line application in PlainScript 2.1.
+#
+#   npm start -- add "write the docs"
+#   npm start -- list
+#   npm start -- done 1
+#   npm start -- remove 1
+#
+# The program reads and writes a JSON file through std/fs and std/json, parses
+# its own arguments from std/io, and uses real exit codes. Everything it does is
+# ordinary Node after compilation.
+
+import { print, eprint, args, exit } from "std/io"
+import { exists, readText, writeText } from "std/fs"
+import { encode, tryDecode } from "std/json"
+import { append, count, findIndex, filter } from "std/list"
+import { parseNumber } from "std/text"
+
+declare const process: any
+
+type Task
+    id: number
+    title: text
+    done: boolean
+end
+
+set storeFile to "tasks.json"
+set configuredStore to process.env.PLAINSCRIPT_TASKS
+when configuredStore is text
+    change storeFile to configuredStore
+end
+
+define load() returns list of Task
+    when exists(storeFile)
+        return tryDecode(readText(storeFile), []) as list of Task
+    end
+    return []
+end
+
+define save(tasks: list of Task) returns nothing
+    writeText(storeFile, encode(tasks, 2))
+end
+
+define nextId(tasks: list of Task) returns number
+    set highest to 0
+    for each task in tasks
+        when task.id is greater than highest
+            change highest to task.id
+        end
+    end
+    return highest + 1
+end
+
+define findTask(tasks: list of Task, id: number) returns number
+    return findIndex(tasks, (task: Task) => task.id is equal to id)
+end
+
+set tasks to load()
+set arguments to args()
+
+when count(arguments) is equal to 0
+    eprint("usage: plainscript-cli-app add <title> | list | done <id> | remove <id>")
+    exit(2)
+end
+
+set command to arguments[0]
+
+when command is equal to "add"
+    set rawTitle to arguments[1]
+    set title to ""
+    when rawTitle is text
+        change title to rawTitle
+    end
+    when title is equal to ""
+        eprint("add needs a title")
+        exit(2)
+    end
+    set task: Task to { id: nextId(tasks), title: title, done: false }
+    save(append(tasks, task))
+    print("added {task.id}: {task.title}")
+
+otherwise when command is equal to "list"
+    when count(tasks) is equal to 0
+        print("no tasks")
+    otherwise
+        for each task in tasks
+            set mark to " "
+            when task.done
+                change mark to "x"
+            end
+            print("[{mark}] {task.id}. {task.title}")
+        end
+    end
+
+otherwise when command is equal to "done"
+    set rawId to arguments[1]
+    set idText to ""
+    when rawId is text
+        change idText to rawId
+    end
+    when idText is equal to ""
+        eprint("done needs a task id")
+        exit(2)
+    end
+    set id to parseNumber(idText, -1)
+    set updated: list of Task to []
+    set found to false
+    for each task in tasks
+        when task.id is equal to id
+            change found to true
+            change updated to append(updated, { id: task.id, title: task.title, done: true })
+        otherwise
+            change updated to append(updated, task)
+        end
+    end
+    when not found
+        eprint("no task {id}")
+        exit(1)
+    end
+    save(updated)
+    print("completed {id}")
+
+otherwise when command is equal to "remove"
+    set rawId to arguments[1]
+    set idText to ""
+    when rawId is text
+        change idText to rawId
+    end
+    when idText is equal to ""
+        eprint("remove needs a task id")
+        exit(2)
+    end
+    set id to parseNumber(idText, -1)
+    set kept to filter(tasks, (task: Task) => task.id is not equal to id)
+    when count(kept) is equal to count(tasks)
+        eprint("no task {id}")
+        exit(1)
+    end
+    save(kept)
+    print("removed {id}")
+
+otherwise
+    eprint("unknown command \"{command}\"")
+    exit(2)
+end

@@ -1,0 +1,93 @@
+#syntax 2.1
+
+# A React component written in PlainScript 2.1.
+#
+# `render` and `element` lower to createElement calls from the module scope, so
+# the component is an ordinary function component: hooks, events and keys all
+# behave exactly as they do in React.
+
+import { createElement, useState } from "react"
+import { append, count, filter } from "std/list"
+
+declare const Date: any
+
+export type Task
+    id: number
+    title: text
+    done: boolean
+end
+
+export define App() returns any
+    set (tasks, setTasks) to useState([])
+    set (draft, setDraft) to useState("")
+
+    define remaining() returns number
+        return count(filter(tasks, (task: Task) => not task.done))
+    end
+
+    define submit(event: any) returns nothing
+        event.preventDefault()
+        when draft is not equal to ""
+            setTasks(append(tasks, { id: Date.now(), title: draft, done: false }))
+            setDraft("")
+        end
+        return nothing
+    end
+
+    define toggle(id: number) returns nothing
+        set next: list of Task to []
+        for each task in tasks
+            when task.id is equal to id
+                change next to append(next, { id: task.id, title: task.title, done: not task.done })
+            otherwise
+                change next to append(next, task)
+            end
+        end
+        setTasks(next)
+        return nothing
+    end
+
+    define rows() returns list of any
+        set built: list of any to []
+        for each task in tasks
+            change built to append(built, element "li" with key: task.id, className: "row"
+                element "span" with className: "title"
+                    "{task.title}"
+                end
+                element "button" with type: "button", onClick: () => toggle(task.id)
+                    "{statusOf(task)}"
+                end
+            end)
+        end
+        return built
+    end
+
+    render
+        element "main" with className: "app"
+            element "h1"
+                "PlainScript + React + Vite"
+            end
+            element "p" with className: "muted"
+                "{remaining()} of {count(tasks)} task(s) remaining"
+            end
+            element "form" with onSubmit: submit
+                element "input" with value: draft, placeholder: "What needs doing?", onChange: (event: any) => setDraft(event.target.value)
+                end
+                element "button" with type: "submit"
+                    "Add task"
+                end
+            end
+            element "ul"
+                ...rows()
+            end
+        end
+    end
+end
+
+define statusOf(task: Task) returns text
+    when task.done
+        return "done"
+    otherwise
+        return "open"
+    end
+end

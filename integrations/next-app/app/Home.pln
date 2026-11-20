@@ -1,0 +1,49 @@
+#syntax 2.1
+
+# A React Server Component written in PlainScript 2.1 and rendered by Next.js.
+#
+# Next.js imports the compiled ES module from app/generated/Home.js. Nothing in
+# this file is Next-specific: it is a plain function component that returns
+# createElement calls.
+
+import { createElement } from "react"
+import { append } from "std/list"
+
+export type Feature
+    title: text
+    detail: text
+end
+
+value features: list of Feature is [
+    { title: "Checked before it ships", detail: "PlainScript type-checks the component, then emits an ordinary ES module." },
+    { title: "No JSX runtime", detail: "render and element blocks call createElement from the module scope." },
+    { title: "Next.js native", detail: "The compiled module is a React Server Component that Next can stream." },
+]
+
+export define Home() returns any
+    set cards: list of any to []
+    for each feature in features
+        change cards to append(cards, element "li" with key: feature.title, className: "card"
+            element "h2"
+                "{feature.title}"
+            end
+            element "p"
+                "{feature.detail}"
+            end
+        end)
+    end
+
+    render
+        element "main" with className: "page"
+            element "h1"
+                "PlainScript inside Next.js"
+            end
+            element "p" with className: "lead"
+                "This page is a React Server Component compiled from PlainScript 2.1."
+            end
+            element "ul" with className: "grid"
+                ...cards
+            end
+        end
+    end
+end

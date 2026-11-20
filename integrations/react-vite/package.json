@@ -1,0 +1,20 @@
+{
+  "name": "plainscript-integration-react-vite",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "A React 19 + Vite application written in PlainScript 2.1",
+  "scripts": {
+    "check": "node ../../src/cli.js check src/App.pln",
+    "build:plain": "node ../../src/cli.js build",
+    "build": "npm run build:plain && vite build",
+    "dev": "npm run build:plain && vite"
+  },
+  "dependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "vite": "^6.0.0"
+  }
+}

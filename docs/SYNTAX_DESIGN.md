@@ -456,6 +456,89 @@ Verification includes the full `npm test` suite, `plainscript check` across ever
 4. User-defined classes remain unsupported. JavaScript class interop is not a substitute for class syntax.
 5. Match catch-all syntax is `case _`; the old specification's `otherwise` example did not match the parser and must not be perpetuated.
 
+## The 2.1 dialect: an English-oriented surface
+
+2.1 revisits the vocabulary without touching the type system, the block model or
+the emitted JavaScript. The design question was narrow: which 2.0 spellings read
+poorly when a program is spoken aloud, and what is the smallest coherent
+replacement?
+
+### What changed
+
+| Concept | 2.0 | 2.1 | Reason |
+| --- | --- | --- | --- |
+| Immutable binding | `const x = 1` | `value x is 1` | States what the binding is, not what the emitter does. |
+| Mutable binding | `let x = 1` | `set x to 1` | Reads as an instruction; pairs with `change`. |
+| Assignment | `x = 2` | `change x to 2` | A one-character operator is easy to miss in a long body. |
+| Function | `function f() -> T` | `define f() returns T` | `define` names the act; `returns` reads as prose. |
+| Conditional | `if`/`else` | `when`/`otherwise` | `when` introduces a condition without implying a question. |
+| Each loop | `for x in xs` | `for each x in xs` | Distinguishes iteration from the numeric range form. |
+| Range loop | `for i in 0 to 9` | `for i from 0 to 9` | `from … to …` pairs the bounds. |
+| Comparison | `>=`, `<` | `is at least`, `is less than` | Symbols are fine on a slide and poor in a code review sentence. |
+
+### What did not change, deliberately
+
+`match`, `case`, `while`, `break`, `continue`, `try`, `catch`, `finally`,
+`throw`, `return`, `type`, `declare`, `import`, `export`, `async`, `await`,
+`and`, `or`, `not`, `is` (type test), `as`, `render`, `element` and every
+arithmetic operator keep their spelling. They are already English words with the
+right meaning; renaming them would add vocabulary without adding clarity, which
+is exactly the failure mode of a “renamed JavaScript” language. `end` remains the
+block terminator in both dialects for the same reason: it is unambiguous,
+consistent, and already load-bearing in the grammar.
+
+### Ambiguities and how they are resolved
+
+- **Contextual declaration words.** `value`, `set`, `change`, `define`,
+  `returns` and `each` are not reserved. The parser treats them as construct
+  introducers only in statement or declaration position, using lookahead: `set`
+  followed by a name, or by a balanced pattern group followed by `to`. Hence
+  `set(handler)` is a call, `set { a, b } to pair` is a binding, and `value`
+  remains a legal parameter name.
+- **`is` is overloaded across contexts.** It is the type-test operator in
+  expressions, the separator in `value … is …`, and the first word of every
+  comparison phrase. The three never compete: the phrase is only recognised when
+  the complete word sequence is present, and the declaration `is` is consumed by
+  the binding production before expression parsing begins.
+- **`otherwise when` is not a new keyword.** It normalises to `else if`, so the
+  parser has one branch shape, and the emitter has one `else if` chain.
+- **One loop shape per form.** `for x in xs` is rejected in 2.1 (`PS2014`) rather
+  than silently accepted, so a 2.1 file cannot accumulate two spellings of the
+  same loop.
+- **Phrases are operators.** Comparison phrases become the same token as their
+  symbol before parsing. Precedence, associativity and code generation are
+  therefore identical, and mixing the two forms cannot change meaning.
+
+### Consistency audit
+
+The 2.1 grammar was reviewed against the checklist in this document:
+
+- **Nested blocks** close with one `end`, exactly as in 2.0. `otherwise` and
+  `catch` do not open a new block level; the formatter aligns them with their
+  opener.
+- **Function declarations** use one return marker (`returns`) and one async
+  prefix (`async define`). Function *types* keep `->`, which is a type arrow, not
+  a declaration marker.
+- **Mutable and immutable bindings** are distinguished by the declaration word
+  and by the checker; `change` is the only assignment form in 2.1.
+- **Types and generics** are untouched: `type`, `T`, constraints, unions,
+  variants, records and predicates use the 2.0 forms.
+- **Async operations** use `async define` + `returns` + `await`; no parallel
+  async vocabulary was added.
+- **Error handling** uses `try`/`catch`/`finally`; `throw` and `return` are
+  unchanged.
+- **Imports and exports** are unchanged, including `export define` and
+  `export value`.
+- **Objects and collections** keep record literals, list literals, `list of T`
+  and `map of K to V`.
+- **Readability in larger applications** was the deciding test: declarations,
+  branches and comparisons are the lines a reader scans most, which is why they
+  changed, while operators and control words that already read well did not.
+
+The formal surface grammar is section 15 of [the specification](SPEC.md). The
+practical reference, with the 2.0 equivalent of every construct, is
+[the language reference](LANGUAGE_REFERENCE.md).
+
 ## References
 
 [1]: https://tc39.es/ecma262/ "ECMAScript Language Specification"

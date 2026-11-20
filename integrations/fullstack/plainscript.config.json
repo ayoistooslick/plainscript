@@ -1,0 +1,7 @@
+{
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "generated",
+    "syntax": "2.1"
+  }
+}

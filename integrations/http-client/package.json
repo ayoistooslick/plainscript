@@ -1,0 +1,11 @@
+{
+  "name": "plainscript-integration-http",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Async HTTP server and client written in PlainScript 2.1",
+  "scripts": {
+    "check": "node ../../src/cli.js check src/main.pln",
+    "start": "node ../../src/cli.js run src/main.pln"
+  }
+}

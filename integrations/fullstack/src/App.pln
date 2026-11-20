@@ -1,0 +1,62 @@
+#syntax 2.1
+
+# The client half. It imports the same `Note` type the server and repository
+# use, and renders with `element` blocks, so it is an ordinary React function
+# component and can be rendered by react-dom/server or bundled by Vite.
+
+import { createElement } from "react"
+import { Note } from "./types.pln"
+import { append, count } from "std/list"
+
+export type AppProps
+    notes: list of Note
+end
+
+define remaining(notes: list of Note) returns number
+    set open to 0
+    for each note in notes
+        when not note.done
+            change open to open + 1
+        end
+    end
+    return open
+end
+
+define rows(notes: list of Note) returns list of any
+    set built: list of any to []
+    for each note in notes
+        change built to append(built, element "li" with key: note.id, className: "note"
+            element "span" with className: "body"
+                "{note.body}"
+            end
+            element "span" with className: "state"
+                "{stateOf(note)}"
+            end
+        end)
+    end
+    return built
+end
+
+define stateOf(note: Note) returns text
+    when note.done
+        return "done"
+    otherwise
+        return "open"
+    end
+end
+
+export define App(props: AppProps) returns any
+    render
+        element "main" with className: "notes"
+            element "h1"
+                "PlainScript full-stack notes"
+            end
+            element "p" with className: "muted"
+                "{remaining(props.notes)} of {count(props.notes)} note(s) remaining"
+            end
+            element "ul"
+                ...rows(props.notes)
+            end
+        end
+    end
+end

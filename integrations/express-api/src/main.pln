@@ -1,0 +1,129 @@
+#syntax 2.1
+
+# A complete Express 5 JSON API written in PlainScript 2.1.
+#
+#   npm install
+#   npm start                       # http://localhost:4501
+#
+# The program is compiled to an ES module that imports Express normally. There
+# is no PlainScript runtime and no custom request or response wrapper.
+
+import express from "express"
+import { print, env } from "std/io"
+import { parseNumber } from "std/text"
+import { append, count } from "std/list"
+
+type Note
+    id: number
+    body: text
+end
+
+set notes: list of Note to []
+set nextId to 1
+
+set app to express()
+app.use(express.json())
+
+app.get("/health", (request: any, response: any) => do
+    response.json({ status: "ok", framework: "express", notes: count(notes) })
+end)
+
+app.get("/notes", (request: any, response: any) => do
+    response.json(notes)
+end)
+
+app.get("/notes/:id", (request: any, response: any) => do
+    set id to parseNumber(request.params.id as text, -1)
+    set found to nothing as Note or nothing
+    for each note in notes
+        when note.id is equal to id
+            change found to note
+        end
+    end
+    when found is nothing
+        response.status(404).json({ error: "note not found" })
+    otherwise
+        response.json(found)
+    end
+end)
+
+app.post("/notes", (request: any, response: any) => do
+    set body to request.body
+    set candidate to ""
+    when body is map of text to any
+        when body["body"] is text
+            change candidate to body["body"] as text
+        end
+    end
+
+    when candidate is equal to ""
+        response.status(400).json({ error: "body is required" })
+    otherwise
+        set note: Note to { id: nextId, body: candidate }
+        change nextId to nextId + 1
+        change notes to append(notes, note)
+        response.status(201).json(note)
+    end
+end)
+
+app.put("/notes/:id", (request: any, response: any) => do
+    set id to parseNumber(request.params.id as text, -1)
+    set replacement to ""
+    when request.body is map of text to any
+        when request.body["body"] is text
+            change replacement to request.body["body"] as text
+        end
+    end
+
+    set updated: list of Note to []
+    set found to false
+    for each note in notes
+        when note.id is equal to id
+            change found to true
+            set nextNote: Note to note
+            when replacement is not equal to ""
+                change nextNote to { id: note.id, body: replacement }
+            end
+            change updated to append(updated, nextNote)
+        otherwise
+            change updated to append(updated, note)
+        end
+    end
+
+    when found
+        change notes to updated
+        response.json({ id: id, body: replacement })
+    otherwise
+        response.status(404).json({ error: "note not found" })
+    end
+end)
+
+app.delete("/notes/:id", (request: any, response: any) => do
+    set id to parseNumber(request.params.id as text, -1)
+    set kept: list of Note to []
+    set removed to false
+    for each note in notes
+        when note.id is equal to id
+            change removed to true
+        otherwise
+            change kept to append(kept, note)
+        end
+    end
+
+    when removed
+        change notes to kept
+        response.json({ deleted: true, id: id })
+    otherwise
+        response.status(404).json({ error: "note not found" })
+    end
+end)
+
+# Express recognises a four-argument middleware as the error handler.
+app.use((error: any, request: any, response: any, next: any) => do
+    response.status(500).json({ error: "internal error" })
+end)
+
+set port to parseNumber(env("PORT", "4501"))
+app.listen(port, () => do
+    print("express api listening on {port}")
+end)

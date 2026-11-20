@@ -1,0 +1,15 @@
+#syntax 2.1
+
+# Entry point of a three-module program. `plainscript build --declarations`
+# emits one ES module and one .d.pln declaration per source file.
+
+import { print } from "std/io"
+import { addItem, describe, emptyCart, subtotal } from "./cart.pln"
+import { format } from "./money.pln"
+
+set cart to emptyCart("USD")
+change cart to addItem(cart, "keyboard", 89, 2)
+change cart to addItem(cart, "monitor", 240, 1)
+
+print(describe(cart))
+print("subtotal: {format(subtotal(cart))}")

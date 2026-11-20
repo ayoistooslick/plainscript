@@ -8,6 +8,7 @@
 // completion, hover, go-to-definition, references, rename (document-scoped),
 // document symbols and whole-document formatting.
 
+const fs = require('fs');
 const path = require('path');
 const { fileURLToPath, pathToFileURL } = require('url');
 const { Compiler } = require('./modules');
@@ -15,6 +16,19 @@ const { tokenize } = require('./lexer');
 const { format } = require('./formatter');
 const T = require('./types');
 const { VERSION } = require('./version');
+
+// The language server reads the project's default dialect so editor
+// diagnostics and formatting match what `plainscript build` produces. A file
+// pragma still takes precedence inside the lexer.
+function configDialect(root) {
+  try {
+    const config = JSON.parse(fs.readFileSync(path.join(root, 'plainscript.config.json'), 'utf8'));
+    const raw = config.syntax !== undefined ? config.syntax : (config.compilerOptions && config.compilerOptions.syntax);
+    return raw === undefined || raw === null ? null : String(raw);
+  } catch {
+    return null;
+  }
+}
 
 const KEYWORDS = [
   'import', 'export', 'from', 'as', 'type', 'declare', 'function', 'async',
@@ -207,7 +221,7 @@ class PlainScriptLanguageServer {
   validate(uri) {
     const file = this.documentPath(uri);
     if (!file) return;
-    const compiler = new Compiler({ root: this.root, overrides: this.overrides() });
+    const compiler = new Compiler({ root: this.root, overrides: this.overrides(), dialect: configDialect(this.root) });
     let record;
     try {
       record = compiler.load(file);
@@ -660,7 +674,7 @@ class PlainScriptLanguageServer {
     const source = this.documentText(uri);
     if (!source) return [];
     try {
-      const formatted = format(source, this.documentPath(uri) || '<editor>');
+      const formatted = format(source, this.documentPath(uri) || '<editor>', { dialect: configDialect(this.root) });
       if (formatted === source) return [];
       const lines = source.split('\n');
       return [{
