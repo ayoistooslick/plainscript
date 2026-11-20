@@ -12,7 +12,9 @@
 <p>Dialect detection happens before lexing. <code>src/dialect.js</code> reads the first line:</p>
 <ul>
 <li><code>#syntax 2.1</code> selects the 2.1 dialect.</li>
-<li><code>#syntax 2.0</code>, or no pragma, selects 2.0.</li>
+<li><code>#syntax 2.0</code> selects 2.0.</li>
+<li>A file without a pragma uses the project default from <code>plainscript.config.json</code>; with no</li>
+<p>default configured, it is 2.0.</p>
 <li>An unknown version produces <code>PS1005</code> and the file is not compiled.</li>
 </ul>
 <p>The lexer then applies the 2.1 normalisation to its token stream:</p>

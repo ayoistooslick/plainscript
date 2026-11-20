@@ -15,7 +15,7 @@ A `.pln` file selects its surface dialect on the first line:
 #syntax 2.1
 ```
 
-`#syntax 2.0`, or no pragma at all, is the 2.0 dialect. The compiler reads the
+`#syntax 2.0`, or no pragma with no configured default, is the 2.0 dialect. The compiler reads the
 pragma per file, so one project can mix both. `check`, `build`, `watch`, `run`,
 `fmt`, `lsp` and `dap` all handle either dialect; a 2.0 word inside a 2.1 file is
 reported as `PS2030` with the 2.1 spelling in the message. `fmt` preserves the
