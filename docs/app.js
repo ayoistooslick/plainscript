@@ -206,4 +206,225 @@ window.searchIndex = [{"title":"PlainScript","url":"index.html","text":"PlainScr
       observer.observe(heading);
     });
   }
+
+  var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---------------- real 3D stage ---------------- */
+  (function stages() {
+    var canvases = document.querySelectorAll('canvas[data-stage]');
+    if (!canvases.length) return;
+    var phi = (1 + Math.sqrt(5)) / 2;
+    var raw = [[-1, phi, 0], [1, phi, 0], [-1, -phi, 0], [1, -phi, 0], [0, -1, phi], [0, 1, phi], [0, -1, -phi], [0, 1, -phi], [phi, 0, -1], [phi, 0, 1], [-phi, 0, -1], [-phi, 0, 1]];
+    var verts = raw.map(function (v) {
+      var len = Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
+      return [v[0] / len, v[1] / len, v[2] / len];
+    });
+    var faces = [[0, 11, 5], [0, 5, 1], [0, 1, 7], [0, 7, 10], [0, 10, 11], [1, 5, 9], [5, 11, 4], [11, 10, 2], [10, 7, 6], [7, 1, 8], [3, 9, 4], [3, 4, 2], [3, 2, 6], [3, 6, 8], [3, 8, 9], [4, 9, 5], [2, 4, 11], [6, 2, 10], [8, 6, 7], [9, 8, 1]];
+
+    Array.prototype.forEach.call(canvases, function (canvas) {
+      var ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      var width = 0;
+      var height = 0;
+      var running = false;
+      var frame = 0;
+      var spin = { x: 0, y: 0, tx: 0, ty: 0, drag: false, px: 0, py: 0 };
+      var start = performance.now();
+
+      function project(v, yaw, pitch, scale, cx, cy) {
+        var cyaw = Math.cos(yaw), syaw = Math.sin(yaw);
+        var cpit = Math.cos(pitch), spit = Math.sin(pitch);
+        var x1 = v[0] * cyaw - v[2] * syaw;
+        var z1 = v[0] * syaw + v[2] * cyaw;
+        var y1 = v[1] * cpit - z1 * spit;
+        var z2 = v[1] * spit + z1 * cpit;
+        var persp = 2.9 / (2.9 - z2);
+        return { x: cx + x1 * scale * persp, y: cy + y1 * scale * persp, rx: x1, ry: y1, rz: z2, s: persp };
+      }
+
+      function draw(time) {
+        var size = Math.min(width, height);
+        var cx = width / 2;
+        var cy = height / 2;
+        var scale = size * 0.31;
+        var scrollTilt = (window.scrollY || 0) * 0.0004;
+        var yaw = time * 0.34 + spin.x * 1.4 + 0.4;
+        var pitch = -0.32 + Math.sin(time * 0.28) * 0.1 + spin.y * 0.9 + scrollTilt;
+        ctx.clearRect(0, 0, width, height);
+
+        ctx.beginPath();
+        for (var i = 0; i <= 96; i++) {
+          var a = (i / 96) * Math.PI * 2;
+          var ringPoint = project([Math.cos(a) * 1.62, Math.sin(a * 2) * 0.06, Math.sin(a) * 1.62], yaw, pitch + 0.42, scale, cx, cy);
+          if (i === 0) ctx.moveTo(ringPoint.x, ringPoint.y);
+          else ctx.lineTo(ringPoint.x, ringPoint.y);
+        }
+        ctx.strokeStyle = 'rgba(166,121,255,.28)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        var rotated = verts.map(function (v) { return project(v, yaw, pitch, scale, cx, cy); });
+        var lx = -0.42, ly = -0.5, lz = -0.76;
+        var ll = Math.sqrt(lx * lx + ly * ly + lz * lz);
+        lx /= ll; ly /= ll; lz /= ll;
+
+        faces.map(function (face, index) {
+          var a = rotated[face[0]], b = rotated[face[1]], c = rotated[face[2]];
+          return { face: face, z: (a.rz + b.rz + c.rz) / 3, index: index };
+        }).sort(function (m, n) { return m.z - n.z; }).forEach(function (item) {
+          var a = rotated[item.face[0]], b = rotated[item.face[1]], c = rotated[item.face[2]];
+          var nx = (b.ry - a.ry) * (c.rz - a.rz) - (b.rz - a.rz) * (c.ry - a.ry);
+          var ny = (b.rz - a.rz) * (c.rx - a.rx) - (b.rx - a.rx) * (c.rz - a.rz);
+          var nz = (b.rx - a.rx) * (c.ry - a.ry) - (b.ry - a.ry) * (c.rx - a.rx);
+          var nl = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
+          nx /= nl; ny /= nl; nz /= nl;
+          var glow = Math.pow(Math.abs(nx * lx + ny * ly + nz * lz), 1.6);
+          ctx.beginPath();
+          ctx.moveTo(a.x, a.y);
+          ctx.lineTo(b.x, b.y);
+          ctx.lineTo(c.x, c.y);
+          ctx.closePath();
+          ctx.fillStyle = 'rgba(' + Math.round(109 + 57 * glow) + ',' + Math.round(60 + 46 * glow) + ',' + Math.round(224 - 26 * glow) + ',' + (0.10 + glow * 0.34).toFixed(3) + ')';
+          ctx.fill();
+          ctx.strokeStyle = 'rgba(242,238,231,' + (0.10 + glow * 0.4).toFixed(3) + ')';
+          ctx.lineWidth = 0.9;
+          ctx.stroke();
+        });
+
+        for (var k = 0; k < 3; k++) {
+          var ang = time * (0.5 + k * 0.17) + k * 2.1;
+          var sat = project([Math.cos(ang) * 1.62, Math.sin(ang * 1.7 + k) * 0.55, Math.sin(ang) * 1.62], yaw, pitch + 0.42, scale, cx, cy);
+          ctx.beginPath();
+          ctx.arc(sat.x, sat.y, Math.max(0.8, 2.2 * sat.s), 0, Math.PI * 2);
+          ctx.fillStyle = k === 1 ? 'rgba(255,106,61,.95)' : 'rgba(201,170,255,.95)';
+          ctx.shadowColor = k === 1 ? 'rgba(255,106,61,.9)' : 'rgba(166,121,255,.9)';
+          ctx.shadowBlur = 14;
+          ctx.fill();
+          ctx.shadowBlur = 0;
+        }
+      }
+
+      function resize() {
+        var rect = canvas.getBoundingClientRect();
+        var dpr = Math.min(Math.max(window.devicePixelRatio || 1, 2), 2.5);
+        width = Math.max(1, rect.width);
+        height = Math.max(1, rect.height);
+        canvas.width = Math.round(width * dpr);
+        canvas.height = Math.round(height * dpr);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        draw((performance.now() - start) / 1000);
+      }
+
+      function loop(now) {
+        if (!running) return;
+        var time = (now - start) / 1000;
+        spin.x += (spin.tx - spin.x) * 0.07;
+        spin.y += (spin.ty - spin.y) * 0.07;
+        draw(time);
+        frame = window.requestAnimationFrame(loop);
+      }
+
+      function play() {
+        if (reduceMotion) { draw((performance.now() - start) / 1000); return; }
+        if (running) return;
+        running = true;
+        frame = window.requestAnimationFrame(loop);
+      }
+      function pause() { running = false; window.cancelAnimationFrame(frame); }
+
+      canvas.style.cursor = 'grab';
+      canvas.addEventListener('pointerdown', function (event) {
+        spin.drag = true;
+        spin.px = event.clientX;
+        spin.py = event.clientY;
+        canvas.style.cursor = 'grabbing';
+        if (canvas.setPointerCapture) canvas.setPointerCapture(event.pointerId);
+      });
+      canvas.addEventListener('pointermove', function (event) {
+        if (spin.drag) {
+          spin.tx += (event.clientX - spin.px) * 0.006;
+          spin.ty += (event.clientY - spin.py) * 0.004;
+          spin.px = event.clientX;
+          spin.py = event.clientY;
+        } else {
+          var box = canvas.getBoundingClientRect();
+          spin.tx = ((event.clientX - box.left) / box.width - 0.5) * 0.5;
+          spin.ty = ((event.clientY - box.top) / box.height - 0.5) * 0.35;
+        }
+      });
+      function release() {
+        spin.drag = false;
+        spin.tx = 0;
+        spin.ty = 0;
+        canvas.style.cursor = 'grab';
+      }
+      canvas.addEventListener('pointerup', release);
+      canvas.addEventListener('pointercancel', release);
+      canvas.addEventListener('pointerleave', function () {
+        if (!spin.drag) { spin.tx = 0; spin.ty = 0; }
+      });
+
+      if ('ResizeObserver' in window) new ResizeObserver(resize).observe(canvas);
+      else window.addEventListener('resize', resize);
+      if ('IntersectionObserver' in window) {
+        new IntersectionObserver(function (entries) {
+          entries.forEach(function (entry) {
+            if (entry.isIntersecting) play();
+            else pause();
+          });
+        }, { threshold: 0.05 }).observe(canvas);
+      }
+      resize();
+      play();
+    });
+  })();
+
+  /* ---------------- pointer tilt, with real perspective ---------------- */
+  (function tilts() {
+    if (reduceMotion || !window.matchMedia('(hover: hover)').matches) return;
+    var els = document.querySelectorAll('[data-tilt], [data-tilt-soft], .code-tabs');
+    Array.prototype.forEach.call(els, function (el) {
+      var soft = el.hasAttribute('data-tilt-soft') || el.classList.contains('code-tabs');
+      var code = el.classList.contains('code-tabs');
+      var pending = false;
+      var nx = 0;
+      var ny = 0;
+      function apply() {
+        pending = false;
+        if (code) {
+          el.style.setProperty('--tx', ny.toFixed(2));
+          el.style.setProperty('--ty', nx.toFixed(2));
+        } else {
+          el.style.setProperty('--rx', (soft ? -ny * 4 : -ny * 7).toFixed(2) + 'deg');
+          el.style.setProperty('--ry', (soft ? nx * 5 : nx * 9).toFixed(2) + 'deg');
+        }
+      }
+      el.addEventListener('pointermove', function (event) {
+        var box = el.getBoundingClientRect();
+        nx = (event.clientX - box.left) / box.width - 0.5;
+        ny = (event.clientY - box.top) / box.height - 0.5;
+        if (!pending) { pending = true; window.requestAnimationFrame(apply); }
+      });
+      el.addEventListener('pointerleave', function () {
+        el.style.removeProperty('--rx');
+        el.style.removeProperty('--ry');
+        el.style.removeProperty('--tx');
+        el.style.removeProperty('--ty');
+      });
+    });
+  })();
+
+  /* ---------------- scroll reveal (additive only) ---------------- */
+  (function reveals() {
+    var items = document.querySelectorAll('.reveal');
+    if (!items.length || reduceMotion || !('IntersectionObserver' in window)) return;
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (!entry.isIntersecting) return;
+        entry.target.classList.add('in');
+        observer.unobserve(entry.target);
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -6% 0px' });
+    Array.prototype.forEach.call(items, function (el) { observer.observe(el); });
+  })();
 })();
