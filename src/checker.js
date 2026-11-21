@@ -181,7 +181,24 @@ class Checker {
         declaration.typeParams.forEach((param, index) => {
           localEnv.set(param, this.resolveType(node.args[index], typeEnv));
         });
-        return this.resolveTypeDeclarationBody(declaration, localEnv);
+        // A generic alias may mention itself through a field, as in
+        // `type Box<T> = { value: T, next: Box<T>? }`. Expanding that eagerly
+        // never terminates, so the recursion point becomes a named reference:
+        // the alias is still visible to diagnostics and `deref`, but its body
+        // is not re-expanded while it is already being expanded.
+        const expansions = this.expandingAliases || (this.expandingAliases = new Set());
+        const expansionKey = `${this.aliasKey(name)}<${declaration.typeParams
+          .map((param) => T.showType(localEnv.get(param)))
+          .join(', ')}>`;
+        // The depth guard also stops pathological chains such as
+        // `Wrap<Wrap<T>>` from growing without bound.
+        if (expansions.has(expansionKey) || expansions.size > 32) return T.namedRef(this.aliasKey(name), name);
+        expansions.add(expansionKey);
+        try {
+          return this.resolveTypeDeclarationBody(declaration, localEnv);
+        } finally {
+          expansions.delete(expansionKey);
+        }
       }
       case 'ListType':
         return T.listOf(this.resolveType(node.elem, typeEnv));
@@ -1320,7 +1337,16 @@ class Checker {
     if (!factory) {
       this.report('PS3405', 'A render block needs "createElement" in scope. Import it from React or "std/dom".', node);
     }
-    for (const child of node.children) this.checkStatement(child);
+    for (const child of node.children) {
+      // A render child must produce markup. Loops and branches are allowed and
+      // contribute the children they create; a control-transfer statement can
+      // never be a child, and reporting it here avoids an emitter crash.
+      if (child.kind === 'Return' || child.kind === 'Throw' || child.kind === 'Break' || child.kind === 'Continue') {
+        this.report('PS3410', `A "${child.kind.toLowerCase()}" statement cannot appear directly inside a render block.`, child);
+        continue;
+      }
+      this.checkStatement(child);
+    }
   }
 
   // ------------------------------------------------------------- expressions
@@ -1578,6 +1604,31 @@ class Checker {
     }
     if (objectType.k === 'prim' && objectType.name === 'text') {
       this.report('PS3336', 'Text has no fields. Use functions from "std/text".', node);
+      return T.PRIM.error;
+    }
+    if (objectType.k === 'promise') {
+      // Promises cross the JavaScript boundary, but their three standard
+      // combinator methods have a precise shape. Typing them means rejection
+      // handlers are checked while the resolved value stays known.
+      const value = objectType.value;
+      const anyFn = (params) => T.fnType(params, T.PRIM.any);
+      if (node.property === 'then') {
+        return T.fnType([
+          { name: 'onFulfilled', type: anyFn([{ name: 'value', type: value }]), optional: true },
+          { name: 'onRejected', type: anyFn([{ name: 'reason', type: T.PRIM.any }]), optional: true },
+        ], T.promiseOf(T.PRIM.any));
+      }
+      if (node.property === 'catch') {
+        return T.fnType([
+          { name: 'onRejected', type: T.fnType([{ name: 'reason', type: T.PRIM.any }], T.union([value, T.promiseOf(value)])) },
+        ], T.promiseOf(value));
+      }
+      if (node.property === 'finally') {
+        return T.fnType([
+          { name: 'onFinally', type: anyFn([]) },
+        ], T.promiseOf(value));
+      }
+      this.report('PS3335', `Type ${T.showType(objectType)} has no field "${node.property}"; a Promise exposes then, catch and finally.`, node);
       return T.PRIM.error;
     }
     this.report('PS3335', `Type ${T.showType(objectType)} has no field "${node.property}".`, node);

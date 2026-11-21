@@ -36,7 +36,7 @@ and invalid-row rejection. These are executable checks, not API-shape claims.
 | Language type system | Structural records, generics/constraints, narrowing, variants, literal unions, fixed/variadic tuples, readonly fields, intersections, conditional/mapped types with naked-parameter distribution, deferred indexed access, overloads, predicates, recursive types and documented structural variance | Enormous declaration ecosystem, more mature inference, conditional `infer`, classes/nominal tooling, optional tuple elements | **TypeScript wins on breadth and ecosystem**; core structural features are now comparable |
 | Ecosystem and hiring | npm interop, but a new language and small library/tooling ecosystem | Enormous ecosystem, frameworks, hosting support, community | **TypeScript wins** |
 | Build performance | Synthetic PlainScript-only benchmark: 40 modules, median cold compile 16.95 ms | No pinned cross-language benchmark in this repository | **Unproven**; no speed claim |
-| JSX/React | `render` blocks lower to `createElement`; no JSX/fragments/automatic keys | First-class JSX and the entire React tooling ecosystem | **TypeScript wins** |
+| JSX/React | `render` blocks lower to `createElement`; `element Fragment` for fragments, loop/branch children for dynamic lists, explicit keys, no JSX | First-class JSX and the entire React tooling ecosystem | **TypeScript wins** |
 | Operational maturity | Small compiler/runtime; SQLite/PostgreSQL/MySQL focus; no bundler; partial LSP and minimal DAP | Mature compilers, debuggers, profilers, deployment tooling | **TypeScript wins** |
 
 ## What PlainScript genuinely offers

@@ -13,10 +13,27 @@ export function postgresSql(sql) {
     const char = sql[position];
     if (quote) {
       output += char;
-      if (char === quote && sql[position - 1] !== '\\') quote = null;
+      // A doubled quote is an escaped quote inside the literal, not the end of
+      // it: `'it''s ?'` must not expose the embedded question mark.
+      if (char === quote) {
+        if (sql[position + 1] === quote) { output += sql[position + 1]; position += 1; continue; }
+        if (sql[position - 1] !== '\\') quote = null;
+      }
       continue;
     }
     if (char === "'" || char === '"') { quote = char; output += char; continue; }
+    // PostgreSQL dollar-quoted bodies (`$$ ... $$` or `$tag$ ... $tag$`) are
+    // string literals too, so a `?` inside one must not become a placeholder.
+    if (char === '$') {
+      const tag = /^\$[A-Za-z_]*\$/.exec(sql.slice(position));
+      if (tag) {
+        const end = sql.indexOf(tag[0], position + tag[0].length);
+        const stop = end === -1 ? sql.length : end + tag[0].length;
+        output += sql.slice(position, stop);
+        position = stop - 1;
+        continue;
+      }
+    }
     if (char === '-' && sql[position + 1] === '-') {
       const end = sql.indexOf('\n', position);
       const stop = end === -1 ? sql.length : end;

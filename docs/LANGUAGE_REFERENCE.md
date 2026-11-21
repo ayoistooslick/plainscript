@@ -578,8 +578,36 @@ end
 
 `render` returns the expression; `element` builds a child. Attributes use
 `with name: value`, children are statements, and `...list` inserts a dynamic
-list. They lower to `createElement` from the module scope, so React (or another
-library exposing `createElement`) must be imported.
+list. A `for each`/`for … from … to`/`while`/`when`/`match` child builds its
+own part of the list, so a keyed list needs no helper function:
+
+```plainscript
+#syntax 2.1
+
+import { createElement } from "react"
+
+export define TaskList() returns any
+    value tasks is [
+        { id: 1, title: "write the docs" },
+        { id: 2, title: "ship 2.1" },
+    ]
+
+    render
+        element "ul"
+            for each task in tasks
+                element "li" with key: task.id
+                    task.title
+                end
+            end
+        end
+    end
+end
+```
+
+`element Fragment` renders sibling children without a wrapper element. Keys are
+explicit; there is no automatic key inference. Everything lowers to
+`createElement` from the module scope, so React (or another library exposing
+`createElement`) must be imported.
 
 ## 12. Interop boundaries
 

@@ -223,9 +223,18 @@ plainscript interop types/api.d.ts
 plainscript interop types --json
 ```
 
-Interfaces, aliases, object/function/tuple types, unions, intersections, `keyof`, indexed
-access, mapped types, generics without defaults, exported functions/values and re-exports
-are translated. `infer`, template-literal types, namespaces, classes, optional tuple
+Interfaces (including declaration merging), aliases, object/function/tuple types, unions,
+intersections, `keyof`, indexed access, mapped types, generics with constraints, exported
+functions/values, re-exports, `declare class` and template-literal types are translated.
+A class becomes an instance record plus a `declare const` binding: readonly fields, methods
+and optional members survive; private/protected members are skipped, static members are
+omitted with one `PS7005` warning, and a constructor's parameters are not represented
+because `new` is an untyped boundary. A template-literal type expands to a literal union
+when every substitution is finite (`` `key-${'down' | 'up'}` ``); an open pattern such as
+`` `/api/${string}` `` widens to `text` with `PS7005`. A generic method also widens to its
+constraint with `PS7005` because record fields cannot declare type parameters.
+
+`infer`, namespaces, ambient `declare module` blocks, `export * from`, optional tuple
 elements, index signatures and other constructs without a direct PlainScript equivalent
 produce `PS7001` errors; a file with errors is not written. Omitted generic defaults are a
 `PS7004` warning, not a silent substitution. Review warnings and run `plainscript check` on

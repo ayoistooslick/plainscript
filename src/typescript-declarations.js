@@ -17,6 +17,7 @@ const UNSUPPORTED = 'PS7001';
 const IMPORT_MISSING = 'PS7002';
 const SYNTAX = 'PS7003';
 const GENERIC_DEFAULT = 'PS7004';
+const WIDENED = 'PS7005';
 
 class TypeScriptDeclarationError extends Error {
   constructor(diagnostic) {
@@ -106,6 +107,9 @@ class TypeParser {
     this.diagnostics = [];
     this.unsupported = false;
     this.usedNames = new Set();
+    // Interfaces with the same name merge in TypeScript. Remember where each
+    // was emitted so a later declaration can extend the first one.
+    this.interfaceDecls = new Map();
   }
 
   peek(offset = 0) { return this.tokens[this.index + offset] || this.tokens[this.tokens.length - 1]; }
@@ -182,7 +186,8 @@ class TypeParser {
         if (this.at('declare')) { this.parseDeclare(false, declarations, functions); continue; }
         if (this.at('function')) { this.parseFunction(false, functions); continue; }
         if (this.at('const') || this.at('let') || this.at('var')) { this.parseVariable(false, declarations); continue; }
-        if (this.at('namespace') || this.at('module') || this.at('class') || this.at('enum')) {
+        if (this.at('class')) { this.parseClass(false, declarations); continue; }
+        if (this.at('namespace') || this.at('module') || this.at('enum')) {
           const token = this.peek();
           this.error(UNSUPPORTED, `TypeScript ${token.v} declarations are not supported; keep this declaration in JavaScript or migrate it manually.`, token);
           this.skipStatement();
@@ -311,7 +316,13 @@ class TypeParser {
     if (this.at('declare')) { this.parseDeclare(true, declarations, functions); return; }
     if (this.at('function')) { this.parseFunction(true, functions); return; }
     if (this.at('const') || this.at('let') || this.at('var')) { this.parseVariable(true, declarations); return; }
-    if (this.at('namespace') || this.at('module') || this.at('class') || this.at('enum')) {
+    if (this.at('class')) { this.parseClass(true, declarations); return; }
+    if (this.atPunct('*')) {
+      this.error(UNSUPPORTED, 'Star re-exports (export * from "…") are not translated; list the exported names explicitly.', this.peek());
+      this.skipStatement();
+      return;
+    }
+    if (this.at('namespace') || this.at('module') || this.at('enum')) {
       this.error(UNSUPPORTED, `TypeScript ${this.peek().v} declarations are not supported.`, this.peek());
       this.skipStatement();
       return;
@@ -359,17 +370,30 @@ class TypeParser {
       }
     }
     const members = this.parseObjectMembers(true);
+    // A declaration with an unsupported member is omitted as a whole: a
+    // partial interface would silently narrow the real package type.
     if (members.unsupported) return;
-    const fields = members.fields;
-    const object = fields.length
-      ? `{ ${fields.map((field) => `${field.readonly ? 'readonly ' : ''}${field.name}${field.optional ? '?' : ''}: ${field.type}`).join(', ')} }`
-      : '{ }';
-    const base = bases.map(renderType).join(' & ');
+    const key = `${name}${renderTypeParams(typeParams)}`;
+    const existing = this.interfaceDecls.get(key);
+    const fields = existing ? mergeFields(existing.fields, members.fields) : members.fields;
+    const allBases = existing ? [...existing.bases, ...bases] : bases;
+    const base = allBases.map(renderType).filter(Boolean).join(' & ');
+    const object = renderRecord(fields);
     const type = base ? (fields.length ? `${object} & ${base}` : base) : object;
-    declarations.push(`${exported ? 'export ' : ''}type ${name}${renderTypeParams(typeParams)} = ${type}`);
+    const isExported = exported || Boolean(existing && existing.exported);
+    const rendered = `${isExported ? 'export ' : ''}type ${name}${renderTypeParams(typeParams)} = ${type}`;
+    if (existing) {
+      existing.fields = fields;
+      existing.bases = allBases;
+      existing.exported = isExported;
+      declarations[existing.index] = rendered;
+    } else {
+      this.interfaceDecls.set(key, { index: declarations.length, fields, bases: allBases, exported: isExported });
+      declarations.push(rendered);
+    }
   }
 
-  parseObjectMembers(interfaceBody = false) {
+  parseObjectMembers(interfaceBody = false, classBody = false) {
     this.expect('{');
     const fields = [];
     let unsupported = false;
@@ -377,7 +401,47 @@ class TypeParser {
       const start = this.peek();
       let readonly = false;
       let optional = false;
-      if (this.at('readonly')) { this.next(); readonly = true; }
+      let isStatic = false;
+      let ignored = false;
+      // Class member modifiers: `readonly` is meaningful, the visibility and
+      // binding modifiers only decide whether the member is part of the
+      // instance shape. `private`/`protected` members are not public surface.
+      let scanning = true;
+      while (scanning) {
+        scanning = false;
+        if (this.at('readonly')) { this.next(); readonly = true; scanning = true; continue; }
+        if (!classBody) continue;
+        if (this.at('static')) { this.next(); isStatic = true; scanning = true; continue; }
+        if (this.at('public')) { this.next(); scanning = true; continue; }
+        if (this.at('private') || this.at('protected')) { this.next(); ignored = true; scanning = true; continue; }
+        if (this.at('abstract') || this.at('override') || this.at('declare') || this.at('accessor')) { this.next(); scanning = true; }
+      }
+      // Private/protected members are not public surface, and static members
+      // live on the constructor value rather than the instance. Neither can be
+      // expressed as a record field, so skip them without poisoning the class.
+      if (ignored) { this.skipToSemicolon(); continue; }
+      if (isStatic) {
+        if (!this.staticMembersWarned) {
+          this.error(WIDENED, 'Static class members are not part of the instance type and were omitted.', start, 'warning');
+          this.staticMembersWarned = true;
+        }
+        // A static signature ends with `;` even when it has a parameter list,
+        // so skip to the terminator rather than to the first balanced brace.
+        this.skipToSemicolon();
+        continue;
+      }
+      // A constructor contributes no instance field. Its parameters are still
+      // parsed so the rest of the class body stays aligned, but `new` is an
+      // untyped JavaScript boundary in PlainScript.
+      if (classBody && this.at('constructor') && this.peek(1).t === 'punct' && this.peek(1).v === '(') {
+        this.next();
+        const constructorParams = this.parseTypeParameters();
+        if (constructorParams.length) this.error(UNSUPPORTED, 'A generic constructor is not representable in a class declaration.', start);
+        this.parseParameters();
+        if (this.atPunct(':')) { this.next(); this.parseType(); }
+        this.eat(';');
+        continue;
+      }
       if (this.atPunct('[')) {
         this.error(UNSUPPORTED, 'Index signatures and mapped members are not translated in this position; use a map type.', this.peek());
         unsupported = true;
@@ -394,7 +458,7 @@ class TypeParser {
         this.skipStatement();
         continue;
       }
-      let nameToken = this.peek();
+      const nameToken = this.peek();
       let name;
       if (nameToken.t === 'string' || nameToken.t === 'number') { this.next(); name = nameToken.v; }
       else if (nameToken.t === 'ident') { this.next(); name = nameToken.v; }
@@ -404,6 +468,7 @@ class TypeParser {
         this.skipStatement();
         continue;
       }
+      let field = null;
       if (this.atPunct('?')) { this.next(); optional = true; }
       if (this.atPunct('(') || this.atPunct('<')) {
         const typeParams = this.parseTypeParameters();
@@ -412,10 +477,13 @@ class TypeParser {
         if (this.atPunct(':')) { this.next(); returnType = this.parseType(); }
         else { this.error(SYNTAX, `Method "${name}" is missing a return type.`, start); unsupported = true; returnType = { kind: 'prim', name: 'any' }; }
         if (typeParams.length) {
-          this.error(UNSUPPORTED, `Generic method "${name}" is not representable as a PlainScript field.`, start);
-          unsupported = true;
+          // PlainScript function types cannot carry their own type parameters,
+          // so a generic method is widened to its constraints (or any) with an
+          // explicit warning instead of dropping the whole declaration.
+          this.error(WIDENED, `Generic method "${name}" was widened to its constraints; PlainScript record fields cannot declare type parameters.`, start, 'warning');
+          field = { name, optional, readonly, type: eraseTypeParams(renderFunctionType(params, returnType), typeParams) };
         } else {
-          fields.push({ name, optional, readonly, type: renderFunctionType(params, returnType) });
+          field = { name, optional, readonly, type: renderFunctionType(params, returnType) };
         }
       } else {
         if (!this.atPunct(':')) {
@@ -425,15 +493,48 @@ class TypeParser {
           continue;
         }
         this.next();
-        let type = this.parseType();
+        const type = this.parseType();
         if (!type) { unsupported = true; continue; }
-        fields.push({ name, optional, readonly, type: renderType(type) });
+        field = { name, optional, readonly, type: renderType(type) };
       }
+      if (field) fields.push(field);
       this.eat(';');
       this.eat(',');
     }
     this.expect('}');
     return { fields, unsupported };
+  }
+
+  // A declared class is a runtime constructor plus an instance shape. The
+  // shape is a record; the constructor value stays `any` because PlainScript
+  // treats `new` on a JavaScript boundary as untyped.
+  parseClass(exported, declarations) {
+    this.next();
+    const name = this.expectIdentifier('a class name').v;
+    const typeParams = this.parseTypeParameters();
+    const bases = [];
+    if (this.at('extends')) {
+      this.next();
+      const base = this.parseType();
+      if (base) bases.push(base);
+    }
+    if (this.at('implements')) {
+      this.next();
+      while (true) {
+        const implemented = this.parseType();
+        if (implemented) bases.push(implemented);
+        if (this.atPunct(',')) { this.next(); continue; }
+        break;
+      }
+    }
+    this.staticMembersWarned = false;
+    const members = this.parseObjectMembers(false, true);
+    if (members.unsupported) return;
+    const object = renderRecord(members.fields);
+    const base = bases.map(renderType).join(' & ');
+    const type = base ? (members.fields.length ? `${object} & ${base}` : base) : object;
+    declarations.push(`${exported ? 'export ' : ''}type ${name}${renderTypeParams(typeParams)} = ${type}`);
+    declarations.push(`${exported ? 'export ' : ''}declare const ${name}: any`);
   }
 
   parseAlias(exported, declarations) {
@@ -456,6 +557,12 @@ class TypeParser {
     this.next();
     if (this.at('function')) { this.parseFunction(exported, functions); return; }
     if (this.at('const') || this.at('let') || this.at('var')) { this.parseVariable(exported, declarations); return; }
+    if (this.at('class')) { this.parseClass(exported, declarations); return; }
+    if (this.at('module')) {
+      this.error(UNSUPPORTED, 'Ambient module declarations cannot be translated; move the declarations to the package root or translate them by hand.', this.peek());
+      this.skipStatement();
+      return;
+    }
     if (this.at('interface')) { this.parseInterface(exported, declarations); return; }
     if (this.at('type')) { this.parseAlias(exported, declarations); return; }
     this.error(UNSUPPORTED, `Unsupported declare construct ${JSON.stringify(this.peek().v)}.`, this.peek());
@@ -565,7 +672,16 @@ class TypeParser {
     const token = this.peek();
     if (token.t === 'string') { this.next(); return { kind: 'literal', value: token.v, base: 'text' }; }
     if (token.t === 'number') { this.next(); return { kind: 'literal', value: Number(token.v), base: 'number' }; }
-    if (token.t === 'template') { this.next(); this.error(UNSUPPORTED, 'Template literal types are not supported.', token); return null; }
+    if (token.t === 'template') {
+      this.next();
+      const expansion = expandTemplateLiteral(token.v);
+      if (expansion) {
+        const members = expansion.map((value) => ({ kind: 'literal', value, base: 'text' }));
+        return members.length === 1 ? members[0] : { kind: 'union', members };
+      }
+      this.error(WIDENED, 'Template literal type was translated as text; PlainScript does not model template literal types.', token, 'warning');
+      return { kind: 'prim', name: 'text' };
+    }
     if (token.t === 'punct' && token.v === '(') {
       const checkpoint = this.index;
       const diagnosticCheckpoint = this.diagnostics.length;
@@ -727,8 +843,10 @@ class TypeParser {
         }
         this.next();
         const ret = this.parseType();
-        if (typeParams.length) this.error(UNSUPPORTED, `Generic method "${nameToken.v}" is not supported here.`, nameToken);
-        else if (ret) fields.push({ name: nameToken.v, optional, readonly, type: renderFunctionType(params, ret) });
+        if (typeParams.length) {
+          this.error(WIDENED, `Generic method "${nameToken.v}" was widened to its constraints; PlainScript record fields cannot declare type parameters.`, nameToken, 'warning');
+          if (ret) fields.push({ name: nameToken.v, optional, readonly, type: eraseTypeParams(renderFunctionType(params, ret), typeParams) });
+        } else if (ret) fields.push({ name: nameToken.v, optional, readonly, type: renderFunctionType(params, ret) });
         this.eat(';');
         this.eat(',');
         continue;
@@ -762,6 +880,76 @@ class TypeParser {
       else if (token.v === close) { depth -= 1; if (depth === 0) return; }
     }
   }
+}
+
+// Replace each declared type parameter with its constraint (or `any`) in an
+// already-rendered signature. Used where a generic signature is widened.
+function eraseTypeParams(text, typeParams) {
+  if (!typeParams.length) return text;
+  const names = typeParams.map((param) => param.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const pattern = new RegExp(`\\b(${names.join('|')})\\b`, 'g');
+  const replacements = new Map(typeParams.map((param) => [param.name, param.constraint ? renderType(param.constraint) : 'any']));
+  return text.replace(pattern, (name) => replacements.get(name));
+}
+
+function renderRecord(fields) {
+  return fields.length
+    ? `{ ${fields.map((field) => `${field.readonly ? 'readonly ' : ''}${field.name}${field.optional ? '?' : ''}: ${field.type}`).join(', ')} }`
+    : '{ }';
+}
+
+function mergeFields(first, second) {
+  const merged = [...first];
+  const seen = new Set(first.map((field) => field.name));
+  for (const field of second) {
+    if (seen.has(field.name)) continue;
+    seen.add(field.name);
+    merged.push(field);
+  }
+  return merged;
+}
+
+// Template literal types have no PlainScript equivalent. Expand the common
+// finite case (`\`key-${'down' | 'up'}\``); otherwise widen to text with an
+// explicit warning rather than pretending the pattern was preserved.
+function expandTemplateLiteral(raw) {
+  const parts = raw.split(/\$\{([^}]*)\}/);
+  const choices = [];
+  for (let index = 0; index < parts.length; index += 1) {
+    if (index % 2 === 0) { choices.push([parts[index]]); continue; }
+    const expression = parts[index].trim();
+    const values = literalChoices(expression);
+    if (!values) return null;
+    choices.push(values);
+  }
+  let combinations = [''];
+  for (const options of choices) {
+    const next = [];
+    for (const prefix of combinations) {
+      for (const option of options) next.push(prefix + option);
+    }
+    if (next.length > 50) return null;
+    combinations = next;
+  }
+  return combinations;
+}
+
+function literalChoices(expression) {
+  // `${string}` is an open pattern, not an empty substitution; widening to
+  // text is the only honest translation.
+  if (expression === 'string' || expression === 'number' || expression === 'boolean') return null;
+  const members = expression.split('|').map((member) => member.trim()).filter(Boolean);
+  if (!members.length) return null;
+  const values = [];
+  for (const member of members) {
+    if ((member.startsWith("'") && member.endsWith("'")) || (member.startsWith('"') && member.endsWith('"'))) {
+      values.push(member.slice(1, -1));
+      continue;
+    }
+    if (/^-?[0-9]+$/.test(member)) { values.push(member); continue; }
+    return null;
+  }
+  return values;
 }
 
 function normalizeSpecifier(spec) {

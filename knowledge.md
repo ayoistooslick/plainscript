@@ -64,7 +64,7 @@ Options: `--quiet`, `--verbose`, `--check`, `--std-base=<url>`.
 src/            compiler (lexer, dialect, parser, checker, HIR, codegen, modules, CLI, LSP, DAP)
 stdlib/          runtime modules + .d.pln declaration files
 integrations/    Express, React+Vite, Next.js, HTTP and SQLite projects in PlainScript 2.1
-tests/           313+ tests across compiler layers, docs examples and integrations
+tests/           340+ tests across compiler layers, docs examples and integrations
 demos/           larger sample applications
 docs/            guides, reference, specification and generated documentation site
 legacy/v1/       archived v1 compiler, tests, examples (for reference only)
@@ -105,10 +105,10 @@ Hello, world!
 - One backend: JavaScript/ESM only. Another target is possible in future but not implemented.
 - No bundler: `build` emits one module per file. Use Vite, webpack or Next to bundle.
 - Language tooling: `plainscript lsp` provides diagnostics, completion, hover, navigation, rename, symbols, formatting, semantic tokens and quick fixes; the VS Code debugger uses `plainscript dap`. The extension is test-level, not UI-automated.
-- `render` blocks are not JSX: attributes are `with name: value`, children are statements, dynamic child lists built with `element` expressions.
+- `render` blocks are not JSX: attributes are `with name: value`, children are statements, and loops/branches inside a render block build dynamic child lists. `element Fragment` gives a fragment; keys are explicit (`with key: …`), never inferred.
 - Types are erased: no runtime reflection beyond `is` checks on primitives, lists, maps and variant tags.
 - `??` and `?.` are JavaScript's own operators; semantics match exactly.
-- No exceptions typing: `catch` binds `any`.
+- No exceptions typing: `catch` binds `any`. Promise `then`/`catch`/`finally` are typed, but a rejection reason is always `any`.
 - Concurrency is cooperative: `std/task` adds groups, cancellation, timeouts, channels and worker handles; there is no compiler-level task syntax.
 - Not yet published: the npm registry serves 2.0.0; publishing 2.1.0 is a separate explicit step.
 - Integrations: eight projects under `integrations/` are compiled and executed by `npm test` (Express, React SSR, SQLite, HTTP, CLI, multi-module, full-stack); the Vite and Next production builds need their own installs and run through `npm run verify:integrations`, which CI does not run by default.

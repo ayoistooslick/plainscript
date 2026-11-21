@@ -603,9 +603,13 @@ end
 - `element "tag" with prop: value, other: flag` creates an element by calling
   `createElement(tag, props, ...children)` **from the enclosing scope**. That name must be
   imported or declared; PlainScript has no built-in element factory.
-- A prop without `:` is shorthand for a boolean/name value: `with disabled`.
+- A prop without `:` is shorthand for a name in scope: `with checked` means
+  `checked: checked`. Write `with disabled: true` for a constant.
 - Children are statements. A child expression contributes its value; `...expr` spreads a
-  list of children; nested `element` blocks nest.
+  list of children; nested `element` blocks nest; a `for each`, `for … from … to`, `while`,
+  `when` or `match` statement inside a render block contributes the children its executed
+  path creates (a dynamic list). A `return`, `throw`, `break` or `continue` cannot be a
+  direct child (`PS3410`).
 - `element` is also an expression, which is how dynamic child lists are built:
 
 ```plainscript
@@ -615,7 +619,10 @@ for item in items
 end
 ```
 
-There are no fragments, no context syntax and no automatic keys.
+A fragment is an element whose tag is the `Fragment` value from the imported factory:
+`element Fragment with key: id … end`. It renders its children without an extra DOM node.
+Keys are always explicit (`with key: value`); there is no automatic key inference and no
+context syntax.
 
 ### 7.6 Other statements
 

@@ -188,13 +188,16 @@ Translates supported TypeScript `.d.ts` declarations into `.d.pln` declarations.
 paths it recursively scans the current directory, skipping `node_modules`, `dist`, `.git`
 and `.plainscript`. Relative imports that resolve to a `.d.ts` file are translated too.
 
-Supported: interfaces, type aliases, object/function/tuple types, unions, intersections,
-`keyof`, indexed access, mapped types, generics without defaults, exported function/value
-declarations and re-exports. Unsupported constructs — `infer`, template-literal types,
-namespaces, classes, optional tuple elements, index signatures and signatures with no direct
-PlainScript equivalent — produce `PS7001` diagnostics; the affected file is **not** written.
-Generic defaults are omitted with a `PS7004` warning. The command never substitutes `any`
-for an unsupported type.
+Supported: interfaces (with declaration merging), type aliases, object/function/tuple
+types, unions, intersections, `keyof`, indexed access, mapped types, generics with
+constraints, exported function/value declarations, re-exports, `declare class` and
+finite template-literal types. A class is written as an instance record plus a
+`declare const` binding; statics are omitted and a generic method widens to its
+constraint, both with a `PS7005` warning. Unsupported constructs — `infer`, namespaces,
+ambient `declare module` blocks, `export * from`, optional tuple elements, index
+signatures and signatures with no direct PlainScript equivalent — produce `PS7001`
+diagnostics; the affected file is **not** written. Generic defaults are omitted with a
+`PS7004` warning. The command never substitutes `any` for an unsupported type.
 
 ```bash
 plainscript interop types

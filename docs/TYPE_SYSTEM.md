@@ -96,12 +96,19 @@ method surface, so the practical risk is confined to aliasing a JavaScript array
 ## Declaration interop
 
 `plainscript interop` translates a conservative TypeScript declaration subset to `.d.pln`:
-interfaces, aliases, object/function/tuple types, unions/intersections, mapped types,
-generics without defaults, and exported function/value declarations. Unsupported constructs
-(such as `infer`, template-literal types, namespaces, classes and signatures with no direct
-PlainScript equivalent) produce `PS7001` errors and the affected declaration is not
-written; warnings such as an omitted generic default are reported as `PS7004`. It is not an
-arbitrary `.d.ts` parser. PlainScript's native declaration format remains `.d.pln`.
+interfaces (including declaration merging), aliases, object/function/tuple types,
+unions/intersections, mapped types, generics with constraints, classes (as an instance
+record plus a `declare const` binding), template-literal types, and exported
+function/value declarations. Template-literal types expand to a literal union when every
+substitution is finite (`\`key-${'down' | 'up'}\``); an open pattern such as
+`\`/api/${string}\`` widens to `text` with a `PS7005` warning. Constructors and class
+statics are not part of the instance type: statics are omitted with one `PS7005` warning,
+private/protected members are skipped, and `new` remains an untyped boundary. A generic
+method widens to its constraint with `PS7005` because PlainScript record fields cannot
+declare their own type parameters. Omitted generic defaults are `PS7004`. Unsupported
+constructs (`infer`, namespaces, index signatures, qualified type names) produce `PS7001`
+errors and the affected declaration is not written. It is not an arbitrary `.d.ts` parser.
+PlainScript's native declaration format remains `.d.pln`.
 
 ## Still absent
 

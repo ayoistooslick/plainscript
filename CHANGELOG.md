@@ -12,6 +12,47 @@ All notable changes to PlainScript are documented here.
 - Remove the 3D hero stage and the three-plate art strip (Figs. 02, 04, 05 and 06) from the
   generated documentation homepage.
 
+### Rendering
+
+- `for each`, `for … from … to`, `while`, `when` and `match` are now valid children of a
+  `render`/`element` block and contribute the children their executed path creates. A
+  dynamic keyed list no longer needs a helper function, and the previous internal crash
+  (“Lowering does not support expression ForEach”) is gone.
+- A `return`, `throw`, `break` or `continue` directly inside a render block reports
+  `PS3410` instead of failing during lowering.
+- `element Fragment` renders sibling children without a wrapper element and works with
+  explicit keys; this is now documented and covered by a server-render test.
+
+### Type checking
+
+- `Promise` exposes typed `then`, `catch` and `finally` methods, so rejection handlers are
+  checked and `p.then((n: text) => …)` is rejected when `p` resolves a `number`.
+- A recursive generic alias such as `type Box<T>` with a `Box<T>?` field no longer
+  overflows the stack; the recursion point becomes a named reference.
+
+### TypeScript declaration interop
+
+- `declare class` declarations translate to an instance record plus a `declare const`
+  binding (readonly fields, methods, optional members), with private/protected members
+  skipped and static members omitted with one `PS7005` warning.
+- Template-literal types expand to a literal union when every substitution is finite;
+  open patterns widen to `text` with `PS7005`.
+- Repeated interfaces merge instead of producing a duplicate type declaration, and a
+  generic method widens to its constraint with `PS7005` rather than dropping the whole
+  declaration.
+
+### Database adapters
+
+- `tests/db-live.test.js` runs the PostgreSQL/MySQL adapters against real servers when
+  `PLAINSCRIPT_TEST_POSTGRES_URL`/`PLAINSCRIPT_TEST_MYSQL_URL` and `pg`/`mysql2` are
+  present, covering connection failure, binding, invalid queries, rollback and commit.
+- PostgreSQL placeholder translation now leaves `'it''s ?'` and `$$ … ? … $$` untouched.
+
+### Release engineering
+
+- The publish workflow no longer defaults to `2.0.0`; it defaults to `2.1.0` and refuses a
+  target older than `package.json`'s version.
+
 ### Diagnostics
 
 - `PS3301` on a 2.1 declaration word (`value`, `val`, `set`, `change`, `define`, `returns`,

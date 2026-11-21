@@ -77,3 +77,28 @@ test('formatting is idempotent', () => {
 test('lexical errors are not silently reformatted', () => {
   assert.throws(() => format('let x = "unterminated\n', 'f.pln'), CompileError);
 });
+
+test('formatting a render block with loop children preserves the program', () => {
+  const { compile } = require('../src');
+  const source = `#syntax 2.1
+import { createElement } from "react"
+
+export define List(xs: list of number) returns any
+  render
+    element "ul"
+      for each x in xs
+        element "li" with key: x
+          "{x}"
+        end
+      end
+    end
+  end
+end
+`;
+  const once = format(source, 'list.pln');
+  assert.strictEqual(format(once, 'list.pln'), once);
+  assert.strictEqual(
+    compile(once, { filename: 'list.pln' }).code,
+    compile(source, { filename: 'list.pln' }).code,
+  );
+});

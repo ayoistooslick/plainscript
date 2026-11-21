@@ -426,7 +426,28 @@ export define Counter() returns any
         end
     end
 end</code></pre></figure>
-<p><code>render</code> returns the expression; <code>element</code> builds a child. Attributes use <code>with name: value</code>, children are statements, and <code>...list</code> inserts a dynamic list. They lower to <code>createElement</code> from the module scope, so React (or another library exposing <code>createElement</code>) must be imported.</p>
+<p><code>render</code> returns the expression; <code>element</code> builds a child. Attributes use <code>with name: value</code>, children are statements, and <code>...list</code> inserts a dynamic list. A <code>for each</code>/<code>for … from … to</code>/<code>while</code>/<code>when</code>/<code>match</code> child builds its own part of the list, so a keyed list needs no helper function:</p>
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
+
+import { createElement } from &quot;react&quot;
+
+export define TaskList() returns any
+    value tasks is [
+        { id: 1, title: &quot;write the docs&quot; },
+        { id: 2, title: &quot;ship 2.1&quot; },
+    ]
+
+    render
+        element &quot;ul&quot;
+            for each task in tasks
+                element &quot;li&quot; with key: task.id
+                    task.title
+                end
+            end
+        end
+    end
+end</code></pre></figure>
+<p><code>element Fragment</code> renders sibling children without a wrapper element. Keys are explicit; there is no automatic key inference. Everything lowers to <code>createElement</code> from the module scope, so React (or another library exposing <code>createElement</code>) must be imported.</p>
 <h2 id="12-interop-boundaries">12. Interop boundaries</h2>
 <figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
 

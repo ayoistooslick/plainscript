@@ -346,16 +346,20 @@ Known and deliberate for 2.1.0:
   timeouts, channels and worker handles; it cannot stop promises or host calls
   that ignore cancellation.
 - **`render` blocks are not JSX.** Attributes are `with name: value`, children
-  are statements, and dynamic lists are built with `element` expressions. No
-  fragments or automatic key inference.
+  are statements. Loops and branches inside a `render`/`element` block build
+  dynamic child lists, `element Fragment` renders sibling children without a
+  wrapper, and keys stay explicit (`with key: item.id`); there is no automatic
+  key inference.
 - **Types are erased.** No runtime reflection beyond `is` checks on primitives,
   lists, maps and variant tags. `as` is unchecked at runtime.
 - **No exceptions typing.** `catch` binds `any`; typed operational errors use
   `OperationResult`/`OperationFailure`.
 - **Database support requires an installed driver.** `std/db` is SQLite via
   Node's `node:sqlite`; PostgreSQL/MySQL adapters dynamically load
-  application-installed drivers. No live PostgreSQL/MySQL server is available
-  here, so those adapter tests use driver-shaped fakes.
+  application-installed drivers. The default suite uses driver-shaped fakes;
+  `tests/db-live.test.js` runs the same operations against real servers when
+  `PLAINSCRIPT_TEST_POSTGRES_URL` / `PLAINSCRIPT_TEST_MYSQL_URL` are set. No
+  live server is available in this checkout, so that path is unverified here.
 - **Debugging is adapter-based.** `plainscript dap` maps breakpoints and stack
   frames through source maps; the VS Code integration is test-level.
 - **TypeScript interop is a subset.** `plainscript interop` translates

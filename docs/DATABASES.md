@@ -145,12 +145,31 @@ build SQL by interpolating request values.
 
 `tests/db.test.js` verifies SQLite tables, persistence, parameter binding, migrations,
 rollback and failure behavior. `tests/db-adapters.test.js` verifies PostgreSQL and MySQL
-placeholder translation, SQL/type generation, query binding, transaction statements,
-connection lifecycle, URI parsing and the asynchronous declaration surface using
-driver-shaped fakes. **No live PostgreSQL or MySQL server is available in this
-repository's test environment**, so those adapters are not claimed as server-integration
-tested. Install the driver in the application's own `package.json` and run your integration
-suite against a real instance before deployment.
+placeholder translation (including quoted, commented, doubled-quote and dollar-quoted
+inputs), SQL/type generation, query binding, transaction statements, connection lifecycle,
+URI parsing and the asynchronous declaration surface using driver-shaped fakes.
+`tests/db-live.test.js` is the real-server harness. It skips unless both the URL and the
+driver are present:
+
+```bash
+# Any disposable PostgreSQL 14+ / MySQL 8+ (or MariaDB 10.6+) instance works.
+docker run --rm -d --name ps-test -e POSTGRES_PASSWORD=test \
+  -p 5432:5432 postgres:16
+docker run --rm -d --name my-test -e MYSQL_ROOT_PASSWORD=test \
+  -e MYSQL_DATABASE=plainscript_test -p 3306:3306 mysql:8
+
+npm install --no-save pg mysql2
+PLAINSCRIPT_TEST_POSTGRES_URL=postgres://postgres:test@127.0.0.1:5432/postgres \
+PLAINSCRIPT_TEST_MYSQL_URL=mysql://root:test@127.0.0.1:3306/plainscript_test \
+npx node --test tests/db-live.test.js
+```
+
+The harness creates and drops its own table, then checks connection failure, parameterised
+insert/select, injection-shaped values, invalid-query errors, rollback and commit.
+**No live PostgreSQL or MySQL server is available in this repository's test environment
+(no database service, Docker daemon or root access)**, so those adapters are not claimed as
+server-integration tested here. Install the driver in the application's own `package.json`
+and run this harness (or your own suite) against a real instance before deployment.
 
 SQLite table methods are synchronous. The PostgreSQL and MySQL adapters return Promises for
 `table()` operations and must be awaited; the type declarations select `AsyncTable` for an

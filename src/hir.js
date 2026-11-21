@@ -34,6 +34,7 @@ class Lowerer {
     this.checker = options.checker;
     this.file = options.file;
     this.matchCounter = 0;
+    this.childrenCounter = 0;
     this.unitVariants = options.unitVariants || new Set();
     this.variantFields = options.variantFields || new Map();
     this.typeOnlyImports = options.typeOnlyImports || new Set();
@@ -380,18 +381,161 @@ class Lowerer {
     return this.call({ kind: 'Call', callee: node.right, args: [node.left], line: node.line, col: node.col });
   }
 
+  // A render/element child is one of: a nested element, an expression, or a
+  // control-flow statement that contributes zero or more children. Loops and
+  // branches are how a render block builds a dynamic child list without
+  // leaving the language; they are lowered to an inline array builder below.
+  childExpression(child) {
+    if (child.kind === 'Element') return this.elementExpression(child);
+    if (child.kind === 'ExprStmt') return this.expression(child.expression);
+    if (child.kind === 'Render') return this.elementCall(child.children);
+    return null;
+  }
+
+  isControlFlow(node) {
+    return node.kind === 'ForEach' || node.kind === 'ForRange' || node.kind === 'Conditional'
+      || node.kind === 'While' || node.kind === 'Match';
+  }
+
+  // Rewrite a render body so every produced child is pushed onto `target`.
+  // Control flow nests recursively: a loop inside an `otherwise` branch still
+  // only contributes the children its executed path creates.
+  pushChildren(target, statements) {
+    const out = [];
+    for (const statement of statements) {
+      const value = this.childExpression(statement);
+      if (value) {
+        out.push({
+          kind: 'ExprStmt',
+          expression: {
+            kind: 'Call',
+            callee: { kind: 'Member', object: { kind: 'Name', name: target }, property: 'push' },
+            args: [value],
+            line: statement.line,
+            col: statement.col,
+          },
+          line: statement.line,
+          col: statement.col,
+        });
+        continue;
+      }
+      if (this.isControlFlow(statement)) {
+        out.push(this.controlFlowInRender(statement, target));
+        continue;
+      }
+      const lowered = this.statement(statement);
+      if (lowered) out.push(lowered);
+    }
+    return out;
+  }
+
+  controlFlowInRender(node, target) {
+    switch (node.kind) {
+      case 'ForEach':
+        return {
+          kind: 'ForEach',
+          pattern: this.pattern(node.pattern),
+          iterable: this.expression(node.iterable),
+          body: this.pushChildren(target, node.body),
+          line: node.line,
+          col: node.col,
+        };
+      case 'ForRange':
+        return {
+          kind: 'ForRange',
+          pattern: this.pattern(node.pattern),
+          from: this.expression(node.from),
+          to: this.expression(node.to),
+          body: this.pushChildren(target, node.body),
+          line: node.line,
+          col: node.col,
+        };
+      case 'While':
+        return {
+          kind: 'While',
+          condition: this.expression(node.condition),
+          body: this.pushChildren(target, node.body),
+          line: node.line,
+          col: node.col,
+        };
+      case 'Conditional':
+        return {
+          kind: 'Conditional',
+          branches: node.branches.map((branch) => ({
+            condition: this.expression(branch.condition),
+            body: this.pushChildren(target, branch.body),
+          })),
+          otherwise: node.otherwise ? this.pushChildren(target, node.otherwise) : null,
+          line: node.line,
+          col: node.col,
+        };
+      case 'Match':
+        return {
+          kind: 'Match',
+          subject: this.expression(node.subject),
+          cases: node.cases.map((branch) => ({
+            pattern: branch.pattern,
+            guard: branch.guard ? this.expression(branch.guard) : null,
+            body: this.pushChildren(target, branch.body),
+          })),
+          line: node.line,
+          col: node.col,
+        };
+      default:
+        throw new Error(`Lowering does not support ${node.kind} inside a render block`);
+    }
+  }
+
+  // Build the child list for a control-flow statement as an immediately
+  // invoked arrow: `...(() => { const $children1 = []; ...; return $children1; })()`.
+  controlFlowChildren(node) {
+    const id = this.childrenCounter += 1;
+    const name = `$children${id}`;
+    const body = [
+      {
+        kind: 'VarDecl',
+        declKind: 'let',
+        pattern: { kind: 'Name', name },
+        init: { kind: 'List', items: [] },
+        line: node.line,
+        col: node.col,
+      },
+      this.controlFlowInRender(node, name),
+      { kind: 'Return', value: { kind: 'Name', name }, line: node.line, col: node.col },
+    ];
+    const call = {
+      kind: 'Call',
+      callee: {
+        kind: 'Lambda',
+        params: [],
+        expression: null,
+        body,
+        async: containsAwait([node]),
+      },
+      args: [],
+      line: node.line,
+      col: node.col,
+    };
+    // Only an async lambda needs the enclosing function to await its result.
+    if (call.callee.async) return { kind: 'Spread', value: { kind: 'Await', value: call } };
+    return { kind: 'Spread', value: call };
+  }
+
   elementCall(children) {
     // A render block is exactly one element tree; plain child expressions are
-    // wrapped by the factory as-is.
+    // wrapped by the factory as-is. Multiple top-level children keep the
+    // original `div` wrapper so existing programs emit the same markup.
     if (children.length === 1 && children[0].kind === 'Element') {
       return this.elementExpression(children[0]);
     }
-    const args = children.map((child) => {
-      if (child.kind === 'Element') return this.elementExpression(child);
-      if (child.kind === 'ExprStmt') return this.expression(child.expression);
-      if (child.kind === 'Render') return this.elementCall(child.children);
-      return this.statement(child);
-    });
+    const args = [];
+    for (const child of children) {
+      const value = this.childExpression(child);
+      if (value) { args.push(value); continue; }
+      if (this.isControlFlow(child)) args.push(this.controlFlowChildren(child));
+      // A statement that cannot produce a child (return/throw/break) is left to
+      // the checker, which reports it; dropping it here avoids a crash.
+    }
     return {
       kind: 'Call',
       callee: { kind: 'Name', name: 'createElement' },
@@ -410,12 +554,12 @@ class Lowerer {
         fields: node.props.map((property) => ({ key: property.key, value: this.expression(property.value) })),
       }
       : { kind: 'Nothing' };
-    const children = node.children.map((child) => {
-      if (child.kind === 'Element') return this.elementExpression(child);
-      if (child.kind === 'ExprStmt') return this.expression(child.expression);
-      if (child.kind === 'Render') return this.elementCall(child.children);
-      return this.expression(child);
-    });
+    const children = [];
+    for (const child of node.children) {
+      const value = this.childExpression(child);
+      if (value) { children.push(value); continue; }
+      if (this.isControlFlow(child)) children.push(this.controlFlowChildren(child));
+    }
     return {
       kind: 'Call',
       callee: { kind: 'Name', name: 'createElement' },
