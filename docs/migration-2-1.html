@@ -12,7 +12,7 @@ print(&quot;this file is now 2.1&quot;)</code></pre></figure>
 <h2 id="2-rename-what-the-compiler-reports">2. Rename what the compiler reports</h2>
 <p>In a 2.1 file the 2.0 declarations are rejected with <code>PS2030</code>, and the message names the 2.1 word. The full mapping:</p>
 <div class="table-wrap"><table><thead><tr><th>2.0</th><th>2.1</th><th>Notes</th></tr></thead><tbody>
-<tr><td><code>const x = 1</code></td><td><code>value x is 1</code></td><td>Immutable.</td></tr>
+<tr><td><code>const x = 1</code></td><td><code>value x is 1</code></td><td>Immutable. <code>val x is 1</code> is an accepted alias.</td></tr>
 <tr><td><code>let x = 1</code></td><td><code>set x to 1</code></td><td>Mutable.</td></tr>
 <tr><td><code>x = 2</code></td><td><code>change x to 2</code></td><td>Works for names, members and indexes.</td></tr>
 <tr><td><code>x += 1</code></td><td><code>change x to x + 1</code></td><td><code>+=</code> still parses in expressions; <code>change</code> is the documented 2.1 form.</td></tr>
@@ -31,7 +31,7 @@ print(&quot;this file is now 2.1&quot;)</code></pre></figure>
 <tr><td><code>a &lt;= b</code></td><td><code>a is at most b</code></td><td></td></tr>
 </tbody></table></div>
 <p>Unchanged in 2.1: <code>match</code>, <code>case</code>, <code>while</code>, <code>break</code>, <code>continue</code>, <code>try</code>, <code>catch</code>, <code>finally</code>, <code>throw</code>, <code>return</code>, <code>let</code>-free expressions, <code>type</code>, <code>declare</code>, <code>import</code>, <code>export</code>, <code>async</code>, <code>await</code>, <code>and</code>, <code>or</code>, <code>not</code>, <code>is</code> (type test), <code>as</code>, <code>render</code>, <code>element</code>, and all arithmetic operators.</p>
-<p><code>value</code>, <code>set</code>, <code>change</code>, <code>define</code>, <code>returns</code> and <code>each</code> are contextual, so they remain usable as identifiers. <code>when</code> and <code>otherwise</code> are reserved in both dialects.</p>
+<p><code>value</code>, <code>val</code>, <code>set</code>, <code>change</code>, <code>define</code>, <code>returns</code> and <code>each</code> are contextual, so they remain usable as identifiers. <code>when</code> and <code>otherwise</code> are reserved in both dialects.</p>
 <h2 id="3-opt-whole-projects-in">3. Opt whole projects in</h2>
 <p>A pragma in every file is tedious for a new project. Set the default once in <code>plainscript.config.json</code>:</p>
 <figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">json</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="json">{

@@ -69,11 +69,14 @@ class Parser {
         ? 'define' : null;
     }
     if (token.v === 'change') return next.t === 'ident' ? 'change' : null;
-    if (token.v === 'value' || token.v === 'set') {
-      if (next.t === 'ident') return token.v;
+    // `val` is a short alias for an immutable 2.1 binding: `val x is 1`.
+    if (token.v === 'value' || token.v === 'val' || token.v === 'set') {
+      const immutable = token.v !== 'set';
+      const kind = immutable ? 'value' : 'set';
+      if (next.t === 'ident') return kind;
       if (next.t === 'punct' && (next.v === '{' || next.v === '(')) {
-        const separator = token.v === 'value' ? 'is' : 'to';
-        return this.groupIsFollowedBy(1, separator) ? token.v : null;
+        const separator = immutable ? 'is' : 'to';
+        return this.groupIsFollowedBy(1, separator) ? kind : null;
       }
     }
     return null;
@@ -98,7 +101,7 @@ class Parser {
   }
 
   englishVariable(token) {
-    const declKind = token.v === 'value' ? 'const' : 'let';
+    const declKind = token.v === 'set' ? 'let' : 'const';
     this.next();
     const pattern = this.bindingPattern();
     let type = null;

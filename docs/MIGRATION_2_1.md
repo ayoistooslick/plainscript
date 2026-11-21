@@ -29,7 +29,7 @@ names the 2.1 word. The full mapping:
 
 | 2.0 | 2.1 | Notes |
 | --- | --- | --- |
-| `const x = 1` | `value x is 1` | Immutable. |
+| `const x = 1` | `value x is 1` | Immutable. `val x is 1` is an accepted alias. |
 | `let x = 1` | `set x to 1` | Mutable. |
 | `x = 2` | `change x to 2` | Works for names, members and indexes. |
 | `x += 1` | `change x to x + 1` | `+=` still parses in expressions; `change` is the documented 2.1 form. |
@@ -52,8 +52,8 @@ Unchanged in 2.1: `match`, `case`, `while`, `break`, `continue`, `try`, `catch`,
 `import`, `export`, `async`, `await`, `and`, `or`, `not`, `is` (type test), `as`,
 `render`, `element`, and all arithmetic operators.
 
-`value`, `set`, `change`, `define`, `returns` and `each` are contextual, so they
-remain usable as identifiers. `when` and `otherwise` are reserved in both
+`value`, `val`, `set`, `change`, `define`, `returns` and `each` are contextual, so
+they remain usable as identifiers. `when` and `otherwise` are reserved in both
 dialects.
 
 ## 3. Opt whole projects in

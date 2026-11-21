@@ -42,6 +42,19 @@ test('unknown names get a suggestion', () => {
   assert.match(diagnostic.hint, /total/);
 });
 
+test('2.1 code without a pragma gets a dialect hint', () => {
+  const diagnostic = firstDiagnostic('value Messi is 3');
+  assert.strictEqual(diagnostic.code, 'PS3301');
+  assert.match(diagnostic.hint, /#syntax 2\.1/);
+});
+
+test('a file with the pragma gets no dialect hint', () => {
+  const diagnostic = firstDiagnostic('#syntax 2.1\nvalue total is 1\nvalue x is totl');
+  assert.strictEqual(diagnostic.code, 'PS3301');
+  assert.doesNotMatch(diagnostic.hint, /#syntax/);
+  assert.match(diagnostic.hint, /total/);
+});
+
 test('argument type mismatches are reported', () => {
   const codes = codesOf('function f(count: number) -> number\n    return count\nend\nf("no")');
   assert.ok(codes.includes('PS3343'));

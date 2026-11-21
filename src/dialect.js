@@ -22,7 +22,8 @@
 // already English and a second spelling would add vocabulary without adding
 // clarity.
 //
-// `value`, `set`, `change`, `define`, `returns` and `each` are *contextual*:
+// `value` (and its short alias `val`), `set`, `change`, `define`, `returns`
+// and `each` are *contextual*:
 // they introduce a construct only in the position where that construct can
 // appear. They remain valid identifiers everywhere else, so `value` can still
 // be a parameter name. Only `when` and `otherwise` are reserved, because those
@@ -54,7 +55,7 @@ const COMPARISON_PHRASES = Object.freeze([
   { words: ['is', 'at', 'most'], operator: '<=' },
 ]);
 
-const CONTEXTUAL_WORDS = Object.freeze(['value', 'set', 'change', 'define', 'returns', 'each']);
+const CONTEXTUAL_WORDS = Object.freeze(['value', 'val', 'set', 'change', 'define', 'returns', 'each']);
 
 function isDialect(value) {
   return DIALECTS.includes(String(value));

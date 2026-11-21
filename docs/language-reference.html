@@ -34,12 +34,13 @@ change count to count + 1  # assignment
 
 print(&quot;{name} has {count}&quot;)</code></pre></figure>
 <div class="table-wrap"><table><thead><tr><th>Concept</th><th>2.1</th><th>2.0</th></tr></thead><tbody>
-<tr><td>Immutable</td><td><code>value x is 1</code></td><td><code>const x = 1</code></td></tr>
+<tr><td>Immutable</td><td><code>value x is 1</code> (alias: <code>val x is 1</code>)</td><td><code>const x = 1</code></td></tr>
 <tr><td>Mutable</td><td><code>set x to 1</code></td><td><code>let x = 1</code></td></tr>
 <tr><td>Assignment</td><td><code>change x to 2</code></td><td><code>x = 2</code></td></tr>
 <tr><td>Compound assignment</td><td><code>change x to x + 1</code></td><td><code>x += 1</code></td></tr>
 <tr><td>Type annotation</td><td><code>value x: number is 1</code></td><td><code>const x: number = 1</code></td></tr>
 </tbody></table></div>
+<p><code>val</code> is an accepted short spelling of <code>value</code> everywhere a binding can start, including destructuring and <code>export</code>: <code>val Messi is 3</code> and <code>export val rating is 10</code> mean exactly what <code>value … is …</code> means. It is contextual like <code>value</code>, so it stays usable as a parameter or variable name.</p>
 <p>Destructuring works with both words:</p>
 <figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
 

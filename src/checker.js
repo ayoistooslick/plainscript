@@ -2,6 +2,7 @@
 
 const T = require('./types');
 const { Span, error } = require('./diagnostics');
+const { CONTEXTUAL_WORDS, PRAGMA } = require('./dialect');
 
 const PRIMITIVES = new Set(['number', 'text', 'boolean', 'nothing', 'any', 'unknown', 'never']);
 
@@ -1491,8 +1492,19 @@ class Checker {
   }
 
   suggestionFor(name) {
+    // The 2.1 declaration words are contextual, so a 2.1 program without its
+    // pragma parses them as ordinary names and fails here first. Point at the
+    // pragma instead of at a typo, which is what a diff-distance suggestion
+    // would look like.
+    if (CONTEXTUAL_WORDS.includes(name) && !this.hasSyntaxPragma()) {
+      return 'This looks like PlainScript 2.1 code. Add "#syntax 2.1" as the first line of the file, or set "syntax": "2.1" in plainscript.config.json.';
+    }
     const candidate = closest(name, [...this.scope.visibleNames(), ...this.variantCtors.keys()]);
     return candidate ? `Did you mean "${candidate}"?` : null;
+  }
+
+  hasSyntaxPragma() {
+    return PRAGMA.test(String(this.source).split('\n', 1)[0]);
   }
 
   memberType(node, forAssignment) {

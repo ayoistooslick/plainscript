@@ -807,8 +807,8 @@ statement       = value-decl | set-decl | change-stmt | define-decl
                 | for-each | for-range | conditional | match-stmt
                 | statement-2-0-except-bindings-and-branches ;
 
-value-decl      = "value" , binding-pattern , [ ":" , typeExpression ] ,
-                  "is" , expression ;
+value-decl      = ( "value" | "val" ) , binding-pattern ,
+                  [ ":" , typeExpression ] , "is" , expression ;
 set-decl        = "set" , binding-pattern , [ ":" , typeExpression ] ,
                   "to" , expression ;
 change-stmt     = "change" , assignable-expression , "to" , expression ;
@@ -835,7 +835,7 @@ case-clause     = "case" , pattern , [ "when" , expression ] , { statement } ;
 
 | Concept | 2.0 | 2.1 |
 | --- | --- | --- |
-| Immutable binding | `const x = e` | `value x is e` |
+| Immutable binding | `const x = e` | `value x is e` (`val x is e` is an alias) |
 | Mutable binding | `let x = e` | `set x to e` |
 | Assignment | `x = e` | `change x to e` |
 | Function declaration | `function f() -> T` | `define f() returns T` |

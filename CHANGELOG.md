@@ -2,6 +2,22 @@
 
 All notable changes to PlainScript are documented here.
 
+## [Unreleased]
+
+### `val` alias
+
+- `val` is accepted as an alias for `value` in 2.1 files: `val Messi is 3` declares the same
+  immutable binding, including destructuring and `export val … is …` forms. Like `value`,
+  `val` is contextual and remains usable as an identifier elsewhere.
+- Remove the 3D hero stage and the three-plate art strip (Figs. 02, 04, 05 and 06) from the
+  generated documentation homepage.
+
+### Diagnostics
+
+- `PS3301` on a 2.1 declaration word (`value`, `val`, `set`, `change`, `define`, `returns`,
+  `each`) now hints that the file looks like 2.1 code and names the fixes: `#syntax 2.1` on
+  the first line, or `"syntax": "2.1"` in `plainscript.config.json`.
+
 ## [2.1.0] — 2026-11-20
 
 ### English-oriented dialect, real integrations and a documentation overhaul

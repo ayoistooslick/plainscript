@@ -212,6 +212,35 @@ print("{id}:{title}")
   assert.strictEqual(result.stdout, '7:seven\n');
 });
 
+test('val is an alias for value', () => {
+  const result = runSource(`#syntax 2.1
+import { print } from "std/io"
+val team is "Barcelona"
+val { id, title } is { id: 7, title: "seven" }
+print("{team}:{id}:{title}")
+`);
+  assert.strictEqual(result.status, 0, result.stderr);
+  assert.strictEqual(result.stdout, 'Barcelona:7:seven\n');
+
+  const immutable = diagnosticsOf(`#syntax 2.1
+val total is 1
+change total to 2
+`);
+  assert.ok(immutable.some((d) => d.severity === 'error'), 'assignment to val must fail');
+});
+
+test('val outside statement position stays an ordinary name', () => {
+  const result = runSource(`#syntax 2.1
+import { print } from "std/io"
+define twice(val: number) returns number
+    return val * 2
+end
+print(twice(21))
+`);
+  assert.strictEqual(result.status, 0, result.stderr);
+  assert.strictEqual(result.stdout, '42\n');
+});
+
 test('otherwise closes a match as the fallback arm', () => {
   const result = runSource(`#syntax 2.1
 import { print } from "std/io"

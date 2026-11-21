@@ -494,8 +494,8 @@ statement       = value-decl | set-decl | change-stmt | define-decl
                 | for-each | for-range | conditional | match-stmt
                 | statement-2-0-except-bindings-and-branches ;
 
-value-decl      = &quot;value&quot; , binding-pattern , [ &quot;:&quot; , typeExpression ] ,
-                  &quot;is&quot; , expression ;
+value-decl      = ( &quot;value&quot; | &quot;val&quot; ) , binding-pattern ,
+                  [ &quot;:&quot; , typeExpression ] , &quot;is&quot; , expression ;
 set-decl        = &quot;set&quot; , binding-pattern , [ &quot;:&quot; , typeExpression ] ,
                   &quot;to&quot; , expression ;
 change-stmt     = &quot;change&quot; , assignable-expression , &quot;to&quot; , expression ;
@@ -518,7 +518,7 @@ match-stmt      = &quot;match&quot; , expression , { case-clause } ,
 case-clause     = &quot;case&quot; , pattern , [ &quot;when&quot; , expression ] , { statement } ;</code></pre></figure>
 <h3 id="15-3-keyword-and-operator-mapping">15.3 Keyword and operator mapping</h3>
 <div class="table-wrap"><table><thead><tr><th>Concept</th><th>2.0</th><th>2.1</th></tr></thead><tbody>
-<tr><td>Immutable binding</td><td><code>const x = e</code></td><td><code>value x is e</code></td></tr>
+<tr><td>Immutable binding</td><td><code>const x = e</code></td><td><code>value x is e</code> (<code>val x is e</code> is an alias)</td></tr>
 <tr><td>Mutable binding</td><td><code>let x = e</code></td><td><code>set x to e</code></td></tr>
 <tr><td>Assignment</td><td><code>x = e</code></td><td><code>change x to e</code></td></tr>
 <tr><td>Function declaration</td><td><code>function f() -&gt; T</code></td><td><code>define f() returns T</code></td></tr>

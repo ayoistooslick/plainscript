@@ -56,11 +56,16 @@ print("{name} has {count}")
 
 | Concept | 2.1 | 2.0 |
 | --- | --- | --- |
-| Immutable | `value x is 1` | `const x = 1` |
+| Immutable | `value x is 1` (alias: `val x is 1`) | `const x = 1` |
 | Mutable | `set x to 1` | `let x = 1` |
 | Assignment | `change x to 2` | `x = 2` |
 | Compound assignment | `change x to x + 1` | `x += 1` |
 | Type annotation | `value x: number is 1` | `const x: number = 1` |
+
+`val` is an accepted short spelling of `value` everywhere a binding can start,
+including destructuring and `export`: `val Messi is 3` and `export val rating is 10`
+mean exactly what `value … is …` means. It is contextual like `value`, so it stays
+usable as a parameter or variable name.
 
 Destructuring works with both words:
 
