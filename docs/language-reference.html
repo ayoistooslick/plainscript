@@ -1,14 +1,13 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Language reference — PlainScript documentation."><title>Language reference · PlainScript</title><link rel="stylesheet" href="style.css"></head><body><div class="site-shell"><aside class="sidebar"><a class="brand" href="index.html"><span class="brand-mark">PS</span><span><span class="brand-name">PlainScript</span><span class="brand-meta">Language docs · 2.1</span></span><span class="stamp">🗿</span></a><div class="nav-group"><div class="nav-label">Start here</div><a class="nav-link " href="index.html">PlainScript</a><a class="nav-link " href="getting-started.html">Getting started</a><a class="nav-link " href="cli.html">CLI reference</a><a class="nav-link " href="templates.html">Application templates</a></div><div class="nav-group"><div class="nav-label">Language</div><a class="nav-link active" href="language-reference.html">Language reference</a><a class="nav-link " href="spec.html">Language specification</a><a class="nav-link " href="syntax-design.html">Syntax design</a><a class="nav-link " href="type-system.html">Type system</a></div><div class="nav-group"><div class="nav-label">Compiler</div><a class="nav-link " href="compiler.html">Compiler</a><a class="nav-link " href="architecture.html">Compiler architecture</a><a class="nav-link " href="interop.html">JavaScript interoperability</a><a class="nav-link " href="benchmarks.html">Benchmarks</a></div><div class="nav-group"><div class="nav-label">Guides</div><a class="nav-link " href="integrations.html">Integrations</a><a class="nav-link " href="migration-2-1.html">Migrating from 2.0</a><a class="nav-link " href="contracts.html">Unified contracts</a><a class="nav-link " href="concurrency.html">Concurrency</a><a class="nav-link " href="jobs.html">Background jobs</a><a class="nav-link " href="databases.html">Databases</a><a class="nav-link " href="security.html">Security</a><a class="nav-link " href="debugging.html">Debugging</a><a class="nav-link " href="migration.html">Migration guide</a><a class="nav-link " href="comparison.html">Comparison with TypeScript</a></div><div class="nav-group"><div class="nav-label">Project</div><a class="nav-link " href="progress.html">Engineering progress</a><a class="nav-link " href="roadmap.html">Roadmap</a><a class="nav-link " href="audit.html">Audit</a><a class="nav-link " href="decisions.html">Decisions</a></div><div class="sidebar-footer">Open source under MIT.<br><a href="https://github.com/ayoistooslick/Plainscript">View on GitHub ↗</a></div></aside><main class="main"><header class="topbar"><div class="search-wrap"><label class="search" aria-label="Search documentation"><span>⌕</span><input id="doc-search" type="search" placeholder="Search the docs…" autocomplete="off"><kbd>/</kbd></label><div id="search-results" class="search-results" role="listbox"></div></div><nav class="top-links"><a href="index.html">Docs</a><a href="https://github.com/ayoistooslick/Plainscript">GitHub ↗</a></nav></header><div class="content"><article class="page-layout"><div class="prose"><p>&lt;!-- compile-examples --&gt;</p>
-<h1 id="plainscript-2-1-language-reference">PlainScript 2.1 language reference</h1>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Language reference — PlainScript 2.1 documentation."><meta name="color-scheme" content="light"><meta name="theme-color" content="#f7f2e8"><title>Language reference · PlainScript</title><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23181410'/%3E%3Ctext x='16' y='23' font-family='Georgia,serif' font-size='20' fill='%23f7f2e8' text-anchor='middle'%3EP%3C/text%3E%3C/svg%3E"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=Space+Grotesk:wght@400..700&display=swap" rel="stylesheet"><link rel="stylesheet" href="style.css"></head><body><a class="skip" href="#main">Skip to content</a><div class="scrim" data-scrim></div><div class="shell"><aside class="rail" id="rail"><div class="rail-head"><a class="wordmark" href="index.html">PlainScript<span class="dot">.</span></a><div class="rail-meta">Language manual<br>Vol. 2.1 · MMXXVI</div></div><nav class="rail-nav" aria-label="Documentation"><div class="nav-group"><div class="nav-label">Start here</div><a class="nav-link " href="index.html">PlainScript</a><a class="nav-link " href="getting-started.html">Getting started</a><a class="nav-link " href="cli.html">CLI reference</a><a class="nav-link " href="templates.html">Application templates</a></div><div class="nav-group"><div class="nav-label">Language</div><a class="nav-link active" href="language-reference.html" aria-current="page">Language reference</a><a class="nav-link " href="spec.html">Language specification</a><a class="nav-link " href="syntax-design.html">Syntax design</a><a class="nav-link " href="type-system.html">Type system</a></div><div class="nav-group"><div class="nav-label">Compiler</div><a class="nav-link " href="compiler.html">Compiler</a><a class="nav-link " href="architecture.html">Compiler architecture</a><a class="nav-link " href="interop.html">JavaScript interoperability</a><a class="nav-link " href="benchmarks.html">Benchmarks</a></div><div class="nav-group"><div class="nav-label">Guides</div><a class="nav-link " href="integrations.html">Integrations</a><a class="nav-link " href="migration-2-1.html">Migrating from 2.0</a><a class="nav-link " href="contracts.html">Unified contracts</a><a class="nav-link " href="concurrency.html">Concurrency</a><a class="nav-link " href="jobs.html">Background jobs</a><a class="nav-link " href="databases.html">Databases</a><a class="nav-link " href="security.html">Security</a><a class="nav-link " href="debugging.html">Debugging</a><a class="nav-link " href="migration.html">Migration guide</a><a class="nav-link " href="comparison.html">Comparison with TypeScript</a></div><div class="nav-group"><div class="nav-label">Project</div><a class="nav-link " href="progress.html">Engineering progress</a><a class="nav-link " href="roadmap.html">Roadmap</a><a class="nav-link " href="audit.html">Audit</a><a class="nav-link " href="decisions.html">Decisions</a></div></nav><div class="rail-foot"><a href="https://github.com/ayoistooslick/Plainscript">Source ↗</a><span class="sep">/</span><a href="https://github.com/ayoistooslick/Plainscript/issues">Issues ↗</a><br>MIT · built by hand</div></aside><div class="main"><header class="top"><button class="nav-toggle" type="button" data-nav-toggle aria-expanded="false" aria-controls="rail"><span aria-hidden="true">≡</span> <span class="nav-toggle-label">Contents</span></button><a class="top-brand" href="index.html">PlainScript<span>.</span></a><span class="crumb"><b>PlainScript</b><span class="slash">/</span>Language<span class="slash">/</span>Language reference</span><div class="search-wrap"><label class="search" aria-label="Search the manual"><span class="glyph" aria-hidden="true"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg></span><input id="doc-search" type="search" placeholder="Search the manual" autocomplete="off" aria-controls="search-results" aria-expanded="false"><kbd>/</kbd></label><div id="search-results" class="search-results" role="listbox" aria-label="Search results"></div></div><a class="top-github" href="https://github.com/ayoistooslick/Plainscript">GitHub ↗</a><div class="progress" aria-hidden="true"><span></span></div></header><main id="main" class="page"><div class="article-grid"><article class="prose"><div class="page-kicker"><span class="kicker-section">Language</span><span class="kicker-meta">5 min read</span></div><h1 id="plainscript-2-1-language-reference">PlainScript 2.1 language reference</h1>
 <p>This is the practical reference for the 2.1 dialect. The normative semantics are in <a href="spec.html">the specification</a>; this page shows the surface, names the 2.0 equivalent, and states the rules the compiler enforces.</p>
 <p>Every <code>plainscript</code> example on this page is a complete program compiled by the test suite.</p>
 <h2 id="1-files-and-dialects">1. Files and dialects</h2>
 <p>A source file uses the <code>.pln</code> extension and UTF-8. The first line may opt into a dialect:</p>
-<pre><code>#syntax 2.1
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
 
 import { print } from &quot;std/io&quot;
 
-print(&quot;2.1 dialect&quot;)</code></pre>
+print(&quot;2.1 dialect&quot;)</code></pre></figure>
 <p>Rules:</p>
 <ul>
 <li><code>#syntax 2.1</code> must be the first line. Leading whitespace and a BOM are</li>
@@ -25,7 +24,7 @@ print(&quot;2.1 dialect&quot;)</code></pre>
 </ul>
 <p>Comments start with <code>#</code> and run to the end of the line. There are no block comments.</p>
 <h2 id="2-bindings">2. Bindings</h2>
-<pre><code>#syntax 2.1
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
 
 import { print } from &quot;std/io&quot;
 
@@ -33,25 +32,25 @@ value name is &quot;Ada&quot;        # immutable
 set count to 0             # mutable
 change count to count + 1  # assignment
 
-print(&quot;{name} has {count}&quot;)</code></pre>
-<table><thead><tr><th>Concept</th><th>2.1</th><th>2.0</th></tr></thead><tbody>
+print(&quot;{name} has {count}&quot;)</code></pre></figure>
+<div class="table-wrap"><table><thead><tr><th>Concept</th><th>2.1</th><th>2.0</th></tr></thead><tbody>
 <tr><td>Immutable</td><td><code>value x is 1</code></td><td><code>const x = 1</code></td></tr>
 <tr><td>Mutable</td><td><code>set x to 1</code></td><td><code>let x = 1</code></td></tr>
 <tr><td>Assignment</td><td><code>change x to 2</code></td><td><code>x = 2</code></td></tr>
 <tr><td>Compound assignment</td><td><code>change x to x + 1</code></td><td><code>x += 1</code></td></tr>
 <tr><td>Type annotation</td><td><code>value x: number is 1</code></td><td><code>const x: number = 1</code></td></tr>
-</tbody></table>
+</tbody></table></div>
 <p>Destructuring works with both words:</p>
-<pre><code>#syntax 2.1
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
 
 import { print } from &quot;std/io&quot;
 
 value { width, height } is { width: 3, height: 4 }
 set label to &quot;box&quot;
 
-print(&quot;{label}: {width * height}&quot;)</code></pre>
+print(&quot;{label}: {width * height}&quot;)</code></pre></figure>
 <p><code>change</code> also assigns through members and indexes:</p>
-<pre><code>#syntax 2.1
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
 
 import { print } from &quot;std/io&quot;
 
@@ -59,11 +58,11 @@ set user to { name: &quot;Ada&quot;, tags: [&quot;first&quot;] }
 change user.name to &quot;Grace&quot;
 change user.tags[0] to &quot;updated&quot;
 
-print(&quot;{user.name}: {user.tags[0]}&quot;)</code></pre>
+print(&quot;{user.name}: {user.tags[0]}&quot;)</code></pre></figure>
 <p>A <code>value</code> cannot be reassigned; the checker reports it. Bindings are block scoped and shadowing an outer binding is allowed.</p>
 <h2 id="3-text-and-interpolation">3. Text and interpolation</h2>
 <p>Double-quoted text interpolates <code>{expression}</code> and supports escapes. Single quotes are raw; triple quotes are multiline.</p>
-<pre><code>#syntax 2.1
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
 
 import { print } from &quot;std/io&quot;
 
@@ -74,11 +73,11 @@ lines&quot;&quot;&quot;
 
 print(&quot;Hello, {name}!&quot;)
 print(multiline)
-print(&#39;raw {name} stays literal&#39;)</code></pre>
+print(&#39;raw {name} stays literal&#39;)</code></pre></figure>
 <p>Interpolation accepts any expression, including comparison phrases. Its value uses JavaScript string conversion.</p>
 <h2 id="4-types">4. Types</h2>
 <h3 id="primitives-and-collections">Primitives and collections</h3>
-<pre><code>#syntax 2.1
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
 
 import { print } from &quot;std/io&quot;
 import { fromEntries } from &quot;std/map&quot;
@@ -92,10 +91,10 @@ value lookup: map of text to number is fromEntries([{ key: &quot;ada&quot;, valu
 
 print(&quot;{title}: {quantity} {active} {missing}&quot;)
 print(names)
-print(lookup)</code></pre>
+print(lookup)</code></pre></figure>
 <p><code>any</code> is the untyped boundary. <code>unknown</code> must be narrowed before use. <code>never</code> is the empty type.</p>
 <h3 id="records">Records</h3>
-<pre><code>#syntax 2.1
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
 
 import { print } from &quot;std/io&quot;
 
@@ -106,10 +105,10 @@ type User
 end
 
 value user: User is { id: 1, name: &quot;Ada&quot; }
-print(user.name)</code></pre>
+print(user.name)</code></pre></figure>
 <p>Records are structural: any value with at least the required fields is accepted. <code>readonly</code> fields cannot be assigned through.</p>
 <h3 id="variants-and-unions">Variants and unions</h3>
-<pre><code>#syntax 2.1
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
 
 import { print } from &quot;std/io&quot;
 
@@ -128,10 +127,10 @@ end
 
 print(area(Circle(2)))
 print(area(Rectangle(2, 5)))
-print(area(Empty))</code></pre>
+print(area(Empty))</code></pre></figure>
 <p>Variant constructors are values: <code>Circle(2)</code> has type <code>Circle</code>, which is assignable to <code>Shape</code>.</p>
 <h3 id="optionals-and-type-tests">Optionals and type tests</h3>
-<pre><code>#syntax 2.1
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
 
 import { print } from &quot;std/io&quot;
 
@@ -155,10 +154,10 @@ end
 value raw: any is &quot;text&quot;
 when raw is text
     print(raw)
-end</code></pre>
+end</code></pre></figure>
 <p><code>is</code> is a type test in expression position. The comparison phrases in section 9 are separate, complete word sequences.</p>
 <h3 id="generics-constraints-and-predicates">Generics, constraints and predicates</h3>
-<pre><code>#syntax 2.1
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
 
 import { print } from &quot;std/io&quot;
 
@@ -179,10 +178,10 @@ end
 
 print(first([10, 20]))
 print(keys({ id: 7 }))
-print(isText(&quot;yes&quot;))</code></pre>
+print(isText(&quot;yes&quot;))</code></pre></figure>
 <p>Type parameters live between the function name and the parameter list. Constraints use a colon. Predicates use <code>returns value is Type</code>.</p>
 <h3 id="function-types-tuples-and-advanced-types">Function types, tuples and advanced types</h3>
-<pre><code>#syntax 2.1
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
 
 import { print } from &quot;std/io&quot;
 
@@ -198,10 +197,10 @@ value pair: Pair is [1, &quot;one&quot;]
 value doubled is apply((value: number) =&gt; value * 2, 21)
 
 print(pair[0])
-print(doubled)</code></pre>
+print(doubled)</code></pre></figure>
 <p>Conditional types (<code>T extends U ? X : Y</code>), mapped types, <code>keyof</code>, indexed access, literal types and intersections (<code>&amp;</code>) are also implemented. Readonly is a compile-time assignment check, not runtime immutability.</p>
 <h2 id="5-functions">5. Functions</h2>
-<pre><code>#syntax 2.1
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
 
 import { print } from &quot;std/io&quot;
 
@@ -224,26 +223,26 @@ async define main() returns nothing
     print(await double(21))
 end
 
-await main()</code></pre>
-<table><thead><tr><th>Concept</th><th>2.1</th><th>2.0</th></tr></thead><tbody>
+await main()</code></pre></figure>
+<div class="table-wrap"><table><thead><tr><th>Concept</th><th>2.1</th><th>2.0</th></tr></thead><tbody>
 <tr><td>Declaration</td><td><code>define f() returns T</code></td><td><code>function f() -&gt; T</code></td></tr>
 <tr><td>Async</td><td><code>async define f() returns T</code></td><td><code>async function f() -&gt; T</code></td></tr>
 <tr><td>Return type</td><td><code>returns T</code></td><td><code>-&gt; T</code></td></tr>
 <tr><td>Type arrow</td><td><code>(number) -&gt; number</code></td><td><code>(number) -&gt; number</code></td></tr>
-</tbody></table>
+</tbody></table></div>
 <p>Inside a type, <code>-&gt;</code> remains the function arrow in both dialects. In a declaration either <code>returns</code> or <code>-&gt;</code> is accepted in 2.1; documentation uses <code>returns</code>.</p>
 <p>Lambdas keep the 2.0 form:</p>
-<pre><code>#syntax 2.1
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
 
 import { print } from &quot;std/io&quot;
 import { map } from &quot;std/list&quot;
 
 value doubled is map([1, 2, 3], (value: number) =&gt; value * 2)
-print(doubled)</code></pre>
+print(doubled)</code></pre></figure>
 <p>A lambda whose body is a block uses <code>do … end</code>. Async lambdas are written <code>async (value: number) =&gt; …</code>.</p>
 <p>Function overloading and type predicates are available through <code>overload define</code> / <code>overload function</code> and <code>returns value is T</code>. Return types are required for declarations; lambda parameter and result types are inferred from context where possible.</p>
 <h2 id="6-conditionals-and-match">6. Conditionals and match</h2>
-<pre><code>#syntax 2.1
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
 
 import { print } from &quot;std/io&quot;
 
@@ -259,14 +258,14 @@ end
 
 print(classify(4))
 print(classify(-4))
-print(classify(0))</code></pre>
-<table><thead><tr><th>Concept</th><th>2.1</th><th>2.0</th></tr></thead><tbody>
+print(classify(0))</code></pre></figure>
+<div class="table-wrap"><table><thead><tr><th>Concept</th><th>2.1</th><th>2.0</th></tr></thead><tbody>
 <tr><td>If</td><td><code>when</code></td><td><code>if</code></td></tr>
 <tr><td>Else if</td><td><code>otherwise when</code></td><td><code>else if</code></td></tr>
 <tr><td>Else</td><td><code>otherwise</code></td><td><code>else</code></td></tr>
-</tbody></table>
+</tbody></table></div>
 <p><code>match</code> keeps its spelling and adds <code>otherwise</code> as the fallback arm:</p>
-<pre><code>#syntax 2.1
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
 
 import { print } from &quot;std/io&quot;
 
@@ -282,9 +281,9 @@ define label(value: number) returns text
 end
 
 print(label(0))
-print(label(9))</code></pre>
+print(label(9))</code></pre></figure>
 <p>Arms may guard with <code>when</code>:</p>
-<pre><code>#syntax 2.1
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
 
 import { print } from &quot;std/io&quot;
 
@@ -295,9 +294,9 @@ case text when command is not equal to &quot;&quot;
     print(&quot;handling {command}&quot;)
 otherwise
     print(&quot;empty command&quot;)
-end</code></pre>
+end</code></pre></figure>
 <h2 id="7-loops">7. Loops</h2>
-<pre><code>#syntax 2.1
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
 
 import { print } from &quot;std/io&quot;
 
@@ -322,15 +321,15 @@ for each item in [&quot;skip&quot;, &quot;stop&quot;, &quot;never&quot;]
         break
     end
     print(item)
-end</code></pre>
-<table><thead><tr><th>Concept</th><th>2.1</th><th>2.0</th></tr></thead><tbody>
+end</code></pre></figure>
+<div class="table-wrap"><table><thead><tr><th>Concept</th><th>2.1</th><th>2.0</th></tr></thead><tbody>
 <tr><td>Each value</td><td><code>for each x in xs</code></td><td><code>for x in xs</code></td></tr>
 <tr><td>Numeric range</td><td><code>for i from 0 to 9</code></td><td><code>for i in 0 to 9</code></td></tr>
 <tr><td>While</td><td><code>while condition</code></td><td><code>while condition</code></td></tr>
-</tbody></table>
+</tbody></table></div>
 <p><code>break</code> and <code>continue</code> are unchanged. The range is inclusive.</p>
 <p><code>each</code> is an ordinary identifier as well as a loop marker. When a binding name follows it, <code>each</code> opens a foreach loop; when <code>in</code> or <code>from</code> follows it, the variable itself is named <code>each</code>:</p>
-<pre><code>#syntax 2.1
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
 
 import { print } from &quot;std/io&quot;
 
@@ -340,9 +339,9 @@ end
 
 for each from 1 to 2
     print(each)
-end</code></pre>
+end</code></pre></figure>
 <h2 id="8-errors">8. Errors</h2>
-<pre><code>#syntax 2.1
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
 
 import { print } from &quot;std/io&quot;
 
@@ -360,19 +359,19 @@ catch failure
     print(&quot;failed: {failure}&quot;)
 finally
     print(&quot;cleanup&quot;)
-end</code></pre>
+end</code></pre></figure>
 <p><code>try</code>, <code>catch</code> and <code>finally</code> are unchanged; each block closes with <code>end</code>. <code>catch</code> binds the thrown value as <code>any</code>. There is no checked exception type; typed operational failures use <code>std/contract</code>&#39;s result types.</p>
 <h2 id="9-operators">9. Operators</h2>
-<table><thead><tr><th>Meaning</th><th>2.1 phrase</th><th>Symbol</th></tr></thead><tbody>
+<div class="table-wrap"><table><thead><tr><th>Meaning</th><th>2.1 phrase</th><th>Symbol</th></tr></thead><tbody>
 <tr><td>Equal</td><td><code>is equal to</code></td><td><code>==</code></td></tr>
 <tr><td>Not equal</td><td><code>is not equal to</code></td><td><code>!=</code></td></tr>
 <tr><td>Greater</td><td><code>is greater than</code></td><td><code>&gt;</code></td></tr>
 <tr><td>Less</td><td><code>is less than</code></td><td><code>&lt;</code></td></tr>
 <tr><td>At least</td><td><code>is at least</code></td><td><code>&gt;=</code></td></tr>
 <tr><td>At most</td><td><code>is at most</code></td><td><code>&lt;=</code></td></tr>
-</tbody></table>
+</tbody></table></div>
 <p>Phrases lower to the symbolic operators before parsing, so they have exactly the same precedence and code generation. Both spellings are accepted in 2.1 for migration; phrase operators are the documented form.</p>
-<pre><code>#syntax 2.1
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
 
 import { print } from &quot;std/io&quot;
 
@@ -383,10 +382,10 @@ print(1 is less than 2)
 print(2 is at least 2)
 print(2 is at most 2)
 print(true and not false)
-print(1 is equal to 1 or 2 is equal to 3)</code></pre>
+print(1 is equal to 1 or 2 is equal to 3)</code></pre></figure>
 <p><code>and</code>, <code>or</code>, <code>not</code>, <code>??</code>, <code>?.</code>, <code>|&gt;</code> and all arithmetic operators are shared with 2.0. <code>not</code> is unary and binds tighter than a comparison; parenthesise when in doubt.</p>
 <h2 id="10-modules">10. Modules</h2>
-<pre><code>#syntax 2.1
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
 
 import { print } from &quot;std/io&quot;
 import { upper } from &quot;std/text&quot;
@@ -397,7 +396,7 @@ export define shout(text: text) returns text
     return upper(&quot;{text}!&quot;)
 end
 
-print(shout(&quot;hello&quot;))</code></pre>
+print(shout(&quot;hello&quot;))</code></pre></figure>
 <p>Imports and exports are unchanged in both dialects:</p>
 <ul>
 <li><code>import { x } from &quot;./module&quot;</code> — relative <code>.pln</code> sources, emitted as <code>.js</code>.</li>
@@ -408,7 +407,7 @@ print(shout(&quot;hello&quot;))</code></pre>
 <li>Type-only imports are erased.</li>
 </ul>
 <h2 id="11-components">11. Components</h2>
-<pre><code>#syntax 2.1
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
 
 import { createElement, useState } from &quot;react&quot;
 
@@ -425,10 +424,10 @@ export define Counter() returns any
             end
         end
     end
-end</code></pre>
+end</code></pre></figure>
 <p><code>render</code> returns the expression; <code>element</code> builds a child. Attributes use <code>with name: value</code>, children are statements, and <code>...list</code> inserts a dynamic list. They lower to <code>createElement</code> from the module scope, so React (or another library exposing <code>createElement</code>) must be imported.</p>
 <h2 id="12-interop-boundaries">12. Interop boundaries</h2>
-<pre><code>#syntax 2.1
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
 
 import { print } from &quot;std/io&quot;
 
@@ -439,11 +438,11 @@ value started is process.hrtime()
 setTimeout(() =&gt; do
     print(&quot;timer fired&quot;)
 end, 1)
-print(started != nothing)</code></pre>
+print(started != nothing)</code></pre></figure>
 <p>Declare JavaScript values with <code>declare</code>. Use <code>any</code> for values whose shape is not modelled, and <code>as</code> for an explicit unchecked cast. <code>plainscript interop</code> translates the supported TypeScript <code>.d.ts</code> subset to <code>.d.pln</code>.</p>
 <h2 id="13-2-0-alongside-2-1">13. 2.0 alongside 2.1</h2>
 <p>The 2.0 dialect remains fully supported. Its spelling for every concept in this reference is listed in the tables above, and <a href="spec.html">the specification</a> describes both. A module written in each style can share types and values:</p>
-<pre><code>#syntax 2.1
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
 
 import { print } from &quot;std/io&quot;
 
@@ -452,5 +451,5 @@ define combine(left: number, right: number) returns number
     return left + right
 end
 
-print(combine(20, 22))</code></pre>
-<p>When migrating, add <code>#syntax 2.1</code> and then rename the constructs the compiler reports. <code>PS2030</code> names the 2.1 word to use. See <a href="migration-2-1.html">Migrating from 2.0</a>.</p></div><aside class="toc"><div class="toc-title">On this page</div><a class="toc-h2" href="#1-files-and-dialects">1. Files and dialects</a><a class="toc-h2" href="#2-bindings">2. Bindings</a><a class="toc-h2" href="#3-text-and-interpolation">3. Text and interpolation</a><a class="toc-h2" href="#4-types">4. Types</a><a class="toc-h3" href="#primitives-and-collections">Primitives and collections</a><a class="toc-h3" href="#records">Records</a><a class="toc-h3" href="#variants-and-unions">Variants and unions</a><a class="toc-h3" href="#optionals-and-type-tests">Optionals and type tests</a><a class="toc-h3" href="#generics-constraints-and-predicates">Generics, constraints and predicates</a><a class="toc-h3" href="#function-types-tuples-and-advanced-types">Function types, tuples and advanced types</a><a class="toc-h2" href="#5-functions">5. Functions</a><a class="toc-h2" href="#6-conditionals-and-match">6. Conditionals and match</a><a class="toc-h2" href="#7-loops">7. Loops</a><a class="toc-h2" href="#8-errors">8. Errors</a><a class="toc-h2" href="#9-operators">9. Operators</a><a class="toc-h2" href="#10-modules">10. Modules</a><a class="toc-h2" href="#11-components">11. Components</a><a class="toc-h2" href="#12-interop-boundaries">12. Interop boundaries</a><a class="toc-h2" href="#13-2-0-alongside-2-1">13. 2.0 alongside 2.1</a></aside></article><footer class="page-footer"><span>PlainScript 2.1 documentation</span><a href="https://github.com/ayoistooslick/Plainscript/issues">Report a documentation issue ↗</a></footer></div></main></div><script src="app.js"></script></body></html>
+print(combine(20, 22))</code></pre></figure>
+<p>When migrating, add <code>#syntax 2.1</code> and then rename the constructs the compiler reports. <code>PS2030</code> names the 2.1 word to use. See <a href="migration-2-1.html">Migrating from 2.0</a>.</p></article><aside class="toc-rail" aria-label="On this page"><div class="toc-title">On this page</div><nav class="toc"><a class="toc-h2" href="#1-files-and-dialects">1. Files and dialects</a><a class="toc-h2" href="#2-bindings">2. Bindings</a><a class="toc-h2" href="#3-text-and-interpolation">3. Text and interpolation</a><a class="toc-h2" href="#4-types">4. Types</a><a class="toc-h3" href="#primitives-and-collections">Primitives and collections</a><a class="toc-h3" href="#records">Records</a><a class="toc-h3" href="#variants-and-unions">Variants and unions</a><a class="toc-h3" href="#optionals-and-type-tests">Optionals and type tests</a><a class="toc-h3" href="#generics-constraints-and-predicates">Generics, constraints and predicates</a><a class="toc-h3" href="#function-types-tuples-and-advanced-types">Function types, tuples and advanced types</a><a class="toc-h2" href="#5-functions">5. Functions</a><a class="toc-h2" href="#6-conditionals-and-match">6. Conditionals and match</a><a class="toc-h2" href="#7-loops">7. Loops</a><a class="toc-h2" href="#8-errors">8. Errors</a><a class="toc-h2" href="#9-operators">9. Operators</a><a class="toc-h2" href="#10-modules">10. Modules</a><a class="toc-h2" href="#11-components">11. Components</a><a class="toc-h2" href="#12-interop-boundaries">12. Interop boundaries</a><a class="toc-h2" href="#13-2-0-alongside-2-1">13. 2.0 alongside 2.1</a></nav></aside></div><nav class="page-nav" aria-label="Chapter navigation"><a class="pn-prev" href="getting-started.html"><span class="pn-label">← Previous</span><span class="pn-title">Getting started</span></a><a class="pn-next" href="compiler.html"><span class="pn-label">Next →</span><span class="pn-title">Compiler</span></a></nav><footer class="colophon"><div><div class="colophon-mark">PlainScript<span>.</span></div><p>An independent, statically typed language for the JavaScript platform. This manual is set in Fraunces, Newsreader, Space Grotesk and IBM Plex Mono. One stylesheet, no frameworks, no trackers.</p></div><nav class="colophon-links" aria-label="Project links"><a href="index.html">Manual</a><a href="https://github.com/ayoistooslick/Plainscript">Source</a><a href="https://github.com/ayoistooslick/Plainscript/issues">Issues</a><a href="https://github.com/ayoistooslick/Plainscript/blob/main/CHANGELOG.md">Changelog</a><a href="https://github.com/ayoistooslick/Plainscript/blob/main/LICENSE">MIT</a></nav></footer></main></div></div><script src="app.js"></script></body></html>

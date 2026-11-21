@@ -1,16 +1,15 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Getting started — PlainScript documentation."><title>Getting started · PlainScript</title><link rel="stylesheet" href="style.css"></head><body><div class="site-shell"><aside class="sidebar"><a class="brand" href="index.html"><span class="brand-mark">PS</span><span><span class="brand-name">PlainScript</span><span class="brand-meta">Language docs · 2.1</span></span><span class="stamp">🗿</span></a><div class="nav-group"><div class="nav-label">Start here</div><a class="nav-link " href="index.html">PlainScript</a><a class="nav-link active" href="getting-started.html">Getting started</a><a class="nav-link " href="cli.html">CLI reference</a><a class="nav-link " href="templates.html">Application templates</a></div><div class="nav-group"><div class="nav-label">Language</div><a class="nav-link " href="language-reference.html">Language reference</a><a class="nav-link " href="spec.html">Language specification</a><a class="nav-link " href="syntax-design.html">Syntax design</a><a class="nav-link " href="type-system.html">Type system</a></div><div class="nav-group"><div class="nav-label">Compiler</div><a class="nav-link " href="compiler.html">Compiler</a><a class="nav-link " href="architecture.html">Compiler architecture</a><a class="nav-link " href="interop.html">JavaScript interoperability</a><a class="nav-link " href="benchmarks.html">Benchmarks</a></div><div class="nav-group"><div class="nav-label">Guides</div><a class="nav-link " href="integrations.html">Integrations</a><a class="nav-link " href="migration-2-1.html">Migrating from 2.0</a><a class="nav-link " href="contracts.html">Unified contracts</a><a class="nav-link " href="concurrency.html">Concurrency</a><a class="nav-link " href="jobs.html">Background jobs</a><a class="nav-link " href="databases.html">Databases</a><a class="nav-link " href="security.html">Security</a><a class="nav-link " href="debugging.html">Debugging</a><a class="nav-link " href="migration.html">Migration guide</a><a class="nav-link " href="comparison.html">Comparison with TypeScript</a></div><div class="nav-group"><div class="nav-label">Project</div><a class="nav-link " href="progress.html">Engineering progress</a><a class="nav-link " href="roadmap.html">Roadmap</a><a class="nav-link " href="audit.html">Audit</a><a class="nav-link " href="decisions.html">Decisions</a></div><div class="sidebar-footer">Open source under MIT.<br><a href="https://github.com/ayoistooslick/Plainscript">View on GitHub ↗</a></div></aside><main class="main"><header class="topbar"><div class="search-wrap"><label class="search" aria-label="Search documentation"><span>⌕</span><input id="doc-search" type="search" placeholder="Search the docs…" autocomplete="off"><kbd>/</kbd></label><div id="search-results" class="search-results" role="listbox"></div></div><nav class="top-links"><a href="index.html">Docs</a><a href="https://github.com/ayoistooslick/Plainscript">GitHub ↗</a></nav></header><div class="content"><article class="page-layout"><div class="prose"><p>&lt;!-- compile-examples --&gt;</p>
-<h1 id="getting-started-with-plainscript-2-1">Getting started with PlainScript 2.1</h1>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Getting started — PlainScript 2.1 documentation."><meta name="color-scheme" content="light"><meta name="theme-color" content="#f7f2e8"><title>Getting started · PlainScript</title><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23181410'/%3E%3Ctext x='16' y='23' font-family='Georgia,serif' font-size='20' fill='%23f7f2e8' text-anchor='middle'%3EP%3C/text%3E%3C/svg%3E"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=Space+Grotesk:wght@400..700&display=swap" rel="stylesheet"><link rel="stylesheet" href="style.css"></head><body><a class="skip" href="#main">Skip to content</a><div class="scrim" data-scrim></div><div class="shell"><aside class="rail" id="rail"><div class="rail-head"><a class="wordmark" href="index.html">PlainScript<span class="dot">.</span></a><div class="rail-meta">Language manual<br>Vol. 2.1 · MMXXVI</div></div><nav class="rail-nav" aria-label="Documentation"><div class="nav-group"><div class="nav-label">Start here</div><a class="nav-link " href="index.html">PlainScript</a><a class="nav-link active" href="getting-started.html" aria-current="page">Getting started</a><a class="nav-link " href="cli.html">CLI reference</a><a class="nav-link " href="templates.html">Application templates</a></div><div class="nav-group"><div class="nav-label">Language</div><a class="nav-link " href="language-reference.html">Language reference</a><a class="nav-link " href="spec.html">Language specification</a><a class="nav-link " href="syntax-design.html">Syntax design</a><a class="nav-link " href="type-system.html">Type system</a></div><div class="nav-group"><div class="nav-label">Compiler</div><a class="nav-link " href="compiler.html">Compiler</a><a class="nav-link " href="architecture.html">Compiler architecture</a><a class="nav-link " href="interop.html">JavaScript interoperability</a><a class="nav-link " href="benchmarks.html">Benchmarks</a></div><div class="nav-group"><div class="nav-label">Guides</div><a class="nav-link " href="integrations.html">Integrations</a><a class="nav-link " href="migration-2-1.html">Migrating from 2.0</a><a class="nav-link " href="contracts.html">Unified contracts</a><a class="nav-link " href="concurrency.html">Concurrency</a><a class="nav-link " href="jobs.html">Background jobs</a><a class="nav-link " href="databases.html">Databases</a><a class="nav-link " href="security.html">Security</a><a class="nav-link " href="debugging.html">Debugging</a><a class="nav-link " href="migration.html">Migration guide</a><a class="nav-link " href="comparison.html">Comparison with TypeScript</a></div><div class="nav-group"><div class="nav-label">Project</div><a class="nav-link " href="progress.html">Engineering progress</a><a class="nav-link " href="roadmap.html">Roadmap</a><a class="nav-link " href="audit.html">Audit</a><a class="nav-link " href="decisions.html">Decisions</a></div></nav><div class="rail-foot"><a href="https://github.com/ayoistooslick/Plainscript">Source ↗</a><span class="sep">/</span><a href="https://github.com/ayoistooslick/Plainscript/issues">Issues ↗</a><br>MIT · built by hand</div></aside><div class="main"><header class="top"><button class="nav-toggle" type="button" data-nav-toggle aria-expanded="false" aria-controls="rail"><span aria-hidden="true">≡</span> <span class="nav-toggle-label">Contents</span></button><a class="top-brand" href="index.html">PlainScript<span>.</span></a><span class="crumb"><b>PlainScript</b><span class="slash">/</span>Start here<span class="slash">/</span>Getting started</span><div class="search-wrap"><label class="search" aria-label="Search the manual"><span class="glyph" aria-hidden="true"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg></span><input id="doc-search" type="search" placeholder="Search the manual" autocomplete="off" aria-controls="search-results" aria-expanded="false"><kbd>/</kbd></label><div id="search-results" class="search-results" role="listbox" aria-label="Search results"></div></div><a class="top-github" href="https://github.com/ayoistooslick/Plainscript">GitHub ↗</a><div class="progress" aria-hidden="true"><span></span></div></header><main id="main" class="page"><div class="article-grid"><article class="prose"><div class="page-kicker"><span class="kicker-section">Start here</span><span class="kicker-meta">2 min read</span></div><h1 id="getting-started-with-plainscript-2-1">Getting started with PlainScript 2.1</h1>
 <p>PlainScript is a statically typed language that compiles to JavaScript. You write a <code>.pln</code> file, the compiler checks it, and you run the emitted ES module with Node, Vite, Next.js or any other JavaScript toolchain.</p>
 <p>This guide uses the 2.1 dialect. If you have a 2.0 codebase, read <a href="migration-2-1.html">Migrating from 2.0</a>; nothing breaks until you add the pragma.</p>
 <h2 id="1-install">1. Install</h2>
 <p>PlainScript needs Node.js 20 or newer. From a clone of the repository:</p>
-<pre><code>node src/cli.js version</code></pre>
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">sh</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="bash">node src/cli.js version</code></pre></figure>
 <p>Once the package is installed, the <code>plainscript</code> command replaces <code>node src/cli.js</code>:</p>
-<pre><code>npm install plainscript-lang
-npx plainscript version</code></pre>
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">sh</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="bash">npm install plainscript-lang
+npx plainscript version</code></pre></figure>
 <h2 id="2-your-first-program">2. Your first program</h2>
 <p>Create <code>hello.pln</code>. The first line opts this file into the 2.1 dialect:</p>
-<pre><code>#syntax 2.1
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
 
 import { print } from &quot;std/io&quot;
 
@@ -18,16 +17,16 @@ define greet(name: text) returns text
     return &quot;Hello, {name}!&quot;
 end
 
-print(greet(&quot;world&quot;))</code></pre>
+print(greet(&quot;world&quot;))</code></pre></figure>
 <p>Run it:</p>
-<pre><code>node src/cli.js run hello.pln</code></pre>
-<pre><code>Hello, world!</code></pre>
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">sh</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="bash">node src/cli.js run hello.pln</code></pre></figure>
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">output</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="text">Hello, world!</code></pre></figure>
 <p><code>run</code> compiles in memory and executes the result. To see the JavaScript:</p>
-<pre><code>node src/cli.js build hello.pln</code></pre>
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">sh</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="bash">node src/cli.js build hello.pln</code></pre></figure>
 <p>The emitted module contains a normal <code>function greet(name)</code> and <code>console.log</code>. There is no runtime library.</p>
 <h2 id="3-bindings">3. Bindings</h2>
 <p><code>value</code> binds a name that cannot be reassigned; <code>set</code> binds one that can; <code>change</code> assigns to an existing mutable binding.</p>
-<pre><code>#syntax 2.1
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
 
 import { print } from &quot;std/io&quot;
 
@@ -37,11 +36,11 @@ set attempts to 0
 while attempts is less than maxAttempts
     change attempts to attempts + 1
     print(&quot;attempt {attempts} of {maxAttempts}&quot;)
-end</code></pre>
+end</code></pre></figure>
 <p>Locals are checked. Assigning to a <code>value</code> is a compile error, and so is using a name that was never declared.</p>
 <h2 id="4-types-and-functions">4. Types and functions</h2>
 <p>Types are written after a colon in a parameter list, and a function&#39;s result follows <code>returns</code>.</p>
-<pre><code>#syntax 2.1
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
 
 import { print } from &quot;std/io&quot;
 import { filter } from &quot;std/list&quot;
@@ -64,10 +63,10 @@ value tasks: list of Task is [
 
 for each task in openTasks(tasks)
     print(&quot;{task.id}. {task.title}&quot;)
-end</code></pre>
+end</code></pre></figure>
 <p><code>|&gt;</code> is the pipeline operator: the value on the left becomes the first argument of the call on the right.</p>
 <h2 id="5-conditionals-and-loops">5. Conditionals and loops</h2>
-<pre><code>#syntax 2.1
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
 
 import { print } from &quot;std/io&quot;
 
@@ -87,11 +86,11 @@ end
 
 for each word in [&quot;alpha&quot;, &quot;beta&quot;]
     print(word)
-end</code></pre>
+end</code></pre></figure>
 <p>Every block closes with <code>end</code>. Indentation is for readers; the compiler uses <code>end</code>.</p>
 <h2 id="6-optional-values-and-errors">6. Optional values and errors</h2>
 <p><code>T?</code> is <code>T or nothing</code>. Narrow it with <code>is nothing</code> before using it. Errors are handled with <code>try</code>, <code>catch</code> and <code>finally</code>; <code>throw</code> takes any value.</p>
-<pre><code>#syntax 2.1
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
 
 import { print } from &quot;std/io&quot;
 import { parseNumber } from &quot;std/text&quot;
@@ -120,10 +119,10 @@ catch failure
     print(&quot;caught: {failure}&quot;)
 finally
     print(&quot;done&quot;)
-end</code></pre>
+end</code></pre></figure>
 <h2 id="7-modules-and-npm-packages">7. Modules and npm packages</h2>
 <p>A <code>.pln</code> file is an ES module. Relative imports use <code>.pln</code> paths and are emitted with <code>.js</code>; package and Node built-in imports pass through unchanged.</p>
-<pre><code>#syntax 2.1
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
 
 import { print } from &quot;std/io&quot;
 import { join } from &quot;node:path&quot;
@@ -133,19 +132,19 @@ declare const process: any
 
 value here is process.cwd()
 print(join(here, &quot;src&quot;))
-print(existsSync(join(here, &quot;package.json&quot;)))</code></pre>
+print(existsSync(join(here, &quot;package.json&quot;)))</code></pre></figure>
 <p>Packages without TypeScript declarations are <code>any</code> at the boundary. Add <code>declare</code> statements for the parts you rely on, or keep the values in explicitly typed PlainScript code as soon as possible.</p>
 <h2 id="8-a-project">8. A project</h2>
 <p><code>plainscript new</code> writes a project:</p>
-<pre><code>node src/cli.js new my-app
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">sh</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="bash">node src/cli.js new my-app
 cd my-app
 npm install
-npm run build</code></pre>
+npm run build</code></pre></figure>
 <p>The default project has <code>src/main.pln</code>, a <code>package.json</code> with a build script, and a <code>plainscript.config.json</code> that maps <code>src/</code> to <code>dist/</code>.</p>
-<pre><code>my-app/
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">output</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="text">my-app/
   package.json
   plainscript.config.json
-  src/main.pln        # compiled to dist/main.js</code></pre>
+  src/main.pln        # compiled to dist/main.js</code></pre></figure>
 <p><code>plainscript build</code> reads the config, compiles the module graph and writes one ES module per source file. <code>plainscript watch</code> rebuilds on change.</p>
 <h2 id="9-where-to-go-next">9. Where to go next</h2>
 <ul>
@@ -157,4 +156,4 @@ npm run build</code></pre>
 <p>advanced types.</p>
 <li><a href="compiler.html">Compiler</a> — how source becomes JavaScript.</li>
 <li><a href="cli.html">CLI reference</a> — every command and flag.</li>
-</ul></div><aside class="toc"><div class="toc-title">On this page</div><a class="toc-h2" href="#1-install">1. Install</a><a class="toc-h2" href="#2-your-first-program">2. Your first program</a><a class="toc-h2" href="#3-bindings">3. Bindings</a><a class="toc-h2" href="#4-types-and-functions">4. Types and functions</a><a class="toc-h2" href="#5-conditionals-and-loops">5. Conditionals and loops</a><a class="toc-h2" href="#6-optional-values-and-errors">6. Optional values and errors</a><a class="toc-h2" href="#7-modules-and-npm-packages">7. Modules and npm packages</a><a class="toc-h2" href="#8-a-project">8. A project</a><a class="toc-h2" href="#9-where-to-go-next">9. Where to go next</a></aside></article><footer class="page-footer"><span>PlainScript 2.1 documentation</span><a href="https://github.com/ayoistooslick/Plainscript/issues">Report a documentation issue ↗</a></footer></div></main></div><script src="app.js"></script></body></html>
+</ul></article><aside class="toc-rail" aria-label="On this page"><div class="toc-title">On this page</div><nav class="toc"><a class="toc-h2" href="#1-install">1. Install</a><a class="toc-h2" href="#2-your-first-program">2. Your first program</a><a class="toc-h2" href="#3-bindings">3. Bindings</a><a class="toc-h2" href="#4-types-and-functions">4. Types and functions</a><a class="toc-h2" href="#5-conditionals-and-loops">5. Conditionals and loops</a><a class="toc-h2" href="#6-optional-values-and-errors">6. Optional values and errors</a><a class="toc-h2" href="#7-modules-and-npm-packages">7. Modules and npm packages</a><a class="toc-h2" href="#8-a-project">8. A project</a><a class="toc-h2" href="#9-where-to-go-next">9. Where to go next</a></nav></aside></div><nav class="page-nav" aria-label="Chapter navigation"><span></span><a class="pn-next" href="language-reference.html"><span class="pn-label">Next →</span><span class="pn-title">Language reference</span></a></nav><footer class="colophon"><div><div class="colophon-mark">PlainScript<span>.</span></div><p>An independent, statically typed language for the JavaScript platform. This manual is set in Fraunces, Newsreader, Space Grotesk and IBM Plex Mono. One stylesheet, no frameworks, no trackers.</p></div><nav class="colophon-links" aria-label="Project links"><a href="index.html">Manual</a><a href="https://github.com/ayoistooslick/Plainscript">Source</a><a href="https://github.com/ayoistooslick/Plainscript/issues">Issues</a><a href="https://github.com/ayoistooslick/Plainscript/blob/main/CHANGELOG.md">Changelog</a><a href="https://github.com/ayoistooslick/Plainscript/blob/main/LICENSE">MIT</a></nav></footer></main></div></div><script src="app.js"></script></body></html>

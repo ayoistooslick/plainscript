@@ -7,6 +7,7 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..');
 const DOCS = path.join(ROOT, 'docs');
 const OUT = DOCS;
+const REPO = 'https://github.com/ayoistooslick/Plainscript';
 
 const pages = [
   { slug: 'index', title: 'PlainScript', source: path.join(ROOT, 'README.md'), group: 'Start here', home: true },
@@ -37,86 +38,27 @@ const pages = [
   { slug: 'decisions', title: 'Decisions', source: path.join(DOCS, 'DECISIONS.md'), group: 'Project' },
 ];
 
-const css = `
-:root { --ink:#17212b; --muted:#637081; --line:#dfe6ec; --paper:#fff; --wash:#f5f7f9; --navy:#102431; --blue:#1167a8; --mint:#d9f2e5; --lime:#c7ef8d; --coral:#ff846b; --shadow:0 18px 50px rgba(16,36,49,.08); }
-* { box-sizing:border-box; }
-html { scroll-behavior:smooth; }
-body { margin:0; color:var(--ink); background:var(--paper) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Cpath stroke='var(--muted)' stroke-width='.5' fill='none' d='M10 10 h20 v20 H10 ZM10 30 h20 v-20 H10 Z'/%3E%3C/svg%3E") repeat; font:16px/1.7 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-a { color:var(--blue); text-decoration-thickness:1px; text-underline-offset:3px; }
-a:hover { color:#0b4d7e; }
-.site-shell { min-height:100vh; display:grid; grid-template-columns:280px minmax(0,1fr); }
-.sidebar { position:sticky; top:0; height:100vh; overflow:auto; background:var(--navy); color:#d8e5eb; padding:28px 20px 24px; }
-.brand { display:flex; align-items:center; gap:12px; color:#fff; text-decoration:none; margin:0 8px 34px; }
-.brand-mark { display:grid; place-items:center; width:38px; height:38px; border-radius:12px 12px 12px 4px; background:var(--lime); color:var(--navy); font-weight:900; letter-spacing:-.08em; }
-.brand-name { font-weight:800; letter-spacing:-.03em; font-size:1.05rem; }
-.brand-meta { display:block; color:#91a9b5; font-size:.72rem; font-weight:600; letter-spacing:.08em; text-transform:uppercase; margin-top:1px; }
-.nav-group { margin:0 8px 25px; }
-.nav-label { color:#7f9aa7; text-transform:uppercase; font-size:.67rem; font-weight:800; letter-spacing:.14em; margin:0 0 8px; }
-.nav-link { display:block; padding:7px 10px; border-radius:8px; color:#c2d4dc; text-decoration:none; font-size:.92rem; }
-.nav-link:hover, .nav-link.active { background:rgba(255,255,255,.09); color:#fff; }
-.nav-link.active { box-shadow:inset 3px 0 var(--coral); }
-.sidebar-footer { border-top:1px solid rgba(255,255,255,.1); padding:18px 8px 0; color:#89a2ae; font-size:.8rem; }
-.sidebar-footer a { color:#b7e7ff; }
-.main { min-width:0; }
-.topbar { position:sticky; top:0; z-index:5; display:flex; justify-content:space-between; align-items:center; gap:18px; min-height:70px; padding:14px clamp(22px,5vw,72px); background:rgba(255,255,255,.92); border-bottom:1px solid var(--line); backdrop-filter:blur(12px); }
-.search { display:flex; align-items:center; gap:9px; max-width:480px; flex:1; background:var(--wash); border:1px solid transparent; border-radius:10px; padding:8px 12px; color:var(--muted); }
-.search:focus-within { border-color:#9ecbe7; background:#fff; box-shadow:0 0 0 3px rgba(17,103,168,.08); }
-.search input { width:100%; border:0; outline:0; background:transparent; color:var(--ink); font:inherit; }
-.search kbd { border:1px solid #cdd8df; border-bottom-width:2px; border-radius:5px; padding:1px 5px; font-size:.68rem; color:var(--muted); white-space:nowrap; }
-.top-links { display:flex; align-items:center; gap:16px; font-size:.86rem; white-space:nowrap; }
-.top-links a { color:var(--muted); text-decoration:none; }
-.content { max-width:1120px; margin:0 auto; padding:66px clamp(22px,5vw,72px) 100px; }
-.eyebrow { color:var(--blue); font-size:.75rem; font-weight:850; letter-spacing:.14em; text-transform:uppercase; }
-.hero { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(240px,.65fr); gap:42px; align-items:end; padding:22px 0 52px; }
-.hero h1 { max-width:760px; margin:12px 0 16px; font-size:clamp(2.6rem,6vw,5.8rem); line-height:.98; letter-spacing:-.075em; color:var(--navy); }
-.hero p { max-width:690px; margin:0; font-size:1.18rem; color:var(--muted); }
-.hero-aside { padding:22px; background:var(--mint); border-radius:20px 20px 20px 5px; box-shadow:var(--shadow); }
-.hero-aside strong { display:block; color:var(--navy); font-size:1.05rem; margin-bottom:8px; }
-.hero-aside p { font-size:.92rem; line-height:1.55; color:#35534e; }
-.hero-aside code { color:#184a42; }
-.quick-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin:0 0 58px; }
-.quick-card { display:block; padding:20px; min-height:150px; border:1px solid var(--line); border-radius:15px; color:var(--ink); text-decoration:none; transition:.18s ease; }
-.quick-card:hover { transform:translateY(-3px); border-color:#9ecbe7; box-shadow:var(--shadow); }
-.quick-card .number { color:var(--coral); font-weight:900; font-size:.82rem; }
-.quick-card h2 { margin:10px 0 5px; font-size:1.1rem; letter-spacing:-.025em; }
-.quick-card p { margin:0; color:var(--muted); font-size:.9rem; line-height:1.5; }
-.page-layout { display:grid; grid-template-columns:minmax(0,1fr) 210px; gap:52px; align-items:start; }
-.prose { min-width:0; }
-.prose h1 { color:var(--navy); font-size:clamp(2rem,4vw,3.4rem); line-height:1.05; letter-spacing:-.06em; margin:0 0 18px; }
-.prose h2 { color:var(--navy); font-size:1.7rem; line-height:1.15; letter-spacing:-.045em; margin:48px 0 14px; padding-top:15px; border-top:1px solid var(--line); }
-.prose h3 { color:var(--navy); font-size:1.18rem; margin:30px 0 8px; }
-.prose p { margin:0 0 18px; }
-.prose ul, .prose ol { padding-left:1.4rem; margin:0 0 20px; }
-.prose li { margin:4px 0; }
-.prose blockquote { margin:24px 0; padding:14px 18px; border-left:4px solid var(--coral); background:#fff6f2; color:#62463e; }
-.prose code { padding:2px 5px; border-radius:5px; background:#eef2f5; color:#8c3e2f; font: .9em ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-.prose pre { overflow:auto; padding:18px 20px; margin:22px 0; border-radius:12px; background:#12232d; color:#deedf2; box-shadow:var(--shadow); }
-.prose pre code { padding:0; background:none; color:inherit; font-size:.87rem; line-height:1.65; }
-.prose table { width:100%; border-collapse:collapse; margin:22px 0 28px; font-size:.92rem; }
-.prose th, .prose td { padding:9px 11px; border:1px solid var(--line); text-align:left; vertical-align:top; }
-.prose th { background:var(--wash); color:var(--navy); }
-.toc { position:sticky; top:94px; border-left:1px solid var(--line); padding-left:18px; font-size:.82rem; }
-.toc-title { color:var(--muted); font-size:.68rem; font-weight:850; letter-spacing:.13em; text-transform:uppercase; margin-bottom:10px; }
-.toc a { display:block; color:var(--muted); text-decoration:none; padding:3px 0; line-height:1.35; }
-.toc a:hover { color:var(--blue); }
-.toc a.toc-h3 { padding-left:10px; font-size:.78rem; }
-.page-footer { display:flex; justify-content:space-between; gap:16px; padding-top:30px; margin-top:55px; border-top:1px solid var(--line); color:var(--muted); font-size:.84rem; }
-.empty { padding:28px; border:1px dashed #b9c9d2; border-radius:12px; color:var(--muted); }
-.search-results { position:absolute; top:58px; left:0; right:0; max-height:390px; overflow:auto; padding:8px; background:#fff; border:1px solid var(--line); border-radius:12px; box-shadow:var(--shadow); display:none; }
-.search-wrap { position:relative; flex:1; max-width:480px; }
-.search-results.visible { display:block; }
-.search-result { display:block; padding:10px 12px; border-radius:8px; text-decoration:none; color:var(--ink); }
-.search-result:hover { background:var(--wash); }
-.search-result strong { display:block; font-size:.9rem; }
-.search-result span { display:block; color:var(--muted); font-size:.78rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-@media (max-width:900px) { .site-shell { grid-template-columns:1fr; } .sidebar { position:relative; height:auto; padding:18px 18px 12px; } .brand { margin-bottom:18px; } .nav-group { display:inline-block; vertical-align:top; width:46%; margin-bottom:12px; } .sidebar-footer { display:none; } .hero { grid-template-columns:1fr; } .page-layout { grid-template-columns:1fr; } .toc { position:static; order:-1; border-left:0; border-bottom:1px solid var(--line); padding:0 0 15px; } }
-@media (max-width:620px) { .topbar { padding:12px 16px; } .top-links a:not(:last-child) { display:none; } .content { padding:38px 18px 70px; } .quick-grid { grid-template-columns:1fr; } .nav-group { width:100%; } .hero h1 { font-size:3.3rem; } .page-footer { flex-direction:column; } }
-`;
+const LANG_LABEL = {
+  plainscript: 'pln',
+  bash: 'sh',
+  sh: 'sh',
+  shell: 'sh',
+  text: 'output',
+  json: 'json',
+  js: 'js',
+  javascript: 'js',
+  ts: 'ts',
+  tsx: 'tsx',
+  ebnf: 'ebnf',
+  html: 'html',
+  css: 'css',
+};
 
 function esc(value) {
-  return String(value).replace(/[&<>"']/g, (char) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[char]));
+  return String(value).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 }
 function slug(value) { return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); }
+
 function inline(value) {
   let text = esc(value);
   text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
@@ -125,18 +67,25 @@ function inline(value) {
   text = text.replace(/href="(?:\.\.\/)?docs\/([A-Za-z0-9_-]+)\.md"/g, 'href="$1.html"');
   text = text.replace(/href="([A-Za-z0-9_-]+)\.md"/g, 'href="$1.html"');
   text = text.replace(/href="docs\/DEMOS\.md"/g, 'href="interop.html"');
-  text = text.replace(/href="(CHANGELOG|CONTRIBUTION|LICENSE)(?:\.md)?"/g, 'href="https://github.com/ayoistooslick/Plainscript/blob/main/$1"');
-  text = text.replace(/href="((?:demos|editors|templates|integrations)\/[^\"]+)"/g, 'href="https://github.com/ayoistooslick/Plainscript/tree/main/$1"');
-  const pageSlugs = ['MIGRATION', 'MIGRATION_2_1', 'GETTING_STARTED', 'LANGUAGE_REFERENCE', 'COMPILER', 'INTEGRATIONS', 'SPEC', 'SYNTAX_DESIGN', 'CLI', 'INTEROP', 'PROGRESS', 'DECISIONS', 'AUDIT', 'JOBS', 'DATABASES', 'SECURITY', 'DEBUGGING', 'CONCURRENCY', 'UNIFIED_CONTRACTS', 'TYPE_SYSTEM', 'TEMPLATES', 'BENCHMARKS', 'ROADMAP'];
+  text = text.replace(/href="(CHANGELOG|CONTRIBUTION|LICENSE)(?:\.md)?"/g, 'href="' + REPO + '/blob/main/$1"');
+  text = text.replace(/href="((?:demos|editors|templates|integrations)\/[^"]+)"/g, 'href="' + REPO + '/tree/main/$1"');
+  const pageSlugs = ['MIGRATION', 'MIGRATION_2_1', 'GETTING_STARTED', 'LANGUAGE_REFERENCE', 'COMPILER', 'INTEGRATIONS', 'SPEC', 'SYNTAX_DESIGN', 'CLI', 'INTEROP', 'PROGRESS', 'DECISIONS', 'AUDIT', 'JOBS', 'DATABASES', 'SECURITY', 'DEBUGGING', 'CONCURRENCY', 'UNIFIED_CONTRACTS', 'TYPE_SYSTEM', 'TEMPLATES', 'BENCHMARKS', 'ROADMAP', 'ARCHITECTURE', 'COMPARISON'];
   text = text.replace(/href="UNIFIED_CONTRACTS\.html"/g, 'href="contracts.html"');
   for (const pageSlug of pageSlugs) text = text.replace(new RegExp(`href="${pageSlug}\\.html"`, 'g'), `href="${pageSlug.toLowerCase().replace(/_/g, '-')}.html"`);
   text = text.replace(/href="DEMOS\.html"/g, 'href="interop.html"');
-  text = text.replace(/href="CHANGELOG\.html"/g, 'href="https://github.com/ayoistooslick/Plainscript/blob/main/CHANGELOG.md"');
-  text = text.replace(/href="CONTRIBUTION\.html"/g, 'href="https://github.com/ayoistooslick/Plainscript/blob/main/CONTRIBUTION.md"');
+  text = text.replace(/href="CHANGELOG\.html"/g, 'href="' + REPO + '/blob/main/CHANGELOG.md"');
+  text = text.replace(/href="CONTRIBUTION\.html"/g, 'href="' + REPO + '/blob/main/CONTRIBUTION.md"');
   text = text.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
   text = text.replace(/\*([^*]+)\*/g, '<em>$1</em>');
   return text;
 }
+
+function codeFigure(lang, source) {
+  const clean = (lang || 'text').trim();
+  const label = LANG_LABEL[clean] || clean || 'text';
+  return `<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">${esc(label)}</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="${esc(clean)}">${esc(source)}</code></pre></figure>`;
+}
+
 function markdown(source) {
   const lines = source.replace(/\r/g, '').split('\n');
   const out = [];
@@ -145,79 +94,188 @@ function markdown(source) {
   let list = null;
   let table = null;
   let code = null;
+  let codeLang = 'text';
   let codeIndent = 0;
+  let quote = [];
+
   const flushParagraph = () => { if (paragraph.length) { out.push(`<p>${inline(paragraph.join(' '))}</p>`); paragraph = []; } };
   const flushList = () => { if (list) { out.push(`</${list}>`); list = null; } };
-  const flushTable = () => { if (table) { out.push('</tbody></table>'); table = null; } };
+  const flushTable = () => { if (table) { out.push('</tbody></table></div>'); table = null; } };
+  const flushQuote = () => { if (quote.length) { out.push(`<blockquote>${inline(quote.join(' '))}</blockquote>`); quote = []; } };
+  const flushAll = () => { flushParagraph(); flushList(); flushTable(); flushQuote(); };
+
   for (const raw of lines) {
     const line = raw.trimEnd();
     if (line.trimStart().startsWith('```')) {
-      flushParagraph(); flushList(); flushTable();
+      flushAll();
       if (code === null) {
         code = [];
         codeIndent = line.match(/^\s*/)[0].length;
-        out.push('<pre><code>');
+        codeLang = line.trim().slice(3).trim().toLowerCase() || 'text';
       } else {
-        out[out.length - 1] += `${esc(code.join('\n'))}</code></pre>`;
+        out.push(codeFigure(codeLang, code.join('\n')));
         code = null;
+        codeLang = 'text';
         codeIndent = 0;
       }
       continue;
     }
     if (code !== null) { code.push(raw.slice(codeIndent)); continue; }
-    if (!line.trim()) { flushParagraph(); flushList(); flushTable(); continue; }
+    if (/^\s*<!--[\s\S]*?-->\s*$/.test(line)) { flushAll(); continue; }
+    if (!line.trim()) { flushAll(); continue; }
+
     const heading = line.match(/^(#{1,3})\s+(.+)$/);
-    if (heading) { flushParagraph(); flushList(); flushTable(); const level = heading[1].length; const text = heading[2].replace(/\s+#+$/, ''); const id = slug(text); headings.push({ level, text, id }); out.push(`<h${level} id="${id}">${inline(text)}</h${level}>`); continue; }
-    if (/^>\s?/.test(line)) { flushParagraph(); flushList(); flushTable(); out.push(`<blockquote>${inline(line.replace(/^>\s?/, ''))}</blockquote>`); continue; }
+    if (heading) {
+      flushAll();
+      const level = heading[1].length;
+      const text = heading[2].replace(/\s+#+$/, '');
+      const id = slug(text);
+      headings.push({ level, text, id });
+      out.push(`<h${level} id="${id}">${inline(text)}</h${level}>`);
+      continue;
+    }
+    if (/^>\s?/.test(line)) {
+      flushParagraph(); flushList(); flushTable();
+      quote.push(line.replace(/^>\s?/, ''));
+      continue;
+    }
+    flushQuote();
     const item = line.match(/^\s*[-*+]\s+(.+)$/) || line.match(/^\s*\d+\.\s+(.+)$/);
-    if (item) { flushParagraph(); flushTable(); const type = /^\s*\d+\./.test(line) ? 'ol' : 'ul'; if (list !== type) { flushList(); list = type; out.push(`<${type}>`); } out.push(`<li>${inline(item[1])}</li>`); continue; }
+    if (item) {
+      flushParagraph(); flushTable();
+      const type = /^\s*\d+\./.test(line) ? 'ol' : 'ul';
+      if (list !== type) { flushList(); list = type; out.push(`<${type}>`); }
+      out.push(`<li>${inline(item[1])}</li>`);
+      continue;
+    }
     if (line.includes('|')) {
       const cells = line.split('|').slice(1, -1).map((cell) => cell.trim());
       if (cells.length) {
         flushParagraph(); flushList();
-        if (!table) { table = true; out.push(`<table><thead><tr>${cells.map((cell) => `<th>${inline(cell)}</th>`).join('')}</tr></thead><tbody>`); }
+        if (!table) { table = true; out.push(`<div class="table-wrap"><table><thead><tr>${cells.map((cell) => `<th>${inline(cell)}</th>`).join('')}</tr></thead><tbody>`); }
         else if (!cells.every((cell) => /^:?-+:?$/.test(cell))) out.push(`<tr>${cells.map((cell) => `<td>${inline(cell)}</td>`).join('')}</tr>`);
         continue;
       }
     }
     paragraph.push(line.trim());
   }
-  if (code !== null) out[out.length - 1] += `${esc(code.join('\n'))}</code></pre>`;
-  flushParagraph(); flushList(); flushTable();
+  if (code !== null) out.push(codeFigure(codeLang, code.join('\n')));
+  flushAll();
   return { html: out.join('\n'), headings };
 }
 
 function nav(active) {
   const groups = [...new Set(pages.map((page) => page.group))];
-  return groups.map((group) => `<div class="nav-group"><div class="nav-label">${group}</div>${pages.filter((page) => page.group === group).map((page) => `<a class="nav-link ${page.slug === active ? 'active' : ''}" href="${page.slug === 'index' ? 'index.html' : `${page.slug}.html`}">${page.title}</a>`).join('')}</div>`).join('');
+  return groups.map((group) => `<div class="nav-group"><div class="nav-label">${esc(group)}</div>${pages.filter((page) => page.group === group).map((page) => `<a class="nav-link ${page.slug === active ? 'active' : ''}" href="${page.slug === 'index' ? 'index.html' : `${page.slug}.html`}"${page.slug === active ? ' aria-current="page"' : ''}>${esc(page.title)}</a>`).join('')}</div>`).join('');
 }
+
 function toc(headings) {
   const visible = headings.filter((heading) => heading.level >= 2 && heading.level <= 3);
   if (!visible.length) return '';
-  return `<aside class="toc"><div class="toc-title">On this page</div>${visible.map((heading) => `<a class="toc-h${heading.level}" href="#${heading.id}">${esc(heading.text)}</a>`).join('')}</aside>`;
-}
-function shell(page, body, headings) {
-  const description = page.home ? 'A typed language that compiles to JavaScript.' : `${page.title} — PlainScript documentation.`;
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="${esc(description)}"><title>${esc(page.title)} · PlainScript</title><link rel="stylesheet" href="style.css"></head><body><div class="site-shell"><aside class="sidebar"><a class="brand" href="index.html"><span class="brand-mark">PS</span><span><span class="brand-name">PlainScript</span><span class="brand-meta">Language docs · 2.1</span></span><span class="stamp">🗿</span></a>${nav(page.slug)}<div class="sidebar-footer">Open source under MIT.<br><a href="https://github.com/ayoistooslick/Plainscript">View on GitHub ↗</a></div></aside><main class="main"><header class="topbar"><div class="search-wrap"><label class="search" aria-label="Search documentation"><span>⌕</span><input id="doc-search" type="search" placeholder="Search the docs…" autocomplete="off"><kbd>/</kbd></label><div id="search-results" class="search-results" role="listbox"></div></div><nav class="top-links"><a href="index.html">Docs</a><a href="https://github.com/ayoistooslick/Plainscript">GitHub ↗</a></nav></header><div class="content">${body}<footer class="page-footer"><span>PlainScript 2.1 documentation</span><a href="https://github.com/ayoistooslick/Plainscript/issues">Report a documentation issue ↗</a></footer></div></main></div><script src="app.js"></script></body></html>`;
+  return `<aside class="toc-rail" aria-label="On this page"><div class="toc-title">On this page</div><nav class="toc">${visible.map((heading) => `<a class="toc-h${heading.level}" href="#${heading.id}">${esc(heading.text.replace(/`/g, ''))}</a>`).join('')}</nav></aside>`;
 }
 
-function homeBody(rendered) {
-  return `<section class="hero"><div><div class="eyebrow">A language for serious JavaScript software</div><h1>Make the machine readable.</h1><p>PlainScript 2.1 is a statically typed language that reads like structured English and compiles to ordinary JavaScript modules. Learn the syntax, understand the compiler, and build full-stack applications without leaving the ecosystem.</p></div><aside class="hero-aside"><strong>Start with the shape of the language.</strong><p>Read the quick tour, then move into the specification when you need exact semantics. The docs are organized for both paths.</p><code>plainscript new my-app</code></aside></section><section class="quick-grid"><a class="quick-card" href="cli.html"><span class="number">01 / BUILD</span><h2>Install and run</h2><p>Use the CLI to check, build, format, test, and scaffold a project.</p></a><a class="quick-card" href="spec.html"><span class="number">02 / LEARN</span><h2>Learn the language</h2><p>Follow the language model from modules and types to async code and rendering.</p></a><a class="quick-card" href="architecture.html"><span class="number">03 / UNDERSTAND</span><h2>Explore the compiler</h2><p>Trace source through lexer, parser, checker, HIR, and JavaScript emission.</p></a></section><article class="page-layout"><div class="prose">${rendered.html}</div>${toc(rendered.headings)}</article>`;
+function pageNav(page) {
+  const order = pages.filter((item) => !item.home);
+  const index = order.findIndex((item) => item.slug === page.slug);
+  if (index === -1) return '';
+  const prev = order[index - 1];
+  const next = order[index + 1];
+  const link = (item, kind) => item
+    ? `<a class="pn-${kind}" href="${item.slug}.html"><span class="pn-label">${kind === 'prev' ? '← Previous' : 'Next →'}</span><span class="pn-title">${esc(item.title)}</span></a>`
+    : `<span></span>`;
+  return `<nav class="page-nav" aria-label="Chapter navigation">${link(prev, 'prev')}${link(next, 'next')}</nav>`;
 }
 
-for (const generated of ['index.html', 'cli.html', 'templates.html', 'spec.html', 'syntax-design.html', 'architecture.html', 'interop.html', 'migration.html', 'getting-started.html', 'language-reference.html', 'compiler.html', 'integrations.html', 'migration-2-1.html', 'progress.html', 'audit.html', 'decisions.html', 'style.css', 'app.js', '.nojekyll']) {
+function colophon() {
+  return `<footer class="colophon"><div><div class="colophon-mark">PlainScript<span>.</span></div><p>An independent, statically typed language for the JavaScript platform. This manual is set in Fraunces, Newsreader, Space Grotesk and IBM Plex Mono. One stylesheet, no frameworks, no trackers.</p></div><nav class="colophon-links" aria-label="Project links"><a href="index.html">Manual</a><a href="${REPO}">Source</a><a href="${REPO}/issues">Issues</a><a href="${REPO}/blob/main/CHANGELOG.md">Changelog</a><a href="${REPO}/blob/main/LICENSE">MIT</a></nav></footer>`;
+}
+
+function kicker(page, minutes, html) {
+  const block = `<div class="page-kicker"><span class="kicker-section">${esc(page.group)}</span><span class="kicker-meta">${minutes} min read</span></div>`;
+  if (!/<h1[^>]*>/.test(html)) return block + html;
+  return html.replace(/<h1([^>]*)>/, `${block}<h1$1>`);
+}
+
+function shell(page, body, meta) {
+  const description = meta.description;
+  const crumb = page.home
+    ? '<span class="crumb"><b>PlainScript</b><span class="slash">/</span>Manual</span>'
+    : `<span class="crumb"><b>PlainScript</b><span class="slash">/</span>${esc(page.group)}<span class="slash">/</span>${esc(page.title)}</span>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="${esc(description)}"><meta name="color-scheme" content="light"><meta name="theme-color" content="#f7f2e8"><title>${esc(page.title)} · PlainScript</title><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23181410'/%3E%3Ctext x='16' y='23' font-family='Georgia,serif' font-size='20' fill='%23f7f2e8' text-anchor='middle'%3EP%3C/text%3E%3C/svg%3E"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=Space+Grotesk:wght@400..700&display=swap" rel="stylesheet"><link rel="stylesheet" href="style.css"></head><body><a class="skip" href="#main">Skip to content</a><div class="scrim" data-scrim></div><div class="shell"><aside class="rail" id="rail"><div class="rail-head"><a class="wordmark" href="index.html">PlainScript<span class="dot">.</span></a><div class="rail-meta">Language manual<br>Vol. 2.1 · MMXXVI</div></div><nav class="rail-nav" aria-label="Documentation">${nav(page.slug)}</nav><div class="rail-foot"><a href="${REPO}">Source ↗</a><span class="sep">/</span><a href="${REPO}/issues">Issues ↗</a><br>MIT · built by hand</div></aside><div class="main"><header class="top"><button class="nav-toggle" type="button" data-nav-toggle aria-expanded="false" aria-controls="rail"><span aria-hidden="true">≡</span> <span class="nav-toggle-label">Contents</span></button><a class="top-brand" href="index.html">PlainScript<span>.</span></a>${crumb}<div class="search-wrap"><label class="search" aria-label="Search the manual"><span class="glyph" aria-hidden="true"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg></span><input id="doc-search" type="search" placeholder="Search the manual" autocomplete="off" aria-controls="search-results" aria-expanded="false"><kbd>/</kbd></label><div id="search-results" class="search-results" role="listbox" aria-label="Search results"></div></div><a class="top-github" href="${REPO}">GitHub ↗</a><div class="progress" aria-hidden="true"><span></span></div></header><main id="main" class="page">${body}</main></div></div><script src="app.js"></script></body></html>`;
+}
+
+/* ---------------- homepage ---------------- */
+const sampleSource = [
+  '#syntax 2.1',
+  '',
+  'import { print } from "std/io"',
+  '',
+  'define greet(name: text) returns text',
+  '    return "Hello, {name}."',
+  'end',
+  '',
+  'print(greet("world"))',
+].join('\n');
+const sampleOutput = [
+  'import { print } from "./std/io.js";',
+  '',
+  'function greet(name) {',
+  '  return `Hello, ${name}.`;',
+  '}',
+  '',
+  'print(greet("world"));',
+].join('\n');
+const sampleTerminal = [
+  '$ plainscript run hello.pln',
+  'Hello, world.',
+].join('\n');
+
+function manualIndex() {
+  const order = pages.filter((page) => !page.home);
+  return order.map((page, index) => `<li><a href="${page.slug}.html"><span class="ix">${String(index + 1).padStart(2, '0')}</span><span class="mt">${esc(page.title)}</span><span class="mg">${esc(page.group)}</span></a></li>`).join('');
+}
+
+function homeBody() {
+  const tabs = `<div class="code-tabs" data-tabs><div class="tablist" role="tablist" aria-label="Language specimen"><button type="button" role="tab" id="tab-src" aria-controls="panel-src" aria-selected="true" data-tab="src">hello.pln</button><button type="button" role="tab" id="tab-out" aria-controls="panel-out" aria-selected="false" tabindex="-1" data-tab="out">hello.js</button><button type="button" role="tab" id="tab-cli" aria-controls="panel-cli" aria-selected="false" tabindex="-1" data-tab="cli">terminal</button></div><div class="tabpanel" role="tabpanel" id="panel-src" aria-labelledby="tab-src" data-panel="src"><pre><code data-lang="plainscript">${esc(sampleSource)}</code></pre></div><div class="tabpanel" role="tabpanel" id="panel-out" aria-labelledby="tab-out" data-panel="out" hidden><pre><code data-lang="js">${esc(sampleOutput)}</code></pre></div><div class="tabpanel" role="tabpanel" id="panel-cli" aria-labelledby="tab-cli" data-panel="cli" hidden><pre><code data-lang="text">${esc(sampleTerminal)}</code></pre></div></div>`;
+  return `<div class="home"><div class="folio"><span>PlainScript</span><span>Vol. 2.1</span><span>An independent language</span><span>MMXXVI</span></div><section class="masthead"><h1 class="display">A language that reads like <em>plain writing</em>.</h1><div class="masthead-row"><p class="lede">PlainScript is a statically typed, full-stack language for the JavaScript platform. Write modules that read like structured English; compile them to ordinary ES modules that run anywhere JavaScript already runs. This is the manual — the whole thing, in the open.</p><div class="masthead-actions"><a class="btn-primary" href="getting-started.html">Start the manual <span aria-hidden="true">→</span></a><a class="btn-ghost" href="spec.html">Read the specification</a></div></div><dl class="factbar"><div><dt>Version</dt><dd>2.1.0</dd></div><div><dt>Licence</dt><dd>MIT</dd></div><div><dt>Compiles to</dt><dd>ES modules</dd></div><div><dt>Author</dt><dd>Ayodele A. David</dd></div></dl></section><section class="plate"><div class="plate-copy"><div class="section-mark"><span>Plate 01</span>The language</div><h2>Readable at the source. Ordinary at the output.</h2><p>No new runtime, no virtual machine, no ecosystem to migrate to. PlainScript is a typed surface over the JavaScript platform: the compiler checks your program, then emits modules your existing tools already understand.</p><ul class="checklist"><li>Statically checked before anything runs.</li><li>Functions, records, unions and async without ceremony.</li><li>Ships with a CLI, language server, formatter and debugger.</li><li>One file at a time — 2.0 code keeps compiling.</li></ul></div><div>${tabs}</div></section><section class="manual"><div class="section-mark"><span>Contents</span>Everything, in order</div><ol class="manual-list">${manualIndex()}</ol></section><section class="principles"><div class="section-mark"><span>Position</span>What this is, and is not</div><div class="principle-grid"><article class="principle"><span class="num">01</span><h3>Independent by design</h3><p>PlainScript is not a framework or a wrapper. It is a language with its own grammar, checker and compiler, built in the open by one author and published under MIT.</p></article><article class="principle"><span class="num">02</span><h3>Typed without ceremony</h3><p>Types are inferred where they are obvious and written where they matter. The checker is strict about the things that break software, and quiet about the rest.</p></article><article class="principle"><span class="num">03</span><h3>Ordinary at the output</h3><p>The compiler emits readable ES modules and source maps. There is no runtime to adopt and no ecosystem to leave behind.</p></article></div><p class="closing-line"><a href="decisions.html">Read the design decisions →</a></p></section>${colophon()}</div>`;
+}
+
+/* ---------------- build ---------------- */
+const css = fs.readFileSync(path.join(__dirname, 'docs', 'style.css'), 'utf8');
+const appSource = fs.readFileSync(path.join(__dirname, 'docs', 'app.js'), 'utf8');
+
+for (const generated of ['index.html', 'cli.html', 'templates.html', 'spec.html', 'syntax-design.html', 'architecture.html', 'interop.html', 'migration.html', 'getting-started.html', 'language-reference.html', 'compiler.html', 'integrations.html', 'migration-2-1.html', 'progress.html', 'audit.html', 'decisions.html', 'type-system.html', 'contracts.html', 'concurrency.html', 'jobs.html', 'databases.html', 'security.html', 'debugging.html', 'comparison.html', 'benchmarks.html', 'roadmap.html', 'style.css', 'app.js', '.nojekyll']) {
   fs.rmSync(path.join(OUT, generated), { force: true });
 }
 fs.mkdirSync(OUT, { recursive: true });
 fs.writeFileSync(path.join(OUT, 'style.css'), css.trimStart());
+
 const search = [];
 for (const page of pages) {
   const source = fs.readFileSync(page.source, 'utf8');
   const rendered = markdown(source);
-  search.push({ title: page.title, url: page.slug === 'index' ? 'index.html' : `${page.slug}.html`, text: source.replace(/\s+/g, ' ').slice(0, 260) });
-  const body = page.home ? homeBody(rendered) : `<article class="page-layout"><div class="prose">${rendered.html}</div>${toc(rendered.headings)}</article>`;
-  fs.writeFileSync(path.join(OUT, `${page.slug}.html`), shell(page, body, rendered.headings));
+  const plain = source
+    .replace(/<!--[\s\S]*?-->/g, ' ')
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/[#>*_`|\[\]()]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const words = plain.split(' ').filter(Boolean).length;
+  const minutes = Math.max(1, Math.round(words / 220));
+  search.push({
+    title: page.title,
+    url: page.slug === 'index' ? 'index.html' : `${page.slug}.html`,
+    text: plain.slice(0, 240),
+  });
+  const body = page.home
+    ? homeBody()
+    : `<div class="article-grid"><article class="prose">${kicker(page, minutes, rendered.html)}</article>${toc(rendered.headings)}</div>${pageNav(page)}${colophon()}`;
+  const description = page.home
+    ? 'PlainScript is an independent, statically typed language that compiles to ordinary JavaScript. Read the manual.'
+    : `${page.title} — PlainScript 2.1 documentation.`;
+  fs.writeFileSync(path.join(OUT, `${page.slug}.html`), shell(page, body, { description }));
 }
-fs.writeFileSync(path.join(OUT, 'app.js'), `const searchIndex = ${JSON.stringify(search)};\nconst input = document.querySelector('#doc-search');\nconst results = document.querySelector('#search-results');\nfunction showResults(value) { const query = value.trim().toLowerCase(); if (!query) { results.classList.remove('visible'); results.innerHTML = ''; return; } const matches = searchIndex.filter((item) => (item.title + ' ' + item.text).toLowerCase().includes(query)).slice(0, 8); results.innerHTML = matches.length ? matches.map((item) => '<a class="search-result" href="' + item.url + '"><strong>' + item.title + '</strong><span>' + item.text.replace(/[<>]/g, '') + '</span></a>').join('') : '<div class="empty">No matching page.</div>'; results.classList.add('visible'); }\ninput.addEventListener('input', () => showResults(input.value));\ninput.addEventListener('keydown', (event) => { if (event.key === 'Escape') { input.value = ''; showResults(''); input.blur(); } });\ndocument.addEventListener('keydown', (event) => { if ((event.key === '/' || (event.key === 'k' && (event.metaKey || event.ctrlKey))) && document.activeElement !== input) { event.preventDefault(); input.focus(); } });\ndocument.addEventListener('click', (event) => { if (!event.target.closest('.search-wrap')) results.classList.remove('visible'); });\n`);
+fs.writeFileSync(path.join(OUT, 'app.js'), `window.searchIndex = ${JSON.stringify(search)};\n${appSource}`);
 fs.writeFileSync(path.join(OUT, '.nojekyll'), '');
 console.log(`Built ${pages.length} documentation pages in ${path.relative(ROOT, OUT)}/`);

@@ -1,8 +1,7 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Integrations — PlainScript documentation."><title>Integrations · PlainScript</title><link rel="stylesheet" href="style.css"></head><body><div class="site-shell"><aside class="sidebar"><a class="brand" href="index.html"><span class="brand-mark">PS</span><span><span class="brand-name">PlainScript</span><span class="brand-meta">Language docs · 2.1</span></span><span class="stamp">🗿</span></a><div class="nav-group"><div class="nav-label">Start here</div><a class="nav-link " href="index.html">PlainScript</a><a class="nav-link " href="getting-started.html">Getting started</a><a class="nav-link " href="cli.html">CLI reference</a><a class="nav-link " href="templates.html">Application templates</a></div><div class="nav-group"><div class="nav-label">Language</div><a class="nav-link " href="language-reference.html">Language reference</a><a class="nav-link " href="spec.html">Language specification</a><a class="nav-link " href="syntax-design.html">Syntax design</a><a class="nav-link " href="type-system.html">Type system</a></div><div class="nav-group"><div class="nav-label">Compiler</div><a class="nav-link " href="compiler.html">Compiler</a><a class="nav-link " href="architecture.html">Compiler architecture</a><a class="nav-link " href="interop.html">JavaScript interoperability</a><a class="nav-link " href="benchmarks.html">Benchmarks</a></div><div class="nav-group"><div class="nav-label">Guides</div><a class="nav-link active" href="integrations.html">Integrations</a><a class="nav-link " href="migration-2-1.html">Migrating from 2.0</a><a class="nav-link " href="contracts.html">Unified contracts</a><a class="nav-link " href="concurrency.html">Concurrency</a><a class="nav-link " href="jobs.html">Background jobs</a><a class="nav-link " href="databases.html">Databases</a><a class="nav-link " href="security.html">Security</a><a class="nav-link " href="debugging.html">Debugging</a><a class="nav-link " href="migration.html">Migration guide</a><a class="nav-link " href="comparison.html">Comparison with TypeScript</a></div><div class="nav-group"><div class="nav-label">Project</div><a class="nav-link " href="progress.html">Engineering progress</a><a class="nav-link " href="roadmap.html">Roadmap</a><a class="nav-link " href="audit.html">Audit</a><a class="nav-link " href="decisions.html">Decisions</a></div><div class="sidebar-footer">Open source under MIT.<br><a href="https://github.com/ayoistooslick/Plainscript">View on GitHub ↗</a></div></aside><main class="main"><header class="topbar"><div class="search-wrap"><label class="search" aria-label="Search documentation"><span>⌕</span><input id="doc-search" type="search" placeholder="Search the docs…" autocomplete="off"><kbd>/</kbd></label><div id="search-results" class="search-results" role="listbox"></div></div><nav class="top-links"><a href="index.html">Docs</a><a href="https://github.com/ayoistooslick/Plainscript">GitHub ↗</a></nav></header><div class="content"><article class="page-layout"><div class="prose"><p>&lt;!-- compile-examples --&gt;</p>
-<h1 id="integrations">Integrations</h1>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Integrations — PlainScript 2.1 documentation."><meta name="color-scheme" content="light"><meta name="theme-color" content="#f7f2e8"><title>Integrations · PlainScript</title><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23181410'/%3E%3Ctext x='16' y='23' font-family='Georgia,serif' font-size='20' fill='%23f7f2e8' text-anchor='middle'%3EP%3C/text%3E%3C/svg%3E"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=Space+Grotesk:wght@400..700&display=swap" rel="stylesheet"><link rel="stylesheet" href="style.css"></head><body><a class="skip" href="#main">Skip to content</a><div class="scrim" data-scrim></div><div class="shell"><aside class="rail" id="rail"><div class="rail-head"><a class="wordmark" href="index.html">PlainScript<span class="dot">.</span></a><div class="rail-meta">Language manual<br>Vol. 2.1 · MMXXVI</div></div><nav class="rail-nav" aria-label="Documentation"><div class="nav-group"><div class="nav-label">Start here</div><a class="nav-link " href="index.html">PlainScript</a><a class="nav-link " href="getting-started.html">Getting started</a><a class="nav-link " href="cli.html">CLI reference</a><a class="nav-link " href="templates.html">Application templates</a></div><div class="nav-group"><div class="nav-label">Language</div><a class="nav-link " href="language-reference.html">Language reference</a><a class="nav-link " href="spec.html">Language specification</a><a class="nav-link " href="syntax-design.html">Syntax design</a><a class="nav-link " href="type-system.html">Type system</a></div><div class="nav-group"><div class="nav-label">Compiler</div><a class="nav-link " href="compiler.html">Compiler</a><a class="nav-link " href="architecture.html">Compiler architecture</a><a class="nav-link " href="interop.html">JavaScript interoperability</a><a class="nav-link " href="benchmarks.html">Benchmarks</a></div><div class="nav-group"><div class="nav-label">Guides</div><a class="nav-link active" href="integrations.html" aria-current="page">Integrations</a><a class="nav-link " href="migration-2-1.html">Migrating from 2.0</a><a class="nav-link " href="contracts.html">Unified contracts</a><a class="nav-link " href="concurrency.html">Concurrency</a><a class="nav-link " href="jobs.html">Background jobs</a><a class="nav-link " href="databases.html">Databases</a><a class="nav-link " href="security.html">Security</a><a class="nav-link " href="debugging.html">Debugging</a><a class="nav-link " href="migration.html">Migration guide</a><a class="nav-link " href="comparison.html">Comparison with TypeScript</a></div><div class="nav-group"><div class="nav-label">Project</div><a class="nav-link " href="progress.html">Engineering progress</a><a class="nav-link " href="roadmap.html">Roadmap</a><a class="nav-link " href="audit.html">Audit</a><a class="nav-link " href="decisions.html">Decisions</a></div></nav><div class="rail-foot"><a href="https://github.com/ayoistooslick/Plainscript">Source ↗</a><span class="sep">/</span><a href="https://github.com/ayoistooslick/Plainscript/issues">Issues ↗</a><br>MIT · built by hand</div></aside><div class="main"><header class="top"><button class="nav-toggle" type="button" data-nav-toggle aria-expanded="false" aria-controls="rail"><span aria-hidden="true">≡</span> <span class="nav-toggle-label">Contents</span></button><a class="top-brand" href="index.html">PlainScript<span>.</span></a><span class="crumb"><b>PlainScript</b><span class="slash">/</span>Guides<span class="slash">/</span>Integrations</span><div class="search-wrap"><label class="search" aria-label="Search the manual"><span class="glyph" aria-hidden="true"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg></span><input id="doc-search" type="search" placeholder="Search the manual" autocomplete="off" aria-controls="search-results" aria-expanded="false"><kbd>/</kbd></label><div id="search-results" class="search-results" role="listbox" aria-label="Search results"></div></div><a class="top-github" href="https://github.com/ayoistooslick/Plainscript">GitHub ↗</a><div class="progress" aria-hidden="true"><span></span></div></header><main id="main" class="page"><div class="article-grid"><article class="prose"><div class="page-kicker"><span class="kicker-section">Guides</span><span class="kicker-meta">3 min read</span></div><h1 id="integrations">Integrations</h1>
 <p>PlainScript emits ordinary ES modules. Any JavaScript framework that accepts a module works without a plugin, a runtime shim or a custom bundler.</p>
 <p>This page covers the eight integrations in <a href="../integrations"><code>integrations/</code></a>. Each example is a complete program compiled by the test suite; the full projects are built and executed by <code>npm test</code> and <code>npm run verify:integrations</code>.</p>
-<table><thead><tr><th>Integration</th><th>Verified by</th></tr></thead><tbody>
+<div class="table-wrap"><table><thead><tr><th>Integration</th><th>Verified by</th></tr></thead><tbody>
 <tr><td>Express 5</td><td>HTTP session in <code>npm test</code></td></tr>
 <tr><td>React + Vite</td><td>React SSR in <code>npm test</code>; Vite production build in <code>npm run verify:integrations</code></td></tr>
 <tr><td>Next.js 15</td><td><code>next build</code> and prerendered HTML in <code>npm run verify:integrations</code></td></tr>
@@ -11,10 +10,10 @@
 <tr><td>CLI application</td><td>argument parsing, JSON persistence and exit codes in <code>npm test</code></td></tr>
 <tr><td>Multi-module project</td><td><code>build --declarations</code>, emitted modules and cross-module types in <code>npm test</code></td></tr>
 <tr><td>Full-stack app</td><td>Express + SQLite CRUD, restart persistence and React SSR in <code>npm test</code></td></tr>
-</tbody></table>
+</tbody></table></div>
 <h2 id="express-5">Express 5</h2>
 <p>Express is an untyped JavaScript package, so the app object and request handlers are <code>any</code> deliberately. Everything else stays typed.</p>
-<pre><code>#syntax 2.1
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
 
 import express from &quot;express&quot;
 import { print, env } from &quot;std/io&quot;
@@ -39,15 +38,15 @@ end)
 set port to parseNumber(env(&quot;PORT&quot;, &quot;4501&quot;))
 app.listen(port, () =&gt; do
     print(&quot;express listening on {port}&quot;)
-end)</code></pre>
+end)</code></pre></figure>
 <p>Run the full project:</p>
-<pre><code>cd integrations/express-api
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">sh</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="bash">cd integrations/express-api
 npm install
-npm start</code></pre>
+npm start</code></pre></figure>
 <p>The test suite starts the compiled server, checks <code>/health</code>, creates, updates and deletes a note, and asserts the 400 and 404 responses.</p>
 <h2 id="react-vite">React + Vite</h2>
 <p><code>render</code> and <code>element</code> lower to <code>createElement</code>. A PlainScript component is an ordinary React function component, so hooks, event handlers and keys behave exactly as documented by React.</p>
-<pre><code>#syntax 2.1
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
 
 import { createElement, useState } from &quot;react&quot;
 
@@ -64,15 +63,15 @@ export define Counter() returns any
             end
         end
     end
-end</code></pre>
+end</code></pre></figure>
 <p>Build the Vite project:</p>
-<pre><code>cd integrations/react-vite
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">sh</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="bash">cd integrations/react-vite
 npm install
-npm run build</code></pre>
+npm run build</code></pre></figure>
 <p>The build compiles <code>src/App.pln</code> to <code>src/generated/App.js</code> and bundles it with Vite. The test suite renders the component through <code>react-dom/server</code> and asserts the produced markup.</p>
 <h2 id="next-js-15">Next.js 15</h2>
 <p>A Next.js server component is the same function component. The project compiles <code>app/Home.pln</code> to <code>app/generated/Home.js</code>; <code>app/page.js</code> imports it.</p>
-<pre><code>#syntax 2.1
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
 
 import { createElement } from &quot;react&quot;
 
@@ -87,15 +86,15 @@ export define Home() returns any
             end
         end
     end
-end</code></pre>
+end</code></pre></figure>
 <p>Build the Next.js project:</p>
-<pre><code>cd integrations/next-app
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">sh</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="bash">cd integrations/next-app
 npm install
-npm run build</code></pre>
+npm run build</code></pre></figure>
 <p><code>npm run verify:integrations</code> runs the production build and checks that the prerendered HTML contains the component&#39;s markup.</p>
 <h2 id="async-http">Async HTTP</h2>
 <p><code>std/http</code> accepts and returns Web-standard <code>Request</code> and <code>Response</code> objects on top of Node&#39;s HTTP server. <code>fetchJson</code> uses the platform <code>fetch</code>.</p>
-<pre><code>#syntax 2.1
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
 
 import { serve, json, fetchJson } from &quot;std/http&quot;
 import { print } from &quot;std/io&quot;
@@ -112,11 +111,11 @@ set server to await serve(port, (request: any) =&gt; json({ ok: true, message: &
 set status to await fetchJson(&quot;http://127.0.0.1:{port}/status&quot;) as Status
 print(status.message)
 
-server.close()</code></pre>
+server.close()</code></pre></figure>
 <p><code>integrations/http-client</code> runs this pattern end to end: it starts a server, performs two asynchronous requests, prints the responses and closes the server.</p>
 <h2 id="sqlite">SQLite</h2>
 <p>Node&#39;s built-in <code>node:sqlite</code> driver is used directly. Prepare statements once, bind every value, and narrow rows into records at the boundary.</p>
-<pre><code>#syntax 2.1
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
 
 import { print } from &quot;std/io&quot;
 import { DatabaseSync } from &quot;node:sqlite&quot;
@@ -139,11 +138,11 @@ for each row in database.prepare(&quot;select id, title, done from tasks order b
     print(&quot;{task.id}. {task.title} — done: {task.done}&quot;)
 end
 
-database.close()</code></pre>
+database.close()</code></pre></figure>
 <p><code>integrations/sqlite</code> also exercises updates, an aggregate query, and a transaction that is rolled back.</p>
 <h2 id="command-line-application">Command-line application</h2>
 <p><code>integrations/cli-app</code> is a typed task tracker. It reads its arguments from <code>std/io</code>, stores JSON through <code>std/fs</code> and <code>std/json</code>, and exits 2 on a usage error and 1 when a task does not exist.</p>
-<pre><code>#syntax 2.1
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
 
 import { print, eprint, args, exit } from &quot;std/io&quot;
 import { encode } from &quot;std/json&quot;
@@ -176,11 +175,11 @@ when arguments[0] is equal to &quot;add&quot;
     change tasks to append(tasks, { id: count(tasks) + 1, title: title, done: false })
 end
 
-print(encode(tasks, 2))</code></pre>
+print(encode(tasks, 2))</code></pre></figure>
 <p><code>std/io</code>&#39;s <code>args()</code> returns <code>list of text</code>, so the element access is optional and is narrowed once with <code>is text</code>; that is the same rule as any other optional value.</p>
 <h2 id="multi-module-project">Multi-module project</h2>
 <p><code>integrations/multi-module</code> is a three-module program (<code>main.pln</code>, <code>cart.pln</code>, <code>money.pln</code>) with types crossing every boundary. A type travels with the value import; there is no separate type-import syntax, and the emitter drops imports that are only used in type positions.</p>
-<pre><code>#syntax 2.1
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
 
 # money.pln — the leaf module.
 export type Money
@@ -197,11 +196,11 @@ export define add(left: Money, right: Money) returns Money
         throw &quot;cannot add {right.currency} to {left.currency}&quot;
     end
     return money(left.amount + right.amount, left.currency)
-end</code></pre>
+end</code></pre></figure>
 <p><code>plainscript build --declarations</code> writes one <code>.js</code> and one <code>.d.pln</code> per module, so <code>cart.d.pln</code> describes <code>LineItem</code> in terms of <code>Money</code> for other tools.</p>
 <h2 id="full-stack-application">Full-stack application</h2>
 <p><code>integrations/fullstack</code> is one application with four modules: shared types, a SQLite repository, an Express server and a React client. The server and the repository are ordinary modules; the client imports the same <code>Note</code> type.</p>
-<pre><code>#syntax 2.1
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
 
 import { open } from &quot;std/db&quot;
 import { print } from &quot;std/io&quot;
@@ -221,8 +220,8 @@ for each row in database.query(&quot;select id, body, done from notes&quot;)
     print(&quot;{note.id}. {note.body} (done: {note.done})&quot;)
 end
 
-database.close()</code></pre>
+database.close()</code></pre></figure>
 <p>The repository exposes a <code>NoteRepository</code> record of closures, so the server cannot call a method the repository does not implement. The test suite starts the server, creates, completes and deletes notes over HTTP, restarts it against the same database file to confirm persistence, and renders the React component through <code>react-dom/server</code>.</p>
 <h2 id="other-frameworks">Other frameworks</h2>
 <p>The rule is the same for every framework: if it can import an ES module that exports functions, it can use PlainScript. Build the <code>.pln</code> files first (<code>plainscript build</code>), point the framework at the generated <code>.js</code>, and keep the framework&#39;s own configuration and entry points in JavaScript.</p>
-<p>The templates in <code>templates/</code> cover React + Vite, Next.js, Express, a CLI and a library; <code>demos/</code> contains larger examples, including a contracts demo shared between a SQLite-backed API and a React client.</p></div><aside class="toc"><div class="toc-title">On this page</div><a class="toc-h2" href="#express-5">Express 5</a><a class="toc-h2" href="#react-vite">React + Vite</a><a class="toc-h2" href="#next-js-15">Next.js 15</a><a class="toc-h2" href="#async-http">Async HTTP</a><a class="toc-h2" href="#sqlite">SQLite</a><a class="toc-h2" href="#command-line-application">Command-line application</a><a class="toc-h2" href="#multi-module-project">Multi-module project</a><a class="toc-h2" href="#full-stack-application">Full-stack application</a><a class="toc-h2" href="#other-frameworks">Other frameworks</a></aside></article><footer class="page-footer"><span>PlainScript 2.1 documentation</span><a href="https://github.com/ayoistooslick/Plainscript/issues">Report a documentation issue ↗</a></footer></div></main></div><script src="app.js"></script></body></html>
+<p>The templates in <code>templates/</code> cover React + Vite, Next.js, Express, a CLI and a library; <code>demos/</code> contains larger examples, including a contracts demo shared between a SQLite-backed API and a React client.</p></article><aside class="toc-rail" aria-label="On this page"><div class="toc-title">On this page</div><nav class="toc"><a class="toc-h2" href="#express-5">Express 5</a><a class="toc-h2" href="#react-vite">React + Vite</a><a class="toc-h2" href="#next-js-15">Next.js 15</a><a class="toc-h2" href="#async-http">Async HTTP</a><a class="toc-h2" href="#sqlite">SQLite</a><a class="toc-h2" href="#command-line-application">Command-line application</a><a class="toc-h2" href="#multi-module-project">Multi-module project</a><a class="toc-h2" href="#full-stack-application">Full-stack application</a><a class="toc-h2" href="#other-frameworks">Other frameworks</a></nav></aside></div><nav class="page-nav" aria-label="Chapter navigation"><a class="pn-prev" href="compiler.html"><span class="pn-label">← Previous</span><span class="pn-title">Compiler</span></a><a class="pn-next" href="migration-2-1.html"><span class="pn-label">Next →</span><span class="pn-title">Migrating from 2.0</span></a></nav><footer class="colophon"><div><div class="colophon-mark">PlainScript<span>.</span></div><p>An independent, statically typed language for the JavaScript platform. This manual is set in Fraunces, Newsreader, Space Grotesk and IBM Plex Mono. One stylesheet, no frameworks, no trackers.</p></div><nav class="colophon-links" aria-label="Project links"><a href="index.html">Manual</a><a href="https://github.com/ayoistooslick/Plainscript">Source</a><a href="https://github.com/ayoistooslick/Plainscript/issues">Issues</a><a href="https://github.com/ayoistooslick/Plainscript/blob/main/CHANGELOG.md">Changelog</a><a href="https://github.com/ayoistooslick/Plainscript/blob/main/LICENSE">MIT</a></nav></footer></main></div></div><script src="app.js"></script></body></html>

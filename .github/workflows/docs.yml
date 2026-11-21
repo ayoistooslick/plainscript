@@ -8,6 +8,7 @@ on:
       - "README.md"
       - "docs/**"
       - "scripts/build-docs-site.js"
+      - "scripts/docs/**"
       - "package.json"
       - "package-lock.json"
 

@@ -1,4 +1,4 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Syntax design — PlainScript documentation."><title>Syntax design · PlainScript</title><link rel="stylesheet" href="style.css"></head><body><div class="site-shell"><aside class="sidebar"><a class="brand" href="index.html"><span class="brand-mark">PS</span><span><span class="brand-name">PlainScript</span><span class="brand-meta">Language docs · 2.1</span></span><span class="stamp">🗿</span></a><div class="nav-group"><div class="nav-label">Start here</div><a class="nav-link " href="index.html">PlainScript</a><a class="nav-link " href="getting-started.html">Getting started</a><a class="nav-link " href="cli.html">CLI reference</a><a class="nav-link " href="templates.html">Application templates</a></div><div class="nav-group"><div class="nav-label">Language</div><a class="nav-link " href="language-reference.html">Language reference</a><a class="nav-link " href="spec.html">Language specification</a><a class="nav-link active" href="syntax-design.html">Syntax design</a><a class="nav-link " href="type-system.html">Type system</a></div><div class="nav-group"><div class="nav-label">Compiler</div><a class="nav-link " href="compiler.html">Compiler</a><a class="nav-link " href="architecture.html">Compiler architecture</a><a class="nav-link " href="interop.html">JavaScript interoperability</a><a class="nav-link " href="benchmarks.html">Benchmarks</a></div><div class="nav-group"><div class="nav-label">Guides</div><a class="nav-link " href="integrations.html">Integrations</a><a class="nav-link " href="migration-2-1.html">Migrating from 2.0</a><a class="nav-link " href="contracts.html">Unified contracts</a><a class="nav-link " href="concurrency.html">Concurrency</a><a class="nav-link " href="jobs.html">Background jobs</a><a class="nav-link " href="databases.html">Databases</a><a class="nav-link " href="security.html">Security</a><a class="nav-link " href="debugging.html">Debugging</a><a class="nav-link " href="migration.html">Migration guide</a><a class="nav-link " href="comparison.html">Comparison with TypeScript</a></div><div class="nav-group"><div class="nav-label">Project</div><a class="nav-link " href="progress.html">Engineering progress</a><a class="nav-link " href="roadmap.html">Roadmap</a><a class="nav-link " href="audit.html">Audit</a><a class="nav-link " href="decisions.html">Decisions</a></div><div class="sidebar-footer">Open source under MIT.<br><a href="https://github.com/ayoistooslick/Plainscript">View on GitHub ↗</a></div></aside><main class="main"><header class="topbar"><div class="search-wrap"><label class="search" aria-label="Search documentation"><span>⌕</span><input id="doc-search" type="search" placeholder="Search the docs…" autocomplete="off"><kbd>/</kbd></label><div id="search-results" class="search-results" role="listbox"></div></div><nav class="top-links"><a href="index.html">Docs</a><a href="https://github.com/ayoistooslick/Plainscript">GitHub ↗</a></nav></header><div class="content"><article class="page-layout"><div class="prose"><h1 id="plainscript-syntax-design">PlainScript syntax design</h1>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Syntax design — PlainScript 2.1 documentation."><meta name="color-scheme" content="light"><meta name="theme-color" content="#f7f2e8"><title>Syntax design · PlainScript</title><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23181410'/%3E%3Ctext x='16' y='23' font-family='Georgia,serif' font-size='20' fill='%23f7f2e8' text-anchor='middle'%3EP%3C/text%3E%3C/svg%3E"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=Space+Grotesk:wght@400..700&display=swap" rel="stylesheet"><link rel="stylesheet" href="style.css"></head><body><a class="skip" href="#main">Skip to content</a><div class="scrim" data-scrim></div><div class="shell"><aside class="rail" id="rail"><div class="rail-head"><a class="wordmark" href="index.html">PlainScript<span class="dot">.</span></a><div class="rail-meta">Language manual<br>Vol. 2.1 · MMXXVI</div></div><nav class="rail-nav" aria-label="Documentation"><div class="nav-group"><div class="nav-label">Start here</div><a class="nav-link " href="index.html">PlainScript</a><a class="nav-link " href="getting-started.html">Getting started</a><a class="nav-link " href="cli.html">CLI reference</a><a class="nav-link " href="templates.html">Application templates</a></div><div class="nav-group"><div class="nav-label">Language</div><a class="nav-link " href="language-reference.html">Language reference</a><a class="nav-link " href="spec.html">Language specification</a><a class="nav-link active" href="syntax-design.html" aria-current="page">Syntax design</a><a class="nav-link " href="type-system.html">Type system</a></div><div class="nav-group"><div class="nav-label">Compiler</div><a class="nav-link " href="compiler.html">Compiler</a><a class="nav-link " href="architecture.html">Compiler architecture</a><a class="nav-link " href="interop.html">JavaScript interoperability</a><a class="nav-link " href="benchmarks.html">Benchmarks</a></div><div class="nav-group"><div class="nav-label">Guides</div><a class="nav-link " href="integrations.html">Integrations</a><a class="nav-link " href="migration-2-1.html">Migrating from 2.0</a><a class="nav-link " href="contracts.html">Unified contracts</a><a class="nav-link " href="concurrency.html">Concurrency</a><a class="nav-link " href="jobs.html">Background jobs</a><a class="nav-link " href="databases.html">Databases</a><a class="nav-link " href="security.html">Security</a><a class="nav-link " href="debugging.html">Debugging</a><a class="nav-link " href="migration.html">Migration guide</a><a class="nav-link " href="comparison.html">Comparison with TypeScript</a></div><div class="nav-group"><div class="nav-label">Project</div><a class="nav-link " href="progress.html">Engineering progress</a><a class="nav-link " href="roadmap.html">Roadmap</a><a class="nav-link " href="audit.html">Audit</a><a class="nav-link " href="decisions.html">Decisions</a></div></nav><div class="rail-foot"><a href="https://github.com/ayoistooslick/Plainscript">Source ↗</a><span class="sep">/</span><a href="https://github.com/ayoistooslick/Plainscript/issues">Issues ↗</a><br>MIT · built by hand</div></aside><div class="main"><header class="top"><button class="nav-toggle" type="button" data-nav-toggle aria-expanded="false" aria-controls="rail"><span aria-hidden="true">≡</span> <span class="nav-toggle-label">Contents</span></button><a class="top-brand" href="index.html">PlainScript<span>.</span></a><span class="crumb"><b>PlainScript</b><span class="slash">/</span>Language<span class="slash">/</span>Syntax design</span><div class="search-wrap"><label class="search" aria-label="Search the manual"><span class="glyph" aria-hidden="true"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg></span><input id="doc-search" type="search" placeholder="Search the manual" autocomplete="off" aria-controls="search-results" aria-expanded="false"><kbd>/</kbd></label><div id="search-results" class="search-results" role="listbox" aria-label="Search results"></div></div><a class="top-github" href="https://github.com/ayoistooslick/Plainscript">GitHub ↗</a><div class="progress" aria-hidden="true"><span></span></div></header><main id="main" class="page"><div class="article-grid"><article class="prose"><div class="page-kicker"><span class="kicker-section">Language</span><span class="kicker-meta">15 min read</span></div><h1 id="plainscript-syntax-design">PlainScript syntax design</h1>
 <h2 id="design-goal">Design goal</h2>
 <p>PlainScript should be recognizable to developers who already write JavaScript or TypeScript, without becoming a TypeScript clone. Familiar syntax should be chosen where it clarifies common code; distinctive constructs should remain only when they express a deliberate capability or a simpler rule. The compiler&#39;s actual behavior—not an aspirational example—is the authority for this design.</p>
 <p>The research sources do not establish one universally best syntax. TypeScript keeps JavaScript control flow and uses type annotations after identifiers, with inference in contexts where it can determine a type. Its module handbook also treats module configuration and interoperation as part of the toolchain contract. Go and Rust use braces and explicit type boundaries in different ways. Python uses colon-led, indentation-delimited suites. Kotlin demonstrates both inferred expression-bodied functions and explicit block-bodied function results. These are design choices in their own ecosystems, not recipes PlainScript must copy. [1] [2] [3] [4] [5] [6]</p>
@@ -24,175 +24,175 @@
 <h2 id="before-and-after-ordinary-code">Before and after: ordinary code</h2>
 <h3 id="simple-function">Simple function</h3>
 <p>Current and proposed PlainScript are unchanged here:</p>
-<pre><code>function double(value: number) -&gt; number
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">function double(value: number) -&gt; number
     return value * 2
-end</code></pre>
+end</code></pre></figure>
 <p>A comparable TypeScript function is:</p>
-<pre><code>function double(value: number): number {
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">ts</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="ts">function double(value: number): number {
   return value * 2;
-}</code></pre>
+}</code></pre></figure>
 <p>The selected change does not alter function declarations. <code>-&gt;</code> is explicit and is also used by languages such as Rust, but TypeScript&#39;s colon return annotation is closer to its JavaScript function form. Changing return annotations is a separate syntax decision and is not bundled into this conditional migration. [2] [10]</p>
 <h3 id="typed-function-with-an-optional-parameter">Typed function with an optional parameter</h3>
 <p>Current and proposed PlainScript:</p>
-<pre><code>function label(name: text, prefix?: text) -&gt; text
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">function label(name: text, prefix?: text) -&gt; text
     let start = prefix ?? &quot;&quot;
     return &quot;{start}{name}&quot;
-end</code></pre>
+end</code></pre></figure>
 <p>TypeScript:</p>
-<pre><code>function label(name: string, prefix?: string): string {
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">ts</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="ts">function label(name: string, prefix?: string): string {
   return `${prefix ?? &quot;&quot;}${name}`;
-}</code></pre>
+}</code></pre></figure>
 <p>Both place the type beside the parameter and mark the optional argument locally. PlainScript&#39;s <code>text</code> and nullish <code>nothing</code> types intentionally remain in place for this change; they are part of the implemented language and its type system. TypeScript&#39;s handbook documents optional parameters and the JavaScript runtime meaning of an omitted argument. [2]</p>
 <h3 id="asynchronous-function">Asynchronous function</h3>
 <p>Current and proposed PlainScript:</p>
-<pre><code>async function load(url: text) -&gt; text
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">async function load(url: text) -&gt; text
     let response = await fetch(url)
     return await response.text()
-end</code></pre>
+end</code></pre></figure>
 <p>TypeScript:</p>
-<pre><code>async function load(url: string): Promise&lt;string&gt; {
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">ts</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="ts">async function load(url: string): Promise&lt;string&gt; {
   const response = await fetch(url);
   return await response.text();
-}</code></pre>
+}</code></pre></figure>
 <p>The <code>async</code>/<code>await</code> vocabulary and <code>Promise</code> mapping are retained. ECMAScript specifies async functions; TypeScript documents their result types. Rust also makes async a function qualifier, illustrating another explicit way to communicate async behavior. [1] [2] [12]</p>
 <h3 id="conditional-with-multiple-branches">Conditional with multiple branches</h3>
 <p>Earlier PlainScript 2.0.0 syntax:</p>
-<pre><code>when score &lt; 0
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">when score &lt; 0
     return &quot;invalid&quot;
 otherwise when score == 0
     return &quot;zero&quot;
 otherwise
     return &quot;positive&quot;
-end</code></pre>
+end</code></pre></figure>
 <p>JavaScript/TypeScript:</p>
-<pre><code>if (score &lt; 0) {
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">ts</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="ts">if (score &lt; 0) {
   return &quot;invalid&quot;;
 } else if (score === 0) {
   return &quot;zero&quot;;
 } else {
   return &quot;positive&quot;;
-}</code></pre>
+}</code></pre></figure>
 <p>Proposed PlainScript:</p>
-<pre><code>if score &lt; 0
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">if score &lt; 0
     return &quot;invalid&quot;
 else if score == 0
     return &quot;zero&quot;
 else
     return &quot;positive&quot;
-end</code></pre>
+end</code></pre></figure>
 <p>The branch conditions, branch scopes, narrowing facts, and generated behavior are unchanged. Only the source keywords change. Parentheses and braces are not added in this increment: PlainScript does not use semicolon-separated statements, and a complete brace-delimited block redesign would need a separate grammar and formatter proposal.</p>
 <h3 id="loop-with-nested-conditions">Loop with nested conditions</h3>
 <p>Earlier PlainScript 2.0.0 syntax:</p>
-<pre><code>for item in items
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">for item in items
     when item.active
         when item.score &gt;= threshold
             process(item)
         end
     end
-end</code></pre>
+end</code></pre></figure>
 <p>JavaScript/TypeScript:</p>
-<pre><code>for (const item of items) {
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">ts</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="ts">for (const item of items) {
   if (item.active &amp;&amp; item.score &gt;= threshold) {
     process(item);
   }
-}</code></pre>
+}</code></pre></figure>
 <p>Proposed PlainScript:</p>
-<pre><code>for item in items
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">for item in items
     if item.active
         if item.score &gt;= threshold
             process(item)
         end
     end
-end</code></pre>
+end</code></pre></figure>
 <p>This migration makes each conditional recognizable without changing loop syntax, scope, or the <code>and</code> operator. Combining the conditions is possible, but this change does not rewrite boolean operators.</p>
 <h3 id="generic-function">Generic function</h3>
 <p>Current and proposed PlainScript:</p>
-<pre><code>function first&lt;T&gt;(items: list of T) -&gt; T?
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">function first&lt;T&gt;(items: list of T) -&gt; T?
     return items[0]
-end</code></pre>
+end</code></pre></figure>
 <p>TypeScript:</p>
-<pre><code>function first&lt;T&gt;(items: T[]): T | undefined {
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">ts</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="ts">function first&lt;T&gt;(items: T[]): T | undefined {
   return items[0];
-}</code></pre>
+}</code></pre></figure>
 <p>Generic inference and optional result semantics do not change. TypeScript&#39;s handbook documents generic inference from arguments; PlainScript&#39;s checker continues to own its current <code>T?</code> and <code>nothing</code> rules. [2]</p>
 <h3 id="class-with-methods">Class with methods</h3>
 <p>PlainScript currently has no class-declaration syntax, so neither the current nor proposed PlainScript grammar can express a user-defined class with methods. The supported JavaScript boundary can construct imported classes, for example:</p>
-<pre><code>import { DatabaseSync } from &quot;node:sqlite&quot;
-let database = new DatabaseSync(&quot;:memory:&quot;)</code></pre>
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">import { DatabaseSync } from &quot;node:sqlite&quot;
+let database = new DatabaseSync(&quot;:memory:&quot;)</code></pre></figure>
 <p>The imported JavaScript class is typed as <code>any</code> unless a declaration supplies its shape. A JavaScript/TypeScript class can be written as:</p>
-<pre><code>class Counter {
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">ts</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="ts">class Counter {
   constructor(public value: number = 0) {}
   increment(): number { return ++this.value; }
-}</code></pre>
+}</code></pre></figure>
 <p>Adding classes would need decisions about inheritance, privacy, constructor typing, emitted class semantics, and interop. It is not a syntax-only spelling change and remains a design item for future work.</p>
 <h3 id="object-with-typed-properties">Object with typed properties</h3>
 <p>Current and proposed PlainScript:</p>
-<pre><code>type Person
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">type Person
     name: text
     age: number
 end
 
-let person: Person = { name: &quot;Ada&quot;, age: 36 }</code></pre>
+let person: Person = { name: &quot;Ada&quot;, age: 36 }</code></pre></figure>
 <p>TypeScript:</p>
-<pre><code>type Person = { name: string; age: number };
-const person: Person = { name: &quot;Ada&quot;, age: 36 };</code></pre>
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">ts</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="ts">type Person = { name: string; age: number };
+const person: Person = { name: &quot;Ada&quot;, age: 36 };</code></pre></figure>
 <p>PlainScript&#39;s structural records and checker remain unchanged. The <code>type … end</code> declaration is explicit but differs from TypeScript&#39;s object type alias. This proposal does not introduce a competing brace-based declaration form.</p>
 <h3 id="error-handling">Error handling</h3>
 <p>Current and proposed PlainScript:</p>
-<pre><code>try
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">try
     risky()
 catch error
     print(&quot;failed: {error}&quot;)
 finally
     cleanup()
-end</code></pre>
+end</code></pre></figure>
 <p>JavaScript/TypeScript:</p>
-<pre><code>try {
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">ts</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="ts">try {
   risky();
 } catch (error) {
   console.error(`failed: ${error}`);
 } finally {
   cleanup();
-}</code></pre>
+}</code></pre></figure>
 <p><code>try</code>/<code>catch</code>/<code>finally</code> already use recognizable keywords. PlainScript&#39;s catch value remains <code>any</code>; typed error unions, Go-style multiple-return error checking and deferred cleanup, or a result type are separate semantic proposals. Python documents its own ordered exception matching and <code>else</code> behavior, but those semantics do not apply to PlainScript. [5] [7]</p>
 <h3 id="http-endpoint">HTTP endpoint</h3>
 <p>Earlier PlainScript 2.0.0 syntax used <code>when</code> for route selection:</p>
-<pre><code>async function handler(request: any) -&gt; any
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">async function handler(request: any) -&gt; any
     let url = urlOf(request)
     when request.method == &quot;GET&quot; and url.pathname == &quot;/health&quot;
         return json({ status: &quot;ok&quot; })
     end
     return notFound()
-end</code></pre>
+end</code></pre></figure>
 <p>JavaScript/TypeScript:</p>
-<pre><code>async function handler(request: Request): Promise&lt;Response&gt; {
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">ts</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="ts">async function handler(request: Request): Promise&lt;Response&gt; {
   const url = new URL(request.url);
   if (request.method === &quot;GET&quot; &amp;&amp; url.pathname === &quot;/health&quot;) {
     return Response.json({ status: &quot;ok&quot; });
   }
   return new Response(&quot;Not found&quot;, { status: 404 });
-}</code></pre>
+}</code></pre></figure>
 <p>Proposed PlainScript:</p>
-<pre><code>async function handler(request: any) -&gt; any
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">async function handler(request: any) -&gt; any
     let url = urlOf(request)
     if request.method == &quot;GET&quot; and url.pathname == &quot;/health&quot;
         return json({ status: &quot;ok&quot; })
     end
     return notFound()
-end</code></pre>
+end</code></pre></figure>
 <p>The standard library continues to provide the HTTP helpers; route behavior and JavaScript interoperability do not change.</p>
 <h3 id="database-query">Database query</h3>
 <p>Current and proposed PlainScript use the JavaScript driver at the interop boundary:</p>
-<pre><code>import { DatabaseSync } from &quot;node:sqlite&quot;
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">import { DatabaseSync } from &quot;node:sqlite&quot;
 let database = new DatabaseSync(&quot;:memory:&quot;)
 database.exec(&quot;create table tasks (id integer, title text)&quot;)
 let insert = database.prepare(&quot;insert into tasks values (?, ?)&quot;)
 insert.run(1, &quot;write docs&quot;)
-let rows = database.prepare(&quot;select id, title from tasks&quot;).all() as list of any</code></pre>
+let rows = database.prepare(&quot;select id, title from tasks&quot;).all() as list of any</code></pre></figure>
 <p>TypeScript with Node declarations can describe the driver more precisely, but that depends on declarations for the installed runtime/package. The PlainScript syntax change neither adds an ORM nor changes the <code>any</code> interop boundary.</p>
 <h3 id="frontend-component">Frontend component</h3>
 <p>Current and proposed PlainScript:</p>
-<pre><code>import { createElement } from &quot;react&quot;
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">import { createElement } from &quot;react&quot;
 
 export function Greeting(name: text) -&gt; any
     render
@@ -200,15 +200,15 @@ export function Greeting(name: text) -&gt; any
             &quot;Hello, {name}!&quot;
         end
     end
-end</code></pre>
+end</code></pre></figure>
 <p>TypeScript/React:</p>
-<pre><code>function Greeting({ name }: { name: string }) {
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">tsx</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="tsx">function Greeting({ name }: { name: string }) {
   return &lt;p&gt;Hello, {name}!&lt;/p&gt;;
-}</code></pre>
+}</code></pre></figure>
 <p>PlainScript&#39;s <code>render</code>/<code>element</code> form remains an explicit lowering to the imported <code>createElement</code>; it is not JSX. This syntax is distinctive because it is tied to an existing compiler capability and does not require a JSX parser or runtime transform.</p>
 <h3 id="complete-small-application">Complete small application</h3>
 <p>Earlier PlainScript 2.0.0 route selection:</p>
-<pre><code>import { serve, json, notFound, urlOf } from &quot;std/http&quot;
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">import { serve, json, notFound, urlOf } from &quot;std/http&quot;
 import { print, env } from &quot;std/io&quot;
 import { parseNumber } from &quot;std/text&quot;
 
@@ -225,16 +225,16 @@ end
 
 let port = parseNumber(env(&quot;PORT&quot;, &quot;4321&quot;))
 print(&quot;Listening on {port}&quot;)
-await serve(port, handler)</code></pre>
+await serve(port, handler)</code></pre></figure>
 <p>Equivalent JavaScript/TypeScript route structure:</p>
-<pre><code>async function handler(request: Request): Promise&lt;Response&gt; {
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">ts</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="ts">async function handler(request: Request): Promise&lt;Response&gt; {
   const url = new URL(request.url);
   if (url.pathname === &quot;/health&quot;) return Response.json({ status: &quot;ok&quot; });
   if (url.pathname === &quot;/hello&quot;) return Response.json({ message: &quot;hello&quot; });
   return new Response(&quot;Not found&quot;, { status: 404 });
-}</code></pre>
+}</code></pre></figure>
 <p>Proposed PlainScript changes only the branch spellings:</p>
-<pre><code>import { serve, json, notFound, urlOf } from &quot;std/http&quot;
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">import { serve, json, notFound, urlOf } from &quot;std/http&quot;
 import { print, env } from &quot;std/io&quot;
 import { parseNumber } from &quot;std/text&quot;
 
@@ -251,18 +251,18 @@ end
 
 let port = parseNumber(env(&quot;PORT&quot;, &quot;4321&quot;))
 print(&quot;Listening on {port}&quot;)
-await serve(port, handler)</code></pre>
+await serve(port, handler)</code></pre></figure>
 <p>This example uses only modules and calls already present in <code>stdlib/http.d.pln</code>, <code>stdlib/io.d.pln</code>, and <code>stdlib/text.d.pln</code>; its handler is type-checked and run through the existing module compiler.</p>
 <h2 id="proposed-grammar">Proposed grammar</h2>
 <p>The canonical conditional grammar is:</p>
-<pre><code>Conditional ::= &quot;if&quot; Expression Statement* (&quot;else&quot; &quot;if&quot; Expression Statement*)* (&quot;else&quot; Statement*)? &quot;end&quot;
-MatchArm    ::= &quot;case&quot; Pattern (&quot;if&quot; Expression)? Statement*</code></pre>
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">ebnf</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="ebnf">Conditional ::= &quot;if&quot; Expression Statement* (&quot;else&quot; &quot;if&quot; Expression Statement*)* (&quot;else&quot; Statement*)? &quot;end&quot;
+MatchArm    ::= &quot;case&quot; Pattern (&quot;if&quot; Expression)? Statement*</code></pre></figure>
 <p><code>end</code> remains the required block terminator. Newlines remain insignificant; <code>else</code> and <code>end</code> are the boundaries that stop a conditional body. The <code>if</code> after <code>else</code> introduces another branch, not a nested body. A match guard uses <code>if</code>, matching the same conditional keyword. A match catch-all remains <code>case _</code>; <code>else</code> is not a match arm.</p>
 <p>The lexer reserves <code>if</code> and <code>else</code>. It also keeps the retired words <code>when</code> and <code>otherwise</code> reserved, but the parser no longer accepts them as branch introducers; this makes old source fail clearly instead of letting those words become misleading identifiers. The parser maps the new spellings to the existing <code>Conditional</code> AST node (<code>branches</code> and optional <code>otherwise</code> body) and the existing <code>Match</code> guard field. The semantic representation deliberately keeps the property name <code>otherwise</code> internally; AST field names are not source syntax. Checker, HIR, and code generation continue to receive the same node kinds and emit the same JavaScript as before.</p>
 <h2 id="why-not-change-more-in-this-increment">Why not change more in this increment?</h2>
 <p><strong>Braces for every block.</strong> JavaScript and TypeScript use braces, but PlainScript&#39;s <code>{}</code> already means a map/record literal, destructuring pattern, type record, or import/export group. A brace-block grammar must define how statements are separated after newlines are discarded, how expression braces are distinguished from statement blocks, and how formatter recovery works. Go&#39;s semicolon insertion and Python&#39;s indentation grammar demonstrate that separator rules are language design, not a cosmetic delimiter swap. This needs its own prototype and parser ambiguity analysis. [4] [6]</p>
-<table><thead><tr><th></th></tr></thead><tbody>
-</tbody></table>
+<div class="table-wrap"><table><thead><tr><th></th></tr></thead><tbody>
+</tbody></table></div>
 <p><strong>Return types and collection types.</strong> TypeScript&#39;s <code>: T</code> return annotations are familiar to its users, while Go and Rust use other conventions. Changing <code>-&gt;</code> to <code>:</code> and <code>list of T</code>/<code>Promise of T</code> to bracket/generic forms would touch type parsing, declarations, generated <code>.d.pln</code> files, templates, libraries, and migration tooling. No evidence justifies bundling those changes with ordinary branching. [2] [4] [10]</p>
 <p><strong>Expression-valued conditions or implicit returns.</strong> Kotlin and Rust support value-producing <code>if</code>; Rust makes semicolons affect whether a block yields a value. PlainScript currently models <code>when</code> as a statement and requires <code>return value</code>. This is a semantic expansion, not a spelling simplification. Keep it deferred until its typing, unreachable branches, return coverage, and code generation are designed. [8] [10]</p>
 <p><strong>Classes.</strong> The language currently interoperates with JavaScript classes but cannot declare its own. Adding class definitions is a larger feature with type-checker and HIR consequences. The requested syntax pass will not suggest that interop is equivalent to native class support.</p>
@@ -284,7 +284,7 @@ MatchArm    ::= &quot;case&quot; Pattern (&quot;if&quot; Expression)? Statement*
 <h2 id="the-2-1-dialect-an-english-oriented-surface">The 2.1 dialect: an English-oriented surface</h2>
 <p>2.1 revisits the vocabulary without touching the type system, the block model or the emitted JavaScript. The design question was narrow: which 2.0 spellings read poorly when a program is spoken aloud, and what is the smallest coherent replacement?</p>
 <h3 id="what-changed">What changed</h3>
-<table><thead><tr><th>Concept</th><th>2.0</th><th>2.1</th><th>Reason</th></tr></thead><tbody>
+<div class="table-wrap"><table><thead><tr><th>Concept</th><th>2.0</th><th>2.1</th><th>Reason</th></tr></thead><tbody>
 <tr><td>Immutable binding</td><td><code>const x = 1</code></td><td><code>value x is 1</code></td><td>States what the binding is, not what the emitter does.</td></tr>
 <tr><td>Mutable binding</td><td><code>let x = 1</code></td><td><code>set x to 1</code></td><td>Reads as an instruction; pairs with <code>change</code>.</td></tr>
 <tr><td>Assignment</td><td><code>x = 2</code></td><td><code>change x to 2</code></td><td>A one-character operator is easy to miss in a long body.</td></tr>
@@ -293,7 +293,7 @@ MatchArm    ::= &quot;case&quot; Pattern (&quot;if&quot; Expression)? Statement*
 <tr><td>Each loop</td><td><code>for x in xs</code></td><td><code>for each x in xs</code></td><td>Distinguishes iteration from the numeric range form.</td></tr>
 <tr><td>Range loop</td><td><code>for i in 0 to 9</code></td><td><code>for i from 0 to 9</code></td><td><code>from … to …</code> pairs the bounds.</td></tr>
 <tr><td>Comparison</td><td><code>&gt;=</code>, <code>&lt;</code></td><td><code>is at least</code>, <code>is less than</code></td><td>Symbols are fine on a slide and poor in a code review sentence.</td></tr>
-</tbody></table>
+</tbody></table></div>
 <h3 id="what-did-not-change-deliberately">What did not change, deliberately</h3>
 <p><code>match</code>, <code>case</code>, <code>while</code>, <code>break</code>, <code>continue</code>, <code>try</code>, <code>catch</code>, <code>finally</code>, <code>throw</code>, <code>return</code>, <code>type</code>, <code>declare</code>, <code>import</code>, <code>export</code>, <code>async</code>, <code>await</code>, <code>and</code>, <code>or</code>, <code>not</code>, <code>is</code> (type test), <code>as</code>, <code>render</code>, <code>element</code> and every arithmetic operator keep their spelling. They are already English words with the right meaning; renaming them would add vocabulary without adding clarity, which is exactly the failure mode of a “renamed JavaScript” language. <code>end</code> remains the block terminator in both dialects for the same reason: it is unambiguous, consistent, and already load-bearing in the grammar.</p>
 <h3 id="ambiguities-and-how-they-are-resolved">Ambiguities and how they are resolved</h3>
@@ -333,4 +333,4 @@ MatchArm    ::= &quot;case&quot; Pattern (&quot;if&quot; Expression)? Statement*
 </ul>
 <p>The formal surface grammar is section 15 of <a href="spec.html">the specification</a>. The practical reference, with the 2.0 equivalent of every construct, is <a href="language-reference.html">the language reference</a>.</p>
 <h2 id="references">References</h2>
-<p>[1]: https://tc39.es/ecma262/ &quot;ECMAScript Language Specification&quot; [2]: https://www.typescriptlang.org/docs/handbook/2/everyday-types.html &quot;TypeScript Handbook Everyday Types&quot; [3]: https://www.typescriptlang.org/docs/handbook/modules/introduction.html &quot;TypeScript Handbook Modules Introduction&quot; [4]: https://go.dev/ref/spec &quot;The Go Programming Language Specification&quot; [5]: https://go.dev/doc/effective_go &quot;Effective Go&quot; [6]: https://docs.python.org/3/reference/compound_stmts.html &quot;The Python Language Reference Compound Statements&quot; [7]: https://docs.python.org/3/tutorial/errors.html &quot;The Python Tutorial Errors and Exceptions&quot; [8]: https://kotlinlang.org/docs/basic-syntax.html &quot;Kotlin Basic Syntax&quot; [9]: https://kotlinlang.org/docs/functions.html &quot;Kotlin Functions&quot; [10]: https://doc.rust-lang.org/book/ch03-03-how-functions-work.html &quot;The Rust Programming Language Functions&quot; [11]: https://doc.rust-lang.org/book/ch03-05-control-flow.html &quot;The Rust Programming Language Control Flow&quot; [12]: https://doc.rust-lang.org/reference/items/functions.html &quot;The Rust Reference Functions&quot; [13]: https://rust-lang.github.io/rfcs/2436-style-guide.html &quot;Rust Style Guide&quot;</p></div><aside class="toc"><div class="toc-title">On this page</div><a class="toc-h2" href="#design-goal">Design goal</a><a class="toc-h2" href="#starting-point-the-2-0-0-source-snapshot">Starting point: the 2.0.0 source snapshot</a><a class="toc-h2" href="#research-findings-and-design-principles">Research findings and design principles</a><a class="toc-h2" href="#before-and-after-ordinary-code">Before and after: ordinary code</a><a class="toc-h3" href="#simple-function">Simple function</a><a class="toc-h3" href="#typed-function-with-an-optional-parameter">Typed function with an optional parameter</a><a class="toc-h3" href="#asynchronous-function">Asynchronous function</a><a class="toc-h3" href="#conditional-with-multiple-branches">Conditional with multiple branches</a><a class="toc-h3" href="#loop-with-nested-conditions">Loop with nested conditions</a><a class="toc-h3" href="#generic-function">Generic function</a><a class="toc-h3" href="#class-with-methods">Class with methods</a><a class="toc-h3" href="#object-with-typed-properties">Object with typed properties</a><a class="toc-h3" href="#error-handling">Error handling</a><a class="toc-h3" href="#http-endpoint">HTTP endpoint</a><a class="toc-h3" href="#database-query">Database query</a><a class="toc-h3" href="#frontend-component">Frontend component</a><a class="toc-h3" href="#complete-small-application">Complete small application</a><a class="toc-h2" href="#proposed-grammar">Proposed grammar</a><a class="toc-h2" href="#why-not-change-more-in-this-increment">Why not change more in this increment?</a><a class="toc-h2" href="#compatibility-and-migration">Compatibility and migration</a><a class="toc-h2" href="#required-compiler-changes-and-verification">Required compiler changes and verification</a><a class="toc-h2" href="#decisions-requiring-attention">Decisions requiring attention</a><a class="toc-h2" href="#the-2-1-dialect-an-english-oriented-surface">The 2.1 dialect: an English-oriented surface</a><a class="toc-h3" href="#what-changed">What changed</a><a class="toc-h3" href="#what-did-not-change-deliberately">What did not change, deliberately</a><a class="toc-h3" href="#ambiguities-and-how-they-are-resolved">Ambiguities and how they are resolved</a><a class="toc-h3" href="#consistency-audit">Consistency audit</a><a class="toc-h2" href="#references">References</a></aside></article><footer class="page-footer"><span>PlainScript 2.1 documentation</span><a href="https://github.com/ayoistooslick/Plainscript/issues">Report a documentation issue ↗</a></footer></div></main></div><script src="app.js"></script></body></html>
+<p>[1]: https://tc39.es/ecma262/ &quot;ECMAScript Language Specification&quot; [2]: https://www.typescriptlang.org/docs/handbook/2/everyday-types.html &quot;TypeScript Handbook Everyday Types&quot; [3]: https://www.typescriptlang.org/docs/handbook/modules/introduction.html &quot;TypeScript Handbook Modules Introduction&quot; [4]: https://go.dev/ref/spec &quot;The Go Programming Language Specification&quot; [5]: https://go.dev/doc/effective_go &quot;Effective Go&quot; [6]: https://docs.python.org/3/reference/compound_stmts.html &quot;The Python Language Reference Compound Statements&quot; [7]: https://docs.python.org/3/tutorial/errors.html &quot;The Python Tutorial Errors and Exceptions&quot; [8]: https://kotlinlang.org/docs/basic-syntax.html &quot;Kotlin Basic Syntax&quot; [9]: https://kotlinlang.org/docs/functions.html &quot;Kotlin Functions&quot; [10]: https://doc.rust-lang.org/book/ch03-03-how-functions-work.html &quot;The Rust Programming Language Functions&quot; [11]: https://doc.rust-lang.org/book/ch03-05-control-flow.html &quot;The Rust Programming Language Control Flow&quot; [12]: https://doc.rust-lang.org/reference/items/functions.html &quot;The Rust Reference Functions&quot; [13]: https://rust-lang.github.io/rfcs/2436-style-guide.html &quot;Rust Style Guide&quot;</p></article><aside class="toc-rail" aria-label="On this page"><div class="toc-title">On this page</div><nav class="toc"><a class="toc-h2" href="#design-goal">Design goal</a><a class="toc-h2" href="#starting-point-the-2-0-0-source-snapshot">Starting point: the 2.0.0 source snapshot</a><a class="toc-h2" href="#research-findings-and-design-principles">Research findings and design principles</a><a class="toc-h2" href="#before-and-after-ordinary-code">Before and after: ordinary code</a><a class="toc-h3" href="#simple-function">Simple function</a><a class="toc-h3" href="#typed-function-with-an-optional-parameter">Typed function with an optional parameter</a><a class="toc-h3" href="#asynchronous-function">Asynchronous function</a><a class="toc-h3" href="#conditional-with-multiple-branches">Conditional with multiple branches</a><a class="toc-h3" href="#loop-with-nested-conditions">Loop with nested conditions</a><a class="toc-h3" href="#generic-function">Generic function</a><a class="toc-h3" href="#class-with-methods">Class with methods</a><a class="toc-h3" href="#object-with-typed-properties">Object with typed properties</a><a class="toc-h3" href="#error-handling">Error handling</a><a class="toc-h3" href="#http-endpoint">HTTP endpoint</a><a class="toc-h3" href="#database-query">Database query</a><a class="toc-h3" href="#frontend-component">Frontend component</a><a class="toc-h3" href="#complete-small-application">Complete small application</a><a class="toc-h2" href="#proposed-grammar">Proposed grammar</a><a class="toc-h2" href="#why-not-change-more-in-this-increment">Why not change more in this increment?</a><a class="toc-h2" href="#compatibility-and-migration">Compatibility and migration</a><a class="toc-h2" href="#required-compiler-changes-and-verification">Required compiler changes and verification</a><a class="toc-h2" href="#decisions-requiring-attention">Decisions requiring attention</a><a class="toc-h2" href="#the-2-1-dialect-an-english-oriented-surface">The 2.1 dialect: an English-oriented surface</a><a class="toc-h3" href="#what-changed">What changed</a><a class="toc-h3" href="#what-did-not-change-deliberately">What did not change, deliberately</a><a class="toc-h3" href="#ambiguities-and-how-they-are-resolved">Ambiguities and how they are resolved</a><a class="toc-h3" href="#consistency-audit">Consistency audit</a><a class="toc-h2" href="#references">References</a></nav></aside></div><nav class="page-nav" aria-label="Chapter navigation"><a class="pn-prev" href="spec.html"><span class="pn-label">← Previous</span><span class="pn-title">Language specification</span></a><a class="pn-next" href="architecture.html"><span class="pn-label">Next →</span><span class="pn-title">Compiler architecture</span></a></nav><footer class="colophon"><div><div class="colophon-mark">PlainScript<span>.</span></div><p>An independent, statically typed language for the JavaScript platform. This manual is set in Fraunces, Newsreader, Space Grotesk and IBM Plex Mono. One stylesheet, no frameworks, no trackers.</p></div><nav class="colophon-links" aria-label="Project links"><a href="index.html">Manual</a><a href="https://github.com/ayoistooslick/Plainscript">Source</a><a href="https://github.com/ayoistooslick/Plainscript/issues">Issues</a><a href="https://github.com/ayoistooslick/Plainscript/blob/main/CHANGELOG.md">Changelog</a><a href="https://github.com/ayoistooslick/Plainscript/blob/main/LICENSE">MIT</a></nav></footer></main></div></div><script src="app.js"></script></body></html>
