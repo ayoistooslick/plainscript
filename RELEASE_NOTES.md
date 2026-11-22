@@ -144,6 +144,14 @@ the suite.
 
 ## Publication status
 
-The source tree, changelog and documentation are at 2.2.0. Registry and GitHub
-release publication require account-owner credentials; their actual state is
-recorded in the release evidence, not assumed from this file.
+As of 2026-11-22:
+
+- **GitHub:** `main` is pushed at `8711da9`, and the `v2.2.0` release is
+  published at <https://github.com/ayoistooslick/plainscript/releases/tag/v2.2.0>,
+  with the tag created at that commit.
+- **npm:** not published. The public registry still reports `2.1.0` as latest,
+  and this environment is not authenticated (`npm whoami` returns `ENEEDAUTH`).
+  The dry-run package is `plainscript-lang@2.2.0`, 201 files, 2.63 MB unpacked.
+  To publish, from a clean checkout of `v2.2.0`, run `npm login` (or provide a
+  publish-scoped npm token), confirm `npm whoami`, then run `npm publish`.
+  No registry publication is claimed here.
