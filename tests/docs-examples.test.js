@@ -26,7 +26,9 @@ const DOCUMENTS = [
 ];
 
 function examplesIn(file) {
-  const source = fs.readFileSync(path.join(ROOT, file), 'utf8');
+  // Git checks the repository out with CRLF on Windows; examples are compiled
+  // as LF source so their diagnostics and line numbers stay platform-neutral.
+  const source = fs.readFileSync(path.join(ROOT, file), 'utf8').replace(/\r\n/g, '\n');
   assert.ok(source.includes('<!-- compile-examples -->'), `${file} must declare that its examples are compile-tested`);
   const blocks = [];
   const pattern = /```plainscript\n([\s\S]*?)```/g;
