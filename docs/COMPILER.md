@@ -187,3 +187,51 @@ examples and real integration projects.
 The documentation examples marked `<!-- compile-examples -->` are extracted and
 compiled by `tests/docs-examples.test.js`, so a guide cannot drift from the
 compiler.
+
+## 10. PlainScript 2.3 compiler pipeline
+
+### Classes and `this`
+
+The parser produces `ClassDeclaration`, `ConstructorDeclaration`,
+`MethodDeclaration`, `FieldDeclaration` and `ThisExpression` nodes. The checker
+builds one class type per declaration, resolves inheritance before checking
+bodies, binds `this` to the instance type and validates field initialisation,
+`super` calls, override shapes, static members and generic constructor
+inference. Lowering emits a real JavaScript `class`; decorators become calls
+after the declaration and the returned value replaces the binding.
+
+### Generators
+
+`generator function` parses like a function with `yield` statements. The checker
+requires the annotation to be the element type and types calls as
+`Iterator of T`. Code generation emits `function*` and leaves `yield` in place,
+so ordinary `for ... of` and the standard iterator protocol consume it.
+
+### Checked error contracts
+
+`throws` adds a thrown type to a function signature. The checker records it and
+checks `throw` expressions against the nearest contract; subclass instances are
+accepted nominally. A typed `catch` parameter narrows inside the handler. The
+emitter wraps the handler with an `instanceof` guard and rethrows a mismatch, so
+the static promise is also true at run time.
+
+### Ternary and BigInt
+
+Ternary is a lazy expression node rather than a rewrite of both branches. BigInt
+literals carry a `bigint` type through inference, and arithmetic requires both
+operands to be `bigint`; mixing with `number` is a checker error.
+
+### Cache, optimizer and bundler
+
+The CLI cache is a JSON map keyed by absolute source path. Each entry stores the
+source hash, compiler fingerprint, relevant configuration, local and declaration
+dependency hashes, and the emitted files. A hit requires every field to match;
+otherwise the module is recompiled as before. The optimizer runs on HIR: it
+folds constant unary/binary expressions and drops statements after a terminator,
+retaining function and class declarations that JavaScript hoists.
+
+The bundler starts from the entry, resolves local modules in dependency order,
+wraps each module body in a scope, and links exports through namespace objects.
+Bare package imports and `std/*` remain external. It refuses to bundle an
+exported mutable binding (`let`) because the namespace alias would not reflect
+later writes, which would be a silent semantic change.

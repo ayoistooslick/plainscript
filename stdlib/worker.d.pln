@@ -1,0 +1,12 @@
+# Declarations for std/worker. A worker is a separate JavaScript thread with
+# its own isolate; values cross the boundary by structured clone.
+
+export type WorkerOptions = {
+    timeout?: number,
+    workerData?: any
+}
+
+export declare function runInWorker(modulePath: text, input: any, options?: WorkerOptions) -> Promise of any throws Error
+export declare function workerMain(handler: (any) -> any) -> nothing
+export declare function isMainThread() -> boolean
+export declare function threadId() -> number

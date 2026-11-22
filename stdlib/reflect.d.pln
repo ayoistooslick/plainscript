@@ -1,0 +1,11 @@
+# Declarations for std/reflect. Reflection inspects values at runtime; it is
+# deliberately separate from the compile-time type system.
+
+export declare function typeOf(value: any) -> text
+export declare function className(value: any) -> text
+export declare function fieldsOf(value: any) -> list of text
+export declare function hasField(value: any, name: text) -> boolean
+export declare function isError(value: any) -> boolean
+export declare function isIterator(value: any) -> boolean
+export declare function isPromise(value: any) -> boolean
+export declare function describe(value: any) -> text

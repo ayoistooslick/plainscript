@@ -9,8 +9,98 @@ permissions:
   contents: read
 
 jobs:
-  verify:
+  test:
+    name: Test ${{ matrix.os }} / Node ${{ matrix.node }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node: [20, 22]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Full compiler and runtime test suite
+        run: npm test
+      - name: Verify documentation links
+        if: matrix.os == 'ubuntu-latest' && matrix.node == 22
+        run: node scripts/check-docs-links.js
+
+  bindings:
+    name: Cross-language bindings
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+      - uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: '6.0'
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+      - name: Install Kotlin
+        run: |
+          curl -fsSL https://get.sdkman.io | bash
+          source "$HOME/.sdkman/bin/sdkman-init.sh"
+          sdk install kotlin
+          echo "$HOME/.sdkman/candidates/kotlin/current/bin" >> "$GITHUB_PATH"
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Compile and execute every generated client
+        run: node scripts/verify-bindings.js --require-all
+
+  databases:
+    name: Live PostgreSQL and MySQL
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: plainscript_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: plainscript_test
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -19,5 +109,10 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Full compiler and runtime test suite
+      - name: Install live database drivers
+        run: npm install --no-save pg mysql2
+      - name: Run the full suite against live databases
+        env:
+          PLAINSCRIPT_TEST_POSTGRES_URL: postgres://postgres:postgres@127.0.0.1:5432/plainscript_test
+          PLAINSCRIPT_TEST_MYSQL_URL: mysql://root:root@127.0.0.1:3306/plainscript_test
         run: npm test

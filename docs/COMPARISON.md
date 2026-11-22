@@ -33,11 +33,11 @@ and invalid-row rejection. These are executable checks, not API-shape claims.
 | Typed client transport | Built-in runtime client + JSON HTTP transport + operation router | tRPC: mature generated client, batching, subscriptions, React Query integration | tRPC wins on client ecosystem; PlainScript's is deliberately small |
 | Authentication | scrypt/HS256 primitives and policies in `std/auth`; optional OIDC/SAML wrapper modules over application-installed libraries | Auth.js/Clerk/Passport or custom; far more providers, conformance testing and production integrations | **TypeScript ecosystem wins** on provider breadth and operational maturity |
 | Editor/tooling | LSP diagnostics, completion, hover, definitions, workspace references, rename, symbols, format, semantic tokens and quick fixes; minimal DAP source-map debug adapter; VS Code extension | TypeScript LSP is decades more mature, with refactors, inlay hints, debugging and framework plugins | **TypeScript wins decisively** |
-| Language type system | Structural records, generics/constraints, narrowing, variants, literal unions, fixed/variadic tuples, readonly fields, intersections, conditional/mapped types with naked-parameter distribution, deferred indexed access, overloads, predicates, recursive types and documented structural variance | Enormous declaration ecosystem, more mature inference, conditional `infer`, classes/nominal tooling, optional tuple elements | **TypeScript wins on breadth and ecosystem**; core structural features are now comparable |
+| Language type system | Structural records, nominal classes/inheritance, generics/constraints, narrowing, variants, literal unions, fixed/variadic tuples, readonly fields, intersections, conditional/mapped types with naked-parameter distribution, deferred indexed access, overloads, predicates, recursive types and documented variance | Enormous declaration ecosystem, more mature inference, conditional `infer`, optional tuple elements, decorator metadata | **TypeScript wins on breadth and ecosystem**; core structural and object features are comparable |
 | Ecosystem and hiring | npm interop, but a new language and small library/tooling ecosystem | Enormous ecosystem, frameworks, hosting support, community | **TypeScript wins** |
-| Build performance | Synthetic PlainScript-only benchmark: 40 modules, median cold compile 16.95 ms | No pinned cross-language benchmark in this repository | **Unproven**; no speed claim |
-| JSX/React | `render` blocks lower to `createElement`; `element Fragment` for fragments, loop/branch children for dynamic lists, explicit keys, no JSX | First-class JSX and the entire React tooling ecosystem | **TypeScript wins** |
-| Operational maturity | Small compiler/runtime; SQLite/PostgreSQL/MySQL focus; no bundler; partial LSP and minimal DAP | Mature compilers, debuggers, profilers, deployment tooling | **TypeScript wins** |
+| Build performance | Synthetic PlainScript-only benchmark: 40 modules, median cold compile 19.74 ms on Node 26.13.1; 100-module warm build 88.73 ms with the cache | No pinned cross-language benchmark in this repository | **Unproven**; no speed claim |
+| JSX/React | Native JSX with classic and automatic React runtimes, fragments, spreads, per-file pragmas and local component prop checking | First-class JSX and the entire React tooling ecosystem | **TypeScript wins on ecosystem and third-party prop typing** |
+| Operational maturity | Small compiler/runtime; SQLite/PostgreSQL/MySQL focus; Node-targeted bundler and persistent build cache; partial LSP and minimal DAP | Mature compilers, debuggers, profilers, deployment tooling | **TypeScript wins** |
 
 ## What PlainScript genuinely offers
 
@@ -53,11 +53,12 @@ and invalid-row rejection. These are executable checks, not API-shape claims.
 
 ## What it does not offer
 
-Prisma-level multi-database operations, live-server-tested PostgreSQL/MySQL adapters, a
-MongoDB adapter, distributed workers, a mature auth provider integration, JSX, a bundler, a
-large ecosystem, or a measured speed advantage over TypeScript. The DAP debugger is minimal
-and the VS Code integration is not UI-automated; arbitrary TypeScript `.d.ts` parsing is
-not supported. Any claim that PlainScript is universally better would be false.
+Prisma-level multi-database operations, a MongoDB adapter, distributed workers, a mature
+auth provider integration, a browser-targeted bundler, a large ecosystem, or a measured
+speed advantage over TypeScript. PostgreSQL/MySQL run against live CI services but are not
+as broadly tested as Prisma. The DAP debugger is minimal and the VS Code integration is not
+UI-automated; arbitrary TypeScript `.d.ts` parsing is not supported. Any claim that
+PlainScript is universally better would be false.
 
 ## Reproduce the checks
 

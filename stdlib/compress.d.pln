@@ -1,0 +1,11 @@
+# Declarations for std/compress. Compressed values are base64 text so they can
+# travel through JSON, environment variables and HTTP without a byte type.
+
+export declare function gzip(text: text) -> text
+export declare function gunzip(data: text) -> text throws Error
+export declare function deflate(text: text) -> text
+export declare function inflate(data: text) -> text throws Error
+export declare function brotli(text: text) -> text
+export declare function unbrotli(data: text) -> text throws Error
+export declare function compress(text: text, format?: text) -> text throws Error
+export declare function decompress(data: text, format?: text) -> text throws Error

@@ -35,6 +35,7 @@ const KEYWORDS = [
   'await', 'let', 'const', 'if', 'else', 'for', 'while', 'match', 'case',
   'try', 'catch', 'finally', 'throw', 'return', 'break', 'continue', 'render',
   'element', 'and', 'or', 'not', 'is', 'new', 'nothing', 'true', 'false',
+  'class', 'extends', 'this', 'super', 'yield', 'typeof', 'throws', 'generator',
 ];
 
 class PlainScriptLanguageServer {
@@ -632,7 +633,7 @@ class PlainScriptLanguageServer {
       else if (token.t === 'punct') type = 7;
       else if (token.t === 'ident') {
         const entry = symbols.get(token.v);
-        if (entry && entry.kind === 'type') type = 1;
+        if (entry && (entry.kind === 'type' || entry.kind === 'class')) type = 1;
         else if (entry && entry.kind === 'function') type = 2;
         else type = 3;
       }

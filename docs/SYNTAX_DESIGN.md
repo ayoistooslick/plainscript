@@ -14,7 +14,7 @@ Before this migration, the PlainScript 2.0.0 source snapshot was a newline-insen
 
 These choices have different costs. `when` is less familiar than `if` for an ordinary condition. `otherwise` is longer than `else`. The `end` terminator is explicit and allows the parser to ignore indentation, but is not JavaScript-style bracing. Word operators read clearly in prose but look unfamiliar in otherwise JavaScript-like expressions. `text`, `nothing`, and collection types such as `list of T` make the type vocabulary distinctive; changing them would affect every public signature and standard-library declaration. Lambdas already use the familiar `=>` token for expression bodies, but statement-bodied lambdas use `do … end`.
 
-A source audit found that the condition form is heavily used in demos, templates, and tests. A class declaration is not part of the PlainScript grammar: JavaScript classes can be imported and instantiated at the interop boundary, but a `.pln` file cannot declare a class with methods. The specification also described `otherwise` as a match catch-all even though the parser accepts only `case` arms; this document corrects that example to the implemented wildcard pattern `_`.
+A source audit found that the condition form is heavily used in demos, templates, and tests. At the time of the 2.1 syntax pass a class declaration was not part of the PlainScript grammar; PlainScript 2.3 later added native classes, inheritance, `this`, `super` and decorators (see [Migrating to 2.3](MIGRATION_2_3.md)). The specification also described `otherwise` as a match catch-all even though the parser accepts only `case` arms; this document corrects that example to the implemented wildcard pattern `_`.
 
 ## Research findings and design principles
 
@@ -199,23 +199,29 @@ Generic inference and optional result semantics do not change. TypeScript's hand
 
 ### Class with methods
 
-PlainScript currently has no class-declaration syntax, so neither the current nor proposed PlainScript grammar can express a user-defined class with methods. The supported JavaScript boundary can construct imported classes, for example:
+PlainScript 2.3 adds native class declarations, so this section records the
+historical 2.1 position and its resolution. The implemented form is:
 
 ```plainscript
-import { DatabaseSync } from "node:sqlite"
-let database = new DatabaseSync(":memory:")
+class Counter
+    value: number
+
+    constructor(value: number)
+        this.value = value
+    end
+
+    function increment() -> number
+        this.value += 1
+        return this.value
+    end
+end
 ```
 
-The imported JavaScript class is typed as `any` unless a declaration supplies its shape. A JavaScript/TypeScript class can be written as:
-
-```ts
-class Counter {
-  constructor(public value: number = 0) {}
-  increment(): number { return ++this.value; }
-}
-```
-
-Adding classes would need decisions about inheritance, privacy, constructor typing, emitted class semantics, and interop. It is not a syntax-only spelling change and remains a design item for future work.
+Methods use the ordinary `function` keyword, fields are declared before the
+constructor, and the declaration emits a native JavaScript class. Inheritance,
+`super`, `this`, generic classes, static and readonly members and decorators are
+implemented and covered by `tests/language-2-3.test.js`. JavaScript classes can
+also still be imported and instantiated at the interop boundary.
 
 ### Object with typed properties
 
@@ -432,7 +438,7 @@ The lexer reserves `if` and `else`. It also keeps the retired words `when` and `
 
 **Expression-valued conditions or implicit returns.** Kotlin and Rust support value-producing `if`; Rust makes semicolons affect whether a block yields a value. PlainScript currently models `when` as a statement and requires `return value`. This is a semantic expansion, not a spelling simplification. Keep it deferred until its typing, unreachable branches, return coverage, and code generation are designed. [8] [10]
 
-**Classes.** The language currently interoperates with JavaScript classes but cannot declare its own. Adding class definitions is a larger feature with type-checker and HIR consequences. The requested syntax pass will not suggest that interop is equivalent to native class support.
+**Classes.** This design pass deferred class declarations because they need inheritance, constructor typing, emitted class semantics and interop decisions. PlainScript 2.3 implemented them as native classes; the deferral applied only to that pass.
 
 ## Compatibility and migration
 
@@ -453,7 +459,7 @@ Verification includes the full `npm test` suite, `plainscript check` across ever
 1. The migration is intentionally breaking. Confirm the target release version before tagging or publishing; npm publication is outside this task.
 2. Explicit `end` is retained for this increment. A future brace design must settle statement separators and record-literal ambiguity before implementation.
 3. `and`/`or`/`not`, `->`, `text`/`nothing`, collection type forms, and `render`/`element` remain canonical for now. Their alternatives need separate evidence and migration plans.
-4. User-defined classes remain unsupported. JavaScript class interop is not a substitute for class syntax.
+4. User-defined classes were unsupported in 2.1 and were added in 2.3; JavaScript class interop is still not a substitute for the native syntax.
 5. Match catch-all syntax is `case _`; the old specification's `otherwise` example did not match the parser and must not be perpetuated.
 
 ## The 2.1 dialect: an English-oriented surface

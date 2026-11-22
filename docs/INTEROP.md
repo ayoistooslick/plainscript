@@ -231,10 +231,10 @@ plainscript interop types --json
 Interfaces (including declaration merging), aliases, object/function/tuple types, unions,
 intersections, `keyof`, indexed access, mapped types, generics with constraints, exported
 functions/values, re-exports, `declare class` and template-literal types are translated.
-A class becomes an instance record plus a `declare const` binding: readonly fields, methods
-and optional members survive; private/protected members are skipped, static members are
-omitted with one `PS7005` warning, and a constructor's parameters are not represented
-because `new` is an untyped boundary. A template-literal type expands to a literal union
+A class becomes a real `declare class` with its constructor signature, parameter properties,
+static members, getters, methods and readonly fields. Private and protected members are
+skipped. `new` is checked against the translated constructor, so a wrong argument list is a
+compile-time error (`PS3539`). A template-literal type expands to a literal union
 when every substitution is finite (`` `key-${'down' | 'up'}` ``); an open pattern such as
 `` `/api/${string}` `` widens to `text` with `PS7005`. A generic method also widens to its
 constraint with `PS7005` because record fields cannot declare type parameters.

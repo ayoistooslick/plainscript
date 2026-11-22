@@ -23,6 +23,8 @@ function printTypeNode(node) {
       return `map of ${atomNode(node.key)} to ${atomNode(node.value)}`;
     case 'PromiseType':
       return `Promise of ${atomNode(node.value)}`;
+    case 'IteratorType':
+      return `${node.async ? 'AsyncIterator' : 'Iterator'} of ${atomNode(node.elem)}`;
     case 'OptionalType':
       return `${atomNode(node.inner)}?`;
     case 'UnionType':
@@ -109,6 +111,12 @@ function printType(type) {
       return `map of ${atomType(type.key)} to ${atomType(type.value)}`;
     case 'promise':
       return `Promise of ${atomType(type.value)}`;
+    case 'iterator':
+      return `${type.async ? 'AsyncIterator' : 'Iterator'} of ${atomType(type.elem)}`;
+    case 'instance':
+      return `${type.name}${type.args && type.args.length ? `<${type.args.map((arg) => printType(arg)).join(', ')}>` : ''}`;
+    case 'class':
+      return `class ${type.name}`;
     case 'union':
       return type.members
         .map((member) => (member.k === 'fn' ? `(${printType(member)})` : printType(member)))
@@ -172,7 +180,8 @@ function functionLine(statement, signature, prefix) {
   const result = statement.returnType ? printTypeNode(statement.returnType) : printType(signature.ret);
   const params_ = typeParamsOf(signature.typeParams);
   const name = statement.name || '__defaultExport';
-  return `${prefix} ${name}${params_}(${params}) -> ${result}`;
+  const throwsClause = statement.throwsType ? ` throws ${printTypeNode(statement.throwsType)}` : '';
+  return `${prefix} ${name}${params_}(${params}) -> ${result}${throwsClause}`;
 }
 
 function declareFunction(statement) {
@@ -184,6 +193,38 @@ function declareFunction(statement) {
   }
   lines.push(functionLine(statement, signature, 'export declare function'));
   if (statement.defaultExport) lines.push(`export default ${statement.name || '__defaultExport'}`);
+  return lines.join('\n');
+}
+
+function declareClass(statement) {
+  const head = `export declare class ${statement.name}${typeParamsOf(statement.typeParams)}${statement.superClass ? ` extends ${statement.superClass.name}` : ''}`;
+  const lines = [head];
+  for (const field of statement.fields) {
+    const modifiers = `${field.static ? 'static ' : ''}${field.readonly ? 'readonly ' : ''}`;
+    lines.push(`    ${modifiers}${field.name}${field.optional ? '?' : ''}: ${field.type ? printTypeNode(field.type) : 'any'}`);
+  }
+  if (statement.constructorDecl) {
+    const constructor = statement.constructorDecl;
+    const params = constructor.params.map((parameter) => {
+      const rest = parameter.rest ? '...' : '';
+      const optional = parameter.optional && !parameter.rest ? '?' : '';
+      return `${rest}${parameter.name}${optional}: ${printTypeNode(parameter.type)}`;
+    }).join(', ');
+    const throwsClause = constructor.throwsType ? ` throws ${printTypeNode(constructor.throwsType)}` : '';
+    lines.push(`    constructor(${params})${throwsClause}`);
+  }
+  for (const method of statement.methods) {
+    const params = method.params.map((parameter) => {
+      const rest = parameter.rest ? '...' : '';
+      const optional = parameter.optional && !parameter.rest ? '?' : '';
+      return `${rest}${parameter.name}${optional}: ${printTypeNode(parameter.type)}`;
+    }).join(', ');
+    const result = method.returnType ? printTypeNode(method.returnType) : 'any';
+    const throwsClause = method.throwsType ? ` throws ${printTypeNode(method.throwsType)}` : '';
+    const modifiers = `${method.static ? 'static ' : ''}${method.async ? 'async ' : ''}${method.generator ? 'generator ' : ''}`;
+    lines.push(`    ${modifiers}function ${method.name}${typeParamsOf(method.typeParams)}(${params}) -> ${result}${throwsClause}`);
+  }
+  lines.push('end');
   return lines.join('\n');
 }
 
@@ -237,6 +278,10 @@ function generateDeclarations(record) {
   }
 
   for (const statement of program.body) {
+    if (statement.kind === 'ClassDecl' && statement.exported) blocks.push(declareClass(statement));
+  }
+
+  for (const statement of program.body) {
     if (statement.kind === 'DeclareFunction') {
       const params = statement.params.map((parameter) => {
         const rest = parameter.rest ? '...' : '';
@@ -245,7 +290,8 @@ function generateDeclarations(record) {
         return `${rest}${name}${printTypeNode(parameter.type)}`;
       }).join(', ');
       const result = statement.returnType ? ` -> ${printTypeNode(statement.returnType)}` : '';
-      blocks.push(`export declare function ${statement.name}${typeParamsOf(statement.typeParams)}(${params})${result}`);
+      const throwsClause = statement.throwsType ? ` throws ${printTypeNode(statement.throwsType)}` : '';
+      blocks.push(`export declare function ${statement.name}${typeParamsOf(statement.typeParams)}(${params})${result}${throwsClause}`);
       continue;
     }
     if (statement.kind === 'DeclareValue') {

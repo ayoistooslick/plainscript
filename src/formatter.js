@@ -61,7 +61,21 @@ function format(source, file, options = {}) {
     const hasDeclare = words.includes('declare');
     const hasEquals = tokens.some((token) => token.t === 'punct' && token.v === '=');
 
-    for (const token of tokens) {
+    for (let index = 0; index < tokens.length; index += 1) {
+      const token = tokens[index];
+      // `class` is contextual: `class Name` opens a class body, while
+      // `let class = 1` is an ordinary name.
+      if (token.t === 'ident' && token.v === 'class'
+        && tokens[index + 1] && tokens[index + 1].t === 'ident'
+        && !tokens.slice(0, index).some((previous) => previous.t === 'punct' && previous.v === '=')) {
+        openers += 1;
+        continue;
+      }
+      if (token.t === 'ident' && token.v === 'constructor'
+        && tokens[index + 1] && tokens[index + 1].t === 'punct' && tokens[index + 1].v === '(') {
+        openers += 1;
+        continue;
+      }
       if (token.t === 'ident' && dialect === '2.1' && token.v === 'define') { openers += 1; continue; }
       if (token.t !== 'kw') continue;
       if (token.v === 'end') closers += 1;

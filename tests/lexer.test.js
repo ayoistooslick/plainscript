@@ -88,7 +88,7 @@ test('unterminated strings report PS1003', () => {
 });
 
 test('unknown characters report PS1001 and lexing continues', () => {
-  const result = tokenize('let x = 1 @ 2');
+  const result = tokenize('let x = 1 ~ 2');
   assert.strictEqual(result.errors[0].code, 'PS1001');
   assert.ok(result.tokens.some((token) => token.v === '2'));
 });

@@ -38,17 +38,18 @@ export declare class Client<T extends object = object> {
 export declare function createClient(options: ClientOptions): Client<object>;
 `;
 
-test('class declarations become an instance record plus a runtime binding', () => {
+test('class declarations preserve constructors, statics and methods', () => {
   const result = translateTypeScript(PACKAGE_DECLARATION, { file: '/tmp/client.d.ts', resolveImports: false });
-  assert.match(result.code, /export type Client<T: \{ \}> = \{ readonly options: ClientOptions/);
+  assert.match(result.code, /export declare class Client<T: \{ \}>/);
+  assert.match(result.code, /readonly options: ClientOptions/);
   assert.match(result.code, /connected: boolean/);
-  assert.match(result.code, /request: \(path: text, body\?: T\) -> Promise of any/);
-  assert.match(result.code, /on: \(event: ClientEvents, handler: \(payload: T\) -> nothing\) -> Client<T>/);
-  assert.match(result.code, /export declare const Client: any/);
-  // Private, protected and static members cannot be instance fields. The class
-  // itself is still translated, and only the static omission is reported.
+  assert.match(result.code, /constructor\(options: ClientOptions\)/);
+  assert.match(result.code, /function request<R>\(path: text, body\?: T\) -> Promise of R/);
+  assert.match(result.code, /function on\(event: ClientEvents, handler: \(payload: T\) -> nothing\) -> Client<T>/);
+  assert.match(result.code, /static function connect\(options: ClientOptions\) -> Client<\{ \}>/);
+  assert.doesNotMatch(result.code, /export declare const Client: any/);
+  // Private and protected members are not public surface and must not appear.
   assert.doesNotMatch(result.code, /session|token/);
-  assert.ok(result.diagnostics.some((diagnostic) => diagnostic.code === 'PS7005' && /Static class members/.test(diagnostic.message)));
   assert.doesNotThrow(() => parse(result.code, 'client.d.pln'));
 });
 

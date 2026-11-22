@@ -4,7 +4,9 @@ const T = require('./types');
 const { Span, error } = require('./diagnostics');
 const { CONTEXTUAL_WORDS, PRAGMA } = require('./dialect');
 
-const PRIMITIVES = new Set(['number', 'text', 'boolean', 'nothing', 'any', 'unknown', 'never', 'regex']);
+const PRIMITIVES = new Set(['number', 'text', 'boolean', 'nothing', 'any', 'unknown', 'never', 'regex', 'bigint']);
+
+const BUILTIN_ERRORS = ['Error', 'TypeError', 'RangeError', 'SyntaxError', 'ReferenceError', 'EvalError', 'URIError'];
 
 class Scope {
   constructor(parent) {
@@ -97,6 +99,345 @@ class Checker {
     // Resolved JSX settings (runtime, factory, fragment, import source). The
     // compiler resolves them per file before checking.
     this.jsx = options.jsx || { runtime: 'classic', factory: 'createElement', fragment: 'Fragment' };
+    // Declared and built-in classes, keyed by source name.
+    this.classes = new Map();
+    // The instance type of the class whose method/constructor is being checked.
+    this.thisStack = [];
+    this.classStack = [];
+    this.generatorDepth = 0;
+    this.constructorDepth = 0;
+    this.registerBuiltinClasses();
+  }
+
+  // The JavaScript platform's error classes are part of the language's error
+  // contract: they can be thrown, caught by a typed catch, subclassed and
+  // constructed without importing anything.
+  registerBuiltinClasses() {
+    for (const name of BUILTIN_ERRORS) {
+      const fields = new Map([
+        ['name', { type: T.PRIM.text, optional: false, readonly: false }],
+        ['message', { type: T.PRIM.text, optional: false, readonly: false }],
+        ['stack', { type: T.PRIM.text, optional: true, readonly: false }],
+      ]);
+      fields.set('toString', { type: T.fnType([], T.PRIM.text), optional: false, readonly: true });
+      const instance = T.instanceOf(name, fields);
+      const ctor = T.fnType([{ name: 'message', type: T.PRIM.text, optional: true }], instance);
+      const classType = T.classOf(name, instance, { ctor });
+      const info = {
+        name, builtin: true, node: null, typeParams: [], typeEnv: new Map(),
+        instance, statics: new Map(), ctor, classType, parent: null,
+      };
+      this.classes.set(name, info);
+      // The error constructors are values in every module. They are defined
+      // directly on the global scope so a user import of `Error` from a
+      // declaration file does not collide with them.
+      this.global.define(name, {
+        kind: 'class', type: classType, classInfo: info, mutable: false, builtin: true,
+      });
+    }
+    // Date is a platform class with a stable, structural surface. Typing it
+    // natively means `.d.ts` files that mention Date keep working instead of
+    // widening the value to any.
+    const dateFields = new Map([
+      ['getTime', { type: T.fnType([], T.PRIM.number), optional: false, readonly: true }],
+      ['getFullYear', { type: T.fnType([], T.PRIM.number), optional: false, readonly: true }],
+      ['getMonth', { type: T.fnType([], T.PRIM.number), optional: false, readonly: true }],
+      ['getDate', { type: T.fnType([], T.PRIM.number), optional: false, readonly: true }],
+      ['getHours', { type: T.fnType([], T.PRIM.number), optional: false, readonly: true }],
+      ['getMinutes', { type: T.fnType([], T.PRIM.number), optional: false, readonly: true }],
+      ['getSeconds', { type: T.fnType([], T.PRIM.number), optional: false, readonly: true }],
+      ['getMilliseconds', { type: T.fnType([], T.PRIM.number), optional: false, readonly: true }],
+      ['toISOString', { type: T.fnType([], T.PRIM.text), optional: false, readonly: true }],
+      ['toJSON', { type: T.fnType([], T.PRIM.text), optional: false, readonly: true }],
+      ['toString', { type: T.fnType([], T.PRIM.text), optional: false, readonly: true }],
+    ]);
+    const dateInstance = T.instanceOf('Date', dateFields);
+    const dateCtor = T.fnType([{
+      name: 'args', optional: true, rest: true, type: T.listOf(T.PRIM.any),
+    }], dateInstance);
+    const dateStatics = new Map([
+      ['now', { type: T.fnType([], T.PRIM.number), optional: false, readonly: true }],
+      ['parse', { type: T.fnType([{ name: 'value', type: T.PRIM.text }], T.PRIM.number), optional: false, readonly: true }],
+    ]);
+    const dateClassType = T.classOf('Date', dateInstance, { ctor: dateCtor, statics: dateStatics });
+    const dateInfo = {
+      name: 'Date', builtin: true, node: null, typeParams: [], typeEnv: new Map(),
+      instance: dateInstance, statics: dateStatics, ctor: dateCtor, classType: dateClassType, parent: null,
+    };
+    this.classes.set('Date', dateInfo);
+    this.global.define('Date', {
+      kind: 'class', type: dateClassType, classInfo: dateInfo, mutable: false, builtin: true,
+    });
+  }
+
+  classInfo(name) {
+    return this.classes.get(name) || null;
+  }
+
+  // Class assignability is nominal where it matters: a thrown TypeError is not
+  // a RangeError even though both expose the same Error-shaped fields.
+  isClassSubclass(name, base) {
+    let info = this.classes.get(name);
+    while (info) {
+      if (info.name === base) return true;
+      info = info.parentInfo || null;
+    }
+    return false;
+  }
+
+  thrownTypeCompatible(valueType, declaredType) {
+    const declared = T.deref(declaredType);
+    if (declared.k === 'union') {
+      return declared.members.some((member) => this.thrownTypeCompatible(valueType, member));
+    }
+    const value = T.deref(valueType);
+    if (value.k === 'instance' && declared.k === 'instance') {
+      return this.isClassSubclass(value.name, declared.name);
+    }
+    return T.assignable(valueType, declaredType);
+  }
+
+  // Class declarations are collected before type aliases resolve and before
+  // statements are checked. Fields and methods live in one instance record, so
+  // the ordinary structural member rules apply to `this`, parameters and
+  // values crossing a function boundary.
+  collectClasses() {
+    const declarations = this.program.body.filter((statement) => statement.kind === 'ClassDecl');
+    for (const declaration of declarations) {
+      if (this.classes.has(declaration.name) && !this.classes.get(declaration.name).builtin) {
+        this.report('PS3501', `Class "${declaration.name}" is already declared in this module.`, declaration);
+        continue;
+      }
+      if (this.classes.has(declaration.name) && this.classes.get(declaration.name).builtin) {
+        this.report('PS3501', `Class "${declaration.name}" shadows a built-in class.`, declaration);
+        continue;
+      }
+      const typeEnv = this.typeEnvironment(declaration.typeParams || [], declaration.typeParamConstraints);
+      const info = {
+        name: declaration.name,
+        node: declaration,
+        typeParams: declaration.typeParams || [],
+        typeEnv,
+        instance: T.instanceOf(declaration.name, new Map()),
+        statics: new Map(),
+        ctor: null,
+        parent: null,
+        parentInfo: null,
+        declared: Boolean(declaration.declared),
+      };
+      info.classType = T.classOf(declaration.name, info.instance, {
+        typeParams: info.typeParams, typeEnv, node: declaration,
+      });
+      this.classes.set(declaration.name, info);
+      this.define(declaration.name, {
+        kind: 'class',
+        name: declaration.name,
+        nameLine: declaration.nameLine,
+        nameCol: declaration.nameCol,
+        type: info.classType,
+        classInfo: info,
+        mutable: true,
+        node: declaration,
+      }, declaration);
+      if (declaration.exported) {
+        this.exportedNames.add(declaration.name);
+        // A class crosses a module boundary as both a value (its constructor)
+        // and a type (its instance shape). Generic classes publish a type
+        // constructor so `Box<number>` keeps working after import.
+        this.typeExports.set(declaration.name, info.typeParams.length
+          ? { k: 'genericAlias', params: [...info.typeParams], body: info.instance }
+          : info.instance);
+      }
+    }
+
+    for (const declaration of declarations) {
+      const info = this.classes.get(declaration.name);
+      if (!info || info.builtin) continue;
+      this.populateClass(info, declaration);
+    }
+  }
+
+  populateClass(info, declaration) {
+    if (info.populated) return;
+    const { name, typeEnv } = info;
+
+    let parentInstance = null;
+    if (declaration.superClass) {
+      const resolved = this.resolveType(declaration.superClass, typeEnv);
+      let parentInfo = this.classes.get(declaration.superClass.name);
+      if (!parentInfo) {
+        // An imported class has no local ClassDecl to inspect, but its value
+        // type carries the constructor, statics and instance shape.
+        const entry = this.lookup(declaration.superClass.name);
+        const valueType = entry ? T.deref(entry.type) : null;
+        if (valueType && valueType.k === 'class') {
+          parentInfo = {
+            name: valueType.name,
+            instance: valueType.instance,
+            statics: valueType.statics,
+            ctor: valueType.ctor,
+            parentInfo: null,
+            imported: true,
+            typeParams: valueType.typeParams || [],
+          };
+        }
+      }
+      if (!parentInfo || resolved.k !== 'instance') {
+        this.report('PS3502', `Class "${name}" can only extend another class.`, declaration.superClass);
+      } else {
+        info.parentInfo = parentInfo;
+        info.parent = parentInfo;
+        parentInstance = resolved;
+        // A class hierarchy cannot be cyclic: walk the base links before
+        // accepting the parent.
+        let cursor = parentInfo;
+        const seen = new Set([name]);
+        while (cursor) {
+          if (seen.has(cursor.name)) {
+            this.report('PS3503', `Class inheritance cycle: "${name}" extends itself through "${cursor.name}".`, declaration);
+            parentInstance = null;
+            info.parentInfo = null;
+            info.parent = null;
+            break;
+          }
+          seen.add(cursor.name);
+          cursor = cursor.parentInfo;
+        }
+      }
+    }
+
+    // The placeholder instance's field map is the one published in the class
+    // type. Filling it in place means a self-referential type such as
+    // `function map(...) -> Box<U>` sees the same shape the caller sees.
+    const fields = info.instance.fields;
+    fields.clear();
+    if (parentInstance) {
+      // Parent instance fields are already substituted with the base type
+      // arguments, because `resolveType` on `extends Base<T>` evaluates them.
+      for (const [fieldName, field] of parentInstance.fields) fields.set(fieldName, field);
+    }
+
+    const statics = new Map();
+    if (info.parentInfo) {
+      for (const [fieldName, field] of info.parentInfo.statics) statics.set(fieldName, field);
+    }
+
+    for (const field of declaration.fields) {
+      let fieldType = field.type ? this.resolveType(field.type, typeEnv) : null;
+      if (!fieldType && field.defaultValue) fieldType = this.literalFieldType(field.defaultValue);
+      if (!fieldType) fieldType = T.PRIM.any;
+      const entry = { type: fieldType, optional: Boolean(field.optional), readonly: Boolean(field.readonly) };
+      if (field.static) {
+        if (statics.has(field.name)) this.report('PS3504', `Static member "${field.name}" is already declared.`, field);
+        statics.set(field.name, entry);
+      } else {
+        if (fields.has(field.name) && !(info.parentInfo && info.parentInfo.instance.fields.has(field.name))) {
+          this.report('PS3504', `Field "${field.name}" is already declared.`, field);
+        }
+        fields.set(field.name, entry);
+      }
+    }
+
+    for (const method of declaration.methods) {
+      const signature = this.classSignature(method, info);
+      const methodType = T.fnType(signature.params, signature.ret, signature.typeParams, signature.predicate);
+      method.__signature = signature;
+      if (method.static) {
+        if (statics.has(method.name)) this.report('PS3504', `Static member "${method.name}" is already declared.`, method);
+        statics.set(method.name, { type: methodType, optional: false, readonly: false, method: true, node: method });
+      } else {
+        if (fields.has(method.name) && !(info.parentInfo && info.parentInfo.instance.fields.has(method.name))) {
+          this.report('PS3504', `Member "${method.name}" is already declared.`, method);
+        }
+        fields.set(method.name, { type: methodType, optional: false, readonly: false, method: true, node: method });
+      }
+    }
+
+    if (declaration.constructorDecl) {
+      const signature = this.classSignature(declaration.constructorDecl, info);
+      signature.ret = info.instance;
+      declaration.constructorDecl.__signature = signature;
+      info.ctor = T.fnType(signature.params, info.instance, signature.typeParams);
+    } else if (info.parentInfo && info.parentInfo.ctor) {
+      info.ctor = info.parentInfo.ctor;
+    } else {
+      info.ctor = T.fnType([], info.instance);
+    }
+
+    info.instance.name = name;
+    info.instance.args = info.typeParams.map((parameter) => typeEnv.get(parameter));
+    info.instance.parent = parentInstance;
+    info.statics = statics;
+    info.classType = T.classOf(name, info.instance, {
+      statics, ctor: info.ctor, typeParams: info.typeParams, typeEnv, node: declaration,
+    });
+    info.populated = true;
+
+    // A method can name its own class in a parameter or result (`map` returns
+    // Box<U>`). The first pass resolved that reference while later methods were
+    // still missing from the shape, so re-resolve every signature now that the
+    // instance shape is complete. The field entries are overwritten in place.
+    for (const method of declaration.methods) {
+      delete method.__signature;
+      const signature = this.classSignature(method, info);
+      const methodType = T.fnType(signature.params, signature.ret, signature.typeParams, signature.predicate);
+      const collection = method.static ? statics : fields;
+      collection.set(method.name, { type: methodType, optional: false, readonly: false, method: true, node: method });
+    }
+    if (declaration.constructorDecl) {
+      delete declaration.constructorDecl.__signature;
+      const signature = this.classSignature(declaration.constructorDecl, info);
+      signature.ret = info.instance;
+      info.ctor = T.fnType(signature.params, info.instance, signature.typeParams);
+    }
+
+    const symbol = this.global.names.get(name);
+    if (symbol && symbol.kind === 'class') {
+      symbol.type = info.classType;
+      symbol.classInfo = info;
+    }
+  }
+
+  classSignature(node, info) {
+    const signature = this.signatureOf(node, info.typeEnv);
+    node.__signature = signature;
+    return signature;
+  }
+
+  literalFieldType(value) {
+    if (!value) return T.PRIM.any;
+    if (value.kind === 'Number') return T.PRIM.number;
+    if (value.kind === 'BigInt') return T.PRIM.bigint;
+    if (value.kind === 'Text') return T.PRIM.text;
+    if (value.kind === 'Boolean') return T.PRIM.boolean;
+    if (value.kind === 'Nothing') return T.PRIM.nothing;
+    if (value.kind === 'ListLiteral') return T.listOf(T.PRIM.any);
+    if (value.kind === 'RecordLiteral') return T.record(new Map());
+    if (value.kind === 'Regex') return T.PRIM.regex;
+    return T.PRIM.any;
+  }
+
+  // The instance type a class name denotes in a type position, with its type
+  // parameters substituted by the written arguments.
+  classInstanceType(info, args, node) {
+    // A bare generic class in a type position means "this class with unknown
+    // arguments". That is what `value is Box` needs, and it keeps diagnostic
+    // messages readable instead of demanding arguments at a type test.
+    if (info.typeParams.length && args.length === 0) {
+      args = info.typeParams.map(() => T.PRIM.any);
+    }
+    if (info.typeParams.length !== args.length) {
+      this.report('PS3202', `Type "${info.name}" expects ${info.typeParams.length} type argument(s) but got ${args.length}.`, node);
+      return T.PRIM.error;
+    }
+    if (!info.typeParams.length) return info.instance;
+    const subst = new Map();
+    info.typeParams.forEach((parameter, index) => subst.set(parameter, args[index]));
+    const fields = new Map();
+    for (const [fieldName, field] of info.instance.fields) {
+      fields.set(fieldName, { ...field, type: T.substitute(field.type, subst) });
+    }
+    return T.instanceOf(info.name, fields, { args, parent: info.instance.parent });
   }
 
   report(code, message, node, hint) {
@@ -127,7 +468,7 @@ class Checker {
 
   typeEnvironment(typeParams, constraints = {}) {
     const environment = new Map();
-    for (const name of typeParams) environment.set(name, T.typeVar(name));
+    for (const name of typeParams || []) environment.set(name, T.typeVar(name));
     for (const [name, constraintNode] of Object.entries(constraints || {})) {
       const variable = environment.get(name);
       if (variable && constraintNode) variable.constraint = this.resolveType(constraintNode, environment);
@@ -147,6 +488,13 @@ class Checker {
         if (typeEnv.has(name)) return typeEnv.get(name);
         if (PRIMITIVES.has(name)) return T.PRIM[name];
         if (name === 'error') return T.PRIM.error;
+        // A class name in a type position means an instance of that class, not
+        // its constructor. The constructor type is what the class value has.
+        const classInfo = this.classes.get(name);
+        if (classInfo) {
+          const args = (node.args || []).map((argument) => this.resolveType(argument, typeEnv));
+          return this.classInstanceType(classInfo, args, node);
+        }
         const declaration = this.typeDecls.get(name);
         if (declaration) node.__typeDecl = declaration;
         if (!declaration) {
@@ -207,6 +555,8 @@ class Checker {
       }
       case 'ListType':
         return T.listOf(this.resolveType(node.elem, typeEnv));
+      case 'IteratorType':
+        return T.iteratorOf(this.resolveType(node.elem, typeEnv), Boolean(node.async));
       case 'TupleType':
         return T.tupleOf(
           node.elements.map((element) => this.resolveType(element, typeEnv)),
@@ -530,9 +880,12 @@ class Checker {
 
   // ------------------------------------------------------------- value layer
 
-  signatureOf(node) {
+  signatureOf(node, outerEnv = null) {
     if (node.__signature) return node.__signature;
     const typeEnv = this.typeEnvironment(node.typeParams, node.typeParamConstraints);
+    if (outerEnv) {
+      for (const [name, type] of outerEnv) if (!typeEnv.has(name)) typeEnv.set(name, type);
+    }
     const params = node.params.map((parameter) => ({
       name: parameter.name,
       type: this.resolveType(parameter.type, typeEnv),
@@ -555,12 +908,19 @@ class Checker {
       }
     }
     const declaredReturn = predicate ? T.PRIM.boolean : declared;
-    const ret = node.async
-      ? (declaredReturn && declaredReturn.k === 'promise' ? declaredReturn : T.promiseOf(declaredReturn || T.PRIM.any))
-      : (declaredReturn || null);
+    const declaredThrows = node.throwsType ? this.resolveType(node.throwsType, typeEnv) : null;
+    // A generator's annotation names what it yields. Its call type is the
+    // iterator that drives those values, so callers cannot mistake it for an
+    // eagerly produced list.
+    const ret = node.generator
+      ? T.iteratorOf(declaredReturn || T.PRIM.any)
+      : node.async
+        ? (declaredReturn && declaredReturn.k === 'promise' ? declaredReturn : T.promiseOf(declaredReturn || T.PRIM.any))
+        : (declaredReturn || null);
     const signature = {
-      params, ret, declaredReturn, predicate, typeParams: node.typeParams,
-      typeParamConstraints: node.typeParamConstraints || {}, typeEnv, async: Boolean(node.async), node,
+      params, ret, declaredReturn, declaredThrows, predicate, typeParams: node.typeParams || [],
+      typeParamConstraints: node.typeParamConstraints || {}, typeEnv, async: Boolean(node.async),
+      generator: Boolean(node.generator), node,
     };
     node.__signature = signature;
     return signature;
@@ -606,7 +966,10 @@ class Checker {
 
   hoist() {
     const topLevelOverloads = this.overloadsFrom(this.program.body);
+    const onlyImports = Boolean(this.importsOnly);
     for (const statement of this.program.body) {
+      if (onlyImports && statement.kind !== 'Import') continue;
+      if (!onlyImports && this.importsHoisted && statement.kind === 'Import') continue;
       switch (statement.kind) {
         case 'Import': {
           const resolved = this.resolveImportFn(statement.spec, statement);
@@ -764,10 +1127,27 @@ class Checker {
     }
   }
 
+  // Imports must be visible before class fields resolve, because a class field
+  // can name an imported type or extend an imported base class. Running the
+  // import half of hoisting first keeps the full hoist below idempotent.
+  hoistImports() {
+    if (this.importsHoisted) return;
+    this.importsOnly = true;
+    this.hoist();
+    this.importsOnly = false;
+    this.importsHoisted = true;
+  }
+
   // ------------------------------------------------------------------ driver
 
   run() {
     this.collectTypes();
+    this.hoistImports();
+    // Classes are registered before aliases resolve, so a type alias can name
+    // a class and a class field can name a type alias. Field types that refer
+    // to not-yet-registered aliases remain named references; they resolve as
+    // soon as the alias registry is filled below.
+    this.collectClasses();
     // Imports and function signatures are hoisted before type bodies resolve,
     // so a `type` declaration can name a type that was imported from another
     // module (`type Entry = { task: Task }`).
@@ -875,6 +1255,10 @@ class Checker {
         return;
       case 'FunctionDecl':
         this.checkFunction(node);
+        this.checkFunctionDecorators(node);
+        return;
+      case 'ClassDecl':
+        this.checkClass(node);
         return;
       case 'VarDecl':
         this.checkVarDecl(node);
@@ -902,7 +1286,7 @@ class Checker {
         this.checkTry(node);
         return;
       case 'Throw':
-        this.typeOf(node.value);
+        this.checkThrow(node);
         return;
       case 'Return':
         this.checkReturn(node);
@@ -921,6 +1305,29 @@ class Checker {
         return;
       default:
         this.report('PS3310', `The checker does not know how to handle a ${node.kind} statement.`, node);
+    }
+  }
+
+  checkThrow(node) {
+    const frame = this.functionStack[this.functionStack.length - 1];
+    const valueType = this.typeOf(node.value);
+    node.__type = valueType;
+    if (!frame) return;
+    // A function without a `throws` clause keeps the pre-2.3 unchecked
+    // behaviour. Declaring one turns throws into a checked part of the
+    // signature; `throws nothing` forbids throwing entirely.
+    if (frame.declaredThrows === null || frame.declaredThrows === undefined) return;
+    const declared = T.deref(frame.declaredThrows);
+    if (declared.k === 'prim' && declared.name === 'nothing') {
+      this.report('PS3521', 'This function declares "throws nothing" but throws a value.', node);
+      return;
+    }
+    if (!this.thrownTypeCompatible(valueType, frame.declaredThrows) && !T.isAny(valueType)) {
+      this.report(
+        'PS3520',
+        `This function declares that it throws ${T.showType(frame.declaredThrows)}, but this value is ${T.showType(valueType)}.`,
+        node,
+      );
     }
   }
 
@@ -995,11 +1402,14 @@ class Checker {
     }
   }
 
-  checkFunction(node) {
+  checkFunction(node, context = {}) {
     const signature = node.__signature || this.signatureOf(node);
     const previous = this.scope;
     // Closures capture the enclosing scope, not the module scope.
     this.scope = previous.child();
+    if (context.thisType) this.thisStack.push(context.thisType);
+    if (context.className) this.classStack.push(context.className);
+    if (context.isConstructor) this.constructorDepth += 1;
 
     for (const parameter of signature.params) {
       this.scope.define(parameter.name, {
@@ -1035,17 +1445,38 @@ class Checker {
     this.functionStack.push({
       node,
       declaredReturn: signature.declaredReturn,
+      declaredThrows: signature.declaredThrows,
       async: Boolean(node.async),
+      generator: Boolean(node.generator),
+      yieldType: signature.declaredReturn,
+      yieldTypes: [],
+      isConstructor: Boolean(context.isConstructor),
       inferred: null,
     });
     if (node.async) this.asyncDepth += 1;
+    if (node.generator) this.generatorDepth += 1;
 
     this.hoistFunctions(node.body);
     this.checkStatements(node.body);
     const frame = this.functionStack.pop();
     if (node.async) this.asyncDepth -= 1;
+    if (node.generator) this.generatorDepth -= 1;
 
-    if (signature.declaredReturn) {
+    if (node.generator) {
+      let element = signature.declaredReturn;
+      if (!element) {
+        element = frame.yieldTypes.length ? T.union(frame.yieldTypes) : T.PRIM.nothing;
+        node.__signature.ret = T.iteratorOf(element);
+        node.__signature.inferred = true;
+        const entry = node.name ? this.global.names.get(node.name) : null;
+        if (entry && entry.kind === 'function') {
+          entry.type = T.fnType(signature.params, node.__signature.ret, signature.typeParams, signature.predicate);
+        }
+        if (node.name) this.inferredFunctions.set(node.name, node.__signature.ret);
+      }
+    }
+
+    if (signature.declaredReturn && !node.generator) {
       const returns = inspectReturns(node.body);
       const expected = signature.declaredReturn;
       const label = node.name ? `"${node.name}"` : 'the default export';
@@ -1057,7 +1488,7 @@ class Checker {
       }
     }
 
-    if (!signature.declaredReturn) {
+    if (!signature.declaredReturn && !node.generator) {
       const returns = inspectReturns(node.body);
       let inferred = returns.types.length ? T.union(returns.types) : T.PRIM.nothing;
       if (returns.types.length && !alwaysReturns(node.body)) inferred = T.union([inferred, T.PRIM.nothing]);
@@ -1097,6 +1528,142 @@ class Checker {
     }
 
     this.scope = previous;
+    if (context.thisType) this.thisStack.pop();
+    if (context.className) this.classStack.pop();
+    if (context.isConstructor) this.constructorDepth -= 1;
+  }
+
+  checkFunctionDecorators(node) {
+    if (!node.decorators || !node.decorators.length) return;
+    const signature = node.__signature || this.signatureOf(node);
+    const targetType = T.fnType(signature.params, signature.ret, signature.typeParams, signature.predicate);
+    this.checkDecorators(node.decorators, targetType, node.name ? `function "${node.name}"` : 'function');
+  }
+
+  // ------------------------------------------------------------- decorators
+
+  checkDecorators(decorators, targetType, label) {
+    for (const decorator of decorators || []) {
+      const type = T.deref(this.typeOf(decorator.expression));
+      if (T.isAny(type)) continue;
+      if (type.k !== 'fn') {
+        this.report('PS3522', `A decorator on ${label} must be a function, found ${T.showType(type)}.`, decorator.expression);
+        continue;
+      }
+      const first = type.params[0];
+      if (first && !T.isAny(first.type) && !T.assignable(targetType, first.type)) {
+        this.report(
+          'PS3523',
+          `The decorator's first parameter is ${T.showType(first.type)}, but ${label} is ${T.showType(targetType)}.`,
+          decorator.expression,
+        );
+      }
+      if (type.ret && !T.isAny(type.ret) && !T.assignable(type.ret, targetType)) {
+        this.report(
+          'PS3524',
+          `The decorator returns ${T.showType(type.ret)}, which cannot replace ${label} (${T.showType(targetType)}).`,
+          decorator.expression,
+        );
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------- classes
+
+  checkClass(node) {
+    const info = this.classes.get(node.name);
+    if (!info) return;
+    if (!node.declared) {
+      this.checkDecorators(node.decorators, info.classType, `class "${node.name}"`);
+      if (node.superClass && !info.parentInfo) {
+        // The diagnostic was already reported while populating the class.
+      }
+      const synthetic = node.constructorDecl;
+      for (const field of node.fields) {
+        if (field.defaultValue) {
+          const declared = field.type ? this.resolveType(field.type, info.typeEnv) : null;
+          const valueType = this.typeOf(field.defaultValue, declared);
+          if (declared && !T.assignable(valueType, declared)) {
+            this.report(
+              'PS3505',
+              `Field "${field.name}" is ${T.showType(declared)}, but its initializer is ${T.showType(valueType)}.`,
+              field.defaultValue,
+            );
+          }
+        }
+        if (field.decorators && field.decorators.length) {
+          this.report('PS3526', 'Field decorators are not supported; decorate the class or a method instead.', field.decorators[0].expression);
+        }
+      }
+      if (synthetic) {
+        this.checkFunction(synthetic, {
+          thisType: info.instance, className: node.name, isConstructor: true,
+        });
+        this.checkDecorators(synthetic.decorators, T.fnType([], info.instance), `constructor of "${node.name}"`);
+        this.checkDefiniteAssignment(node, info, synthetic);
+      } else {
+        this.checkDefiniteAssignment(node, info, null);
+      }
+      for (const method of node.methods) {
+        this.checkFunction(method, { thisType: info.instance, className: node.name });
+        if (method.decorators && method.decorators.length) {
+          const signature = method.__signature || this.classSignature(method, info);
+          this.checkDecorators(
+            method.decorators,
+            T.fnType(signature.params, signature.ret, signature.typeParams, signature.predicate),
+            `method "${method.name}"`,
+          );
+        }
+      }
+    } else {
+      for (const method of node.methods) {
+        if (method.body && method.body.length) {
+          this.report('PS3527', 'A declare class member cannot have a body.', method);
+        }
+      }
+    }
+  }
+
+  // Every non-optional instance field must be either initialised at its
+  // declaration or assigned on every constructor path we can see. Assignments
+  // inside branches and loops count, because the common `if (...) { a = ... }
+  // else { a = ... }` form must be accepted; a missed runtime path is still
+  // possible, which is why optional fields exist for genuinely maybe-values.
+  checkDefiniteAssignment(node, info, constructor) {
+    if (node.declared) return;
+    const assigned = new Set();
+    const visit = (statements) => {
+      for (const statement of statements) {
+        if (!statement) continue;
+        if (statement.kind === 'ExprStmt' || statement.kind === 'Assignment') {
+          const target = statement.kind === 'Assignment' ? statement.target : null;
+          if (target && target.kind === 'Member' && target.object && target.object.kind === 'This') assigned.add(target.property);
+        }
+        if (statement.kind === 'Conditional') {
+          for (const branch of statement.branches) visit(branch.body);
+          if (statement.otherwise) visit(statement.otherwise);
+        } else if (statement.kind === 'ForEach' || statement.kind === 'ForRange' || statement.kind === 'While') {
+          visit(statement.body);
+        } else if (statement.kind === 'Match') {
+          for (const branch of statement.cases) visit(branch.body);
+        } else if (statement.kind === 'Try') {
+          visit(statement.body);
+          if (statement.handler) visit(statement.handler);
+          if (statement.finalizer) visit(statement.finalizer);
+        }
+      }
+    };
+    if (constructor) visit(constructor.body);
+    for (const field of node.fields) {
+      if (field.static || field.optional || field.defaultValue) continue;
+      if (!assigned.has(field.name)) {
+        this.report(
+          'PS3506',
+          `Field "${field.name}" is not initialised; give it a default value, mark it optional, or assign this.${field.name} in the constructor.`,
+          field,
+        );
+      }
+    }
   }
 
   checkAssignment(node) {
@@ -1164,6 +1731,12 @@ class Checker {
       const iterableType = T.deref(this.typeOf(node.iterable));
       let elementType = T.PRIM.any;
       if (iterableType.k === 'list') elementType = iterableType.elem;
+      else if (iterableType.k === 'iterator') {
+        if (iterableType.async) {
+          this.report('PS3531', 'A for-each loop cannot consume an AsyncIterator; await the values first.', node.iterable);
+        }
+        elementType = iterableType.elem;
+      }
       else if (iterableType.k === 'prim' && iterableType.name === 'text') elementType = T.PRIM.text;
       else if (iterableType.k === 'map') elementType = T.record(new Map([
         ['key', { type: iterableType.key, optional: false }],
@@ -1333,7 +1906,11 @@ class Checker {
     if (node.handler) {
       const previous = this.scope;
       this.scope = previous.child();
-      this.scope.define(node.errorName, { kind: 'var', type: T.PRIM.any, mutable: false });
+      const caught = node.errorType ? this.resolveType(node.errorType) : T.PRIM.any;
+      this.scope.define(node.errorName, {
+        kind: 'var', type: caught, mutable: false, nameLine: node.line, nameCol: node.col,
+      });
+      node.__catchType = caught;
       this.checkStatements(node.handler);
       this.scope = previous;
     }
@@ -1342,10 +1919,18 @@ class Checker {
 
   checkReturn(node) {
     const frame = this.functionStack[this.functionStack.length - 1];
-    const valueType = this.typeOf(node.value, frame ? frame.declaredReturn : null);
+    const valueType = this.typeOf(node.value, frame && !frame.generator ? frame.declaredReturn : null);
     node.__type = valueType;
     if (!frame) {
       this.report('PS3403', '"return" can only be used inside a function.', node);
+      return;
+    }
+    if (frame.generator) {
+      // A generator's result channel is `yield`; returning a final value would
+      // leak into the iterator protocol without a type that expresses it.
+      if (!T.sameType(T.deref(valueType), T.PRIM.nothing)) {
+        this.report('PS3530', 'A generator cannot return a value; use "yield", or "return nothing" to stop early.', node);
+      }
       return;
     }
     if (frame.declaredReturn && !T.assignable(valueType, frame.declaredReturn)) {
@@ -1475,6 +2060,7 @@ class Checker {
     if (!node) return T.PRIM.nothing;
     switch (node.kind) {
       case 'Number': return this.primitiveOrLiteral(T.PRIM.number, node.value, expected);
+      case 'BigInt': return T.PRIM.bigint;
       case 'Regex': {
         // The lexer validates the pattern and flags; a literal that reached the
         // checker is a usable RegExp value.
@@ -1490,6 +2076,50 @@ class Checker {
       case 'Text': return this.primitiveOrLiteral(T.PRIM.text, node.value, expected);
       case 'Boolean': return this.primitiveOrLiteral(T.PRIM.boolean, node.value, expected);
       case 'Nothing': return T.PRIM.nothing;
+      case 'This': {
+        const type = this.thisStack[this.thisStack.length - 1];
+        if (!type) {
+          this.report('PS3510', '"this" can only be used inside class methods, constructors and field initializers.', node);
+          return T.PRIM.error;
+        }
+        return type;
+      }
+      case 'Super': {
+        const type = this.thisStack[this.thisStack.length - 1];
+        const info = this.classStack.length ? this.classes.get(this.classStack[this.classStack.length - 1]) : null;
+        if (!type || !info || !info.parentInfo) {
+          this.report('PS3511', '"super" can only be used in a class that extends another class.', node);
+          return T.PRIM.error;
+        }
+        return info.parentInfo.instance;
+      }
+      case 'Yield': {
+        const frame = this.functionStack[this.functionStack.length - 1];
+        if (!frame || !frame.generator) {
+          this.report('PS3528', '"yield" can only be used inside a generator function.', node);
+          return T.PRIM.nothing;
+        }
+        const valueType = this.typeOf(node.value);
+        node.value.__type = valueType;
+        frame.yieldTypes.push(valueType);
+        if (frame.yieldType && !T.assignable(valueType, frame.yieldType) && !T.isAny(valueType)) {
+          this.report('PS3529', `This generator yields ${T.showType(frame.yieldType)}, but the value is ${T.showType(valueType)}.`, node);
+        }
+        return T.PRIM.nothing;
+      }
+      case 'TypeOf': {
+        this.typeOf(node.value);
+        return T.PRIM.text;
+      }
+      case 'Ternary': {
+        const conditionType = this.typeOf(node.condition);
+        if (!T.assignable(conditionType, T.PRIM.boolean) && !T.isAny(conditionType)) {
+          this.report('PS3318', `A condition must be boolean, found ${T.showType(conditionType)}.`, node.condition);
+        }
+        const whenTrue = this.typeOf(node.whenTrue, expected);
+        const whenFalse = this.typeOf(node.whenFalse, expected);
+        return T.union([whenTrue, whenFalse]);
+      }
       case 'Template': {
         for (const part of node.parts) {
           if (part.kind === 'TemplateExpression') this.typeOf(part.expression);
@@ -1520,6 +2150,7 @@ class Checker {
       }
       case 'RecordLiteral': {
         const fields = new Map();
+        let dynamic = null;
         const expectedResolved = expected ? T.deref(expected) : null;
         const expectedRecord = expectedResolved && expectedResolved.k === 'record' ? expectedResolved : null;
         const expectedRecords = expectedResolved && expectedResolved.k === 'union'
@@ -1528,10 +2159,23 @@ class Checker {
         for (const field of node.fields) {
           if (field.spread) {
             const spreadType = T.deref(this.typeOf(field.spread));
-            if (spreadType.k === 'record') {
+            if (spreadType.k === 'record' || spreadType.k === 'instance') {
               for (const [key, value] of spreadType.fields) fields.set(key, value);
             } else if (!T.isAny(spreadType)) {
               this.report('PS3326', `Only a record can be spread into a record, found ${T.showType(spreadType)}.`, field.spread);
+            }
+            continue;
+          }
+          if (field.computed) {
+            const keyType = T.deref(this.typeOf(field.computed));
+            const valueType = this.typeOf(field.value);
+            const literal = literalValueOf(field.computed);
+            if (literal && (typeof literal.value === 'string' || typeof literal.value === 'number')) {
+              fields.set(String(literal.value), { type: valueType, optional: false });
+            } else if (keyType.k === 'prim' && (keyType.name === 'text' || keyType.name === 'number')) {
+              dynamic = dynamic ? T.union([dynamic, valueType]) : valueType;
+            } else if (!T.isAny(keyType)) {
+              this.report('PS3535', `A computed key must be text or a number, found ${T.showType(keyType)}.`, field.computed);
             }
             continue;
           }
@@ -1546,6 +2190,11 @@ class Checker {
             if (fieldTypes.length) expectedFieldType = fieldTypes.length === 1 ? fieldTypes[0] : T.union(fieldTypes);
           }
           fields.set(field.key, { type: this.typeOf(field.value, expectedFieldType), optional: false });
+        }
+        if (dynamic) {
+          // A dynamic key makes the set of fields unknown, so the value is a
+          // text-keyed map. Literal computed keys stay ordinary record fields.
+          return T.mapOf(T.PRIM.text, dynamic);
         }
         return T.record(fields);
       }
@@ -1564,10 +2213,7 @@ class Checker {
         this.report('PS3327', `"await" needs a Promise, found ${T.showType(valueType)}.`, node);
         return T.PRIM.any;
       }
-      case 'New':
-        this.typeOf(node.callee);
-        // Constructors cross the JavaScript boundary as untyped values.
-        return T.PRIM.any;
+      case 'New': return this.newType(node);
       case 'Unary': {
         const operandType = this.typeOf(node.operand);
         if (node.operator === 'not') {
@@ -1576,10 +2222,12 @@ class Checker {
           }
           return T.PRIM.boolean;
         }
-        if (!T.assignable(operandType, T.PRIM.number) && !T.isAny(operandType)) {
-          this.report('PS3329', `Unary "-" needs a number, found ${T.showType(operandType)}.`, node);
+        const numeric = T.deref(operandType);
+        const bigint = numeric.k === 'prim' && numeric.name === 'bigint';
+        if (!bigint && !T.assignable(operandType, T.PRIM.number) && !T.isAny(operandType)) {
+          this.report('PS3329', `Unary "-" needs a number or bigint, found ${T.showType(operandType)}.`, node);
         }
-        return T.PRIM.number;
+        return bigint ? T.PRIM.bigint : T.PRIM.number;
       }
       case 'Binary': return this.binaryType(node);
       case 'TypeTest': {
@@ -1669,13 +2317,48 @@ class Checker {
     let objectType = T.deref(this.typeOf(node.object));
     if (objectType.k === 'var' && objectType.constraint) objectType = T.deref(objectType.constraint);
     if (T.isAny(objectType)) return T.PRIM.any;
-    if (objectType.k === 'record') {
+    if (objectType.k === 'class') {
+      const field = objectType.statics.get(node.property);
+      if (!field) {
+        this.report('PS3532', `Class "${objectType.name}" has no static member "${node.property}".`, node);
+        return T.PRIM.error;
+      }
+      if (forAssignment && field.readonly) {
+        this.report('PS3319', `Static member "${node.property}" is readonly and cannot be assigned.`, node);
+        return field.type;
+      }
+      return field.type;
+    }
+    if (objectType.k === 'iterator') {
+      if (node.property === 'next') {
+        const result = T.record(new Map([
+          ['value', { type: T.union([objectType.elem, T.PRIM.nothing]), optional: false }],
+          ['done', { type: T.PRIM.boolean, optional: false }],
+        ]));
+        return T.fnType([], result);
+      }
+      if (node.property === 'return' || node.property === 'throw') {
+        return T.fnType([{ name: 'value', type: T.PRIM.any, optional: true }], T.PRIM.any);
+      }
+      this.report('PS3533', `An iterator exposes next, return and throw; there is no field "${node.property}".`, node);
+      return T.PRIM.error;
+    }
+    if (objectType.k === 'prim' && objectType.name === 'bigint') {
+      if (node.property === 'toString') {
+        return T.fnType([{ name: 'radix', type: T.PRIM.number, optional: true }], T.PRIM.text);
+      }
+      if (node.property === 'valueOf') return T.fnType([], T.PRIM.bigint);
+      this.report('PS3534', `BigInt exposes toString and valueOf; there is no field "${node.property}".`, node);
+      return T.PRIM.error;
+    }
+    if (objectType.k === 'record' || objectType.k === 'instance') {
       const field = objectType.fields.get(node.property);
       if (!field) {
         this.report('PS3333', `Type ${T.showType(objectType)} has no field "${node.property}".`, node);
         return T.PRIM.error;
       }
-      if (forAssignment && field.readonly) {
+      if (forAssignment && field.readonly
+        && !(this.constructorDepth > 0 && node.object.kind === 'This')) {
         this.report('PS3319', `Field "${node.property}" is readonly and cannot be assigned.`, node);
         return field.type;
       }
@@ -1696,10 +2379,10 @@ class Checker {
           }
           continue;
         }
-        if (resolved.k === 'record' || resolved.k === 'variant') {
-          const field = resolved.k === 'record'
-            ? resolved.fields.get(node.property)
-            : resolved.fields.find((item) => item.name === node.property);
+        if (resolved.k === 'record' || resolved.k === 'instance' || resolved.k === 'variant') {
+          const field = resolved.k === 'variant'
+            ? resolved.fields.find((item) => item.name === node.property)
+            : resolved.fields.get(node.property);
           if (!field) {
             this.report('PS3351', `Not every member of ${T.showType(objectType)} has a field "${node.property}"; narrow the value first.`, node);
             return T.PRIM.error;
@@ -1875,7 +2558,94 @@ class Checker {
     return T.PRIM.any;
   }
 
+  currentClassInfo() {
+    return this.classStack.length ? this.classes.get(this.classStack[this.classStack.length - 1]) : null;
+  }
+
+  // Shared argument checking for constructors and super calls, which are not
+  // ordinary function calls: their result is an instance, and a generic class
+  // infers its type arguments from constructor parameters.
+  checkArgumentsDirect(fn, args, node, label) {
+    const subst = new Map();
+    if (!fn || fn.k !== 'fn') {
+      for (const argument of args) this.typeOf(argument);
+      return subst;
+    }
+    const required = fn.params.filter((parameter) => !parameter.optional && !parameter.rest).length;
+    const hasRest = fn.params.some((parameter) => parameter.rest);
+    if (args.length < required) {
+      this.report('PS3538', `${label} expects at least ${required} argument(s) but got ${args.length}.`, node);
+    }
+    if (!hasRest && args.length > fn.params.length) {
+      this.report('PS3538', `${label} expects at most ${fn.params.length} argument(s) but got ${args.length}.`, node);
+    }
+    args.forEach((argument, index) => {
+      const parameter = fn.params[index] || fn.params[fn.params.length - 1];
+      if (argument.kind === 'Spread') {
+        this.typeOf(argument.value);
+        return;
+      }
+      if (!parameter) {
+        this.typeOf(argument);
+        return;
+      }
+      const expected = parameter.rest ? elementTypeOf(parameter.type) : parameter.type;
+      const argumentType = this.typeOf(argument, T.substitute(expected, subst));
+      T.infer(expected, argumentType, subst);
+      const resolvedExpected = T.substitute(expected, subst);
+      if (!T.assignable(argumentType, resolvedExpected)) {
+        this.report(
+          'PS3539',
+          `Argument ${index + 1} of ${label} is ${T.showType(argumentType)}; expected ${T.showType(resolvedExpected)}.`,
+          argument,
+        );
+      }
+    });
+    return subst;
+  }
+
+  newType(node) {
+    const call = node.callee.kind === 'Call' ? node.callee : null;
+    const target = call ? call.callee : node.callee;
+    const args = call ? call.args : [];
+
+    let classType = null;
+    if (target.kind === 'Name') {
+      const entry = this.lookup(target.name);
+      if (entry && entry.kind === 'class') classType = T.deref(entry.type);
+    }
+    if (!classType) {
+      const targetType = T.deref(this.typeOf(target));
+      if (targetType.k === 'class') classType = targetType;
+    }
+    if (!classType) {
+      // A constructor that crosses the JavaScript boundary has no PlainScript
+      // class type. Its value stays `any`, exactly as before 2.3, but a
+      // declared class constructor is now fully checked.
+      if (!call) this.typeOf(node.callee);
+      return T.PRIM.any;
+    }
+
+    const subst = this.checkArgumentsDirect(classType.ctor, args, node, `the constructor of "${classType.name}"`);
+    if (!classType.typeParams || !classType.typeParams.length) return classType.instance;
+    const instance = T.substitute(classType.instance, subst);
+    return T.deref(instance);
+  }
+
   callType(node, expected) {
+    if (node.callee.kind === 'Super') {
+      const info = this.currentClassInfo();
+      if (!info || !info.parentInfo) {
+        this.report('PS3511', '"super(...)" is only valid in a class that extends another class.', node);
+        for (const argument of node.args) this.typeOf(argument);
+        return T.PRIM.any;
+      }
+      if (this.constructorDepth === 0) {
+        this.report('PS3540', '"super(...)" is only valid inside a constructor.', node);
+      }
+      this.checkArgumentsDirect(info.parentInfo.ctor, node.args, node, `the constructor of "${info.parentInfo.name}"`);
+      return T.PRIM.nothing;
+    }
     let calleeType;
 
     if (node.callee.kind === 'Name' && this.variantCtors.has(node.callee.name)) {
@@ -2065,6 +2835,23 @@ class Checker {
       case '/':
       case '%':
       case '**': {
+        const bigint = (value) => value.k === 'prim' && value.name === 'bigint';
+        const leftBig = bigint(leftResolved);
+        const rightBig = bigint(rightResolved);
+        if (leftBig || rightBig) {
+          if (leftBig && rightBig) {
+            // Mixing a bigint and a number would throw at run time; the checker
+            // refuses it at compile time instead of guessing a conversion.
+            if (node.operator === '/' ) return T.PRIM.bigint;
+            return T.PRIM.bigint;
+          }
+          this.report(
+            'PS3536',
+            `Arithmetic "${node.operator}" cannot mix bigint and number; convert one side explicitly.`,
+            node,
+          );
+          return T.PRIM.error;
+        }
         if (!T.assignable(left, T.PRIM.number) || !T.assignable(right, T.PRIM.number)) {
           this.report(
             'PS3344',
@@ -2077,6 +2864,13 @@ class Checker {
       }
       case '==':
       case '!=': {
+        if (isBigIntOf(leftResolved) || isBigIntOf(rightResolved)) {
+          const other = isBigIntOf(leftResolved) ? rightResolved : leftResolved;
+          if (!isBigIntOf(other) && !(other.k === 'prim' && other.name === 'number')) {
+            this.report('PS3537', `Cannot compare a bigint with ${T.showType(other)}.`, node);
+          }
+          return T.PRIM.boolean;
+        }
         if (!T.assignable(left, right) && !T.assignable(right, left)) {
           this.report('PS3345', `Comparing ${T.showType(left)} with ${T.showType(right)} can never be true.`, node);
         }
@@ -2087,7 +2881,10 @@ class Checker {
       case '>':
       case '>=': {
         const comparable = (T.assignable(left, T.PRIM.number) && T.assignable(right, T.PRIM.number)) ||
-          (T.assignable(left, T.PRIM.text) && T.assignable(right, T.PRIM.text));
+          (T.assignable(left, T.PRIM.text) && T.assignable(right, T.PRIM.text)) ||
+          ((isBigIntOf(leftResolved) || isBigIntOf(rightResolved))
+            && (isBigIntOf(leftResolved) || leftResolved.k === 'prim')
+            && (isBigIntOf(rightResolved) || rightResolved.k === 'prim'));
         if (!comparable) {
           this.report('PS3346', `"${node.operator}" compares two numbers or two texts, found ${T.showType(left)} and ${T.showType(right)}.`, node);
         }
@@ -2328,26 +3125,64 @@ function inspectReturns(statements) {
   return { types, missingValue };
 }
 
+function inspectYields(statements) {
+  const types = [];
+  const walk = (nodes) => {
+    for (const node of nodes) {
+      if (!node) continue;
+      if (node.kind === 'Yield') {
+        types.push(node.value && node.value.kind !== 'Nothing' ? (node.value.__type || T.PRIM.any) : T.PRIM.nothing);
+      } else if (node.kind === 'Conditional') {
+        for (const branch of node.branches) walk(branch.body);
+        if (node.otherwise) walk(node.otherwise);
+      } else if (node.kind === 'Try') {
+        walk(node.body);
+        if (node.handler) walk(node.handler);
+        if (node.finalizer) walk(node.finalizer);
+      } else if (node.kind === 'Match') {
+        for (const branch of node.cases) walk(branch.body);
+      } else if (node.kind === 'ForEach' || node.kind === 'ForRange' || node.kind === 'While') {
+        walk(node.body);
+      } else if (node.kind === 'FunctionDecl' || node.kind === 'FunctionExpression') {
+        // Nested generators own their yields.
+      } else if (node.kind === 'ExprStmt') {
+        if (node.expression && node.expression.kind === 'Yield') {
+          types.push(node.expression.value && node.expression.value.kind !== 'Nothing'
+            ? (node.expression.value.__type || T.PRIM.any) : T.PRIM.nothing);
+        }
+      }
+    }
+  };
+  walk(statements);
+  return { types };
+}
+
+function isBigIntOf(type) {
+  return Boolean(type) && type.k === 'prim' && type.name === 'bigint';
+}
+
 function alwaysReturns(statements) {
   if (!statements || statements.length === 0) return false;
-  for (let index = statements.length - 1; index >= 0; index -= 1) {
-    const node = statements[index];
-    if (node.kind === 'Return' || node.kind === 'Throw') return true;
-    if (node.kind === 'Render') return true;
+  // Ordinary statements do not prevent a later return from being reached; a
+  // terminator anywhere in the straight-line sequence guarantees the function
+  // cannot finish normally. Statements after it are unreachable.
+  for (const node of statements) {
+    if (node.kind === 'Return' || node.kind === 'Throw' || node.kind === 'Render') return true;
     if (node.kind === 'Conditional') {
-      if (!node.otherwise) return false;
-      return node.branches.every((branch) => alwaysReturns(branch.body)) && alwaysReturns(node.otherwise);
+      if (!node.otherwise) continue;
+      if (node.branches.every((branch) => alwaysReturns(branch.body)) && alwaysReturns(node.otherwise)) return true;
+      continue;
     }
     if (node.kind === 'Match') {
-      return node.cases.every((branch) => alwaysReturns(branch.body));
+      if (node.cases.every((branch) => alwaysReturns(branch.body))) return true;
+      continue;
     }
     if (node.kind === 'Try') {
       const bodyReturns = alwaysReturns(node.body);
       const handlerReturns = node.handler ? alwaysReturns(node.handler) : false;
-      return bodyReturns && (!node.handler || handlerReturns);
+      if (bodyReturns && (!node.handler || handlerReturns)) return true;
+      continue;
     }
-    if (node.kind === 'FunctionDecl' || node.kind === 'TypeDecl' || node.kind === 'Import') continue;
-    return false;
   }
   return false;
 }
@@ -2363,6 +3198,7 @@ function literalValueOf(node) {
   if (!node) return null;
   if (node.kind === 'Text') return { value: node.v || node.value, type: T.literalType(node.v || node.value, T.PRIM.text) };
   if (node.kind === 'Number') return { value: node.value, type: T.literalType(node.value, T.PRIM.number) };
+  if (node.kind === 'BigInt') return { value: node.value, type: T.PRIM.bigint };
   if (node.kind === 'Boolean') return { value: node.value, type: T.literalType(node.value, T.PRIM.boolean) };
   if (node.kind === 'Unary' && node.operator === '-' && node.operand.kind === 'Number') {
     const value = -node.operand.value;

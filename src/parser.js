@@ -31,7 +31,7 @@ class ParseAbort extends Error {
 const STATEMENT_START = new Set([
   'import', 'export', 'type', 'declare', 'function', 'async', 'let', 'const',
   'if', 'for', 'while', 'match', 'try', 'throw', 'return', 'break',
-  'continue', 'render', 'element',
+  'continue', 'render', 'element', 'class',
 ]);
 
 class Parser {
@@ -249,6 +249,39 @@ class Parser {
   statement() {
     const token = this.peek();
 
+    // Decorators are annotations on the declaration that follows them. They
+    // are parsed here, before dispatch, so `@memo function` and
+    // `@route("/x") class` share one reader.
+    if (token.t === 'punct' && token.v === '@') {
+      const decorators = this.decoratorList();
+      const target = this.peek();
+      if (target.t === 'ident' && target.v === 'class' && this.peek(1).t === 'ident') {
+        return this.classDeclaration({ exported: false, decorators });
+      }
+      if (target.t === 'kw' && target.v === 'function') {
+        const declaration = this.functionDeclaration({ exported: false, decorators });
+        return declaration;
+      }
+      if (target.t === 'kw' && target.v === 'async') {
+        this.next();
+        if (!this.atKw('function')) this.fail('PS2003', 'Expected "function" after "async".');
+        const declaration = this.functionDeclaration({ exported: false, async: true, decorators });
+        return declaration;
+      }
+      this.fail('PS2040', 'A decorator must be followed by a class, function, or method declaration.');
+    }
+
+    if (token.t === 'ident' && token.v === 'generator' && this.peek(1).t === 'kw' && this.peek(1).v === 'function') {
+      this.next();
+      return this.functionDeclaration({ exported: false, generator: true });
+    }
+
+    // `class` stays a contextual word: `let class = 1` remains a valid binding
+    // name, while `class Name` opens a declaration.
+    if (token.t === 'ident' && token.v === 'class' && this.peek(1).t === 'ident') {
+      return this.classDeclaration({ exported: false });
+    }
+
     if (this.dialect === '2.1' && token.t === 'ident') {
       const english = this.englishStatementKind();
       if (english === 'value' || english === 'set') return this.englishVariable(token);
@@ -374,6 +407,16 @@ class Parser {
 
   exportDeclaration() {
     const start = this.expectKw('export');
+    if (this.atPunct('@')) {
+      const decorators = this.decoratorList();
+      if (this.atWord('class') && this.peek(1).t === 'ident') return this.classDeclaration({ exported: true, token: start, decorators });
+      if (this.atIdent() && this.peek().v === 'generator' && this.peek(1).t === 'kw' && this.peek(1).v === 'function') {
+        this.next();
+        return this.functionDeclaration({ exported: true, token: start, generator: true, decorators });
+      }
+      if (this.atKw('function')) return this.functionDeclaration({ exported: true, token: start, decorators });
+      this.fail('PS2040', 'A decorator must be followed by a class or function declaration.', start);
+    }
     if (this.atKw('default')) {
       this.next();
       // `export default define name(...) ... end` is a declaration, not an
@@ -414,6 +457,11 @@ class Parser {
       return this.node('ExportNamed', start, { names, spec });
     }
     if (this.atKw('type')) return this.typeDeclaration(true);
+    if (this.atWord('class') && this.peek(1).t === 'ident') return this.classDeclaration({ exported: true, token: start });
+    if (this.atIdent() && this.peek().v === 'generator' && this.peek(1).t === 'kw' && this.peek(1).v === 'function') {
+      this.next();
+      return this.functionDeclaration({ exported: true, token: start, generator: true });
+    }
     if (this.dialect === '2.1' && this.peek().t === 'ident') {
       const english = this.englishStatementKind();
       if (english === 'value' || english === 'set') {
@@ -489,6 +537,7 @@ class Parser {
 
   declareDeclaration() {
     const start = this.expectKw('declare');
+    if (this.atWord('class') && this.peek(1).t === 'ident') return this.classDeclaration({ declared: true, exported: true });
     if (this.atKw('function')) {
       const fnToken = this.next();
       const nameToken = this.expectIdent('a function name');
@@ -501,7 +550,8 @@ class Parser {
         this.next();
         returnType = this.returnAnnotation();
       }
-      const node = this.node('DeclareFunction', fnToken, { name, nameLine: nameToken.line, nameCol: nameToken.col, typeParams, params, returnType, exported: false, line: start.line, col: start.col });
+      const throwsType = this.throwsClause();
+      const node = this.node('DeclareFunction', fnToken, { name, nameLine: nameToken.line, nameCol: nameToken.col, typeParams, params, returnType, throwsType, exported: false, line: start.line, col: start.col });
       if (Object.keys(typeParameterInfo.constraints).length) node.typeParamConstraints = typeParameterInfo.constraints;
       return node;
     }
@@ -541,7 +591,7 @@ class Parser {
   typeExpression() {
     const start = this.peek();
     const check = this.typeUnion();
-    if (this.atIdent() && this.peek().v === 'extends') {
+    if (this.atKw('extends') || (this.atIdent() && this.peek().v === 'extends')) {
       this.next();
       const extendsType = this.typeUnion(false);
       this.expectPunct('?');
@@ -605,6 +655,10 @@ class Parser {
     if (token.t === 'kw' && token.v === 'nothing') {
       this.next();
       return this.node('NamedType', token, { name: 'nothing', args: [] });
+    }
+    if (token.t === 'kw' && token.v === 'typeof') {
+      this.next();
+      return this.node('TypeofType', token, { value: this.primaryExpression() });
     }
     if (token.t === 'punct' && token.v === '(') {
       this.next();
@@ -688,7 +742,12 @@ class Parser {
       while (!this.atPunct('}')) {
         let readonly = false;
         if (this.atIdent() && this.peek().v === 'readonly' && this.peek(1).t === 'ident') { this.next(); readonly = true; }
-        const name = this.expectIdent('a field name').v;
+        // A record type may name a field after a keyword (`end`, `match`,
+        // `from`) when the value it describes exposes that property.
+        const nameToken = this.peek();
+        if (nameToken.t !== 'ident' && nameToken.t !== 'kw') this.fail('PS2002', 'Expected a field name.');
+        this.next();
+        const name = nameToken.v;
         const optional = this.atPunct('?');
         if (optional) this.next();
         this.expectPunct(':');
@@ -719,8 +778,13 @@ class Parser {
       if (token.v === 'keyof') {
         return this.node('KeyofType', token, { target: this.typePrimary() });
       }
-      if (token.v === 'typeof') {
-        return this.node('TypeofType', token, { value: this.primaryExpression() });
+      if (token.v === 'Iterator' && this.atKw('of')) {
+        this.next();
+        return this.node('IteratorType', token, { elem: this.typeOptional(allowOptional), async: false });
+      }
+      if (token.v === 'AsyncIterator' && this.atKw('of')) {
+        this.next();
+        return this.node('IteratorType', token, { elem: this.typeOptional(allowOptional), async: true });
       }
       // Bare `list` and `map` mean "a list/map of anything", which is what a
       // runtime type test needs.
@@ -851,11 +915,194 @@ class Parser {
       this.next();
       returnType = this.returnAnnotation();
     }
+    const throwsType = this.throwsClause();
     const body = this.blockBody('function');
     const node = this.node('FunctionDecl', token, {
       name, nameLine: nameToken ? nameToken.line : null, nameCol: nameToken ? nameToken.col : null,
-      typeParams, params, returnType, body, async: Boolean(options.async),
+      typeParams, params, returnType, throwsType, body, async: Boolean(options.async),
+      generator: Boolean(options.generator), decorators: options.decorators || [],
       exported: Boolean(options.exported), defaultExport: Boolean(options.defaultExport),
+    });
+    if (Object.keys(typeParameterInfo.constraints).length) node.typeParamConstraints = typeParameterInfo.constraints;
+    return node;
+  }
+
+  // An optional `throws A or B` clause names every error type a function may
+  // propagate. A function without the clause keeps the pre-2.3 unchecked
+  // behaviour, so existing code stays valid; a function with `throws nothing`
+  // promises never to throw.
+  throwsClause() {
+    // Contextual, so the existing `throws` helper in std/test and any user
+    // function of that name keeps working.
+    if (!this.atWord('throws') && !this.atKw('throws')) return null;
+    this.next();
+    return this.typeExpression();
+  }
+
+  decoratorList() {
+    const decorators = [];
+    while (this.atPunct('@')) {
+      const token = this.next();
+      const expression = this.postfixExpression();
+      decorators.push({ expression, line: token.line, col: token.col });
+    }
+    return decorators;
+  }
+
+  // ---------------------------------------------------------------- classes
+  //
+  //   class Animal
+  //     readonly name: text
+  //     static count: number = 0
+  //
+  //     constructor(name: text)
+  //       this.name = name
+  //     end
+  //
+  //     function speak() -> text
+  //       return this.name
+  //     end
+  //   end
+  //
+  // Methods use the same `function` declaration shape as the rest of the
+  // language, so parameters, generics, async, generators and typed errors are
+  // spelled once and understood everywhere.
+  classDeclaration(options = {}) {
+    const start = this.next();
+    if (start.v !== 'class') this.fail('PS2001', 'Expected "class".', start);
+    const nameToken = this.expectIdent('a class name');
+    const name = nameToken.v;
+    const typeParameterInfo = this.typeParameterList();
+    const typeParams = typeParameterInfo.params;
+    let superClass = null;
+    if (this.atKw('extends')) {
+      const superToken = this.next();
+      const base = this.expectIdent('a base class name');
+      const args = [];
+      if (this.atPunct('<')) {
+        this.next();
+        while (!this.atPunct('>')) {
+          args.push(this.typeExpression());
+          if (this.atPunct(',')) this.next();
+          else break;
+        }
+        this.expectPunct('>');
+      }
+      superClass = this.node('NamedType', superToken, { name: base.v, args });
+    }
+
+    const fields = [];
+    const methods = [];
+    let constructorDecl = null;
+
+    while (!this.atKw('end') && !this.atEof()) {
+      const decorators = this.atPunct('@') ? this.decoratorList() : [];
+      let isStatic = false;
+      if (this.atIdent() && this.peek().v === 'static' && this.peek(1).t !== 'punct') {
+        isStatic = true;
+        this.next();
+      }
+      let isReadonly = false;
+      if (this.atIdent() && this.peek().v === 'readonly' && this.peek(1).t === 'ident') {
+        isReadonly = true;
+        this.next();
+      }
+
+      let generator = false;
+      if (this.atIdent() && this.peek().v === 'generator' && this.peek(1).t === 'kw' && this.peek(1).v === 'function') {
+        generator = true;
+        this.next();
+      }
+
+      if (this.atIdent() && this.peek().v === 'constructor' && this.peek(1).t === 'punct' && this.peek(1).v === '(') {
+        const constructorToken = this.next();
+        if (isStatic) this.fail('PS2041', 'A constructor cannot be static.', constructorToken);
+        if (constructorDecl) this.fail('PS2042', 'A class has exactly one constructor.', constructorToken);
+        const params = this.parameterList();
+        const throwsType = this.throwsClause();
+        const body = options.declared ? [] : this.blockBody('constructor');
+        constructorDecl = this.node('ConstructorDecl', constructorToken, {
+          params, throwsType, body, decorators, line: constructorToken.line, col: constructorToken.col,
+        });
+        continue;
+      }
+
+      if (this.atKw('function')) {
+        const methodToken = this.peek();
+        this.next();
+        const methodName = this.expectIdent('a method name');
+        const methodTypeInfo = this.typeParameterList();
+        const params = this.parameterList();
+        let returnType = null;
+        if (this.atReturnArrow()) {
+          this.next();
+          returnType = this.returnAnnotation();
+        }
+        const throwsType = this.throwsClause();
+        const body = options.declared ? [] : this.blockBody('method');
+        const method = this.node('MethodDecl', methodToken, {
+          name: methodName.v, nameLine: methodName.line, nameCol: methodName.col,
+          typeParams: methodTypeInfo.params, params, returnType, throwsType, body,
+          async: false, generator, static: isStatic, decorators,
+        });
+        if (Object.keys(methodTypeInfo.constraints).length) method.typeParamConstraints = methodTypeInfo.constraints;
+        methods.push(method);
+        continue;
+      }
+
+      if (this.atKw('async')) {
+        this.next();
+        if (!this.atKw('function')) this.fail('PS2003', 'Expected "function" after "async" in a class method.');
+        const methodToken = this.next();
+        const methodName = this.expectIdent('a method name');
+        const methodTypeInfo = this.typeParameterList();
+        const params = this.parameterList();
+        let returnType = null;
+        if (this.atReturnArrow()) {
+          this.next();
+          returnType = this.returnAnnotation();
+        }
+        const throwsType = this.throwsClause();
+        const body = options.declared ? [] : this.blockBody('method');
+        const method = this.node('MethodDecl', methodToken, {
+          name: methodName.v, nameLine: methodName.line, nameCol: methodName.col,
+          typeParams: methodTypeInfo.params, params, returnType, throwsType, body,
+          async: true, generator, static: isStatic, decorators,
+        });
+        if (Object.keys(methodTypeInfo.constraints).length) method.typeParamConstraints = methodTypeInfo.constraints;
+        methods.push(method);
+        continue;
+      }
+
+      // A field declaration: `name: text`, `name?: text`, `static name = 0`.
+      const fieldToken = this.expectIdent('a class member');
+      const optional = this.atPunct('?');
+      if (optional) this.next();
+      let type = null;
+      if (this.atPunct(':')) {
+        this.next();
+        type = this.typeExpression();
+      }
+      let defaultValue = null;
+      if (this.atPunct('=')) {
+        this.next();
+        defaultValue = this.expression();
+      }
+      if (!type && !defaultValue) {
+        this.fail('PS2043', 'A class field needs a type or an initializer.', fieldToken);
+      }
+      fields.push({
+        name: fieldToken.v, nameLine: fieldToken.line, nameCol: fieldToken.col,
+        optional, readonly: isReadonly, static: isStatic, type, defaultValue, decorators,
+      });
+      if (this.atPunct(',')) this.next();
+    }
+    this.expectKw('end', 'PS2044');
+
+    const node = this.node('ClassDecl', start, {
+      name, nameLine: nameToken.line, nameCol: nameToken.col, typeParams, superClass,
+      fields, constructorDecl, methods, decorators: options.decorators || [],
+      exported: Boolean(options.exported), declared: Boolean(options.declared),
     });
     if (Object.keys(typeParameterInfo.constraints).length) node.typeParamConstraints = typeParameterInfo.constraints;
     return node;
@@ -1148,11 +1395,16 @@ class Parser {
     const start = this.expectKw('try');
     const body = this.statementsUntil(new Set(['catch', 'finally', 'end']), 'try block');
     let errorName = null;
+    let errorType = null;
     let handler = null;
     let finalizer = null;
     if (this.atKw('catch')) {
       this.next();
       errorName = this.expectIdent('an error name').v;
+      if (this.atPunct(':')) {
+        this.next();
+        errorType = this.typeExpression();
+      }
       handler = this.statementsUntil(new Set(['finally', 'end']), 'catch block');
     }
     if (this.atKw('finally')) {
@@ -1160,7 +1412,7 @@ class Parser {
       finalizer = this.statementsUntil(new Set(['end']), 'finally block');
     }
     this.expectKw('end', 'PS2016');
-    return this.node('Try', start, { body, errorName, handler, finalizer });
+    return this.node('Try', start, { body, errorName, errorType, handler, finalizer });
   }
 
   // --------------------------------------------------------------- rendering
@@ -1235,7 +1487,23 @@ class Parser {
   }
 
   expression() {
-    return this.pipeline();
+    return this.ternary();
+  }
+
+  // `condition ? whenTrue : whenFalse` binds looser than every binary
+  // operator and is right-associative, so chained conditionals read like the
+  // JavaScript and TypeScript spelling developers already know.
+  ternary() {
+    const start = this.peek();
+    const condition = this.pipeline();
+    if (this.atPunct('?')) {
+      this.next();
+      const whenTrue = this.expression();
+      this.expectPunct(':', 'PS2045');
+      const whenFalse = this.expression();
+      return this.node('Ternary', start, { condition, whenTrue, whenFalse });
+    }
+    return condition;
   }
 
   pipeline() {
@@ -1331,11 +1599,27 @@ class Parser {
   }
 
   unaryExpression() {
+    if (this.atKw('typeof')) {
+      const token = this.next();
+      return this.node('TypeOf', token, { value: this.unaryExpression() });
+    }
     if (this.atKw('new')) {
       const token = this.next();
-      // `new` applies to the postfix expression, so `new Parser(a, b)` keeps
-      // its call and arguments and emits `new Parser(a, b)`.
-      return this.castSuffix(this.node('New', token, { callee: this.postfixExpression() }));
+      // `new` binds to the constructor and its arguments, not to a later
+      // member call: `new Dog().bark()` constructs a Dog and then barks.
+      let callee = this.primaryExpression();
+      while (this.atPunct('.') || this.atPunct('?.')) {
+        const dot = this.next();
+        const property = this.expectPropertyName();
+        callee = this.node('Member', dot, { object: callee, property: property.v, optional: dot.v === '?.' });
+      }
+      if (this.atPunct('(')) {
+        const callToken = this.peek();
+        const args = this.callArguments();
+        callee = this.node('Call', callToken, { callee, args, optional: false });
+      }
+      const created = this.node('New', token, { callee });
+      return this.castSuffix(this.postfixSuffix(created));
     }
     if (this.atKw('not') || this.atPunct('-')) {
       const token = this.next();
@@ -1361,7 +1645,11 @@ class Parser {
   }
 
   postfixExpression() {
-    let value = this.primaryExpression();
+    return this.postfixSuffix(this.primaryExpression());
+  }
+
+  postfixSuffix(initial) {
+    let value = initial;
     while (true) {
       if (this.atPunct('.')) {
         const token = this.next();
@@ -1435,6 +1723,10 @@ class Parser {
       this.next();
       return this.node('Number', token, { value: Number(token.v) });
     }
+    if (token.t === 'bigint') {
+      this.next();
+      return this.node('BigInt', token, { value: token.v });
+    }
     if (token.t === 'text') {
       this.next();
       return this.node('Text', token, { value: token.v });
@@ -1459,6 +1751,18 @@ class Parser {
       if (token.v === 'nothing') {
         this.next();
         return this.node('Nothing', token, {});
+      }
+      if (token.v === 'this') {
+        this.next();
+        return this.node('This', token, {});
+      }
+      if (token.v === 'super') {
+        this.next();
+        return this.node('Super', token, {});
+      }
+      if (token.v === 'yield') {
+        this.next();
+        return this.node('Yield', token, { value: this.expression() });
       }
       if (token.v === 'function') {
         return this.functionExpression();
@@ -1524,6 +1828,12 @@ class Parser {
         if (this.atPunct('...')) {
           const spreadToken = this.next();
           fields.push({ spread: this.expression(), token: spreadToken });
+        } else if (this.atPunct('[')) {
+          const bracket = this.next();
+          const keyExpression = this.expression();
+          this.expectPunct(']', 'PS2046');
+          this.expectPunct(':', 'PS2046');
+          fields.push({ computed: keyExpression, value: this.expression(), token: bracket });
         } else {
           const keyToken = this.peek();
           let key;

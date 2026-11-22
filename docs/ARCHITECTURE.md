@@ -1,6 +1,6 @@
 # Compiler architecture
 
-PlainScript 2.2 is a single-pass-per-stage compiler with an explicit typed IR between
+PlainScript 2.3 is a single-pass-per-stage compiler with an explicit typed IR between
 checking and emission. There are no runtime dependencies, and the emitted code has no
 PlainScript runtime.
 
@@ -219,3 +219,21 @@ real project.
   data; an LSP would call `Compiler.compile` per document and translate diagnostics.
 - **Standard library growth**: add `stdlib/x.js` + `stdlib/x.d.pln`; no compiler change is
   needed unless the module needs a new host capability.
+
+## 2.3 additions
+
+- **Class lowering.** Class declarations keep their fields, constructor,
+  methods, statics and decorators in HIR. JavaScript `class` is emitted directly;
+  decorators are applied after the declaration and replace the binding.
+- **Generator lowering.** `generator function` and `yield` pass through to
+  JavaScript generators. The checker exposes the call type as `Iterator of T`.
+- **Exception guards.** Typed catches lower to an `instanceof` guard followed
+  by a rethrow, so the checker's guarantee survives into JavaScript.
+- **Build cache.** `src/cli.js` maintains a per-project JSON cache keyed by
+  source path with source, compiler, configuration and dependency hashes.
+- **Bundler.** `src/bundle.js` walks local imports, wraps each module and emits
+  one ES module while keeping packages and `std/*` external.
+- **Optimizer.** `src/optimize.js` folds constant expressions and removes
+  unreachable statements on HIR, before code generation.
+- **Standard library.** Ten Node-backed modules live under `stdlib/` with
+  `.d.pln` declarations; no compiler change is needed to add another.

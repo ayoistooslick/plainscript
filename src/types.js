@@ -17,6 +17,7 @@ const PRIM = Object.freeze({
   never: { k: 'prim', name: 'never' },
   error: { k: 'prim', name: 'error' },
   regex: { k: 'prim', name: 'regex' },
+  bigint: { k: 'prim', name: 'bigint' },
 });
 
 let nextVarId = 1;
@@ -63,6 +64,22 @@ const conditionalType = (check, extendsType, trueType, falseType, distributive =
 const keyofType = (target) => ({ k: 'keyof', target });
 const indexedAccessType = (target, index) => ({ k: 'indexed', target, index });
 const mappedType = (variable, key, value, optional = false) => ({ k: 'mapped', variable, key, value, optional });
+// A class instance is structural like a record, but it keeps the class name so
+// `x is C` can lower to `instanceof C` and diagnostics can name the type.
+const instanceOf = (name, fields, options = {}) => ({
+  k: 'instance', name, fields, args: options.args || [], parent: options.parent || null,
+});
+// The static side of a class: a value whose members are static fields,
+// methods and the constructor. `new` consumes it; a member access reads it.
+const classOf = (name, instance, options = {}) => ({
+  k: 'class', name, instance, statics: options.statics || new Map(),
+  ctor: options.ctor || null, typeParams: options.typeParams || [],
+  typeEnv: options.typeEnv || new Map(), node: options.node || null,
+});
+// Generators produce a lazy sequence. A PlainScript iterator is also
+// iterable, because every generator object is a JavaScript iterable and the
+// standard iterator helpers accept any iterable.
+const iteratorOf = (elem, async = false) => ({ k: 'iterator', elem, async: Boolean(async) });
 
 function union(members) {
   const flat = [];
@@ -139,6 +156,14 @@ function showType(t, seen = new Set()) {
       return `map of ${showType(t.key, seen)} to ${showType(t.value, seen)}`;
     case 'promise':
       return `Promise of ${showType(t.value, seen)}`;
+    case 'iterator':
+      return `${t.async ? 'AsyncIterator' : 'Iterator'} of ${showType(t.elem, seen)}`;
+    case 'instance': {
+      const args = t.args && t.args.length ? `<${t.args.map((arg) => showType(arg, seen)).join(', ')}>` : '';
+      return `${t.name}${args}`;
+    }
+    case 'class':
+      return `class ${t.name}`;
     case 'var':
       return t.name;
     case 'record': {
@@ -208,6 +233,12 @@ function containsVariable(t, seen = new Set()) {
     case 'tuple': return t.elements.some((element) => containsVariable(element, seen)) || containsVariable(t.rest, seen);
     case 'map': return containsVariable(t.key, seen) || containsVariable(t.value, seen);
     case 'promise': return containsVariable(t.value, seen);
+    case 'iterator': return containsVariable(t.elem, seen);
+    case 'instance': {
+      for (const field of t.fields.values()) if (containsVariable(field.type, seen)) return true;
+      return false;
+    }
+    case 'class': return containsVariable(t.instance, seen) || [...t.statics.values()].some((field) => containsVariable(field.type, seen));
     case 'union': return t.members.some((member) => containsVariable(member, seen));
     case 'record': {
       for (const field of t.fields.values()) if (containsVariable(field.type, seen)) return true;
@@ -334,6 +365,19 @@ function evaluate(t, seen = new Set()) {
   if (t.k === 'tuple') return tupleOf(t.elements.map((element) => evaluate(element, seen)), t.rest ? evaluate(t.rest, seen) : null);
   if (t.k === 'map') return mapOf(evaluate(t.key, seen), evaluate(t.value, seen));
   if (t.k === 'promise') return promiseOf(evaluate(t.value, seen));
+  if (t.k === 'iterator') return iteratorOf(evaluate(t.elem, seen), t.async);
+  if (t.k === 'instance') {
+    const fields = new Map();
+    for (const [name, field] of t.fields) fields.set(name, { ...field, type: evaluate(field.type, seen) });
+    return instanceOf(t.name, fields, { args: (t.args || []).map((arg) => evaluate(arg, seen)), parent: t.parent });
+  }
+  if (t.k === 'class') {
+    const statics = new Map();
+    for (const [name, field] of t.statics) statics.set(name, { ...field, type: evaluate(field.type, seen) });
+    return classOf(t.name, evaluate(t.instance, seen), {
+      statics, ctor: evaluate(t.ctor, seen), typeParams: t.typeParams, typeEnv: t.typeEnv, node: t.node,
+    });
+  }
   if (t.k === 'fn') {
     return fnType(
       t.params.map((parameter) => ({ ...parameter, type: evaluate(parameter.type, seen) })),
@@ -415,6 +459,35 @@ function assignable(from, to, seen = new Set()) {
     return assignable(from.key, to.key, seen) && assignable(from.value, to.value, seen);
   }
   if (from.k === 'promise' && to.k === 'promise') return assignable(from.value, to.value, seen);
+  if (from.k === 'iterator' && to.k === 'iterator') {
+    return from.async === to.async && assignable(from.elem, to.elem, seen);
+  }
+  if (from.k === 'class' || to.k === 'class') {
+    // Constructors are nominal: only the same class (or a subclass) has that
+    // constructor identity. Static members still follow structural typing.
+    if (from.k !== 'class' || to.k !== 'class') return false;
+    if (from.name === to.name) return true;
+    return Boolean(from.node && from.node.superClass && from.node.superClass.name === to.name);
+  }
+
+  // A class instance is accepted wherever a record with the same members is
+  // expected, and a record is accepted by a class-typed parameter when it
+  // supplies every member. Methods are ordinary function-valued fields, so the
+  // rule is the one structural typing already uses for records.
+  if ((from.k === 'instance' || to.k === 'instance') && (from.k === 'record' || to.k === 'instance' || to.k === 'variant' || to.k === 'unit')) {
+    if (from.k === 'unit') return false;
+    const sourceFields = from.k === 'variant'
+      ? new Map(from.fields.map((field) => [field.name, { type: field.type, optional: false }]))
+      : from.fields;
+    const targetFields = to.k === 'instance' ? to.fields : to.fields;
+    for (const [name, field] of targetFields) {
+      if (field.optional) continue;
+      const actual = sourceFields.get(name);
+      if (!actual) return false;
+      if (!assignable(actual.type, field.type, seen)) return false;
+    }
+    return true;
+  }
 
   if (to.k === 'record' && (from.k === 'record' || from.k === 'variant' || from.k === 'unit')) {
     if (from.k === 'unit') return from.unionName === to.name && to.fields.size === 0;
@@ -499,6 +572,7 @@ function infer(pattern, actual, subst, depth = 0) {
     return infer(pattern.key, actual.key, subst, depth + 1) && infer(pattern.value, actual.value, subst, depth + 1);
   }
   if (pattern.k === 'promise' && actual.k === 'promise') return infer(pattern.value, actual.value, subst, depth + 1);
+  if (pattern.k === 'iterator' && actual.k === 'iterator') return infer(pattern.elem, actual.elem, subst, depth + 1);
   if (pattern.k === 'fn' && actual.k === 'fn') {
     let ok = true;
     for (let i = 0; i < Math.min(pattern.params.length, actual.params.length); i += 1) {
@@ -537,6 +611,13 @@ function substituteRaw(t, subst) {
       return mapOf(substituteRaw(t.key, subst), substituteRaw(t.value, subst));
     case 'promise':
       return promiseOf(substituteRaw(t.value, subst));
+    case 'iterator':
+      return iteratorOf(substituteRaw(t.elem, subst), t.async);
+    case 'instance': {
+      const fields = new Map();
+      for (const [name, field] of t.fields) fields.set(name, { ...field, type: substituteRaw(field.type, subst) });
+      return instanceOf(t.name, fields, { args: (t.args || []).map((arg) => substituteRaw(arg, subst)), parent: t.parent });
+    }
     case 'union':
       return union(t.members.map((m) => substituteRaw(m, subst)));
     case 'conditional':
@@ -596,6 +677,9 @@ module.exports = {
   keyofType,
   indexedAccessType,
   mappedType,
+  instanceOf,
+  classOf,
+  iteratorOf,
   isDeferred,
   containsVariable,
   evaluate,

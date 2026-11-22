@@ -1,0 +1,25 @@
+# Declarations for std/stream. PlainScript uses Node's stream implementation;
+# these helpers give it one coherent text-oriented surface.
+
+export type Readable = {
+    on: (event: text, handler: (any) -> nothing) -> Readable,
+    pipe: (target: Writable) -> Writable,
+    destroy: (error?: any) -> nothing
+}
+
+export type Writable = {
+    write: (chunk: any) -> boolean,
+    end: (chunk?: any) -> nothing,
+    on: (event: text, handler: (any) -> nothing) -> Writable,
+    destroy: (error?: any) -> nothing
+}
+
+export type Transform = Readable & Writable
+
+export declare function fromText(text: text) -> Readable
+export declare function fromBytes(bytes: list of number) -> Readable
+export declare function collect(stream: Readable) -> Promise of text
+export declare function collectBytes(stream: Readable) -> Promise of list of number
+export declare function writeAll(stream: Writable, text: text) -> Promise of nothing
+export declare function pipeline(source: Readable, target: Writable) -> Promise of nothing
+export declare function transform(f: (text) -> text) -> Transform

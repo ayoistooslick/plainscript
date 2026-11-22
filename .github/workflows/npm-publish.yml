@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version to publish (e.g. 2.1.0)"
+        description: "Version to publish (e.g. 2.3.0)"
         required: true
-        default: "2.1.0"
+        default: "2.3.0"
 
 jobs:
   publish:
@@ -91,7 +91,9 @@ jobs:
           if git rev-parse "$TAG" >/dev/null 2>&1; then
             echo "Tag already exists."
           else
-            git tag "$TAG"
+            # Tag the commit that was just pushed, not the pre-bump checkout.
+            git fetch origin main
+            git tag "$TAG" origin/main
             git push origin "$TAG"
           fi
 

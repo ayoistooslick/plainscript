@@ -1,0 +1,16 @@
+# Declarations for std/bigint. BigInt arithmetic is native; these helpers cover
+# parsing, conversion and the operations the operators do not spell.
+
+export declare function parse(text: text, radix?: number) -> bigint throws Error
+export declare function tryParse(text: text, radix?: number) -> bigint?
+export declare function fromNumber(value: number) -> bigint
+export declare function toNumber(value: bigint) -> number
+export declare function toText(value: bigint, radix?: number) -> text
+export declare function abs(value: bigint) -> bigint
+export declare function min(left: bigint, right: bigint) -> bigint
+export declare function max(left: bigint, right: bigint) -> bigint
+export declare function gcd(left: bigint, right: bigint) -> bigint
+export declare function pow(base: bigint, exponent: bigint) -> bigint
+export declare function modPow(base: bigint, exponent: bigint, modulus: bigint) -> bigint
+export declare function isEven(value: bigint) -> boolean
+export declare function compare(left: bigint, right: bigint) -> number

@@ -9,7 +9,6 @@
 import { createElement, useState } from "react"
 import { append, count, filter } from "std/list"
 
-declare const Date: any
 
 export type Task
     id: number

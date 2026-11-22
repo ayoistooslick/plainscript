@@ -1,0 +1,21 @@
+# Declarations for std/crypto. Hashing, authentication, random values and
+# authenticated encryption backed by Node's OpenSSL implementation.
+
+export declare function digest(algorithm: text, text: text) -> text throws Error
+export declare function sha256(text: text) -> text
+export declare function sha512(text: text) -> text
+export declare function sha1(text: text) -> text
+export declare function hmac(algorithm: text, secret: text, text: text) -> text throws Error
+export declare function hmacSha256(secret: text, text: text) -> text
+export declare function randomBytes(count: number) -> list of number
+export declare function randomText(count: number) -> text
+export declare function randomUUID() -> text
+export declare function base64Encode(text: text) -> text
+export declare function base64Decode(text: text) -> text throws Error
+export declare function hexEncode(text: text) -> text
+export declare function hexDecode(text: text) -> text throws Error
+export declare function timingSafeEqual(left: text, right: text) -> boolean
+export declare function pbkdf2(password: text, salt: text, iterations: number, length?: number) -> text
+export declare function deriveKey(password: text, salt: text, length?: number) -> text
+export declare function encrypt(plaintext: text, password: text) -> text
+export declare function decrypt(ciphertext: text, password: text) -> text throws Error

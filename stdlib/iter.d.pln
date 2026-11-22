@@ -1,0 +1,20 @@
+# Declarations for std/iter. Lazy sequences built on the language's generator
+# protocol; every function here returns an Iterator (which is also iterable).
+
+export declare function range(first: number, last: number, step?: number) -> Iterator of number
+export declare function repeat<T>(value: T, count: number) -> Iterator of T
+export declare function fromList<T>(items: list of T) -> Iterator of T
+export declare function toList<T>(items: Iterator of T) -> list of T
+export declare function map<T, U>(items: Iterator of T, f: (T) -> U) -> Iterator of U
+export declare function filter<T>(items: Iterator of T, keep: (T) -> boolean) -> Iterator of T
+export declare function take<T>(items: Iterator of T, count: number) -> Iterator of T
+export declare function drop<T>(items: Iterator of T, count: number) -> Iterator of T
+export declare function chain<T>(first: Iterator of T, second: Iterator of T) -> Iterator of T
+export declare function enumerate<T>(items: Iterator of T) -> Iterator of [number, T]
+export declare function zip<T, U>(left: Iterator of T, right: Iterator of U) -> Iterator of [T, U]
+export declare function reduce<T, U>(items: Iterator of T, initial: U, combine: (U, T) -> U) -> U
+export declare function count<T>(items: Iterator of T) -> number
+export declare function some<T>(items: Iterator of T, test: (T) -> boolean) -> boolean
+export declare function every<T>(items: Iterator of T, test: (T) -> boolean) -> boolean
+export declare function find<T>(items: Iterator of T, test: (T) -> boolean) -> T?
+export declare function forEach<T>(items: Iterator of T, visit: (T) -> nothing) -> nothing

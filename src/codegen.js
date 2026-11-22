@@ -25,13 +25,14 @@ class CodeGen {
     this.file = options.file || '<input>';
     this.outFile = options.outFile || null;
     this.mapSpecifier = options.mapSpecifier || ((spec) => spec);
+    this.bundle = Boolean(options.bundle);
     this.lines = new Lines();
     this.matchId = 0;
   }
 
   generate(program) {
     for (const statement of program.body) {
-      if (statement.kind === 'Import') this.importStatement(statement);
+      if (statement.kind === 'Import' && !this.bundle) this.importStatement(statement);
     }
     for (const statement of program.body) {
       if (statement.kind !== 'Import') this.statement(statement, 0);
@@ -78,8 +79,11 @@ class CodeGen {
       case 'FunctionDecl':
         this.functionDeclaration(node, depth);
         return;
+      case 'ClassDecl':
+        this.classDeclaration(node, depth);
+        return;
       case 'VarDecl': {
-        const keyword = node.exported ? 'export ' : '';
+        const keyword = node.exported && !this.bundle ? 'export ' : '';
         const declaration = node.declKind === 'let' ? 'let' : 'const';
         this.lines.push(depth, `${keyword}${declaration} ${this.pattern(node.pattern)} = ${this.expr(node.init)};`, node);
         return;
@@ -141,6 +145,10 @@ class CodeGen {
         this.block(node.body, depth + 1);
         if (node.handler) {
           this.lines.push(depth, `} catch (${jsName(node.errorName)}) {`, node);
+          if (node.catchType) {
+            const test = this.typeTest(node.catchType, node.errorName);
+            if (test !== 'true') this.lines.push(depth + 1, `if (!${test}) throw ${jsName(node.errorName)};`, node);
+          }
           this.block(node.handler, depth + 1);
         }
         if (node.finalizer) {
@@ -166,11 +174,13 @@ class CodeGen {
         this.lines.push(depth, `return ${this.expr(node.call)};`, node);
         return;
       case 'ExportNamed':
+        if (this.bundle) return;
         this.lines.push(depth, `export { ${node.names.map((name) => (name.local === name.exported
           ? jsName(name.local)
           : `${jsName(name.local)} as ${jsName(name.exported)}`)).join(', ')} };`, node);
         return;
       case 'ReExport': {
+        if (this.bundle) return;
         const specifier = this.mapSpecifier(node.spec);
         this.lines.push(depth, `export { ${node.names.map((name) => (name.local === name.exported
           ? jsName(name.local)
@@ -178,7 +188,7 @@ class CodeGen {
         return;
       }
       case 'ExportDefault':
-        this.lines.push(depth, `export default ${this.expr(node.value)};`, node);
+        this.lines.push(depth, this.bundle ? `const __bundle_default = ${this.expr(node.value)};` : `export default ${this.expr(node.value)};`, node);
         return;
       default:
         throw new Error(`The JavaScript backend does not support ${node.kind}`);
@@ -194,16 +204,54 @@ class CodeGen {
   }
 
   functionDeclaration(node, depth) {
-    const keyword = node.defaultExport ? 'export default ' : (node.exported ? 'export ' : '');
+    const keyword = this.bundle ? '' : (node.defaultExport ? 'export default ' : (node.exported ? 'export ' : ''));
     const asyncKeyword = node.async ? 'async ' : '';
+    const generator = node.generator ? '*' : '';
     const params = node.params.map((parameter) => {
       const rest = parameter.rest ? '...' : '';
       const defaultValue = parameter.defaultValue ? ` = ${this.expr(parameter.defaultValue)}` : '';
       return `${rest}${jsName(parameter.name)}${defaultValue}`;
     }).join(', ');
-    const declaredName = node.name ? ` ${jsName(node.name)}` : '';
-    this.lines.push(depth, `${keyword}${asyncKeyword}function${declaredName}(${params}) {`, node);
+    const bundleDefault = this.bundle && node.defaultExport;
+    const declaredName = node.name ? ` ${jsName(node.name)}` : (bundleDefault ? ' __bundle_default' : '');
+    this.lines.push(depth, `${keyword}${asyncKeyword}function${generator}${declaredName}(${params}) {`, node);
     this.block(node.body, depth + 1);
+    this.lines.push(depth, '}', node);
+    if (bundleDefault && node.name) this.lines.push(depth, `const __bundle_default = ${jsName(node.name)};`, node);
+  }
+
+  classDeclaration(node, depth) {
+    const keyword = node.exported && !this.bundle ? 'export ' : '';
+    const heritage = node.superName ? ` extends ${jsName(node.superName)}` : '';
+    this.lines.push(depth, `${keyword}class ${jsName(node.name)}${heritage} {`, node);
+    for (const field of node.fields) {
+      const stat = field.static ? 'static ' : '';
+      const initializer = field.defaultValue ? ` = ${this.expr(field.defaultValue)}` : '';
+      this.lines.push(depth + 1, `${stat}${jsName(field.name)}${initializer};`, field);
+    }
+    if (node.constructor) {
+      const params = node.constructor.params.map((parameter) => {
+        const rest = parameter.rest ? '...' : '';
+        const defaultValue = parameter.defaultValue ? ` = ${this.expr(parameter.defaultValue)}` : '';
+        return `${rest}${jsName(parameter.name)}${defaultValue}`;
+      }).join(', ');
+      this.lines.push(depth + 1, `constructor(${params}) {`, node.constructor);
+      this.block(node.constructor.body, depth + 2);
+      this.lines.push(depth + 1, '}', node.constructor);
+    }
+    for (const method of node.methods) {
+      const stat = method.static ? 'static ' : '';
+      const asyncKeyword = method.async ? 'async ' : '';
+      const generator = method.generator ? '*' : '';
+      const params = method.params.map((parameter) => {
+        const rest = parameter.rest ? '...' : '';
+        const defaultValue = parameter.defaultValue ? ` = ${this.expr(parameter.defaultValue)}` : '';
+        return `${rest}${jsName(parameter.name)}${defaultValue}`;
+      }).join(', ');
+      this.lines.push(depth + 1, `${stat}${asyncKeyword}${generator}${jsName(method.name)}(${params}) {`, method);
+      this.block(method.body, depth + 2);
+      this.lines.push(depth + 1, '}', method);
+    }
     this.lines.push(depth, '}', node);
   }
 
@@ -325,6 +373,8 @@ class CodeGen {
     switch (node.kind) {
       case 'Number':
         return Number.isFinite(node.value) ? String(node.value) : 'NaN';
+      case 'BigInt':
+        return `${node.value}n`;
       case 'Text':
         return JSON.stringify(node.value);
       case 'Regex':
@@ -348,6 +398,7 @@ class CodeGen {
       case 'Record': {
         const fields = node.fields.map((field) => {
           if (field.spread) return `...${this.expr(field.spread)}`;
+          if (field.computed) return `[${this.expr(field.computed)}]: ${this.expr(field.value)}`;
           const key = /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(field.key) ? field.key : JSON.stringify(field.key);
           return `${key}: ${this.expr(field.value)}`;
         });
@@ -374,6 +425,16 @@ class CodeGen {
       }
       case 'Await':
         return `(await ${this.expr(node.value)})`;
+      case 'This':
+        return 'this';
+      case 'Super':
+        return 'super';
+      case 'Yield':
+        return `(yield ${this.expr(node.value)})`;
+      case 'TypeOf':
+        return `(typeof ${wrap(this.expr(node.value))})`;
+      case 'Ternary':
+        return `(${this.expr(node.condition)} ? ${this.expr(node.whenTrue)} : ${this.expr(node.whenFalse)})`;
       case 'Unary':
         return `(${node.operator === 'not' ? '!' : '-'}${wrap(this.expr(node.operand))})`;
       case 'Binary':
@@ -419,6 +480,7 @@ class CodeGen {
           case 'text': return `(typeof ${v} === "string")`;
           case 'boolean': return `(typeof ${v} === "boolean")`;
           case 'regex': return `(${v} instanceof RegExp)`;
+          case 'bigint': return `(typeof ${v} === "bigint")`;
           case 'nothing': return `(${v} === null || ${v} === undefined)`;
           case 'any':
           case 'unknown': return 'true';
@@ -426,6 +488,12 @@ class CodeGen {
           default: return 'false';
         }
       case 'list': return `Array.isArray(${v})`;
+      case 'iterator': return `(${v} !== null && typeof ${v} === "object" && typeof ${v}.next === "function")`;
+      case 'instance': {
+        // A class instance test is nominal: it asks the runtime whether the
+        // value was constructed by this class (or a subclass).
+        return `(${v} instanceof ${jsName(type.name)})`;
+      }
       case 'map': return `(${v} !== null && typeof ${v} === "object" && !Array.isArray(${v}))`;
       case 'promise': return `(${v} !== null && typeof ${v} === "object" && typeof ${v}.then === "function")`;
       case 'fn': return `(typeof ${v} === "function")`;

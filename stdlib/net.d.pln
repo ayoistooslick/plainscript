@@ -1,0 +1,28 @@
+# Declarations for std/net. TCP and UDP are exposed directly; TLS and HTTP live
+# in std/http and the host's npm ecosystem.
+
+export type TcpSocket = {
+    readonly remoteAddress: text,
+    readonly remotePort: number,
+    write: (text: text) -> boolean,
+    end: (text?: text) -> nothing,
+    onData: ((text: text) -> nothing) -> nothing,
+    onClose: (() -> nothing) -> nothing,
+    close: () -> nothing
+}
+
+export type TcpServer = {
+    readonly port: number,
+    readonly host: text,
+    close: () -> nothing
+}
+
+export type UdpServer = {
+    readonly port: number,
+    close: () -> nothing
+}
+
+export declare function connectTcp(host: text, port: number) -> Promise of TcpSocket throws Error
+export declare function listenTcp(host: text, port: number, onConnection: (TcpSocket) -> nothing) -> Promise of TcpServer throws Error
+export declare function sendUdp(host: text, port: number, text: text, timeout?: number) -> Promise of text throws Error
+export declare function listenUdp(host: text, port: number, onMessage: (text: text, remoteAddress: text, remotePort: number) -> text?) -> Promise of UdpServer throws Error

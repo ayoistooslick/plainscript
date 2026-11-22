@@ -580,7 +580,7 @@ and replacement syntax are the host's. See [Regular expressions](REGEX.md).
 import { print } from "std/io"
 import { upper } from "std/text"
 
-export value version is "2.2.0"
+export value version is "2.3.0"
 
 export define shout(text: text) returns text
     return upper("{text}!")
@@ -779,3 +779,147 @@ The other side receives `{"jsonrpc":"2.0","id":1,"method":"add","params":[2,3]}`
 and replies with a result or a structured error. The boundary is a process
 boundary: values are JSON, memory is not shared, and a crash stays on its side.
 See [Cross-language bridges](CROSS_LANGUAGE.md).
+
+## 2.3 language additions
+
+### Classes
+
+```
+import { print } from "std/io"
+
+class Account
+    owner: text
+    readonly id: number
+    static nextId: number = 1
+
+    constructor(owner: text)
+        this.owner = owner
+        this.id = Account.nextId
+        Account.nextId += 1
+    end
+
+    function label() -> text
+        return "{this.owner} #{this.id}"
+    end
+
+    static function reset() -> nothing
+        Account.nextId = 1
+    end
+end
+
+class Admin extends Account
+    constructor(owner: text)
+        super(owner)
+    end
+    function label() -> text
+        return "{super.label()} (admin)"
+    end
+end
+
+let admin = new Admin("Ada")
+print(admin.label())
+print("{admin is Account}")
+```
+
+Classes use `function` for methods, just like free functions. Fields need a
+type or an initializer. A constructor is optional. `static` and `readonly` are
+contextual identifiers in class bodies.
+
+Generic classes use the same angle-bracket syntax as generic functions:
+
+```
+class Box<T>
+    value: T
+    constructor(value: T)
+        this.value = value
+    end
+    function map<U>(transform: (T) -> U) -> Box<U>
+        return new Box(transform(this.value))
+    end
+end
+```
+
+### Ternaries, BigInt, records and comments
+
+```
+let count = 1
+let label = count > 0 ? "some" : "none"
+let large = 12345678901234567890n
+let key = "answer"
+let name = "Ada"
+let record = { [key]: 42, name }
+/* nested /* comments */ are fine */
+```
+
+### Generators
+
+```
+import { print } from "std/io"
+
+generator function squares(limit: number) -> number
+    let index = 1
+    while index <= limit
+        yield index * index
+        index += 1
+    end
+end
+
+for square in squares(3)
+    print(square)
+end
+```
+
+### Typed errors
+
+```
+import { print } from "std/io"
+
+class ConfigError extends Error
+    key: text
+    constructor(key: text)
+        super("missing config {key}")
+        this.key = key
+    end
+end
+
+function setting(key: text) throws ConfigError
+    if key == "port"
+        return "8080"
+    end
+    throw new ConfigError(key)
+end
+
+try
+    print(setting("host"))
+catch error: ConfigError
+    print("missing {error.key}")
+end
+```
+
+### Decorators
+
+```
+function tagged(value: any) -> any
+    return value
+end
+
+class Greeter
+    @tagged
+    function greet(name: text) -> text
+        return "hello {name}"
+    end
+end
+```
+
+A decorator is an expression that receives the decorated value and returns its
+replacement.
+
+### Iteration helpers
+
+```
+import { print } from "std/io"
+import { range, map, toList } from "std/iter"
+
+let doubled = toList(map(range(1, 4), (value: number) => value * 2))
+print(doubled)
+```

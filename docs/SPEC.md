@@ -1,4 +1,4 @@
-# The PlainScript 2.2 Language Specification
+# The PlainScript 2.3 Language Specification
 
 This document defines the language implemented by the compiler in `src/`. When this
 document and the compiler disagree, the compiler is authoritative and the document is a
@@ -962,3 +962,107 @@ use either `returns` or `->` in 2.1, and documentation uses `returns`.
 
 A file that needs more time can remove its pragma and return to 2.0 semantics with no other
 change.
+
+## 12. PlainScript 2.3
+
+2.3 keeps every 2.0, 2.1 and 2.2 production. It adds an object model, lazy
+iteration, typed failures, expression conveniences and a richer standard
+library. `class` and `throws` are contextual keywords, so source that used
+them as names still parses.
+
+### 12.1 Classes
+
+```
+class Name<T> extends Base
+    field: Type
+    static count: number = 0
+    readonly id: text
+
+    constructor(value: T)
+        super(...)
+        this.field = value
+    end
+
+    function method<U>(argument: U) -> U
+        return argument
+    end
+
+    static function create(value: T) -> Name<T>
+        return new Name(value)
+    end
+end
+```
+
+- A class declaration introduces a value (the constructor) and an instance
+  type. The instance type has the declared fields and methods.
+- `this` has the enclosing instance type. It is available in fields,
+  constructors and methods, and is an error in free functions.
+- `super(...)` calls the base constructor; `super.method(...)` calls a base
+  instance method. A subclass constructor must call `super` before using
+  `this`.
+- Fields without an initializer must be definitely assigned by the constructor.
+  `readonly` fields may be assigned only there.
+- `static` fields and methods live on the constructor value.
+- Generic classes infer constructor type arguments from the arguments.
+- `value is ClassName` is a nominal runtime check (`instanceof`), not a
+  structural test.
+- Decorators run after the declaration and replace the binding. A class
+  decorator receives the constructor; a method decorator receives the method
+  function and is assigned back to `Class.prototype.method` (or `Class.method`).
+
+### 12.2 Expression conveniences
+
+- Ternary: `condition ? whenTrue : whenFalse`. Only the chosen branch is
+  evaluated.
+- BigInt: `123n`, `0xffn`, `0b1010n`, type `bigint`. BigInt and number do not
+  mix implicitly.
+- Computed record keys: `{ [expression]: value }`.
+- Shorthand fields: `{ name }` is `{ name: name }`.
+- Nested block comments: `/* ... /* ... */ ... */`.
+
+### 12.3 Generators and iterators
+
+```
+generator function values(limit: number) -> number
+    let index = 0
+    while index < limit
+        yield index
+        index += 1
+    end
+end
+```
+
+A generator's return annotation is the yielded element type. Its call type is
+`Iterator of Element`; `for value in iterator` consumes it. A generator cannot
+return a final value (`return nothing` stops it). `Iterator` values are also
+JavaScript iterables.
+
+### 12.4 Typed exceptions
+
+`function f(...) throws TypeError` declares the thrown type. `throw value` must
+be assignable to that type, allowing subclass instances. `throws nothing`
+forbids throwing. A clause is optional; without one, throws stay unchecked for
+backward compatibility.
+
+`catch error: Type` binds `error` as `Type`. At run time the thrown value is
+tested; a value that is not an instance of `Type` is rethrown before the handler
+runs. One `try` has one catch clause; nest `try` blocks for multiple typed
+handlers.
+
+### 12.5 Reflection and the standard library
+
+`typeof expression` produces the runtime JavaScript type tag as `text`.
+`std/reflect` adds `typeOf`, `className`, `fieldsOf`, `hasField`, `isError`,
+`isIterator`, `isPromise` and `describe`. The 2.3 standard library also adds
+`std/iter`, `std/bigint`, `std/env`, `std/process`, `std/crypto`,
+`std/compress`, `std/stream`, `std/worker` and `std/net`.
+
+### 12.6 Tooling guarantees
+
+- `plainscript build` reuses an emitted module only when its source, compiler
+  version, configuration and dependency hashes are unchanged.
+- `plainscript bundle` produces one ES module. It preserves external package
+  imports and rejects exported `let` bindings because a namespace copy would
+  break ESM live-binding semantics.
+- The optimiser folds literals and removes statements after a terminator while
+  preserving hoisted declarations.

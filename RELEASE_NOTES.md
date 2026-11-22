@@ -1,3 +1,146 @@
+# PlainScript 2.3.0 — classes, generators, typed errors and a faster toolchain
+
+PlainScript 2.3 is a language and tooling release. The language gains an object
+model, lazy iteration, checked failures and the expression conveniences that
+were missing from 2.2. The compiler gains a bundler, an incremental cache and an
+optimiser, and the standard library gains ten modules.
+
+There is no intentional source break from 2.0, 2.1 or 2.2. `class` and `throws`
+are contextual keywords, so existing identifiers keep working. The one stricter
+check is deliberate: a declared `throws` type is checked nominally.
+
+## Language
+
+### Classes
+
+```plainscript
+class HttpError extends Error
+    status: number
+    readonly retryable: boolean
+
+    constructor(message: text, status: number)
+        super(message)
+        this.status = status
+        this.retryable = status >= 500
+    end
+
+    function describe() -> text
+        return "{this.status}: {this.message}"
+    end
+
+    static function badRequest(message: text) -> HttpError
+        return new HttpError(message, 400)
+    end
+end
+```
+
+Classes support inheritance, `super`, `this`, generics, static and readonly
+members and decorators. They lower to native JavaScript classes. `x is C` is a
+nominal `instanceof` check. Generic class arguments are inferred from
+`new Box(3)`.
+
+### Generators
+
+```plainscript
+generator function pages(first: number, last: number) -> number
+    let page = first
+    while page <= last
+        yield page
+        page += 1
+    end
+end
+
+for page in pages(1, 3)
+    print(page)
+end
+```
+
+A generator's annotation is its yielded element type; its call type is
+`Iterator of T`. `std/iter` adds lazy and eager helpers over iterators.
+
+### Typed errors
+
+`function load(id: text) throws NotFoundError` makes throwing part of the
+signature. A `throw` of an unrelated class is rejected. `throws nothing`
+forbids throwing entirely. `catch error: NotFoundError` narrows the binding and
+is guarded at run time, so a mismatched value is rethrown rather than passed to
+a handler that assumes the wrong type.
+
+One catch clause per `try` remains the rule, matching JavaScript; nest `try`
+blocks for multiple typed handlers.
+
+### Everything else in the language
+
+- Ternary expressions with lazy branches.
+- BigInt literals (`123n`, `0xffn`, `0b1010n`) and a distinct `bigint` type.
+- Computed record keys (`{ [key]: value }`) and shorthand fields (`{ name }`).
+- Nested block comments.
+- Runtime `typeof`.
+- Decorators on classes, methods and fields.
+
+## Tooling
+
+- **Bundler.** `plainscript bundle src/main.pln --out=dist/app.js` emits one ES
+  module. Packages and `std/*` stay external. Exported `let` is rejected
+  (`PS4010`) because a bundle cannot preserve ESM live bindings.
+- **Incremental build.** `plainscript build` caches each emitted module in
+  `.plainscript/build-cache.json`. A hit requires the source hash, compiler
+  fingerprint, configuration and all local/declaration dependency hashes to
+  match, so editing a dependency invalidates its importers. `--no-cache` forces
+  a cold build.
+- **Optimiser.** Constant folding, constant ternary selection and
+  unreachable-statement removal run by default; `--no-optimize` keeps the raw
+  HIR.
+- **TypeScript declarations.** `.d.ts` import now emits real `declare class`
+  declarations with constructors, parameter properties, statics, getters,
+  methods, `this`, `Date`, `Error`, `RegExp`, `Function` and common utility
+  types. Unsupported utility types widen with an explicit warning.
+- **Editor support.** The formatter indents classes and constructors; the LSP
+  reports class symbols and completes the 2.3 keywords.
+
+## Standard library
+
+New modules: `std/iter`, `std/reflect`, `std/bigint`, `std/env`, `std/process`,
+`std/crypto`, `std/compress`, `std/stream`, `std/worker` and `std/net`. Each has
+a `.d.pln` declaration and runtime coverage. `std/worker` and `std/net` require
+Node; browser builds should stay on the portable modules.
+
+## Verification
+
+- `tests/language-2-3.test.js` covers classes, inheritance, generics, statics,
+  readonly fields, decorators, generators, typed throws and catches, ternary,
+  BigInt, computed keys, shorthand, block comments and `typeof`, including
+  negative diagnostics and runtime output.
+- `tests/declaration-interop-hardening.test.js` covers class declarations and
+  constructor mismatch diagnostics.
+- `scripts/verify-bindings.js` generates, compiles and executes clients where
+  the toolchain exists. JavaScript, TypeScript, Python, C and C++ run in the
+  local environment; the all-language CI job installs Go, Rust, Ruby, PHP, C#,
+  Java, Kotlin, Swift and Dart.
+- CI runs on Ubuntu, macOS and Windows with Node 20 and 22, plus live
+  PostgreSQL and MySQL services.
+- `scripts/benchmark-cache.js` measured a 100-module synthetic project on Linux
+  x64 with Node 26.13.1: 200.48 ms cold, 88.73 ms warm median for five runs, and
+  136.16 ms with `--no-cache`; all 101 modules were reused. These are synthetic
+  numbers and include CLI startup.
+- `node scripts/build-docs-site.js` and `node scripts/check-docs-links.js` build
+  and check this documentation site.
+
+## Compatibility and upgrade
+
+Existing source compiles unchanged. If a 2.2 program declared `throws` and threw
+a value from an unrelated class, remove the clause or throw a subclass of the
+declared type. See [Migrating to 2.3](docs/MIGRATION_2_3.md).
+
+## Known boundaries
+
+No native FFI, WebAssembly target or browser bundler. MongoDB, WebSocket
+extensions, distributed job leases, arbitrary `.d.ts` parsing and a reproducible
+cross-language benchmark are not implemented. The debug adapter is
+protocol-tested, not automated through a VS Code UI. See
+[docs/CAPABILITY_AUDIT_2_3.md](docs/CAPABILITY_AUDIT_2_3.md) and
+[docs/ROADMAP.md](docs/ROADMAP.md).
+
 # PlainScript 2.2.0 — native JSX, native regex, cross-language bridges and migration
 
 PlainScript 2.2 is an interoperability and adoption release. It closes the two

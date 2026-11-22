@@ -5,7 +5,6 @@
 import { createElement, useState } from "react"
 import { append, count } from "std/list"
 
-declare const Date: any
 
 export type Item
     id: number

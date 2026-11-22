@@ -1,0 +1,47 @@
+# Declarations for std/process. Commands are executed without a shell by
+# default; use shell() when shell syntax is required.
+
+export type CommandResult = {
+    readonly code: number,
+    readonly stdout: text,
+    readonly stderr: text
+}
+
+export type RunOptions = {
+    cwd?: text,
+    env?: map of text to text,
+    timeout?: number,
+    input?: text
+}
+
+export type ProcessHandle = {
+    readonly pid: number,
+    kill: (signal?: text) -> boolean,
+    onExit: ((CommandResult) -> nothing) -> nothing,
+    onStdout: ((text) -> nothing) -> nothing,
+    onStderr: ((text) -> nothing) -> nothing
+}
+
+export type MemoryUsage = {
+    readonly rss: number,
+    readonly heapTotal: number,
+    readonly heapUsed: number,
+    readonly external: number
+}
+
+export declare function run(command: text, args?: list of text, options?: RunOptions) -> Promise of CommandResult throws Error
+export declare function runSync(command: text, args?: list of text, options?: RunOptions) -> CommandResult throws Error
+export declare function shell(command: text, options?: RunOptions) -> Promise of CommandResult throws Error
+export declare function start(command: text, args?: list of text, options?: RunOptions) -> ProcessHandle
+export declare function which(command: text) -> text?
+export declare function cwd() -> text
+export declare function chdir(path: text) -> nothing
+export declare function pid() -> number
+export declare function ppid() -> number
+export declare function platform() -> text
+export declare function arch() -> text
+export declare function argv() -> list of text
+export declare function exit(code?: number) -> nothing
+export declare function uptime() -> number
+export declare function memoryUsage() -> MemoryUsage
+export declare function onSignal(signal: text, handler: () -> nothing) -> nothing

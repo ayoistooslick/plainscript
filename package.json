@@ -1,6 +1,6 @@
 {
   "name": "plainscript-lang",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "description": "PlainScript: an independent, statically typed full-stack language for the JavaScript platform.",
   "author": {
     "name": "Ayodele Ayokunle David",
@@ -35,10 +35,12 @@
     "fmt": "node src/cli.js fmt",
     "docs:build": "node scripts/build-docs-site.js",
     "verify:integrations": "node scripts/verify-integrations.js",
+    "verify:bindings": "node scripts/verify-bindings.js",
     "demo:cli": "node src/cli.js run demos/cli/src/main.pln",
     "demo:api": "node src/cli.js run demos/api/src/server.pln",
     "demo:database": "node src/cli.js run demos/database/src/main.pln",
-    "demo:realtime": "node src/cli.js run demos/realtime/src/main.pln"
+    "demo:realtime": "node src/cli.js run demos/realtime/src/main.pln",
+    "bench:cache": "node scripts/benchmark-cache.js 100 5"
   },
   "files": [
     "src",
@@ -61,9 +63,11 @@
     "node": ">=20.0.0"
   },
   "devDependencies": {
+    "@types/node": "^22.20.5",
     "express": "^5.3.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
+    "typescript": "^5.9.3",
     "vite": "^6.4.6"
   }
 }

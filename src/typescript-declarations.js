@@ -110,6 +110,7 @@ class TypeParser {
     // Interfaces with the same name merge in TypeScript. Remember where each
     // was emitted so a later declaration can extend the first one.
     this.interfaceDecls = new Map();
+    this.thisTypeName = null;
   }
 
   peek(offset = 0) { return this.tokens[this.index + offset] || this.tokens[this.tokens.length - 1]; }
@@ -505,36 +506,177 @@ class TypeParser {
     return { fields, unsupported };
   }
 
-  // A declared class is a runtime constructor plus an instance shape. The
-  // shape is a record; the constructor value stays `any` because PlainScript
-  // treats `new` on a JavaScript boundary as untyped.
+  // A declared class is a runtime constructor plus an instance shape. With
+  // PlainScript 2.3 classes, the declaration preserves the constructor
+  // signature, static members and methods instead of flattening the class into
+  // an untyped `any` value.
   parseClass(exported, declarations) {
     this.next();
     const name = this.expectIdentifier('a class name').v;
     const typeParams = this.parseTypeParameters();
-    const bases = [];
+    let extendsType = null;
+    const implementsTypes = [];
     if (this.at('extends')) {
       this.next();
-      const base = this.parseType();
-      if (base) bases.push(base);
+      extendsType = this.parseType();
     }
     if (this.at('implements')) {
       this.next();
       while (true) {
         const implemented = this.parseType();
-        if (implemented) bases.push(implemented);
+        if (implemented) implementsTypes.push(implemented);
         if (this.atPunct(',')) { this.next(); continue; }
         break;
       }
     }
-    this.staticMembersWarned = false;
-    const members = this.parseObjectMembers(false, true);
+    const previousThis = this.thisTypeName;
+    this.thisTypeName = name;
+    const members = this.parseClassMembers();
+    this.thisTypeName = previousThis;
     if (members.unsupported) return;
-    const object = renderRecord(members.fields);
-    const base = bases.map(renderType).join(' & ');
-    const type = base ? (members.fields.length ? `${object} & ${base}` : base) : object;
-    declarations.push(`${exported ? 'export ' : ''}type ${name}${renderTypeParams(typeParams)} = ${type}`);
-    declarations.push(`${exported ? 'export ' : ''}declare const ${name}: any`);
+    // Constructor parameter properties also declare instance fields.
+    if (members.constructorParams) {
+      const promoted = new Set(members.constructorParams.filter((parameter) => parameter.parameterProperty && !parameter.parameterPrivate).map((parameter) => parameter.name));
+      members.fields = members.fields.filter((field) => !promoted.has(field.name)).concat(
+        members.constructorParams
+          .filter((parameter) => parameter.parameterProperty && !parameter.parameterPrivate && parameter.type)
+          .map((parameter) => ({ name: parameter.name, optional: parameter.optional, readonly: parameter.parameterReadonly, static: false, type: renderType(parameter.type) })),
+      );
+    }
+
+    const head = `${exported ? 'export ' : ''}declare class ${name}${renderTypeParams(typeParams)}${extendsType && extendsType.kind === 'ref' ? ` extends ${renderType(extendsType)}` : ''}`;
+    const lines = [head];
+    if (extendsType && extendsType.kind !== 'ref') {
+      this.error(WIDENED, `Base type of \"${name}\" was omitted from the class header; only a named base class is representable.`, this.peek(), 'warning');
+    }
+    for (const type of implementsTypes) {
+      if (type && type.kind === 'ref') {
+        this.error(UNSUPPORTED, `\"implements ${renderType(type)}\" has no PlainScript equivalent and was omitted.`, this.peek(), 'warning');
+      }
+    }
+    for (const field of members.fields) {
+      const modifiers = `${field.static ? 'static ' : ''}${field.readonly ? 'readonly ' : ''}`;
+      lines.push(`    ${modifiers}${field.name}${field.optional ? '?' : ''}: ${field.type}`);
+    }
+    if (members.constructorParams) {
+      lines.push(`    constructor(${members.constructorParams.map((parameter) => renderParameter(parameter)).join(', ')})`);
+    }
+    for (const method of members.methods) {
+      const modifiers = `${method.static ? 'static ' : ''}${method.async ? 'async ' : ''}`;
+      lines.push(`    ${modifiers}function ${method.name}${renderTypeParams(method.typeParams)}(${method.params.map((parameter) => renderParameter(parameter)).join(', ')}) -> ${renderType(method.returnType)}`);
+    }
+    lines.push('end');
+    declarations.push(lines.join('\n'));
+  }
+
+  // Class members keep their kind (field vs method) and static flag, which the
+  // flat record used for interfaces deliberately discards.
+  parseClassMembers() {
+    this.expect('{');
+    const fields = [];
+    const methods = [];
+    let constructorParams = null;
+    let unsupported = false;
+    while (!this.atPunct('}') && this.peek().t !== 'eof') {
+      const start = this.peek();
+      let readonly = false;
+      let isStatic = false;
+      let privateMember = false;
+      let async = false;
+      let accessor = null;
+      let scanning = true;
+      while (scanning) {
+        scanning = false;
+        if (this.at('readonly')) { this.next(); readonly = true; scanning = true; continue; }
+        if (this.at('static')) { this.next(); isStatic = true; scanning = true; continue; }
+        if (this.at('public')) { this.next(); scanning = true; continue; }
+        if (this.at('private') || this.at('protected')) { this.next(); privateMember = true; scanning = true; continue; }
+        if (this.at('abstract') || this.at('override') || this.at('declare') || this.at('accessor') || this.at('async')) {
+          if (this.at('async')) async = true;
+          this.next(); scanning = true; continue;
+        }
+        if (this.at('get') || this.at('set')) { accessor = this.next().v; scanning = true; }
+      }
+      if (privateMember) { this.skipToSemicolon(); continue; }
+      if (this.atPunct('[')) {
+        this.error(UNSUPPORTED, 'Index signatures are not supported; use a map type.', this.peek());
+        unsupported = true;
+        this.skipBalanced('[', ']');
+        if (this.atPunct(':')) { this.next(); this.parseType(); }
+        this.eat(';');
+        continue;
+      }
+      if (isStatic && this.atPunct('{')) {
+        this.error(UNSUPPORTED, 'Static initialization blocks have no declaration equivalent and were omitted.', this.peek(), 'warning');
+        this.skipBalanced('{', '}');
+        continue;
+      }
+      if (this.at('constructor') && this.peek(1).t === 'punct' && this.peek(1).v === '(') {
+        this.next();
+        const constructorTypeParams = this.parseTypeParameters();
+        if (constructorTypeParams.length) {
+          this.error(UNSUPPORTED, 'A generic constructor is not representable in a class declaration.', start, 'warning');
+        }
+        constructorParams = this.parseParameters();
+        if (this.atPunct(':')) { this.next(); this.parseType(); }
+        this.eat(';');
+        continue;
+      }
+      // An overload signature and its implementation repeat the same name.
+      // PlainScript methods are not overloaded in a declare class, so the
+      // first signature wins and the duplicate is ignored.
+      const memberName = this.peek();
+      let name;
+      if (memberName.t === 'string' || memberName.t === 'number') { this.next(); name = memberName.v; }
+      else if (memberName.t === 'ident') { this.next(); name = memberName.v; }
+      else if (memberName.t === 'kw') {
+        // Keywords other than `end` are legal PlainScript identifiers in this
+        // position; `end` terminates the class and cannot name a member.
+        if (memberName.v === 'end') {
+          this.error(UNSUPPORTED, 'A class member named "end" cannot be declared in PlainScript; the member was omitted.', memberName, 'warning');
+          unsupported = true;
+          this.skipStatement();
+          continue;
+        }
+        this.next();
+        name = memberName.v;
+      }
+      else {
+        this.error(SYNTAX, `Expected a class member but found ${JSON.stringify(memberName.v)}.`, memberName);
+        unsupported = true;
+        this.skipStatement();
+        continue;
+      }
+      const optional = Boolean(this.eat('?'));
+      if (this.atPunct('(') || this.atPunct('<')) {
+        const methodTypeParams = this.parseTypeParameters();
+        const params = this.parseParameters();
+        let returnType = { kind: 'prim', name: 'nothing' };
+        if (this.atPunct(':')) { this.next(); returnType = this.parseType(); }
+        else if (!accessor) this.error(SYNTAX, `Method \"${name}\" is missing a return type.`, start);
+        this.eat(';');
+        if (accessor === 'set') continue;
+        if (accessor === 'get') {
+          fields.push({ name, optional, readonly: true, static: isStatic, type: renderType(returnType || { kind: 'prim', name: 'any' }) });
+          continue;
+        }
+        if (methods.some((method) => method.name === name && method.static === isStatic)) continue;
+        methods.push({ name, static: isStatic, async, typeParams: methodTypeParams, params, returnType: returnType || { kind: 'prim', name: 'any' } });
+        continue;
+      }
+      if (!this.atPunct(':')) {
+        this.error(SYNTAX, `Property \"${name}\" is missing a type annotation.`, start);
+        unsupported = true;
+        this.skipStatement();
+        continue;
+      }
+      this.next();
+      const type = this.parseType();
+      this.eat(';');
+      if (type) fields.push({ name, optional, readonly: readonly || accessor === 'get', static: isStatic, type: renderType(type) });
+    }
+    this.expect('}');
+    return { fields, methods, constructorParams, unsupported };
   }
 
   parseAlias(exported, declarations) {
@@ -589,8 +731,32 @@ class TypeParser {
     this.expect('(');
     const params = [];
     while (!this.atPunct(')')) {
+      // A TypeScript `this` parameter only annotates the receiver; it is not a
+      // runtime argument and must not shift the remaining parameters.
+      if (this.at('this') && this.peek(1).t === 'punct' && this.peek(1).v === ':') {
+        this.next(); this.next(); this.parseType();
+        if (this.atPunct(',')) { this.next(); continue; }
+        break;
+      }
       let rest = false;
       if (this.atPunct('...')) { this.next(); rest = true; }
+      // Parameter properties (`constructor(public id: string)`) are legal in
+      // declaration files. They are fields as well as parameters; the flag is
+      // read by parseClassMembers.
+      let parameterProperty = false;
+      let parameterReadonly = false;
+      let parameterPrivate = false;
+      let scanning = true;
+      while (scanning) {
+        scanning = false;
+        if (['public', 'private', 'protected', 'readonly'].some((modifier) => this.at(modifier)) && this.peek(1).t === 'ident') {
+          const modifier = this.next().v;
+          parameterProperty = true;
+          if (modifier === 'readonly') parameterReadonly = true;
+          if (modifier === 'private' || modifier === 'protected') parameterPrivate = true;
+          scanning = true;
+        }
+      }
       const name = this.expectIdentifier('a parameter name').v;
       let optional = false;
       if (this.atPunct('?')) { this.next(); optional = true; }
@@ -600,7 +766,7 @@ class TypeParser {
       if (rest && type && type.kind === 'list') type = { kind: 'list', inner: type.inner };
       else if (rest && type && type.kind === 'ref' && type.name === 'Array' && type.args[0]) type = { kind: 'list', inner: type.args[0] };
       else if (rest) { this.error(UNSUPPORTED, `Rest parameter "${name}" must use an array type.`, this.peek()); type = null; }
-      params.push({ name, optional, rest, type });
+      params.push({ name, optional, rest, type, parameterProperty, parameterReadonly, parameterPrivate });
       this.eat('='); // declaration defaults are ignored
       if (this.atPunct(',')) this.next();
       else break;
@@ -749,8 +915,14 @@ class TypeParser {
         if (primitive === 'object') return { kind: 'record', fields: [] };
         return { kind: 'prim', name: primitive };
       }
-      if (word === 'this' || word === 'symbol' || word === 'bigint') {
-        this.error(UNSUPPORTED, `TypeScript "${word}" is not representable in PlainScript.`, token);
+      if (word === 'this') {
+        if (this.thisTypeName) return { kind: 'ref', name: this.thisTypeName, args: [] };
+        this.error(UNSUPPORTED, 'TypeScript "this" is only representable inside a declared class.', token);
+        return null;
+      }
+      if (word === 'bigint') return { kind: 'prim', name: 'bigint' };
+      if (word === 'symbol') {
+        this.error(UNSUPPORTED, 'TypeScript "symbol" is not representable in PlainScript.', token);
         return null;
       }
       let args = [];
@@ -789,8 +961,41 @@ class TypeParser {
         }
         return { kind: 'map', key: args[0], value: args[1] };
       }
-      if (['Date', 'Map', 'Set', 'WeakMap', 'WeakSet', 'Function', 'RegExp', 'Error'].includes(word)) {
-        this.error(UNSUPPORTED, `Platform type "${word}" has no structural PlainScript equivalent; declare the shape you use.`, token);
+      // The structural utility types map directly onto PlainScript's mapped
+      // types, so importing them keeps real field types instead of widening.
+      if (word === 'Partial' || word === 'Required' || word === 'Readonly') {
+        if (!args.length) {
+          this.error(UNSUPPORTED, `${word} requires a type argument.`, token);
+          return null;
+        }
+        if (word === 'Readonly') {
+          this.error(UNSUPPORTED, 'Readonly<T> is translated as a mutable mapped type; PlainScript mapped types cannot mark every field readonly.', token, 'warning');
+        }
+        return {
+          kind: 'mapped', key: 'K', keyType: { kind: 'keyof', target: args[0] },
+          optional: word === 'Partial', value: { kind: 'indexed', target: args[0], index: { kind: 'ref', name: 'K', args: [] } },
+        };
+      }
+      if (word === 'Pick') {
+        if (args.length < 2) {
+          this.error(UNSUPPORTED, 'Pick requires an object type and a key type.', token);
+          return null;
+        }
+        return {
+          kind: 'mapped', key: 'P', keyType: args[1], optional: false,
+          value: { kind: 'indexed', target: args[0], index: { kind: 'ref', name: 'P', args: [] } },
+        };
+      }
+      if (['Omit', 'Exclude', 'Extract', 'NonNullable', 'ReturnType', 'Parameters', 'Awaited'].includes(word)) {
+        this.error(UNSUPPORTED, `${word}<…> has no structural PlainScript equivalent and was translated as any.`, token, 'warning');
+        return { kind: 'prim', name: 'any' };
+      }
+      if (word === 'Error') return { kind: 'ref', name: 'Error', args: [] };
+      if (word === 'Date') return { kind: 'ref', name: 'Date', args: [] };
+      if (word === 'RegExp') return { kind: 'prim', name: 'regex' };
+      if (word === 'Function') return { kind: 'function', params: [{ name: 'args', rest: true, optional: true, type: { kind: 'prim', name: 'any' } }], ret: { kind: 'prim', name: 'any' } };
+      if (['Map', 'Set', 'WeakMap', 'WeakSet'].includes(word)) {
+        this.error(UNSUPPORTED, `Platform type "${word}" has no structural PlainScript equivalent; use std/map, a list, or declare the shape you use.`, token);
         return null;
       }
       return { kind: 'ref', name: word, args };
@@ -961,9 +1166,18 @@ function renderTypeParams(params) {
   return params.length ? `<${params.map((param) => `${param.name}${param.constraint ? `: ${renderType(param.constraint)}` : ''}`).join(', ')}>` : '';
 }
 
+const PLAINSCRIPT_PARAMETER_KEYWORDS = new Set([
+  'and', 'as', 'async', 'await', 'break', 'case', 'catch', 'const', 'continue',
+  'declare', 'default', 'do', 'else', 'end', 'export', 'extends', 'false', 'finally',
+  'for', 'from', 'function', 'if', 'import', 'in', 'is', 'let', 'match', 'new',
+  'not', 'nothing', 'of', 'or', 'otherwise', 'return', 'super', 'this', 'throw', 'to',
+  'true', 'try', 'type', 'typeof', 'when', 'while', 'with', 'yield',
+]);
+
 function renderParameter(parameter) {
   if (!parameter || !parameter.type) return `${parameter.name}: any`;
-  return `${parameter.rest ? '...' : ''}${parameter.name}${parameter.optional ? '?' : ''}: ${renderType(parameter.type)}`;
+  const name = PLAINSCRIPT_PARAMETER_KEYWORDS.has(parameter.name) ? `${parameter.name}Value` : parameter.name;
+  return `${parameter.rest ? '...' : ''}${name}${parameter.optional ? '?' : ''}: ${renderType(parameter.type)}`;
 }
 
 function renderFunctionType(params, ret, typeParams = []) {

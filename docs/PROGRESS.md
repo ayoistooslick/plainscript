@@ -53,6 +53,17 @@ plainscript check demos/contracts-fullstack/src/App.pln
   checking; native regex literals with typed `std/text` helpers; resolved re-exports;
   executable declared runtimes and generated boundaries; React + Vite integration
   rewritten in PlainScript JSX.
+- **2.3 language work.** Classes, inheritance, `super`, `this`, static/readonly
+  members, generic classes and decorators; generators and `Iterator of T`; typed
+  throws and catches with runtime checking; ternary, BigInt, computed keys,
+  shorthand fields and nested block comments.
+- **2.3 tooling.** `plainscript bundle`, a persistent per-file build cache with
+  dependency invalidation, HIR constant folding/dead-code removal, ten new
+  standard library modules and a typed TypeScript bridge client.
+- **2.3 verification.** `tests/language-2-3.test.js` covers each language
+  feature; `scripts/verify-bindings.js` compiles and executes generated clients;
+  CI runs Linux, macOS and Windows on Node 20 and 22 plus a live
+  PostgreSQL/MySQL job.
 
 ## Evidence
 
@@ -71,9 +82,10 @@ Focused files:
 
 ## Remaining limitations
 
-See the README limitation list and `docs/ROADMAP.md`. In particular, a MongoDB `std/db`
-adapter, live PostgreSQL/MySQL test servers, arbitrary TypeScript `.d.ts` parsing,
-WebSocket extensions, distributed/leased job workers, VS Code UI automation for DAP and a
-cross-language performance baseline are not implemented or not verified here. PostgreSQL
-and MySQL adapter tests use injected driver fakes; see [DATABASES](DATABASES.md). No
-package has been published as part of this work.
+See `docs/ROADMAP.md` and `docs/CAPABILITY_AUDIT_2_3.md`. A MongoDB adapter,
+arbitrary TypeScript `.d.ts` parsing, WebSocket extensions, distributed job
+leases, VS Code UI automation for DAP, a browser bundler and a reproducible
+cross-language performance baseline are not implemented. `std/worker` and
+`std/net` are Node-only. The debug adapter is protocol-tested, not clicked
+through in an editor. Live PostgreSQL/MySQL tests run in CI; locally they require
+the service environment described in the workflow.

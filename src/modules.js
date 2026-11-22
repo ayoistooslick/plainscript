@@ -7,6 +7,7 @@ const os = require('os');
 const { parse } = require('./parser');
 const { checkModule } = require('./checker');
 const { lowerProgram } = require('./hir');
+const { optimizeProgram } = require('./optimize');
 const { generate } = require('./codegen');
 const { Span, error, CompileError } = require('./diagnostics');
 const { resolveJsxOptions, jsxConfigFor } = require('./jsx');
@@ -51,6 +52,9 @@ class Compiler {
     // Editor and test harnesses can supply unsaved documents without writing
     // them to disk. Keys are absolute paths.
     this.overrides = options.overrides || new Map();
+    // Literal folding and unreachable-statement removal. Enabled by default;
+    // `--no-optimize` and `optimize: false` keep the unoptimised HIR.
+    this.optimize = options.optimize !== false;
   }
 
   sourceFor(file) {
@@ -408,6 +412,7 @@ class Compiler {
       typeOnlyImports: record.check.typeOnlyImports,
       jsx: record.jsx || resolveJsxOptions(record.source, this.jsxOptions || {}),
     });
+    if (this.optimize) record.optimization = optimizeProgram(hir);
 
     const generated = generate(hir, {
       file: record.display,
@@ -415,6 +420,7 @@ class Compiler {
       mapSpecifier: (spec) => this.emitSpecifier(spec, outFile, record),
       unitVariants,
       variantFields,
+      bundle: Boolean(options.bundle),
     });
 
     record.hir = hir;

@@ -22,6 +22,7 @@ const DOCUMENTS = [
   'docs/JSX.md',
   'docs/REGEX.md',
   'docs/CROSS_LANGUAGE.md',
+  'docs/STDLIB.md',
 ];
 
 function examplesIn(file) {

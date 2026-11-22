@@ -47,7 +47,18 @@ directory (`dist/` by default). With no arguments it compiles every `.pln` under
 root, skipping the output directory, `node_modules`, dot-directories and `*.d.pln`
 declaration files.
 
-A failed build writes nothing. When the project is not already ESM, a
+A failed build writes nothing. Builds are incremental: `.plainscript/build-cache.json` under the project root
+stores a hash of each source, the compiler fingerprint, the configuration and
+the local/declaration dependencies of every emitted module. A file is reused
+only when all of them match, so editing a dependency also invalidates its
+importers. `--no-cache` forces a cold compile, and deleting the cache file is
+always safe.
+
+The compiler folds side-effect-free literals and removes statements that follow
+a terminator while preserving hoisted declarations. `--no-optimize` keeps the
+unoptimised HIR, which is useful when debugging emitted output.
+
+When the project is not already ESM, a
 `package.json {"type":"module"}` is written into the output directory so Node loads the
 files correctly.
 
@@ -337,3 +348,21 @@ if (!result.ok) {
 
 `src/index.js` re-exports the documented API: `compileFile`, `Compiler`, `format`,
 `diagnostics` helpers and `VERSION`.
+
+### `plainscript bundle <entry.pln>`
+
+Compiles an entry module and its local imports into one ES module
+(`--out=<file>`, default `dist/<entry>.bundle.js`). Package imports and `std/*`
+imports stay external so the host resolves them normally; local modules are
+wrapped in scopes and concatenated. Exported `let` bindings are rejected with
+`PS4010`: copying them into a namespace would break ESM live-binding semantics,
+so the bundler refuses rather than producing a subtly wrong bundle.
+
+```
+plainscript bundle src/main.pln --out=dist/app.js
+node dist/app.js
+```
+
+The bundle preserves the module graph's evaluation order. Source maps are not
+emitted for bundles yet; run the unbundled build when you need per-file
+debugging.

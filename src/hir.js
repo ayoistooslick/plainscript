@@ -102,8 +102,13 @@ class Lowerer {
       case 'DeclareValue':
       case 'OverloadDecl':
         return null;
-      case 'FunctionDecl':
-        return this.functionDeclaration(node);
+      case 'ClassDecl':
+        return this.classDeclaration(node);
+      case 'FunctionDecl': {
+        const declaration = this.functionDeclaration(node);
+        if (!node.decorators || !node.decorators.length || !node.name) return declaration;
+        return [declaration, ...this.decoratorAssignments(node.decorators, { kind: 'Name', name: node.name })];
+      }
       case 'VarDecl':
         return {
           kind: 'VarDecl',
@@ -176,10 +181,14 @@ class Lowerer {
           col: node.col,
         };
       case 'Try':
+        // A typed catch keeps a runtime guard: the annotation narrows inside
+        // the handler, and a value that does not match is rethrown instead of
+        // being typed as something it is not.
         return {
           kind: 'Try',
           body: this.block(node.body),
           errorName: node.errorName,
+          catchType: node.errorType ? this.checker.resolveType(node.errorType) : null,
           handler: node.handler ? this.block(node.handler) : null,
           finalizer: node.finalizer ? this.block(node.finalizer) : null,
           line: node.line,
@@ -252,6 +261,7 @@ class Lowerer {
       })),
       body,
       async: Boolean(node.async) || containsAwait(node.body),
+      generator: Boolean(node.generator),
       exported: Boolean(node.exported),
       defaultExport: Boolean(node.defaultExport),
       line: node.line,
@@ -259,11 +269,135 @@ class Lowerer {
     };
   }
 
+  // ---------------------------------------------------------------- classes
+
+  classDeclaration(node) {
+    if (node.declared) return null;
+    const body = {
+      kind: 'ClassDecl',
+      name: node.name,
+      superName: node.superClass ? node.superClass.name : null,
+      fields: node.fields.map((field) => ({
+        name: field.name,
+        static: Boolean(field.static),
+        optional: Boolean(field.optional),
+        defaultValue: field.defaultValue ? this.expression(field.defaultValue) : null,
+        line: field.line,
+        col: field.col,
+      })),
+      constructor: node.constructorDecl ? {
+        params: node.constructorDecl.params.map((parameter) => ({
+          name: parameter.name,
+          defaultValue: parameter.defaultValue ? this.expression(parameter.defaultValue) : null,
+          rest: Boolean(parameter.rest),
+        })),
+        body: this.block(node.constructorDecl.body),
+        line: node.constructorDecl.line,
+        col: node.constructorDecl.col,
+      } : null,
+      methods: node.methods.map((method) => ({
+        kind: 'Method',
+        name: method.name,
+        static: Boolean(method.static),
+        async: Boolean(method.async),
+        generator: Boolean(method.generator),
+        params: method.params.map((parameter) => ({
+          name: parameter.name,
+          defaultValue: parameter.defaultValue ? this.expression(parameter.defaultValue) : null,
+          rest: Boolean(parameter.rest),
+        })),
+        body: this.block(method.body),
+        line: method.line,
+        col: method.col,
+      })),
+      exported: Boolean(node.exported),
+      line: node.line,
+      col: node.col,
+    };
+
+    const applications = [];
+    // Decorators apply before the class value is used. The innermost decorator
+    // is the first listed below the declaration, so applications run in
+    // reverse source order, exactly like TypeScript's legacy decorators.
+    if (node.decorators && node.decorators.length) {
+      applications.push(...this.decoratorAssignments(node.decorators, { kind: 'Name', name: node.name }));
+    }
+    for (const method of node.methods) {
+      if (!method.decorators || !method.decorators.length) continue;
+      const target = method.static
+        ? { kind: 'Member', object: { kind: 'Name', name: node.name }, property: method.name, optional: false }
+        : {
+          kind: 'Member',
+          object: {
+            kind: 'Member',
+            object: { kind: 'Name', name: node.name },
+            property: 'prototype',
+            optional: false,
+          },
+          property: method.name,
+          optional: false,
+        };
+      applications.push(...this.decoratorAssignments(method.decorators, target));
+    }
+    return applications.length ? [body, ...applications] : body;
+  }
+
+  // A decorator receives the decorated value as its first argument and may
+  // replace it. `@memo` becomes `memo(value)`; `@route("/x")` becomes
+  // `route(value, "/x")`. The assignment is to the original binding, so a
+  // decorated class, method or function keeps its name.
+  decoratorAssignments(decorators, target) {
+    const assignments = [];
+    for (let index = decorators.length - 1; index >= 0; index -= 1) {
+      const decorator = decorators[index];
+      const expression = decorator.expression;
+      let call;
+      if (expression.kind === 'Call') {
+        call = {
+          kind: 'Call',
+          callee: this.expression(expression.callee),
+          args: [this.cloneTarget(target), ...expression.args.map((argument) => this.expression(argument))],
+          line: decorator.line,
+          col: decorator.col,
+        };
+      } else {
+        call = {
+          kind: 'Call',
+          callee: this.expression(expression),
+          args: [this.cloneTarget(target)],
+          line: decorator.line,
+          col: decorator.col,
+        };
+      }
+      assignments.push({
+        kind: 'Assignment',
+        target: this.cloneTarget(target),
+        operator: '=',
+        value: call,
+        line: decorator.line,
+        col: decorator.col,
+      });
+    }
+    return assignments;
+  }
+
+  cloneTarget(node) {
+    switch (node.kind) {
+      case 'Name': return { kind: 'Name', name: node.name, line: node.line, col: node.col };
+      case 'Member': return {
+        kind: 'Member', object: this.cloneTarget(node.object), property: node.property, optional: false, line: node.line, col: node.col,
+      };
+      default: return node;
+    }
+  }
+
   expression(node) {
     if (!node) return { kind: 'Nothing' };
     switch (node.kind) {
       case 'Number':
         return { kind: 'Number', value: node.value, line: node.line, col: node.col };
+      case 'BigInt':
+        return { kind: 'BigInt', value: node.value, line: node.line, col: node.col };
       case 'Text':
         return { kind: 'Text', value: node.value, line: node.line, col: node.col };
       case 'Regex':
@@ -303,9 +437,13 @@ class Lowerer {
       case 'RecordLiteral':
         return {
           kind: 'Record',
-          fields: node.fields.map((field) => field.spread
-            ? { spread: this.expression(field.spread) }
-            : { key: field.key, value: this.expression(field.value) }),
+          fields: node.fields.map((field) => {
+            if (field.spread) return { spread: this.expression(field.spread) };
+            if (field.computed) {
+              return { computed: this.expression(field.computed), value: this.expression(field.value) };
+            }
+            return { key: field.key, value: this.expression(field.value) };
+          }),
           line: node.line,
           col: node.col,
         };
@@ -331,6 +469,23 @@ class Lowerer {
         return this.call(node);
       case 'Await':
         return { kind: 'Await', value: this.expression(node.value), line: node.line, col: node.col };
+      case 'This':
+        return { kind: 'This', line: node.line, col: node.col };
+      case 'Super':
+        return { kind: 'Super', line: node.line, col: node.col };
+      case 'Yield':
+        return { kind: 'Yield', value: this.expression(node.value), line: node.line, col: node.col };
+      case 'TypeOf':
+        return { kind: 'TypeOf', value: this.expression(node.value), line: node.line, col: node.col };
+      case 'Ternary':
+        return {
+          kind: 'Ternary',
+          condition: this.expression(node.condition),
+          whenTrue: this.expression(node.whenTrue),
+          whenFalse: this.expression(node.whenFalse),
+          line: node.line,
+          col: node.col,
+        };
       case 'Unary':
         return { kind: 'Unary', operator: node.operator, operand: this.expression(node.operand), line: node.line, col: node.col };
       case 'Binary':

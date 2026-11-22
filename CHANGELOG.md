@@ -2,6 +2,83 @@
 
 All notable changes to PlainScript are documented here.
 
+## [2.3.0] — 2026-11-22
+
+### Classes and objects
+
+- Parse and check `class`, `constructor`, `function` methods, `static` and
+  `readonly` fields, `extends`, `super`, `this`, generic classes and `new`.
+- Emit native JavaScript classes with prototype methods and static members.
+- Infer generic class arguments from constructor calls, check definite field
+  assignment and readonly assignment, and narrow with nominal `is` checks.
+- Add class decorators and method/field decorators using the TypeScript legacy
+  protocol: the decorated value is passed first and the returned value replaces
+  the binding.
+- Update the formatter, LSP symbols, semantic tokens and keyword completion.
+
+### Generators and iteration
+
+- Add `generator function`, `yield` and `Iterator of T`.
+- Consume generator values with `for ... in`.
+- Add `std/iter` with `range`, `map`, `filter`, `take`, `drop`, `chain`,
+  `enumerate`, `zip`, `reduce`, `count`, `some`, `every`, `find` and `forEach`.
+
+### Typed failures
+
+- Add optional `throws Type` clauses to functions, methods and signatures.
+  Subclasses are accepted nominally; `throws nothing` forbids throwing.
+- Add `catch error: Type`, checked against the thrown contract and guarded at
+  run time so a mismatched value is rethrown before the handler runs.
+
+### Expressions and data
+
+- Add ternary expressions with lazy branch evaluation.
+- Add BigInt literals and a distinct `bigint` type with arithmetic and comparison.
+- Add computed record keys and shorthand fields.
+- Add nested block comments.
+- Add runtime `typeof`.
+
+### Compiler and tooling
+
+- Add `plainscript bundle`, producing one ES module with external package and
+  `std/*` imports and rejecting exported `let` bindings that cannot preserve
+  ESM live bindings.
+- Add a persistent `.plainscript/build-cache.json` cache keyed by source,
+  compiler fingerprint, configuration and recursive dependency hashes.
+  `--no-cache` bypasses it.
+- Add HIR optimisations: constant folding, constant conditional selection and
+  unreachable-statement removal that preserves hoisted declarations.
+  `--no-optimize` disables them.
+- Extend `.d.ts` import: real `declare class` output with constructors,
+  parameter properties, statics, getters, methods, `this`, `bigint`, `Date`,
+  `Error`, `RegExp`, `Function` and utility types.
+
+### Standard library
+
+- Add `std/iter`, `std/reflect`, `std/bigint`, `std/env`, `std/process`,
+  `std/crypto`, `std/compress`, `std/stream`, `std/worker` and `std/net`, each
+  with declarations and runtime coverage.
+- Add a typed TypeScript bridge client; bindings now cover 14 targets.
+
+### Verification and release
+
+- Add `tests/language-2-3.test.js` covering every language feature, including
+  runtime behaviour and negative diagnostics.
+- Add `scripts/verify-bindings.js` to compile and execute generated clients
+  where toolchains exist, and `scripts/benchmark-cache.js` for the cache.
+- Replace CI with Linux/macOS/Windows on Node 20 and 22, an all-language bindings
+  job and a live PostgreSQL/MySQL job.
+- Document the 2.3 surface in the README, specification, language reference,
+  migration guide, capability audit, standard library page and roadmap.
+
+### Compatibility
+
+2.0, 2.1 and 2.2 source compiles unchanged. `class` and `throws` remain usable
+as identifiers. One diagnostic is intentionally stricter: a declared `throws`
+type is now checked nominally, so throwing an unrelated class with a similar
+shape is rejected. Remove the `throws` clause to keep the old unchecked
+behaviour.
+
 ## [2.2.0] — 2026-11-22
 
 ### Native JSX and React components

@@ -8,17 +8,17 @@ const { detectDialect, applyDialect } = require('./dialect');
 // outside it can introduce a block.
 const KEYWORDS = new Set([
   'and', 'as', 'async', 'await', 'break', 'case', 'catch', 'const',
-  'continue', 'declare', 'default', 'do', 'element', 'else', 'end', 'export', 'finally',
+  'continue', 'declare', 'default', 'do', 'element', 'else', 'end', 'export', 'extends', 'finally',
   'for', 'from', 'function', 'if', 'import', 'in', 'is', 'let', 'match', 'not',
-  'new', 'nothing', 'of', 'or', 'otherwise', 'render', 'return', 'throw', 'to',
-  'true', 'throw', 'try', 'type', 'when', 'while', 'with', 'false',
+  'new', 'nothing', 'of', 'or', 'otherwise', 'render', 'return', 'super', 'this', 'throw', 'to',
+  'true', 'throw', 'try', 'type', 'typeof', 'when', 'while', 'with', 'yield', 'false',
 ]);
 
 // Multi-character operators, longest first.
 const OPERATORS = [
   '...', '|>', '->', '=>', '?.', '??', '==', '!=', '<=', '>=',
   '+=', '-=', '*=', '/=', '%=', '**', '+', '-', '*', '/', '%', '<', '>',
-  '=', '(', ')', '[', ']', '{', '}', ',', ':', '.', '?', '&',
+  '=', '(', ')', '[', ']', '{', '}', ',', ':', '.', '?', '&', '@',
 ];
 
 const SIMPLE_ESCAPES = {
@@ -74,6 +74,43 @@ class Lexer {
 
       if (ch === '\n') { this.advance(); continue; }
       if (ch === ' ' || ch === '\t' || ch === '\r' || ch === '\f' || ch === '\v') { this.advance(); continue; }
+
+      // Block comments are recognised before the regex-position rule, because
+      // `/*` at the start of an expression is a comment, never a regex. They
+      // nest, so a commented-out block that already contains one still closes
+      // at the matching `*/`.
+      if (ch === '/' && this.source[this.i + 1] === '*') {
+        const line = this.line;
+        const column = this.col();
+        const start = this.i;
+        let depth = 0;
+        let closed = false;
+        while (this.i < this.source.length) {
+          if (this.source[this.i] === '/' && this.source[this.i + 1] === '*') {
+            depth += 1;
+            this.advance(2);
+            continue;
+          }
+          if (this.source[this.i] === '*' && this.source[this.i + 1] === '/') {
+            depth -= 1;
+            this.advance(2);
+            if (depth === 0) { closed = true; break; }
+            continue;
+          }
+          this.advance();
+        }
+        if (!closed) {
+          this.report('PS1015', 'Unterminated block comment.', line, column);
+        }
+        this.comments.push({
+          v: this.source.slice(start + 2, Math.max(start + 2, this.i - 2)),
+          raw: this.source.slice(start, this.i),
+          block: true,
+          line,
+          col: column,
+        });
+        continue;
+      }
 
       // A shebang is a comment on the first line, like every other '#'
       // comment; keeping it in the comment list lets the formatter preserve it.
@@ -489,11 +526,22 @@ class Lexer {
 
   readNumber(line, column) {
     const start = this.i;
-    if (this.source[this.i] === '0' && (this.source[this.i + 1] === 'x' || this.source[this.i + 1] === 'X')) {
+          if (this.source[this.i] === '0' && (this.source[this.i + 1] === 'x' || this.source[this.i + 1] === 'X')) {
       this.advance(2);
       while (this.i < this.source.length && /[0-9a-fA-F_]/.test(this.source[this.i])) this.advance();
       const text = this.source.slice(start, this.i);
-      const value = Number.parseInt(text.slice(2).replace(/_/g, ''), 16);
+      const bigint = this.source[this.i] === 'n';
+      if (bigint) this.advance();
+      const digits = text.slice(2).replace(/_/g, '');
+      if (!digits) {
+        this.report('PS1002', `Invalid hexadecimal literal ${JSON.stringify(text)}.`, line, column, text.length);
+        return;
+      }
+      if (bigint) {
+        this.push('bigint', BigInt(`0x${digits}`).toString(), line, column);
+        return;
+      }
+      const value = Number.parseInt(digits, 16);
       if (Number.isNaN(value)) {
         this.report('PS1002', `Invalid hexadecimal literal ${JSON.stringify(text)}.`, line, column, text.length);
         return;
@@ -505,7 +553,18 @@ class Lexer {
       this.advance(2);
       while (this.i < this.source.length && /[01_]/.test(this.source[this.i])) this.advance();
       const text = this.source.slice(start, this.i);
-      const value = Number.parseInt(text.slice(2).replace(/_/g, ''), 2);
+      const bigint = this.source[this.i] === 'n';
+      if (bigint) this.advance();
+      const digits = text.slice(2).replace(/_/g, '');
+      if (!digits) {
+        this.report('PS1002', `Invalid binary literal ${JSON.stringify(text)}.`, line, column, text.length);
+        return;
+      }
+      if (bigint) {
+        this.push('bigint', BigInt(`0b${digits}`).toString(), line, column);
+        return;
+      }
+      const value = Number.parseInt(digits, 2);
       if (Number.isNaN(value)) {
         this.report('PS1002', `Invalid binary literal ${JSON.stringify(text)}.`, line, column, text.length);
         return;
@@ -528,6 +587,14 @@ class Lexer {
       }
     }
     const text = this.source.slice(start, this.i).replace(/_/g, '');
+    // A BigInt literal has no decimal point, exponent or fractional part. The
+    // suffix is consumed only in that shape, so `1.toString()` keeps working
+    // and `1n` is unambiguous.
+    if (this.source[this.i] === 'n' && !/[.eE]/.test(text)) {
+      this.advance();
+      this.push('bigint', BigInt(text).toString(), line, column);
+      return;
+    }
     this.push('number', String(Number(text)), line, column);
   }
 

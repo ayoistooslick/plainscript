@@ -1,6 +1,6 @@
 <!-- compile-examples -->
 
-# PlainScript 2.2
+# PlainScript 2.3
 
 PlainScript is an independent, statically typed programming language for the
 JavaScript platform. It reads like structured English, checks every program
@@ -8,9 +8,12 @@ before it runs, and compiles to ordinary ES modules that use the JavaScript
 ecosystem directly — React, Next.js, Vite, Express, Node built-ins and npm
 packages included.
 
-Version 2.2 adds native JSX, native regular expressions, cross-language
-JSON-RPC bridges and a migration tool, without breaking 2.0 or 2.1 source. The
-English-oriented 2.1 dialect remains the primary surface of the language.
+Version 2.3 adds classes and `this`, inheritance and `super`, generic classes,
+decorators, generators and `yield`, checked exceptions, ternary expressions,
+BigInt, computed keys, object shorthand and nested block comments. It also adds
+a bundler, a persistent incremental build cache, an optimiser, ten standard
+library modules and a much deeper TypeScript declaration importer. Nothing from
+2.0, 2.1 or 2.2 is removed; `class` and `throws` remain usable as identifiers.
 
 Created by **Ayodele Ayokunle David**. PlainScript is MIT licensed.
 
@@ -36,6 +39,51 @@ print(greet("world"))
 ```bash
 node src/cli.js run hello.pln
 # Hello, world!
+```
+
+## What 2.3 adds
+
+- **Classes with real semantics.** `class`, `constructor`, methods declared with
+  `function`, `static`, `readonly`, `extends`, `super`, `this`, generic classes
+  and structural `is` checks all run as native JavaScript classes.
+- **Typed error contracts.** `throws` on functions, `catch error: Type` and
+  runtime rethrow on a mismatch. Omitting `throws` keeps the old unchecked
+  behaviour.
+- **Generators and a lazy iterator protocol.** `generator function`,
+  `yield`, `Iterator of T`, plus `std/iter` for mapping, filtering, ranges and
+  conversion.
+- **Expression and data conveniences.** Ternary expressions, BigInt literals and
+  arithmetic, computed record keys, shorthand fields, decorators and nested
+  block comments.
+- **A deeper standard library.** `std/iter`, `std/reflect`, `std/bigint`,
+  `std/env`, `std/process`, `std/crypto`, `std/compress`, `std/stream`,
+  `std/worker` and `std/net`, each with real declarations and runtime tests.
+- **Tooling maturity.** `plainscript bundle` emits a single ES module,
+  `plainscript build` keeps a persistent dependency-aware cache, the compiler
+  folds constants and removes unreachable code, and `.d.ts` classes keep their
+  constructors, statics, accessors and methods.
+- **Broader verification.** CI covers Linux, macOS and Windows, executes
+  generated clients for 14 languages, and runs PostgreSQL and MySQL live tests.
+
+```plainscript
+import { print } from "std/io"
+
+class AppError extends Error
+    code: number
+    constructor(message: text, code: number)
+        super(message)
+        this.code = code
+    end
+end
+
+generator function retries() -> number
+    yield 1
+    yield 2
+end
+
+for attempt in retries()
+    print(attempt)
+end
 ```
 
 ## What 2.2 adds
@@ -368,6 +416,7 @@ Start with [Getting started](docs/GETTING_STARTED.md), then:
 - [Migrating to 2.2](docs/MIGRATION_2_2.md), [from 2.0](docs/MIGRATION_2_1.md).
 - [Type system](docs/TYPE_SYSTEM.md), [interop](docs/INTEROP.md),
   [contracts](docs/UNIFIED_CONTRACTS.md), [databases](docs/DATABASES.md).
+- [Capability audit for 2.3](docs/CAPABILITY_AUDIT_2_3.md).
 - [Capability audit for 2.2](docs/CAPABILITY_AUDIT_2_2.md).
 
 ---
@@ -408,13 +457,14 @@ Express/React/SQLite/HTTP execution and the documentation examples.
 
 ## Limitations
 
-Known and deliberate for 2.2.0:
+Known and deliberate for 2.3.0:
 
 - **One backend.** JavaScript/ESM only. The IR and emitter are separated so
   another target is possible, but none exists.
-- **No bundler.** `build` emits one module per file. Browser projects use Vite,
-  Next or another bundler, as the integrations do. Importing the standard
-  library in a browser needs `--std-base`.
+- **The bundler targets Node/ESM.** `plainscript bundle` emits one module for
+  Node, keeping packages and `std/*` external. It is not a browser bundler;
+  browser projects still use Vite or Next, and the standard library in a browser
+  needs `--std-base`.
 - **Advanced type limits.** Arbitrary intersections of unions/functions,
   optional tuple elements and general TypeScript-style conditional inference
   remain absent. Readonly is a compile-time assignment check. Deferred
@@ -430,37 +480,38 @@ Known and deliberate for 2.2.0:
   components with declared prop records are checked.
 - **Cross-language boundaries are processes, not native FFI.** The JSON-RPC
   bridge keeps memory and crashes apart and works without a compiler plugin per
-  language, at the cost of serialisation. C, C++, Java, Kotlin, Go, Rust, C#,
-  Ruby, PHP, Swift and Dart clients are generated; only JavaScript, Python and C
-  were executed end to end in this environment. Native FFI and WebAssembly are
-  not implemented.
+  language, at the cost of serialisation. Clients are generated for 14 targets;
+  this checkout executes JavaScript, TypeScript, Python, C and C++, and the CI
+  all-language job covers the rest. Native FFI and WebAssembly are not
+  implemented.
 - **Migration converts the JavaScript family.** Python, Rust, Go, JVM, Ruby,
   PHP, C#, Swift and Dart modules are analysed but stay native; connect them
   through the bridge. The migration tool does not run a project's test command
   for you, and it does not translate non-JavaScript source line by line.
-- **No ternary expression.** PlainScript has statement conditionals (`when` /
-  `otherwise`) and expressions such as `match`; it does not have `a ? b : c`.
-  Classes, `this`, generators and decorators also remain boundary concerns.
-- **Types are erased.** No runtime reflection beyond `is` checks on primitives,
-  lists, maps and variant tags. `as` is unchecked at runtime.
-- **Promise typing is available.** `catch` binds `any` for non-Promise values,
-  but `Promise` exposes typed `then`/`catch`/`finally` methods so rejection
-  handlers are checked. A `p.then((n: text) => …)` is rejected when `p`
-  resolves a `number`. Typed operational errors use `OperationResult`/`OperationFailure`.
+- **Typed failures are opt-in.** A function without `throws` keeps the old
+  unchecked behaviour. One `try` has one catch clause; nest `try` blocks for
+  multiple typed handlers. Untyped `catch` still binds `any`.
+- **Types are erased.** `std/reflect` reports runtime classes, fields, errors,
+  iterators and promises, and `is` checks primitives, lists, maps, variant tags
+  and class instances. Generic type arguments do not exist at run time, and `as`
+  is unchecked.
 - **Database support requires an installed driver.** `std/db` is SQLite via
   Node's `node:sqlite`; PostgreSQL/MySQL adapters dynamically load
-  application-installed drivers. The default suite uses driver-shaped fakes;
-  `tests/db-live.test.js` runs the same operations against real servers when
-  `PLAINSCRIPT_TEST_POSTGRES_URL` / `PLAINSCRIPT_TEST_MYSQL_URL` are set. No
-  live server is available in this checkout, so that path is unverified here.
+  application-installed drivers. `tests/db-live.test.js` runs against real
+  servers when `PLAINSCRIPT_TEST_POSTGRES_URL` / `PLAINSCRIPT_TEST_MYSQL_URL`
+  are set, and CI does this with PostgreSQL 16 and MySQL 8.4. This local
+  checkout does not have those services.
 - **Debugging is adapter-based.** `plainscript dap` maps breakpoints and stack
-  frames through source maps; the VS Code integration is test-level.
+  frames through source maps; the VS Code integration is test-level, not
+  UI-automated.
 - **TypeScript interop is a subset.** `plainscript interop` translates
-  declarations with a direct PlainScript equivalent and reports the rest.
-- **Benchmarks are PlainScript-only.** No cross-language speed claim is made.
-- **Publication is a separate step.** The source version is 2.2.0; npm and
-  GitHub release state depends on credentials and is recorded in the release
-  notes rather than inferred from the repository.
+  declarations with a direct PlainScript equivalent, including classes and
+  constructors, and reports the rest.
+- **Benchmarks are PlainScript-only.** The synthetic numbers in
+  [docs/BENCHMARKS.md](docs/BENCHMARKS.md) make no cross-language speed claim.
+- **Publication is a separate step.** The source version is 2.3.0; npm and
+  GitHub release state is verified against the registry and release page rather
+  than inferred from the repository.
 
 ## Contributing
 

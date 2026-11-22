@@ -248,3 +248,15 @@ These were not on the original roadmap but blocked real use:
 5. JSX declarations for third-party component packages.
 6. A persistent incremental build cache and published cross-language benchmark.
 7. Live database and identity-provider conformance runs.
+
+## Resolution in 2.3
+
+| Recommendation | Result |
+| --- | --- |
+| 1. Ternary and a class/interop story | Ternary, classes, inheritance, generics, decorators and `this` are implemented and runtime-tested. |
+| 2. Execution-tested bindings | `scripts/verify-bindings.js` and the all-language CI job compile and execute the generated clients; TypeScript is now a separate typed client. |
+| 3. Native FFI or WebAssembly | Not implemented; the documented JSON-RPC process boundary remains. This is an explicit product boundary, not a hidden gap. |
+| 4. Non-JavaScript migration adapters | Not implemented; only JavaScript conversion and boundary generation exist. |
+| 5. Third-party JSX props | Still `any` unless a declaration the importer understands exists. |
+| 6. Incremental cache and cross-language benchmark | The persistent dependency-aware build cache is implemented and tested. The benchmark remains Node-only; no cross-language fixture is published. |
+| 7. Live database and identity conformance | A PostgreSQL/MySQL CI job with real services exists. Identity-provider conformance is still not automated. |

@@ -126,3 +126,23 @@ See [Unified Contracts](UNIFIED_CONTRACTS.md) for the end-to-end path and
 [predicates](../tests/predicates.test.js), [variance](../tests/variance.test.js),
 [recursive types](../tests/recursive-types.test.js) and
 [advanced V2 types](../tests/advanced-v2-types.test.js) for executable coverage.
+
+## 2.3 type additions
+
+- **Nominal classes.** A class type is identified by its declaration, not its
+  fields. `instanceof`/`is` checks narrow to the class, and subclass instances
+  are assignable to a base class. Constructor arguments infer generic class
+  parameters.
+- **`this` type.** Inside a class, `this` has the instance type, including
+  inherited members. `super` is available only in a subclass and only for the
+  base constructor and methods.
+- **`bigint`.** A distinct primitive. Arithmetic and comparison require both
+  operands to be `bigint`; converting to or from `number` is explicit.
+- **`Iterator of T`.** The result of a generator call and of the lazy helpers in
+  `std/iter`. `for ... in` consumes it and binds `T`.
+- **Typed throws.** The thrown type joins a function's signature. `throws
+  nothing` forbids throwing; an absent clause is unchecked (the 2.2 default).
+- **Typed catch.** `catch error: C` narrows `error` to `C` and inserts a runtime
+  check that rethrows values not assignable to `C`.
+- **`typeof`.** Yields `text` for the runtime type tag, for use where a
+  structural type is not available at compile time.

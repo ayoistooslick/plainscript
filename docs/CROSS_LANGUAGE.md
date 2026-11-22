@@ -5,8 +5,9 @@
 PlainScript runs on JavaScript, so JavaScript and TypeScript are the native
 interoperability story: import an npm package, a Node builtin, a browser API or a
 local `.js` module and the emitted ESM uses it directly. Projects in other
-languages need a boundary that crosses a process. Version 2.2 standardises that
-boundary instead of inventing a different integration for every language.
+languages need a boundary that crosses a process. PlainScript 2.2 standardised
+that boundary, and 2.3 adds a typed TypeScript client and deeper verification,
+instead of inventing a different integration for every language.
 
 The boundary is **newline-delimited JSON-RPC 2.0**. A PlainScript module is
 served by `plainscript bridge`; generated clients in Python, JavaScript,
@@ -119,18 +120,25 @@ with the same request/response shape.
 
 | Language | Generated | End-to-end verified here |
 | --- | --- | --- |
-| JavaScript / TypeScript | `.mjs` client | Yes, against a live bridge |
+| JavaScript | `.mjs` client | Yes, against a live bridge |
+| TypeScript | `*_bridge.ts` typed client | Yes, strict `tsc` and live bridge |
 | Python | `*_bridge.py` client and `python_server.py` | Yes, both directions |
 | C | header + helpers | Yes, compiled with GCC and executed |
 | C++ | header | Compiles, one-shot call verified |
-| Java, Kotlin | `BridgeClient.java` / `.kt` | Generation only (no JVM toolchain here) |
-| Go | `*_bridge.go` | Generation only (no Go toolchain here) |
-| Rust | `*_bridge.rs` | Generation only (no Rust toolchain here) |
-| C#, Ruby, PHP, Swift, Dart | one client each | Generation only |
+| Java, Kotlin | `BridgeClient.java` / `.kt` | Compiled by the all-language CI job |
+| Go | `*_bridge.go` | Compiled and executed by the all-language CI job |
+| Rust | `*_bridge.rs` | Compiled by the all-language CI job |
+| C# | `BridgeClient.cs` | Compiled by the all-language CI job |
+| Ruby, PHP | one client each | Executed against a live bridge by the all-language CI job |
+| Swift, Dart | one client each | Compiled by the all-language CI job |
 
-"Generation only" means the file is produced and type-checked by review, not
-that it was executed in this checkout. Do not treat the table as a claim that
-every runtime was exercised.
+The repository ships `scripts/verify-bindings.js`, which generates every client,
+compiles it with the language toolchain and runs a live bridge call where the
+toolchain allows it. This checkout has Node, Python, C and C++ toolchains, so
+those are executed locally; Go, Rust, Ruby, PHP, C#, Java, Kotlin, Swift and
+Dart are compiled or executed by the dedicated CI job that installs them. A
+client that cannot be executed in a given environment is reported as skipped
+with the missing toolchain, never counted as a pass.
 
 ## Call another language from PlainScript
 
@@ -186,7 +194,7 @@ message; a `try … catch` around `request` handles it.
 | C / C++ library | Keep the library in C/C++, expose a narrow process or HTTP service; generated C client for calling PlainScript |
 | Java / Kotlin / Go / Rust service | Run it as a service and call over HTTP JSON-RPC; generated client |
 | Data pipeline across languages | JSON-RPC process boundary with a versioned manifest |
-| Hot path inside a native library | Not solved by 2.2; native FFI/WASM embedding is a future adapter |
+| Hot path inside a native library | Not solved by 2.3; native FFI/WASM embedding is a future adapter |
 
 The architecture is extensible by adding a generator to
 `src/interop/bindings.js` and a small client runtime for the language. The

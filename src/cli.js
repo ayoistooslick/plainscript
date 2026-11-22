@@ -3,6 +3,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const { spawn } = require('child_process');
 const { generateDeclarations } = require('./declarations');
 
@@ -29,6 +30,7 @@ Usage: plainscript <command> [options]
 Commands
   run [file.pln] [args...]   compile and execute a program (default src/main.pln)
   build [files...]           compile the project to dist/ (--declarations for .d.pln)
+  bundle [entry.pln]         bundle a program and its modules into one ES module
   check [files...]           type-check without running
   fmt [files...]             normalise indentation and blank lines
   test [files...]            run *.test.pln files
@@ -61,7 +63,9 @@ Options
   --call=<name> with bridge: run one call and print its JSON result
   --args=<json> with --call: argument array (default [])
   --lang=<list> with bindings: comma-separated languages (default: all supported)
-  --out=<dir>   with bindings: output directory (default: bindings)
+  --out=<path>  with bindings: output directory; with bundle: output file
+  --no-cache    skip the persistent build cache
+  --no-optimize skip constant folding and dead-code elimination
   --write       with migrate: write interop boundaries and converted modules
   --report=<file> with migrate: write the full JSON report to a file
   --help        show this message
@@ -71,7 +75,7 @@ Exit codes
 `;
 
 function parseArguments(argv) {
-  const flags = { quiet: false, verbose: false, check: false, help: false, stdBase: null, template: null, declarations: false, json: false, syntax: null, manifest: false, write: false, http: null, host: '127.0.0.1', call: null, args: null, lang: null, out: null, report: null };
+  const flags = { quiet: false, verbose: false, check: false, help: false, stdBase: null, template: null, declarations: false, json: false, syntax: null, manifest: false, write: false, http: null, host: '127.0.0.1', call: null, args: null, lang: null, out: null, report: null, cache: true, optimize: true };
   const positional = [];
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
@@ -93,7 +97,9 @@ function parseArguments(argv) {
     else if (argument.startsWith('--lang=')) flags.lang = argument.slice('--lang='.length);
     else if (argument === '--lang') { flags.lang = argv[index + 1] || null; index += 1; }
     else if (argument.startsWith('--out=')) flags.out = argument.slice('--out='.length);
-    else if (argument === '--out') { flags.out = argv[index + 1] || null; index += 1; }
+    else if (argument === '--out' || argument === '-o') { flags.out = argv[index + 1] || null; index += 1; }
+    else if (argument === '--no-cache') flags.cache = false;
+    else if (argument === '--no-optimize') flags.optimize = false;
     else if (argument.startsWith('--report=')) flags.report = argument.slice('--report='.length);
     else if (argument === '--help' || argument === '-h') flags.help = true;
     else if (argument.startsWith('--std-base=')) flags.stdBase = argument.slice('--std-base='.length);
@@ -338,6 +344,111 @@ function wirePackageTypes(root, outRoot, outputs, declarations, imported, flags)
   status(`  package.json: types -> ${typesPath}`, flags);
 }
 
+function commandBundle(positional, flags) {
+  const root = process.cwd();
+  let entry = positional[0] ? path.resolve(root, positional[0]) : path.resolve(root, 'src', 'main.pln');
+  if (!isFile(entry)) {
+    process.stderr.write(positional[0] ? `No such file: ${positional[0]}\n` : 'plainscript bundle needs a .pln entry (no src/main.pln found).\n');
+    return 2;
+  }
+  const bundleDialect = dialectFor(findProjectRoot(entry), flags);
+  if (bundleDialect.failed) return 2;
+  const outFile = flags.out ? path.resolve(root, flags.out) : path.join(root, 'dist', 'bundle.mjs');
+  if (outFile === entry) {
+    process.stderr.write('The bundle output cannot overwrite the entry file.\n');
+    return 2;
+  }
+
+  const { createBundler } = require('./bundle');
+  const bundler = createBundler({ root: findProjectRoot(entry), dialect: bundleDialect.value });
+  const result = bundler.bundle(entry, outFile);
+  const diagnostics = [...result.diagnostics];
+  for (const diagnostic of bundler.compiler.diagnostics) {
+    if (!diagnostics.some((existing) => existing.code === diagnostic.code
+      && existing.message === diagnostic.message
+      && existing.span && diagnostic.span
+      && existing.span.line === diagnostic.span.line
+      && existing.span.column === diagnostic.span.column)) diagnostics.push(diagnostic);
+  }
+  if (reportDiagnostics(diagnostics, bundler.compiler, flags) || !result.ok) return 1;
+
+  fs.mkdirSync(path.dirname(outFile), { recursive: true });
+  fs.writeFileSync(outFile, result.code);
+  // The bundle is an ES module even when the surrounding package is CommonJS.
+  const packagePath = path.join(root, 'package.json');
+  let type = null;
+  if (isFile(packagePath)) {
+    try { type = JSON.parse(fs.readFileSync(packagePath, 'utf8')).type || null; } catch { type = null; }
+  }
+  if (type !== 'module') {
+    fs.writeFileSync(path.join(path.dirname(outFile), 'package.json'), `${JSON.stringify({ type: 'module' }, null, 2)}\n`);
+  }
+  status(`bundled ${result.files.length} module(s) -> ${path.relative(root, outFile)} (${result.external.length} external import(s))`, flags);
+  return 0;
+}
+
+function hashText(value) {
+  return crypto.createHash('sha256').update(value).digest('hex');
+}
+
+function hashFile(file) {
+  try {
+    return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+  } catch {
+    return null;
+  }
+}
+
+// Compiler, standard library and configuration participate in every cache
+// key: installing a new compiler or changing JSX options invalidates outputs
+// whose source text did not change.
+let compilerFingerprintCache = null;
+function compilerFingerprint() {
+  if (compilerFingerprintCache) return compilerFingerprintCache;
+  const root = path.resolve(__dirname, '..');
+  const roots = [path.join(root, 'src'), path.join(root, 'stdlib')];
+  const files = [];
+  const walk = (directory) => {
+    let entries = [];
+    try { entries = fs.readdirSync(directory, { withFileTypes: true }); } catch { return; }
+    for (const entry of entries) {
+      const candidate = path.join(directory, entry.name);
+      if (entry.isDirectory()) walk(candidate);
+      else if (/\.(js|d\.pln)$/.test(entry.name)) files.push(candidate);
+    }
+  };
+  for (const directory of roots) walk(directory);
+  files.sort();
+  const digest = crypto.createHash('sha256');
+  digest.update(VERSION);
+  for (const file of files) {
+    digest.update(path.relative(root, file));
+    digest.update(fs.readFileSync(file));
+  }
+  compilerFingerprintCache = digest.digest('hex');
+  return compilerFingerprintCache;
+}
+
+function readBuildCache(root) {
+  const cachePath = path.join(root, '.plainscript', 'build-cache.json');
+  try {
+    const cache = JSON.parse(fs.readFileSync(cachePath, 'utf8'));
+    if (cache.version !== 1 || !cache.files || typeof cache.files !== 'object') return null;
+    return { path: cachePath, ...cache };
+  } catch {
+    return null;
+  }
+}
+
+function writeBuildCache(cachePath, files) {
+  try {
+    fs.mkdirSync(path.dirname(cachePath), { recursive: true });
+    fs.writeFileSync(cachePath, `${JSON.stringify({ version: 1, files })}\n`);
+  } catch {
+    // A cache that cannot be written is not a build failure.
+  }
+}
+
 function commandBuild(positional, flags, options = {}) {
   const root = process.cwd();
   const { srcRoot, outRoot, exclude } = resolveLayout(root);
@@ -358,13 +469,96 @@ function commandBuild(positional, flags, options = {}) {
 
   const buildDialect = dialectFor(root, flags);
   if (buildDialect.failed) return 2;
-  const compiler = options.compiler || new Compiler({ root, outputFor, stdBase: flags.stdBase, dialect: buildDialect.value });
+  const compiler = options.compiler || new Compiler({ root, outputFor, stdBase: flags.stdBase, dialect: buildDialect.value, optimize: flags.optimize });
   compiler.diagnostics.length = 0;
+
+  // Persistent per-file emission cache. A file is reusable only when its text,
+  // compiler version, project configuration and every local/declaration
+  // dependency still match. A dependency change therefore invalidates its
+  // importers recursively instead of leaving stale JavaScript behind.
+  const useCache = flags.cache !== false;
+  const cachePath = path.join(root, '.plainscript', 'build-cache.json');
+  const cache = useCache ? (readBuildCache(root) || { path: cachePath, files: {} }) : null;
+  const configHash = hashText(`${hashFile(path.join(root, 'plainscript.config.json')) || ''}:${hashFile(path.join(root, 'package.json')) || ''}`);
+  const fingerprint = hashText(`${compilerFingerprint()}:${buildDialect.value}:${flags.stdBase || ''}:${configHash}`);
+  const sourceHashes = new Map();
+  const sourceHash = (file) => {
+    if (!sourceHashes.has(file)) sourceHashes.set(file, hashFile(file));
+    return sourceHashes.get(file);
+  };
+  const validated = new Map();
+  const validateCacheEntry = (file, stack = new Set()) => {
+    if (validated.has(file)) return validated.get(file);
+    if (stack.has(file)) return false;
+    stack.add(file);
+    const entry = cache && cache.files[file];
+    let valid = Boolean(entry)
+      && entry.fingerprint === fingerprint
+      && entry.sourceHash === sourceHash(file)
+      && entry.outFile === path.relative(root, outputFor(file))
+      && isFile(path.join(root, entry.outFile));
+    if (valid && flags.declarations && typeof entry.declaration !== 'string') valid = false;
+    if (valid) {
+      for (const [dependency, hash] of Object.entries(entry.dependencies || {})) {
+        if (cache.files[dependency]) {
+          if (!validateCacheEntry(dependency, stack)) { valid = false; break; }
+        } else if (sourceHash(dependency) !== hash) {
+          valid = false;
+          break;
+        }
+      }
+    }
+    stack.delete(file);
+    validated.set(file, valid);
+    return valid;
+  };
+
   const outputs = [];
+  let reused = 0;
   for (const file of files) {
     const outFile = outputFor(file);
+    if (cache && validateCacheEntry(file)) {
+      const entry = cache.files[file];
+      outputs.push({
+        file,
+        outFile,
+        code: entry.code,
+        map: entry.map,
+        declaration: entry.declaration,
+        imports: entry.imports || [],
+        cached: true,
+      });
+      reused += 1;
+      continue;
+    }
     const result = compiler.compile(file, { outFile });
-    if (result.ok) outputs.push({ file, outFile, code: result.code, map: result.map });
+    if (!result.ok) continue;
+    const record = compiler.modules.get(file);
+    const declaration = record ? generateDeclarations(record) : null;
+    const dependencies = {};
+    const imports = [];
+    if (record) {
+      for (const resolved of record.resolutions.values()) {
+        if (resolved.kind === 'local') imports.push(resolved.path);
+        const candidates = [];
+        if (resolved.path && resolved.path.endsWith('.d.pln')) candidates.push(resolved.path);
+        if (resolved.path && (resolved.kind === 'typed-package' || resolved.kind === 'declared')) candidates.push(resolved.path);
+        for (const candidate of candidates) {
+          const hash = sourceHash(candidate);
+          if (hash) dependencies[candidate] = hash;
+        }
+      }
+    }
+    outputs.push({
+      file,
+      outFile,
+      code: result.code,
+      map: result.map,
+      declaration,
+      imports,
+      dependencies,
+      cached: false,
+    });
   }
 
   const failed = reportDiagnostics(compiler.diagnostics, compiler, flags);
@@ -374,10 +568,8 @@ function commandBuild(positional, flags, options = {}) {
   const declarations = [];
   if (flags.declarations) {
     for (const output of outputs) {
-      const record = compiler.modules.get(output.file);
-      const text = generateDeclarations(record);
-      if (text === null) continue;
-      declarations.push({ file: output.outFile.replace(/\.js$/, '.d.pln'), text });
+      if (typeof output.declaration !== 'string') continue;
+      declarations.push({ file: output.outFile.replace(/\.js$/, '.d.pln'), text: output.declaration });
     }
   }
 
@@ -421,17 +613,31 @@ function commandBuild(positional, flags, options = {}) {
     fs.writeFileSync(path.join(outRoot, 'package.json'), `${JSON.stringify({ type: 'module' }, null, 2)}\n`);
   }
 
-  if (declarations.length) {
-    const imported = new Set();
-    for (const record of compiler.modules.values()) {
-      for (const resolved of record.resolutions.values()) {
-        if (resolved.kind === 'local') imported.add(resolved.path);
-      }
+  const imported = new Set();
+  for (const output of outputs) {
+    for (const dependency of output.imports || []) imported.add(dependency);
+  }
+  if (declarations.length) wirePackageTypes(root, outRoot, outputs, declarations, imported, flags);
+
+  if (useCache) {
+    const files = { ...(cache.files || {}) };
+    for (const output of outputs) {
+      if (output.cached) continue;
+      files[output.file] = {
+        fingerprint,
+        sourceHash: sourceHash(output.file),
+        outFile: path.relative(root, output.outFile),
+        code: output.code,
+        map: output.map,
+        declaration: output.declaration,
+        dependencies: output.dependencies || {},
+        imports: output.imports || [],
+      };
     }
-    wirePackageTypes(root, outRoot, outputs, declarations, imported, flags);
+    writeBuildCache(cache.path, files);
   }
 
-  status(`built ${written} file(s) into ${path.relative(root, outRoot) || '.'}${unchanged ? ` (${unchanged} unchanged)` : ''}${declarations.length ? ` (+${declarations.length} declaration file(s))` : ''}`, flags);
+  status(`built ${written} file(s) into ${path.relative(root, outRoot) || '.'}${unchanged ? ` (${unchanged} unchanged)` : ''}${reused ? ` (${reused} cached)` : ''}${declarations.length ? ` (+${declarations.length} declaration file(s))` : ''}`, flags);
   return 0;
 }
 
@@ -1078,6 +1284,7 @@ function main(argv) {
   const commands = {
     run: commandRun,
     build: commandBuild,
+    bundle: commandBundle,
     check: commandCheck,
     watch: commandWatch,
     fmt: commandFormat,
