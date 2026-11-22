@@ -89,3 +89,13 @@ cross-language performance baseline are not implemented. `std/worker` and
 `std/net` are Node-only. The debug adapter is protocol-tested, not clicked
 through in an editor. Live PostgreSQL/MySQL tests run in CI; locally they require
 the service environment described in the workflow.
+
+## 2.3.0 publication
+
+- npm: `plainscript-lang@2.3.0` is the `latest` tag; a clean install was
+  verified to report `2.3.0` and execute a class program.
+- GitHub: release and tag `v2.3.0` point at the 2.3.0 release commit.
+- Documentation: <https://ayoistooslick.github.io/plainscript/> serves Vol. 2.3,
+  including the restored Fig. 01–05 captions, the migration guide and the
+  standard library page. The deployed pages were fetched and checked after the
+  deployment.
