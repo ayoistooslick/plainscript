@@ -231,7 +231,46 @@ my-app/
 `plainscript build` reads the config, compiles the module graph and writes one
 ES module per source file. `plainscript watch` rebuilds on change.
 
-## 9. Where to go next
+## 9. JSX, regex and other languages
+
+Native JSX is available in `.pln` files. A component needs the React factory in
+scope for the classic runtime:
+
+```plainscript
+#syntax 2.1
+
+import { createElement } from "react"
+
+export define Badge(props: { label: text }) returns any
+    return <span className="badge">{props.label}</span>
+end
+```
+
+Regex literals are values typed as `regex`:
+
+```plainscript
+#syntax 2.1
+
+import { print } from "std/io"
+
+value pattern is /^[a-z]+$/i
+print(pattern.test("PlainScript"))
+print("PlainScript" is regex)
+```
+
+To use PlainScript from Python, Java, Go, C or another runtime, expose a module
+over the bridge and generate a client:
+
+```bash
+plainscript bridge src/service.pln --call=add --args='[2, 3]'
+plainscript bindings src/service.pln --out=bindings
+```
+
+- [JSX and React](JSX.md)
+- [Regular expressions](REGEX.md)
+- [Cross-language bridges](CROSS_LANGUAGE.md)
+
+## 10. Where to go next
 
 - [Language reference](LANGUAGE_REFERENCE.md) — every construct, with the 2.0
   spelling beside it.
@@ -240,4 +279,5 @@ ES module per source file. `plainscript watch` rebuilds on change.
 - [Type system](TYPE_SYSTEM.md) — generics, unions, narrowing, variants and
   advanced types.
 - [Compiler](COMPILER.md) — how source becomes JavaScript.
+- [Migrating to 2.2](MIGRATION_2_2.md) — analysis, conversion and boundaries.
 - [CLI reference](CLI.md) — every command and flag.

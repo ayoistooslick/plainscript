@@ -1443,6 +1443,14 @@ class Parser {
       this.next();
       return this.node('Template', token, { parts: this.templateParts(token) });
     }
+    if (token.t === 'regex') {
+      this.next();
+      return this.node('Regex', token, { pattern: token.pattern, flags: token.flags, raw: token.v });
+    }
+    if (token.t === 'jsx') {
+      this.next();
+      return this.jsxNode(token.node, token);
+    }
     if (token.t === 'kw') {
       if (token.v === 'true' || token.v === 'false') {
         this.next();
@@ -1540,6 +1548,94 @@ class Parser {
 
     this.fail('PS2027', `Expected an expression but found ${describe(token)}.`);
     return null;
+  }
+
+  // ---------------------------------------------------------------- JSX
+
+  // The lexer captured a JSX region structurally; these methods turn it into
+  // ordinary AST nodes with ordinary positions. Embedded expression sources
+  // are re-tokenised in the surrounding dialect, so `{items.map(x => <li/>)}`
+  // type-checks with the rest of the file.
+  jsxNode(spec, token) {
+    if (spec.type === 'fragment') {
+      return this.node('JSXFragment', token, {
+        children: spec.children.map((child) => this.jsxChild(child)).filter(Boolean),
+      });
+    }
+    const tag = this.jsxTag(spec.tag, spec.line, spec.column);
+    const attrs = [];
+    for (const attr of spec.attrs || []) {
+      if (attr.kind === 'spread') {
+        const source = attr.src && typeof attr.src.src === 'string'
+          ? { ...attr.src, src: attr.src.src.replace(/^\s*\.\.\./, '') }
+          : attr.src;
+        const value = this.parseInlineExpression(source, attr.line, attr.col);
+        if (value) attrs.push({ kind: 'spread', value });
+        continue;
+      }
+      let value;
+      if (attr.valueKind === 'text') value = { kind: 'Text', value: attr.value, line: attr.line, col: attr.col };
+      else if (attr.valueKind === 'boolean') value = { kind: 'Boolean', value: true, line: attr.line, col: attr.col };
+      else value = this.parseInlineExpression(attr.value, attr.line, attr.col);
+      attrs.push({ kind: 'attribute', name: attr.name, value });
+    }
+    return this.node('JSXElement', token, {
+      tagName: spec.tag,
+      tag,
+      attrs,
+      children: (spec.children || []).map((child) => this.jsxChild(child)).filter(Boolean),
+      selfClosing: Boolean(spec.selfClosing),
+    });
+  }
+
+  jsxChild(child) {
+    if (!child) return null;
+    if (child.type === 'text') return { kind: 'JSXText', value: child.value, line: child.line, col: child.column };
+    if (child.type === 'expression') return this.parseInlineExpression(child.src, child.line, child.col);
+    if (child.type === 'spread') {
+      const source = child.src && typeof child.src.src === 'string'
+        ? { ...child.src, src: child.src.src.replace(/^\s*\.\.\./, '') }
+        : child.src;
+      const value = this.parseInlineExpression(source, child.line, child.col);
+      return value ? { kind: 'JSXSpreadChild', value, line: child.line, col: child.col } : null;
+    }
+    return this.jsxNode(child, child);
+  }
+
+  jsxTag(name, line, column) {
+    const first = name.split('.')[0];
+    const intrinsic = /^[a-z]/.test(first) || name.includes('-') || name.includes(':');
+    if (intrinsic) return { kind: 'Text', value: name, line, col: column };
+    const parts = name.split('.');
+    let node = { kind: 'Name', name: parts[0], line, col: column };
+    for (const part of parts.slice(1)) node = { kind: 'Member', object: node, property: part, optional: false, line, col: column };
+    return node;
+  }
+
+  parseInlineExpression(spec, line, column) {
+    if (!spec || !String(spec.src || '').trim()) return null;
+    const source = spec.src;
+    const result = tokenize(source, this.file, { dialect: this.dialect });
+    for (const token of result.tokens) {
+      token.line = line + token.line - 1;
+      if (token.line === line) token.col = column + 1 + token.col - 1;
+    }
+    this.errors.push(...result.errors);
+    const parser = new Parser(result.tokens, this.file, source, this.dialect);
+    try {
+      const expression = parser.expression();
+      if (!parser.atEof()) {
+        this.errors.push(error('PS2032', 'Unexpected tokens after a JSX expression.', this.spanOf(parser.peek())));
+      }
+      this.errors.push(...parser.errors);
+      return expression;
+    } catch (failure) {
+      if (failure instanceof ParseAbort) {
+        this.errors.push(failure.diagnostic);
+        return { kind: 'Nothing', line, col: column };
+      }
+      throw failure;
+    }
   }
 
   functionExpression() {

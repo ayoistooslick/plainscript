@@ -16,6 +16,7 @@ const PRIM = Object.freeze({
   unknown: { k: 'prim', name: 'unknown' },
   never: { k: 'prim', name: 'never' },
   error: { k: 'prim', name: 'error' },
+  regex: { k: 'prim', name: 'regex' },
 });
 
 let nextVarId = 1;

@@ -1,5 +1,8 @@
 # Audit of PlainScript 1.x
 
+> For the 2.2 capability audit, including JSX, regex, interoperability, migration and
+> the remaining gaps, see [Capability audit 2.2](CAPABILITY_AUDIT_2_2.md).
+
 This audit was performed on the source archived at `legacy/v1/`, not on README claims.
 Every number and quotation below comes from that tree.
 

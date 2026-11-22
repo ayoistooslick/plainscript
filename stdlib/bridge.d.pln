@@ -1,0 +1,16 @@
+# Declarations for std/bridge.
+#
+# A bridge is a child process that speaks newline-delimited JSON-RPC 2.0, the
+# same protocol as `plainscript bridge`. The other side can be written in any
+# language; `src/interop/python_server.py` is a ready-made Python host.
+
+export type Bridge
+    pid: number
+    request: (method: text, params?: list of any) -> Promise of any
+    notify: (method: text, params?: list of any) -> nothing
+    close: () -> nothing
+end
+
+export declare function open(command: text, args?: list of text) -> Bridge
+export declare function call(bridge: Bridge, method: text, params?: list of any) -> Promise of any
+export declare function close(bridge: Bridge) -> nothing

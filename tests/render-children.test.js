@@ -110,6 +110,60 @@ end
   assert.ok(errors.some((diagnostic) => diagnostic.code === 'PS3410'), JSON.stringify(errors));
 });
 
+test('a return inside a loop inside render is reported as PS3410', () => {
+  const project = compileProject({
+    'main.pln': `#syntax 2.1
+import { createElement } from "react"
+
+export define BrokenWithLoop() returns any
+    render
+        for each item in items
+            return 1
+        end
+    end
+end
+`,
+  });
+  const errors = project.compiler.diagnostics.filter((diagnostic) => diagnostic.severity === 'error');
+  assert.ok(errors.some((diagnostic) => diagnostic.code === 'PS3410'), JSON.stringify(errors));
+});
+
+test('a return inside a conditional branch inside render is reported as PS3410', () => {
+  const project = compileProject({
+    'main.pln': `#syntax 2.1
+import { createElement } from "react"
+
+export define BrokenWithBranch() returns any
+    render
+        when true
+            return 1
+        end
+    end
+end
+`,
+  });
+  const errors = project.compiler.diagnostics.filter((diagnostic) => diagnostic.severity === 'error');
+  assert.ok(errors.some((diagnostic) => diagnostic.code === 'PS3410'), JSON.stringify(errors));
+});
+
+test('a return inside a while loop inside render is reported as PS3410', () => {
+  const project = compileProject({
+    'main.pln': `#syntax 2.1
+import { createElement } from "react"
+
+export define BrokenWithWhile() returns any
+    render
+        while true
+            return 1
+        end
+    end
+end
+`,
+  });
+  const errors = project.compiler.diagnostics.filter((diagnostic) => diagnostic.severity === 'error');
+  assert.ok(errors.some((diagnostic) => diagnostic.code === 'PS3410'), JSON.stringify(errors));
+});
+
 test('Promise then/catch/finally are typed and their handlers are checked', () => {
   const accepts = diagnosticsOf(`#syntax 2.1
 declare const p: Promise of number

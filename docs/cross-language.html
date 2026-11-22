@@ -1,0 +1,136 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Cross-language bridges — PlainScript 2.2 documentation."><meta name="color-scheme" content="dark"><meta name="theme-color" content="#08070b"><title>Cross-language bridges · PlainScript</title><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23a679ff'/%3E%3Ctext x='16' y='23' font-family='Georgia,serif' font-size='20' fill='%2308070b' text-anchor='middle'%3EP%3C/text%3E%3C/svg%3E"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=Space+Grotesk:wght@400..700&display=swap" rel="stylesheet"><link rel="stylesheet" href="style.css"></head><body><a class="skip" href="#main">Skip to content</a><div class="scrim" data-scrim></div><div class="shell"><aside class="rail" id="rail"><div class="rail-head"><a class="wordmark" href="index.html">PlainScript<span class="dot">.</span></a><div class="rail-meta">Language manual<br>Vol. 2.2 · MMXXVI</div></div><nav class="rail-nav" aria-label="Documentation"><div class="nav-group"><div class="nav-label">Start here</div><a class="nav-link " href="index.html">PlainScript</a><a class="nav-link " href="getting-started.html">Getting started</a><a class="nav-link " href="cli.html">CLI reference</a><a class="nav-link " href="templates.html">Application templates</a></div><div class="nav-group"><div class="nav-label">Language</div><a class="nav-link " href="language-reference.html">Language reference</a><a class="nav-link " href="regex.html">Regular expressions</a><a class="nav-link " href="spec.html">Language specification</a><a class="nav-link " href="syntax-design.html">Syntax design</a><a class="nav-link " href="type-system.html">Type system</a></div><div class="nav-group"><div class="nav-label">Guides</div><a class="nav-link " href="jsx.html">JSX and React</a><a class="nav-link " href="integrations.html">Integrations</a><a class="nav-link " href="migration-2-1.html">Migrating from 2.0</a><a class="nav-link " href="migration-2-2.html">Migrating to 2.2</a><a class="nav-link " href="contracts.html">Unified contracts</a><a class="nav-link " href="concurrency.html">Concurrency</a><a class="nav-link " href="jobs.html">Background jobs</a><a class="nav-link " href="databases.html">Databases</a><a class="nav-link " href="security.html">Security</a><a class="nav-link " href="debugging.html">Debugging</a><a class="nav-link " href="migration.html">Migration guide</a><a class="nav-link " href="comparison.html">Comparison with TypeScript</a></div><div class="nav-group"><div class="nav-label">Compiler</div><a class="nav-link " href="compiler.html">Compiler</a><a class="nav-link " href="architecture.html">Compiler architecture</a><a class="nav-link " href="interop.html">JavaScript interop</a><a class="nav-link active" href="cross-language.html" aria-current="page">Cross-language bridges</a><a class="nav-link " href="benchmarks.html">Benchmarks</a></div><div class="nav-group"><div class="nav-label">Project</div><a class="nav-link " href="progress.html">Engineering progress</a><a class="nav-link " href="roadmap.html">Roadmap</a><a class="nav-link " href="audit.html">Audit</a><a class="nav-link " href="capability-audit-2-2.html">Capability audit 2.2</a><a class="nav-link " href="decisions.html">Decisions</a></div></nav><div class="rail-foot"><a href="https://github.com/ayoistooslick/Plainscript">Source ↗</a><span class="sep">/</span><a href="https://github.com/ayoistooslick/Plainscript/issues">Issues ↗</a><br>MIT · built by hand</div></aside><div class="main"><header class="top"><button class="nav-toggle" type="button" data-nav-toggle aria-expanded="false" aria-controls="rail"><span aria-hidden="true">≡</span> <span class="nav-toggle-label">Contents</span></button><a class="top-brand" href="index.html">PlainScript<span>.</span></a><span class="crumb"><b>PlainScript</b><span class="slash">/</span>Compiler<span class="slash">/</span>Cross-language bridges</span><div class="search-wrap"><label class="search" aria-label="Search the manual"><span class="glyph" aria-hidden="true"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg></span><input id="doc-search" type="search" placeholder="Search the manual" autocomplete="off" aria-controls="search-results" aria-expanded="false"><kbd>/</kbd></label><div id="search-results" class="search-results" role="listbox" aria-label="Search results"></div></div><a class="top-github" href="https://github.com/ayoistooslick/Plainscript">GitHub ↗</a><div class="progress" aria-hidden="true"><span></span></div></header><main id="main" class="page"><div class="article-grid"><article class="prose"><div class="chapter-head"><figure class="chapter-band" data-tilt><img src="assets/plate-chrome.jpg" alt="" width="1024" height="1024" loading="lazy" decoding="async"></figure><div class="page-kicker"><span class="kicker-no">15</span><span class="kicker-section">Compiler</span><span class="kicker-meta">4 min read</span></div><h1 id="cross-language-interoperability">Cross-language interoperability</h1></div>
+<p>PlainScript runs on JavaScript, so JavaScript and TypeScript are the native interoperability story: import an npm package, a Node builtin, a browser API or a local <code>.js</code> module and the emitted ESM uses it directly. Projects in other languages need a boundary that crosses a process. Version 2.2 standardises that boundary instead of inventing a different integration for every language.</p>
+<p>The boundary is <strong>newline-delimited JSON-RPC 2.0</strong>. A PlainScript module is served by <code>plainscript bridge</code>; generated clients in Python, JavaScript, TypeScript, Java, Kotlin, C, C++, Go, Rust, Ruby, PHP, C#, Swift and Dart call it over stdio or HTTP. <code>std/bridge</code> is the same protocol in the other direction, so PlainScript can call a Python service.</p>
+<p>This is deliberately a process boundary, not a foreign-function interface (FFI) or a native embedding API. It works wherever the participating runtimes work, keeps crashes and memory ownership apart, and requires no compiler plugin for each host language. The trade-off is serialisation cost and no shared mutable memory; use it at module boundaries, not inside a hot loop.</p>
+<h2 id="expose-plainscript-to-another-language">Expose PlainScript to another language</h2>
+<p>Export typed functions from a module:</p>
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
+
+import { count } from &quot;std/list&quot;
+
+export type Totals
+    count: number
+    total: number
+end
+
+export define add(a: number, b: number) returns number
+    return a + b
+end
+
+export define greet(name: text) returns text
+    return &quot;Hello, {name}!&quot;
+end
+
+export define totals(values: list of number) returns Totals
+    set sum to 0
+    for each value in values
+        change sum to sum + value
+    end
+    return { count: count(values), total: sum }
+end
+
+export async define later(ms: number) returns number
+    return ms * 2
+end</code></pre></figure>
+<p>The bridge builds a manifest from the checker&#39;s exports. Parameters, return types, optionality, records, lists, maps and async functions are described, so a generated client knows which arguments to send and what shape to expect.</p>
+<h3 id="serve-it">Serve it</h3>
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">sh</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="bash"># one call, useful in a shell or another program
+plainscript bridge src/service.pln --call=add --args=&#39;[2, 3]&#39;
+# 5
+
+# inspect the manifest
+plainscript bridge src/service.pln --manifest
+
+# newline-delimited JSON-RPC over stdio
+plainscript bridge src/service.pln
+
+# the same messages over HTTP: POST /rpc, GET /health, GET /manifest
+plainscript bridge src/service.pln --http=8787</code></pre></figure>
+<p>A request is one JSON object per line:</p>
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">json</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="json">{&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;id&quot;:1,&quot;method&quot;:&quot;add&quot;,&quot;params&quot;:[2,3]}</code></pre></figure>
+<p>The response is one object per line:</p>
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">json</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="json">{&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;id&quot;:1,&quot;result&quot;:5}</code></pre></figure>
+<p>Batches, notifications (requests without an id), positional parameters, named parameters, <code>__ping</code> and <code>__manifest</code> are supported. Errors use the standard JSON-RPC codes plus an execution code for a thrown PlainScript value:</p>
+<div class="table-wrap"><table><thead><tr><th>Code</th><th>Meaning</th></tr></thead><tbody>
+<tr><td><code>-32700</code></td><td>Parse error</td></tr>
+<tr><td><code>-32600</code></td><td>Invalid request</td></tr>
+<tr><td><code>-32601</code></td><td>Unknown method</td></tr>
+<tr><td><code>-32602</code></td><td>Invalid params</td></tr>
+<tr><td><code>-32603</code></td><td>Internal error</td></tr>
+<tr><td><code>-32000</code></td><td>The PlainScript function threw</td></tr>
+</tbody></table></div>
+<p>The bridge serialises results with JSON; <code>nothing</code> becomes <code>null</code>, and a non-serialisable value is reported as an execution error.</p>
+<h3 id="generated-bindings">Generated bindings</h3>
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">sh</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="bash">plainscript bindings src/service.pln --out=bindings
+plainscript bindings src/service.pln --lang=python,go --out=bindings</code></pre></figure>
+<p>The output contains the manifest, protocol notes and one client per requested language. Generated clients are small and dependency-free where the language allows it; C and C++ use a header plus a generated implementation that calls the CLI, while JVM, Go, Rust, Ruby, PHP, C#, Swift and Dart clients are source files with the same request/response shape.</p>
+<div class="table-wrap"><table><thead><tr><th>Language</th><th>Generated</th><th>End-to-end verified here</th></tr></thead><tbody>
+<tr><td>JavaScript / TypeScript</td><td><code>.mjs</code> client</td><td>Yes, against a live bridge</td></tr>
+<tr><td>Python</td><td><code>*_bridge.py</code> client and <code>python_server.py</code></td><td>Yes, both directions</td></tr>
+<tr><td>C</td><td>header + helpers</td><td>Yes, compiled with GCC and executed</td></tr>
+<tr><td>C++</td><td>header</td><td>Compiles, one-shot call verified</td></tr>
+<tr><td>Java, Kotlin</td><td><code>BridgeClient.java</code> / <code>.kt</code></td><td>Generation only (no JVM toolchain here)</td></tr>
+<tr><td>Go</td><td><code>*_bridge.go</code></td><td>Generation only (no Go toolchain here)</td></tr>
+<tr><td>Rust</td><td><code>*_bridge.rs</code></td><td>Generation only (no Rust toolchain here)</td></tr>
+<tr><td>C#, Ruby, PHP, Swift, Dart</td><td>one client each</td><td>Generation only</td></tr>
+</tbody></table></div>
+<p>&quot;Generation only&quot; means the file is produced and type-checked by review, not that it was executed in this checkout. Do not treat the table as a claim that every runtime was exercised.</p>
+<h2 id="call-another-language-from-plainscript">Call another language from PlainScript</h2>
+<p><code>std/bridge</code> starts a child process and speaks the same protocol:</p>
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
+
+import { open, close } from &quot;std/bridge&quot;
+import { print } from &quot;std/io&quot;
+
+set python to open(&quot;python3&quot;, [&quot;service.py&quot;])
+print(await python.request(&quot;add&quot;, [2, 3]))
+print(await python.request(&quot;greet&quot;, [&quot;PlainScript&quot;]))
+close(python)</code></pre></figure>
+<p><code>open</code> returns a <code>BridgeProcess</code> with:</p>
+<div class="table-wrap"><table><thead><tr><th>Member</th><th>Meaning</th></tr></thead><tbody>
+<tr><td><code>request(method, params)</code></td><td>Send a request, await its result</td></tr>
+<tr><td><code>notify(method, params)</code></td><td>Send a notification; no result</td></tr>
+<tr><td><code>pid</code></td><td>Child process id</td></tr>
+<tr><td><code>close()</code></td><td>Close stdin and terminate the child</td></tr>
+</tbody></table></div>
+<p>A Python service is ordinary Python. Export functions at module scope; the bundled server (<code>src/interop/python_server.py</code>) reads one JSON request per line and writes one response per line:</p>
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">python</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="python">def add(a, b):
+    return a + b
+
+def greet(name):
+    return f&quot;Hello from Python, {name}!&quot;</code></pre></figure>
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">sh</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="bash">echo &#39;{&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;id&quot;:1,&quot;method&quot;:&quot;add&quot;,&quot;params&quot;:[2,3]}&#39; | python3 src/interop/python_server.py service.py</code></pre></figure>
+<p>The server returns a structured error when the Python function raises. The PlainScript client surfaces it as a <code>BridgeError</code> whose <code>message</code> is the remote message; a <code>try … catch</code> around <code>request</code> handles it.</p>
+<h2 id="choosing-a-boundary">Choosing a boundary</h2>
+<div class="table-wrap"><table><thead><tr><th>Situation</th><th>Recommended boundary</th></tr></thead><tbody>
+<tr><td>JavaScript, TypeScript, React, Node</td><td>Direct ESM import; generated <code>.d.pln</code> for declarations</td></tr>
+<tr><td>Python service or script</td><td><code>plainscript bridge</code> + Python client, or <code>std/bridge</code></td></tr>
+<tr><td>C / C++ library</td><td>Keep the library in C/C++, expose a narrow process or HTTP service; generated C client for calling PlainScript</td></tr>
+<tr><td>Java / Kotlin / Go / Rust service</td><td>Run it as a service and call over HTTP JSON-RPC; generated client</td></tr>
+<tr><td>Data pipeline across languages</td><td>JSON-RPC process boundary with a versioned manifest</td></tr>
+<tr><td>Hot path inside a native library</td><td>Not solved by 2.2; native FFI/WASM embedding is a future adapter</td></tr>
+</tbody></table></div>
+<p>The architecture is extensible by adding a generator to <code>src/interop/bindings.js</code> and a small client runtime for the language. The protocol and manifest are stable across generators; adding a language does not change the compiler.</p>
+<h2 id="security-and-operations">Security and operations</h2>
+<ul>
+<li>A bridge is a local process. <code>--http</code> binds to <code>127.0.0.1</code> by default; put an</li>
+<p>authenticated reverse proxy in front of it before exposing it to a network.</p>
+<li>The bridge executes the module. Do not point it at untrusted source.</li>
+<li>Params are validated against the manifest&#39;s arity and names, but a dynamic</li>
+<p>language client can still send values of the wrong JSON shape. Validate business input inside the PlainScript function.</p>
+<li>The child process is terminated when the client closes or exits; a crashed</li>
+<p>bridge surfaces as a connection error in the client.</p>
+<li>JSON has no distinction between a missing optional value and <code>null</code>. Model</li>
+<p>absence as <code>null</code> or use a record with an explicit flag.</p>
+</ul>
+<h2 id="javascript-interoperability-remains-the-native-path">JavaScript interoperability remains the native path</h2>
+<p>Cross-language JSON-RPC does not replace direct JavaScript interop. The same release continues to support:</p>
+<ul>
+<li>ESM and CommonJS packages through Node&#39;s resolver.</li>
+<li>Node builtins and browser APIs via <code>declare</code>.</li>
+<li>TypeScript declarations through <code>plainscript interop</code>.</li>
+<li>React and Vite through emitted ESM and source maps.</li>
+<li>Local JavaScript modules through <code>.d.pln</code> declarations and generated</li>
+<p>boundaries.</p>
+</ul>
+<p>See <a href="interop.html">JavaScript interoperability</a> for the native path, and <a href="jsx.html">JSX and React</a> for components.</p></article><aside class="toc-rail" aria-label="On this page"><div class="toc-title">On this page</div><nav class="toc"><a class="toc-h2" href="#expose-plainscript-to-another-language">Expose PlainScript to another language</a><a class="toc-h3" href="#serve-it">Serve it</a><a class="toc-h3" href="#generated-bindings">Generated bindings</a><a class="toc-h2" href="#call-another-language-from-plainscript">Call another language from PlainScript</a><a class="toc-h2" href="#choosing-a-boundary">Choosing a boundary</a><a class="toc-h2" href="#security-and-operations">Security and operations</a><a class="toc-h2" href="#javascript-interoperability-remains-the-native-path">JavaScript interoperability remains the native path</a></nav></aside></div><nav class="page-nav" aria-label="Chapter navigation"><a class="pn-prev" href="interop.html"><span class="pn-label">← Previous</span><span class="pn-title">JavaScript interop</span></a><a class="pn-next" href="type-system.html"><span class="pn-label">Next →</span><span class="pn-title">Type system</span></a></nav><footer class="colophon"><div><div class="colophon-mark">PlainScript<span>.</span></div><p>An independent, statically typed language for the JavaScript platform. This manual is set in Fraunces, Newsreader, Space Grotesk and IBM Plex Mono, with halftone plates drawn in-house. One stylesheet, no frameworks, no trackers.</p></div><nav class="colophon-links" aria-label="Project links"><a href="index.html">Manual</a><a href="https://github.com/ayoistooslick/Plainscript">Source</a><a href="https://github.com/ayoistooslick/Plainscript/issues">Issues</a><a href="https://github.com/ayoistooslick/Plainscript/blob/main/CHANGELOG.md">Changelog</a><a href="https://github.com/ayoistooslick/Plainscript/blob/main/LICENSE">MIT</a></nav></footer></main></div></div><script src="app.js"></script></body></html>

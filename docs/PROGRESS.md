@@ -46,8 +46,13 @@ plainscript check demos/contracts-fullstack/src/App.pln
   `std/db-mysql`), auth (`std/auth`), OIDC/SAML helpers (`std/oidc`, `std/saml`),
   async/tasks (`std/task`), jobs (`std/jobs`), React/Next/Vite/Node interop and eight
   starters.
-- **Adoption.** Conservative `plainscript migrate` reporting, `plainscript interop` for a
-  supported `.d.ts` subset, JavaScript/npm interop and incremental migration guidance.
+- **Adoption.** `plainscript migrate` analysis/conversion/boundaries, JSON-RPC bridge and
+  generated clients for fourteen ecosystems, `plainscript interop` for a supported
+  `.d.ts` subset, JavaScript/npm interop and incremental migration guidance.
+- **2.2 language work.** Native JSX with classic/automatic React runtimes and prop
+  checking; native regex literals with typed `std/text` helpers; resolved re-exports;
+  executable declared runtimes and generated boundaries; React + Vite integration
+  rewritten in PlainScript JSX.
 
 ## Evidence
 

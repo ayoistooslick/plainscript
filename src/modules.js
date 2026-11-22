@@ -9,6 +9,7 @@ const { checkModule } = require('./checker');
 const { lowerProgram } = require('./hir');
 const { generate } = require('./codegen');
 const { Span, error, CompileError } = require('./diagnostics');
+const { resolveJsxOptions, jsxConfigFor } = require('./jsx');
 
 const COMPILER_ROOT = path.resolve(__dirname, '..');
 const STDLIB_DIR = path.join(COMPILER_ROOT, 'stdlib');
@@ -45,6 +46,8 @@ class Compiler {
     // Project-wide default syntax dialect. Individual files may override it
     // with a `#syntax 2.0` / `#syntax 2.1` pragma.
     this.dialect = options.dialect ? String(options.dialect) : null;
+    // Project JSX defaults; a per-file pragma overrides them at load time.
+    this.jsxOptions = options.jsx || jsxConfigFor(this.root);
     // Editor and test harnesses can supply unsaved documents without writing
     // them to disk. Keys are absolute paths.
     this.overrides = options.overrides || new Map();
@@ -294,7 +297,8 @@ class Compiler {
     this.loading.add(file);
 
     for (const statement of record.ast.body) {
-      if (statement.kind !== 'Import') continue;
+      const isReExport = statement.kind === 'ExportNamed' && statement.spec;
+      if (statement.kind !== 'Import' && !isReExport) continue;
       const resolved = this.resolveImport(statement.spec, file);
       record.resolutions.set(statement.spec, resolved);
       if (resolved.kind === 'local' || resolved.kind === 'declared' || resolved.kind === 'typed-package') {
@@ -334,11 +338,14 @@ class Compiler {
       return null;
     };
 
+    const jsx = resolveJsxOptions(source, this.jsxOptions || {});
+    record.jsx = jsx;
     const checked = checkModule({
       file: record.display,
       source,
       program: record.ast,
       resolveImport: resolveForChecker,
+      jsx,
     });
     record.check = checked;
     this.diagnostics.push(...checked.diagnostics);
@@ -359,7 +366,10 @@ class Compiler {
     }
 
     if (resolved.kind === 'declared') {
-      return this.relativeImport(outFile, resolved.runtime);
+      // The runtime JavaScript next to a declaration is copied into the output
+      // tree by compileGraph, so the emitted import must point at that copy.
+      const target = this.outputFor ? this.outputFor(resolved.runtime) : resolved.runtime;
+      return this.relativeImport(outFile, target);
     }
     if (resolved.kind === 'untyped' || resolved.kind === 'typed-package') return spec;
 
@@ -396,6 +406,7 @@ class Compiler {
       unitVariants,
       variantFields,
       typeOnlyImports: record.check.typeOnlyImports,
+      jsx: record.jsx || resolveJsxOptions(record.source, this.jsxOptions || {}),
     });
 
     const generated = generate(hir, {
@@ -429,6 +440,28 @@ class Compiler {
       if (!result.ok || this.diagnostics.some((diagnostic) => diagnostic.severity === 'error')) continue;
       outputs.push({ outFile, code: result.code, map: result.map });
     }
+    // Runtime JavaScript that a declaration describes is part of the program
+    // at run time even though it is not compiled. Copying it keeps relative
+    // imports valid in dist/ and in the run directory.
+    const copied = new Set();
+    for (const record of this.modules.values()) {
+      for (const resolved of record.resolutions.values()) {
+        if (resolved.kind !== 'declared' || !resolved.runtime) continue;
+        const runtime = path.resolve(resolved.runtime);
+        if (copied.has(runtime) || !isFile(runtime)) continue;
+        const relative = path.relative(srcRoot, runtime);
+        // Installed packages are resolved by the host; copying only the one
+        // runtime file a declaration names would leave a broken package in the
+        // output tree. Project-local runtimes are copied so boundaries and
+        // declared local modules execute after compilation.
+        if (relative.startsWith('..') || relative.split(path.sep).includes('node_modules')) continue;
+        const destination = path.join(outRoot, relative);
+        fs.mkdirSync(path.dirname(destination), { recursive: true });
+        fs.copyFileSync(runtime, destination);
+        copied.add(runtime);
+      }
+    }
+
     // Nothing is written when compilation failed: a stale program on disk is
     // worse than no program at all.
     for (const output of outputs) {
@@ -477,11 +510,13 @@ function tempRunRoot(entry) {
 function compileFileOrThrow(source, options = {}) {
   const file = options.file || '<input>';
   const ast = parse(source, file, { dialect: options.dialect || null });
+  const jsx = resolveJsxOptions(source, options.jsx || {});
   const checked = checkModule({
     file,
     source,
     program: ast,
     resolveImport: options.resolveImport || (() => null),
+    jsx,
   });
   if (checked.diagnostics.length) throw new CompileError(checked.diagnostics);
   const checker = checked.checker;
@@ -491,7 +526,7 @@ function compileFileOrThrow(source, options = {}) {
     if (constructor.kind === 'value') unitVariants.add(name);
     else variantFields.set(name, constructor.type.params.map((parameter) => parameter.name));
   }
-  const hir = lowerProgram(ast, { checker, file, unitVariants, variantFields });
+  const hir = lowerProgram(ast, { checker, file, unitVariants, variantFields, jsx });
   const generated = generate(hir, {
     file,
     outFile: options.outFile || null,

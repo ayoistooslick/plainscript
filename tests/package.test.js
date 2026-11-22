@@ -12,7 +12,7 @@ const packageJson = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 
 
 test('the compiler version and package version agree', () => {
   assert.strictEqual(packageJson.version, VERSION);
-  assert.strictEqual(VERSION, '2.1.0');
+  assert.strictEqual(VERSION, '2.2.0');
 });
 
 test('the package exposes an API entry point and the standard library', () => {
@@ -53,7 +53,9 @@ test('the publish set excludes archived v1 sources and dependencies', () => {
 
 test('the v1 implementation is preserved under legacy/ and not imported', () => {
   assert.ok(fs.existsSync(path.join(ROOT, 'legacy', 'v1', 'compiler', 'cli.js')));
-  const sources = fs.readdirSync(path.join(ROOT, 'src')).map((name) => fs.readFileSync(path.join(ROOT, 'src', name), 'utf8'));
+  const sources = fs.readdirSync(path.join(ROOT, 'src'))
+    .filter((name) => fs.statSync(path.join(ROOT, 'src', name)).isFile())
+    .map((name) => fs.readFileSync(path.join(ROOT, 'src', name), 'utf8'));
   for (const source of sources) {
     assert.ok(!source.includes('legacy/v1'), 'the v2 compiler must not import v1 code');
   }

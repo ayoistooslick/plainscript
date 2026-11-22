@@ -1,4 +1,4 @@
-# The PlainScript 2.1 Language Specification
+# The PlainScript 2.2 Language Specification
 
 This document defines the language implemented by the compiler in `src/`. When this
 document and the compiler disagree, the compiler is authoritative and the document is a
@@ -86,6 +86,42 @@ to string concatenation, so its runtime value uses JavaScript's string conversio
 
 `#` starts a comment. `...` is spread/rest. `->` introduces a return type. `=>` forms a
 lambda.
+
+### 2.7 Regular expression literals
+
+A regular expression literal is `/pattern/flags`, where `pattern` is the text up to the
+last unescaped `/` and `flags` is a suffix drawn from `d g i m s u v y`. The lexer
+validates both by constructing a host `RegExp`; an invalid pattern is `PS1008`, an
+unterminated literal is `PS1006`, and invalid or duplicate flags are `PS1007`.
+
+The slash is disambiguated by expression position. It is division after a value
+(identifier, literal, call, member access, `)`, `]`, `}` or `nothing`) and starts a regex
+where an expression is expected (after an operator, comma, opening delimiter, `return`,
+`case` and similar). `\/` escapes a slash inside a pattern.
+
+The value has the primitive type `regex`. It is a native JavaScript `RegExp` at runtime.
+The language does not provide a `RegExp` constructor expression.
+
+### 2.8 JSX
+
+JSX is part of the lexical and syntactic surface in both dialects:
+
+```
+<tag attr="text" flag={expression} {...record}>children</tag>
+<tag />
+<>children</>
+{expression}
+```
+
+The lexer scans a complete element as one token, including nested elements, quoted
+attributes, expression containers, entities and text. The parser converts it to
+`JSXElement`, `JSXFragment`, `JSXText` and `JSXSpreadChild` nodes. JSX is an expression and
+may appear wherever an expression is allowed, including a lambda body.
+
+The transform is selected per file by pragmas (`# @jsx`, `# @jsxFrag`,
+`# @jsxRuntime`, `# @jsxImportSource`) and project configuration. Classic mode lowers to
+`factory(type, props, ...children)`; automatic mode imports `jsx`/`jsxs` from
+`${importSource}/jsx-runtime`. See [JSX and React](JSX.md).
 
 ---
 
@@ -468,6 +504,8 @@ When the right side is a lambda, it is called with the left value:
 true, false, nothing
 [1, 2, 3]
 { name: "ada", "quoted key": 1 }
+/item-(?<id>\d+)/gi
+<Card title="hello" count={2} />
 ```
 
 Record/map literals use `{ key: value }`; keys may be identifiers or text literals. There
@@ -624,7 +662,27 @@ A fragment is an element whose tag is the `Fragment` value from the imported fac
 Keys are always explicit (`with key: value`); there is no automatic key inference and no
 context syntax.
 
-### 7.6 Other statements
+### 7.6 JSX expressions
+
+A JSX element is an expression; it can be returned, bound, passed and nested in an
+expression container. Its children are:
+
+- text, with entities decoded and whitespace normalised around newlines;
+- `{expression}` containers, which may produce a single child or a list;
+- `{...expression}` spread children;
+- nested elements and fragments.
+
+Attributes are `name="text"`, `name={expression}`, a bare `name` (equivalent to
+`name: true`) or `{...record}`. Attribute names are emitted verbatim. A component tag
+whose value has a declared record prop type is checked for unknown props (`PS3420`),
+wrong prop types (`PS3421`) and missing required props (`PS3422`). Classic JSX without a
+factory in scope is `PS3405`.
+
+JSX diagnostics are lexical or syntactic: `PS1009` invalid character/tag, `PS1010`
+unclosed expression container, `PS1011` malformed attribute, `PS1012` unclosed element,
+`PS1013` mismatched closing tag, `PS1014` invalid entity.
+
+### 7.7 Other statements
 
 - `print x` is not a statement; import `print` from `std/io` or call a function.
 - An expression on its own line is evaluated and discarded.
@@ -676,7 +734,10 @@ Notable type codes: `PS3205` missing export, `PS3301` unknown name, `PS3304` not
 `PS3350` maybe-nothing access, `PS3351` union missing field, `PS3353` invalid type
 predicate, `PS3354` no overload matches, `PS3355` overload/implementation mismatch,
 `PS3401` missing return, `PS3402` `return` without a value, `PS3404` return type mismatch,
-`PS3406` await outside async.
+`PS3405` missing JSX factory, `PS3406` await outside async, `PS3420` unknown JSX prop,
+`PS3421` JSX prop type mismatch, `PS3422` missing JSX prop. Lexer regex codes are
+`PS1006` unterminated regex, `PS1007` bad flags and `PS1008` invalid pattern; JSX lexical
+codes are listed in section 7.6.
 
 ---
 
@@ -743,6 +804,24 @@ source .pln
   and Cloudflare Workers all provide.
 - Emitted code never imports a PlainScript runtime. The only imports are the ones written
   in source plus the standard library modules the program uses.
+
+### 13.1 Cross-language process boundary
+
+For non-JavaScript modules, the supported boundary is newline-delimited JSON-RPC 2.0.
+`plainscript bridge` exposes a module's exported functions over stdio or HTTP; the
+generated clients in Python, JavaScript, C, C++, Java, Kotlin, Go, Rust, Ruby, PHP, C#,
+Swift and Dart use the manifest. `std/bridge` starts a child process and performs the same
+requests from PlainScript.
+
+Values cross as JSON. There is no shared memory, no native ABI and no reflective access to
+the remote runtime. A bridge call is asynchronous from PlainScript and has process-level
+failure semantics: a closed pipe or non-zero exit is an error, not a language exception
+from the remote process. The remote method set is fixed by the manifest produced at
+compile time.
+
+The boundary is not a substitute for direct ESM interop. JavaScript and TypeScript remain
+the native path, with declarations supplying types where available. See
+[Cross-language bridges](CROSS_LANGUAGE.md).
 
 ---
 

@@ -67,9 +67,11 @@ deletes a note, and asserts the 400 and 404 responses.
 
 ## React + Vite
 
-`render` and `element` lower to `createElement`. A PlainScript component is an
-ordinary React function component, so hooks, event handlers and keys behave
-exactly as documented by React.
+The integration now uses native PlainScript JSX. Elements lower to the configured
+factory (classic `createElement` by default), and a component is an ordinary React
+function component, so hooks, event handlers and keys behave exactly as documented by
+React. The test renders it through `react-dom/server`; the production path uses the
+normal Vite build.
 
 ```plainscript
 #syntax 2.1
@@ -78,19 +80,15 @@ import { createElement, useState } from "react"
 
 export define Counter() returns any
     set (count, setCount) to useState(0)
-
-    render
-        element "div" with className: "counter"
-            element "p"
-                "Count: {count}"
-            end
-            element "button" with onClick: () => setCount(count + 1)
-                "Increment"
-            end
-        end
-    end
+    return <div className="counter">
+        <p>Count: {count}</p>
+        <button type="button" onClick={() => setCount(count + 1)}>Increment</button>
+    </div>
 end
 ```
+
+`render`/`element` blocks remain available for statement-oriented components. See
+[JSX and React](JSX.md) for the automatic runtime and custom factories.
 
 Build the Vite project:
 

@@ -1,0 +1,117 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Migrating to 2.2 — PlainScript 2.2 documentation."><meta name="color-scheme" content="dark"><meta name="theme-color" content="#08070b"><title>Migrating to 2.2 · PlainScript</title><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23a679ff'/%3E%3Ctext x='16' y='23' font-family='Georgia,serif' font-size='20' fill='%2308070b' text-anchor='middle'%3EP%3C/text%3E%3C/svg%3E"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=Space+Grotesk:wght@400..700&display=swap" rel="stylesheet"><link rel="stylesheet" href="style.css"></head><body><a class="skip" href="#main">Skip to content</a><div class="scrim" data-scrim></div><div class="shell"><aside class="rail" id="rail"><div class="rail-head"><a class="wordmark" href="index.html">PlainScript<span class="dot">.</span></a><div class="rail-meta">Language manual<br>Vol. 2.2 · MMXXVI</div></div><nav class="rail-nav" aria-label="Documentation"><div class="nav-group"><div class="nav-label">Start here</div><a class="nav-link " href="index.html">PlainScript</a><a class="nav-link " href="getting-started.html">Getting started</a><a class="nav-link " href="cli.html">CLI reference</a><a class="nav-link " href="templates.html">Application templates</a></div><div class="nav-group"><div class="nav-label">Language</div><a class="nav-link " href="language-reference.html">Language reference</a><a class="nav-link " href="regex.html">Regular expressions</a><a class="nav-link " href="spec.html">Language specification</a><a class="nav-link " href="syntax-design.html">Syntax design</a><a class="nav-link " href="type-system.html">Type system</a></div><div class="nav-group"><div class="nav-label">Guides</div><a class="nav-link " href="jsx.html">JSX and React</a><a class="nav-link " href="integrations.html">Integrations</a><a class="nav-link " href="migration-2-1.html">Migrating from 2.0</a><a class="nav-link active" href="migration-2-2.html" aria-current="page">Migrating to 2.2</a><a class="nav-link " href="contracts.html">Unified contracts</a><a class="nav-link " href="concurrency.html">Concurrency</a><a class="nav-link " href="jobs.html">Background jobs</a><a class="nav-link " href="databases.html">Databases</a><a class="nav-link " href="security.html">Security</a><a class="nav-link " href="debugging.html">Debugging</a><a class="nav-link " href="migration.html">Migration guide</a><a class="nav-link " href="comparison.html">Comparison with TypeScript</a></div><div class="nav-group"><div class="nav-label">Compiler</div><a class="nav-link " href="compiler.html">Compiler</a><a class="nav-link " href="architecture.html">Compiler architecture</a><a class="nav-link " href="interop.html">JavaScript interop</a><a class="nav-link " href="cross-language.html">Cross-language bridges</a><a class="nav-link " href="benchmarks.html">Benchmarks</a></div><div class="nav-group"><div class="nav-label">Project</div><a class="nav-link " href="progress.html">Engineering progress</a><a class="nav-link " href="roadmap.html">Roadmap</a><a class="nav-link " href="audit.html">Audit</a><a class="nav-link " href="capability-audit-2-2.html">Capability audit 2.2</a><a class="nav-link " href="decisions.html">Decisions</a></div></nav><div class="rail-foot"><a href="https://github.com/ayoistooslick/Plainscript">Source ↗</a><span class="sep">/</span><a href="https://github.com/ayoistooslick/Plainscript/issues">Issues ↗</a><br>MIT · built by hand</div></aside><div class="main"><header class="top"><button class="nav-toggle" type="button" data-nav-toggle aria-expanded="false" aria-controls="rail"><span aria-hidden="true">≡</span> <span class="nav-toggle-label">Contents</span></button><a class="top-brand" href="index.html">PlainScript<span>.</span></a><span class="crumb"><b>PlainScript</b><span class="slash">/</span>Guides<span class="slash">/</span>Migrating to 2.2</span><div class="search-wrap"><label class="search" aria-label="Search the manual"><span class="glyph" aria-hidden="true"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg></span><input id="doc-search" type="search" placeholder="Search the manual" autocomplete="off" aria-controls="search-results" aria-expanded="false"><kbd>/</kbd></label><div id="search-results" class="search-results" role="listbox" aria-label="Search results"></div></div><a class="top-github" href="https://github.com/ayoistooslick/Plainscript">GitHub ↗</a><div class="progress" aria-hidden="true"><span></span></div></header><main id="main" class="page"><div class="article-grid"><article class="prose"><div class="chapter-head"><figure class="chapter-band" data-tilt><img src="assets/plate-figure.jpg" alt="" width="1024" height="1024" loading="lazy" decoding="async"></figure><div class="page-kicker"><span class="kicker-no">08</span><span class="kicker-section">Guides</span><span class="kicker-meta">5 min read</span></div><h1 id="migrating-to-plainscript-2-2">Migrating to PlainScript 2.2</h1></div>
+<p>PlainScript 2.2 adds a migration tool that analyses an existing project and produces a phased plan, safe conversions, interoperability boundaries and a machine-readable report. It is designed for incremental adoption: a mixed project is a valid end state. You do not need to rewrite an application before PlainScript is useful.</p>
+<p>The tool is <code>plainscript migrate</code>. It complements, rather than replaces, <code>plainscript interop</code> (TypeScript declaration translation) and <code>plainscript bindings</code> (cross-language clients).</p>
+<h2 id="run-an-analysis-first">Run an analysis first</h2>
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">sh</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="bash">plainscript migrate .
+plainscript migrate . --json
+plainscript migrate . --report=migration-report.json</code></pre></figure>
+<p>The Markdown report contains:</p>
+<ul>
+<li>the detected languages, module system, package manager, frameworks and</li>
+<p>ecosystem markers;</p>
+<li>every analysed source file with its language, line count, exports, imports,</li>
+<p>JSX flag and migration phase;</p>
+<li>a phased plan;</li>
+<li>mechanical scan findings with stable codes;</li>
+<li>unresolved transformations and the reason each one needs attention.</li>
+</ul>
+<p>The JSON report contains the same analysis plus a <code>findings</code> array compatible with 2.1&#39;s migration scan and the new <code>summary</code>, <code>stack</code>, <code>phases</code>, <code>boundaries</code>, <code>conversions</code> and <code>failures</code> fields.</p>
+<h3 id="phases">Phases</h3>
+<div class="table-wrap"><table><thead><tr><th>Phase</th><th>What belongs here</th><th>Strategy</th></tr></thead><tbody>
+<tr><td><code>leaf-utilities</code></td><td>Modules with no dependants</td><td>Convert first; run tests</td></tr>
+<tr><td><code>modules-with-public-api</code></td><td>Exported functions and values</td><td>Convert or wrap; point dependants at the result</td></tr>
+<tr><td><code>ui-components</code></td><td>JSX/TSX and React imports</td><td>Keep behind a boundary, or rewrite with native PlainScript JSX</td></tr>
+<tr><td><code>entrypoints</code></td><td><code>main</code>, <code>server</code>, <code>app</code>, <code>cli</code></td><td>Move last, after the mixed build is green</td></tr>
+</tbody></table></div>
+<p>Entrypoints move last because they exercise the whole graph. A leaf conversion that passes its tests is a safe checkpoint; a broken entrypoint blocks everything.</p>
+<h2 id="safe-conversion">Safe conversion</h2>
+<p>For JavaScript files that pass a conservative gate, <code>--write</code> emits a <code>.pln</code> module beside the source:</p>
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">sh</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="bash">plainscript migrate src --write</code></pre></figure>
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
+
+# Converted from util.js by plainscript migrate.
+# Review the result and run the project tests before deleting the source.
+
+export define add(a: number, b: number) returns number
+    return a + b
+end</code></pre></figure>
+<p>The converter preserves exports, function bodies, records, lists, ordinary control flow and string interpolation. It infers no types it cannot prove: a parameter without an annotation is <code>any</code>, and the original tests remain the behavioural oracle. The converted file is a starting point for review, not a claim that the whole module is idiomatic PlainScript.</p>
+<p>The converter refuses, rather than mistranslates:</p>
+<ul>
+<li>classes and <code>this</code>-bound methods;</li>
+<li>JSX;</li>
+<li>CommonJS <code>require</code>/<code>module.exports</code>;</li>
+<li>default exports and wildcard re-exports;</li>
+<li>generators, decorators, dynamic <code>import()</code> and <code>eval</code>.</li>
+</ul>
+<p>A refusal produces a finding with a reason. The original file stays untouched.</p>
+<h2 id="interoperability-boundaries">Interoperability boundaries</h2>
+<p>When a JavaScript, JSX, TypeScript or TSX module cannot be safely converted, <code>--write</code> generates a boundary triplet:</p>
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">output</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="text">bridges/App.pln            PlainScript-facing wrapper
+bridges/App.runtime.js     runtime adapter for the original module
+bridges/App.runtime.d.pln  declaration consumed by the checker</code></pre></figure>
+<p>Import the wrapper from PlainScript:</p>
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">output</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="text">#syntax 2.1
+
+import { App } from &quot;./bridges/App&quot;</code></pre></figure>
+<p>The wrapper re-exports the adapter, the adapter points at the original source, and the declaration supplies types. The original module remains authoritative: editing and testing it continues exactly as before, while PlainScript gains a checked import. Boundaries are generated for ESM and CommonJS modules; the CommonJS adapter imports the module namespace and re-exports its named values.</p>
+<p>The runtime file has a distinct name from the wrapper&#39;s emitted JavaScript so a <code>plainscript build</code> cannot overwrite the adapter. The declaration is named to match the adapter, because that is what the resolver looks up.</p>
+<h2 id="incremental-workflow">Incremental workflow</h2>
+<ol>
+<li>Run <code>plainscript migrate . --json &gt; migration.json</code> and keep the report.</li>
+<li>Convert one leaf module with <code>--write</code>.</li>
+<li>Run <code>plainscript check</code> on the converted file and the project&#39;s test suite.</li>
+<li>Import the converted module from one dependant, leaving the rest untouched.</li>
+<li>For UI or CommonJS modules, import the generated boundary instead.</li>
+<li>Repeat by phase. Use <code>--check</code> in CI once the remaining unresolved list is</li>
+<p>accepted; it exits non-zero while findings or manual modules remain.</p>
+</ol>
+<p><code>plainscript migrate --check .</code> is a ratchet, not a release gate for a mixed project. It reports what is left; a project can ship with a documented boundary list.</p>
+<h2 id="extending-to-other-languages">Extending to other languages</h2>
+<p>Source conversion for 2.2 is deliberately limited to JavaScript and the JavaScript-family syntax. Other languages are analysed (public declarations are detected for Python, Rust, Go, Java, Kotlin, Ruby, PHP, C#, Swift and Dart) and reported as <code>manual</code>: their native module stays authoritative and is connected through the JSON-RPC bridge or the generated bindings rather than translated line by line.</p>
+<p>This is an honest boundary. A Python or Go function can be exposed as a service without rewriting it, and a PlainScript module can call it with <code>std/bridge</code>. The migration tool does not claim to preserve Python semantics in PlainScript source, because it does not translate Python.</p>
+<h2 id="migrating-a-react-application">Migrating a React application</h2>
+<p>A JSX/TSX component is detected as a UI module. Two routes are supported:</p>
+<ul>
+<li><strong>Boundary first.</strong> Generate <code>bridges/App.*</code>, import <code>App</code> from PlainScript,</li>
+<p>and keep the component in its existing React/Vite build. This is the fastest route for an application with a large component tree.</p>
+<li><strong>Native rewrite.</strong> Move the component to <code>.pln</code> with native JSX. Props are</li>
+<p>checked where they are declared; hooks, events and custom runtimes work. See <a href="jsx.html">JSX and React</a>.</p>
+</ul>
+<p>The <code>integrations/react-vite</code> project uses the native route and is rendered in the test suite. A React application can contain both routes during migration.</p>
+<h2 id="migrating-from-2-1">Migrating from 2.1</h2>
+<p>There is no source break between 2.1 and 2.2. Existing 2.1 modules compile unchanged. New files can use JSX and regex literals without opt-in flags.</p>
+<p>Recommended order:</p>
+<ol>
+<li>Upgrade the package to 2.2.0.</li>
+<li>Run <code>plainscript check</code> and <code>npm test</code>; both should pass before adopting new</li>
+<p>syntax.</p>
+<li>Add regex literals where string workarounds exist, and native JSX where a</li>
+<p>separate JSX layer exists.</p>
+<li>Run <code>plainscript migrate</code> to find remaining JavaScript modules that can be</li>
+<p>wrapped or converted.</p>
+<li>Publish the generated boundaries or converted modules as one reviewable</li>
+<p>change.</p>
+</ol>
+<h2 id="verification-checklist">Verification checklist</h2>
+<ul>
+<li><code>plainscript check</code> on every converted file.</li>
+<li>The original project&#39;s tests, unchanged, on the mixed project.</li>
+<li>A production build using the existing bundler or build script.</li>
+<li>A cross-language round trip for every bridge boundary.</li>
+<li>A rollback path: deleting <code>bridges/</code> and the converted <code>.pln</code> files restores</li>
+<p>the original project.</p>
+</ul>
+<h2 id="limitations">Limitations</h2>
+<ul>
+<li>The converter is line-oriented and gated; it is not a full JavaScript parser</li>
+<p>and does not handle every expression.</p>
+<li>Type and data-model translation is intentionally conservative. TypeScript</li>
+<p>annotations are not inferred from <code>.d.ts</code> during conversion; use <code>plainscript interop</code> for declarations.</p>
+<li>Automated execution of the project&#39;s tests is not performed by the tool. The</li>
+<p>report lists the checks to run; your CI runs them.</p>
+<li>Only the JavaScript family gets source boundaries. Other languages use the</li>
+<p>process bridge or stay native.</p>
+<li>Names that collide after conversion (for example a value and a type with the</li>
+<p>same name) require review.</p>
+</ul></article><aside class="toc-rail" aria-label="On this page"><div class="toc-title">On this page</div><nav class="toc"><a class="toc-h2" href="#run-an-analysis-first">Run an analysis first</a><a class="toc-h3" href="#phases">Phases</a><a class="toc-h2" href="#safe-conversion">Safe conversion</a><a class="toc-h2" href="#interoperability-boundaries">Interoperability boundaries</a><a class="toc-h2" href="#incremental-workflow">Incremental workflow</a><a class="toc-h2" href="#extending-to-other-languages">Extending to other languages</a><a class="toc-h2" href="#migrating-a-react-application">Migrating a React application</a><a class="toc-h2" href="#migrating-from-2-1">Migrating from 2.1</a><a class="toc-h2" href="#verification-checklist">Verification checklist</a><a class="toc-h2" href="#limitations">Limitations</a></nav></aside></div><nav class="page-nav" aria-label="Chapter navigation"><a class="pn-prev" href="migration-2-1.html"><span class="pn-label">← Previous</span><span class="pn-title">Migrating from 2.0</span></a><a class="pn-next" href="cli.html"><span class="pn-label">Next →</span><span class="pn-title">CLI reference</span></a></nav><footer class="colophon"><div><div class="colophon-mark">PlainScript<span>.</span></div><p>An independent, statically typed language for the JavaScript platform. This manual is set in Fraunces, Newsreader, Space Grotesk and IBM Plex Mono, with halftone plates drawn in-house. One stylesheet, no frameworks, no trackers.</p></div><nav class="colophon-links" aria-label="Project links"><a href="index.html">Manual</a><a href="https://github.com/ayoistooslick/Plainscript">Source</a><a href="https://github.com/ayoistooslick/Plainscript/issues">Issues</a><a href="https://github.com/ayoistooslick/Plainscript/blob/main/CHANGELOG.md">Changelog</a><a href="https://github.com/ayoistooslick/Plainscript/blob/main/LICENSE">MIT</a></nav></footer></main></div></div><script src="app.js"></script></body></html>

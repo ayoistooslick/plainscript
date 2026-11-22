@@ -1,6 +1,6 @@
 <!-- compile-examples -->
 
-# PlainScript 2.1
+# PlainScript 2.2
 
 PlainScript is an independent, statically typed programming language for the
 JavaScript platform. It reads like structured English, checks every program
@@ -8,8 +8,9 @@ before it runs, and compiles to ordinary ES modules that use the JavaScript
 ecosystem directly — React, Next.js, Vite, Express, Node built-ins and npm
 packages included.
 
-Version 2.1 introduces the English-oriented dialect as the primary surface of
-the language. It is opt-in per file, so 2.0 sources keep compiling unchanged.
+Version 2.2 adds native JSX, native regular expressions, cross-language
+JSON-RPC bridges and a migration tool, without breaking 2.0 or 2.1 source. The
+English-oriented 2.1 dialect remains the primary surface of the language.
 
 Created by **Ayodele Ayokunle David**. PlainScript is MIT licensed.
 
@@ -36,6 +37,27 @@ print(greet("world"))
 node src/cli.js run hello.pln
 # Hello, world!
 ```
+
+## What 2.2 adds
+
+- **Native JSX/TSX-style components.** Write React components directly in
+  `.pln` files. Classic `createElement` and automatic `jsx-runtime` modes,
+  fragments, spread attributes, custom factories, per-file pragmas and prop
+  checking are implemented. See [JSX and React](docs/JSX.md).
+- **Native regular expressions.** Regex literals are typed, validated and
+  emitted as native `RegExp` values, with captures, named groups, flags and
+  typed helpers in `std/text`. See [Regular expressions](docs/REGEX.md).
+- **Cross-language interoperability.** A JSON-RPC 2.0 bridge serves PlainScript
+  modules over stdio or HTTP and generates clients for JavaScript, TypeScript,
+  Python, C, C++, Java, Kotlin, Go, Rust, Ruby, PHP, C#, Swift and Dart.
+  `std/bridge` calls Python services from PlainScript. See
+  [Cross-language bridges](docs/CROSS_LANGUAGE.md).
+- **Migration tooling.** `plainscript migrate` analyses a project, plans phases,
+  safely converts eligible JavaScript modules, generates interoperability
+  boundaries for JSX/TS/TSX/CommonJS modules and writes Markdown or JSON reports.
+  See [Migrating to 2.2](docs/MIGRATION_2_2.md).
+- **Module fixes.** Value re-exports, declared local runtimes and generated
+  boundaries now resolve and execute correctly.
 
 Check types without running, or compile a project to ES modules:
 
@@ -195,7 +217,7 @@ The repository ships integration projects written in 2.1 and checks them:
 | Integration | What runs | Status |
 | --- | --- | --- |
 | [`integrations/express-api`](integrations/express-api) | Express 5 JSON API; real HTTP create/read/update/delete session | Passes in `npm test` |
-| [`integrations/react-vite`](integrations/react-vite) | React 19 component compiled to Vite bundle | SSR test in `npm test`; production bundle via `npm run verify:integrations` |
+| [`integrations/react-vite`](integrations/react-vite) | React 19 component written with native PlainScript JSX; compiled to a Vite bundle | SSR test in `npm test`; production bundle via `npm run verify:integrations` |
 | [`integrations/next-app`](integrations/next-app) | Next.js 15 App Router server component | `next build` + prerendered HTML via `npm run verify:integrations` |
 | [`integrations/http-client`](integrations/http-client) | `std/http` server plus async `fetchJson` client | Passes in `npm test` |
 | [`integrations/sqlite`](integrations/sqlite) | Node SQLite, prepared statements, transactions | Passes in `npm test` |
@@ -236,9 +258,55 @@ app.listen(port, () => do
 end)
 ```
 
-`render` and `element` blocks lower to `createElement` calls resolved from the
-module scope, so a component written in PlainScript is a normal React
-component — no plugin, no JSX runtime, no custom bundler:
+React components can use native JSX. The compiler lowers elements to the
+configured factory (classic `createElement` by default) or to the automatic
+runtime; hooks and events are ordinary PlainScript code:
+
+```plainscript
+#syntax 2.1
+
+import { createElement } from "react"
+
+export type TaskProps
+    title: text
+    done?: boolean
+end
+
+define status(done: boolean) returns text
+    when done
+        return "done"
+    end
+    return "open"
+end
+
+export define Task(props: TaskProps) returns any
+    return <li className="task">
+        <span>{props.title}</span>
+        <small>{status(props.done ?? false)}</small>
+    </li>
+end
+```
+
+`render` and `element` blocks remain available and also lower to
+`createElement` calls resolved from module scope. They are a statement-oriented
+component surface; JSX is the expression-oriented one. Neither needs a plugin,
+custom bundler or PlainScript-specific runtime.
+
+Regex literals are native values with typed helpers:
+
+```plainscript
+#syntax 2.1
+
+import { print } from "std/io"
+import { findMatch, replaceAllMatches } from "std/text"
+
+set content to "release-2.1, release-2.2"
+set found to findMatch(content, /release-(?<major>\d+)\.(?<minor>\d+)/)
+when found is not equal to nothing
+    print(found.named["major"])
+end
+print(replaceAllMatches(content, /release-/g, "v"))
+```
 
 ```plainscript
 #syntax 2.1
@@ -271,7 +339,9 @@ end
 | `plainscript new <dir> [--template <id>]` | Scaffold a default or bundled application. |
 | `plainscript lsp` | Language server over stdio. |
 | `plainscript dap` | Debug Adapter Protocol server over stdio. |
-| `plainscript migrate [paths…]` | Report JavaScript/TypeScript migration blockers. |
+| `plainscript bridge <file>` | Serve a module over newline-delimited JSON-RPC 2.0 (`--http`, `--call`, `--args`, `--manifest`). |
+| `plainscript bindings <file>` | Generate cross-language clients (`--lang`, `--out`) from a bridge manifest. |
+| `plainscript migrate [paths…]` | Analyse, convert and generate interoperability boundaries (`--json`, `--write`, `--report`, `--check`). |
 | `plainscript interop [files…]` | Translate the supported `.d.ts` subset to `.d.pln`. |
 | `plainscript ir <file>` | Print the typed HIR that code generation consumes. |
 
@@ -291,9 +361,14 @@ Start with [Getting started](docs/GETTING_STARTED.md), then:
   emitted modules.
 - [Integrations](docs/INTEGRATIONS.md) — Express, React + Vite, Next.js, HTTP
   and SQLite.
-- [Migrating from 2.0](docs/MIGRATION_2_1.md).
+- [JSX and React](docs/JSX.md) — components, runtimes, prop checking.
+- [Regular expressions](docs/REGEX.md) — literals, captures, helpers.
+- [Cross-language bridges](docs/CROSS_LANGUAGE.md) — Python, C, JVM, Go,
+  Rust and the generated clients.
+- [Migrating to 2.2](docs/MIGRATION_2_2.md), [from 2.0](docs/MIGRATION_2_1.md).
 - [Type system](docs/TYPE_SYSTEM.md), [interop](docs/INTEROP.md),
   [contracts](docs/UNIFIED_CONTRACTS.md), [databases](docs/DATABASES.md).
+- [Capability audit for 2.2](docs/CAPABILITY_AUDIT_2_2.md).
 
 ---
 
@@ -316,22 +391,24 @@ legacy/v1/      archived v1 compiler, tests and docs
 ## Tests and verification
 
 ```bash
-npm test                       # compiler, runtime, CLI, packaging and 2.1 integrations
+npm test                       # 382 tests: compiler, runtime, JSX, regex, interop, migration, CLI, packaging and integrations
 npm run docs:build             # build the documentation site into docs/
 npm run verify:integrations    # Vite production bundle and Next.js production build
 ```
 
 The suite covers the lexer, both dialects, parser, checker, inference,
 narrowing, exhaustiveness, code generation, runtime behaviour, module
-resolution, async, error handling, CLI behaviour, formatter invariants,
-npm/Node interop, packaging, real Express/React/SQLite/HTTP execution and the
-documentation examples.
+resolution and re-exports, async, error handling, CLI behaviour, formatter
+invariants, native JSX rendering through React 19, regex semantics and
+diagnostics, the JSON-RPC bridge with Python and compiled C clients, migration
+analysis and boundary execution, npm/Node interop, packaging, real
+Express/React/SQLite/HTTP execution and the documentation examples.
 
 ---
 
 ## Limitations
 
-Known and deliberate for 2.1.0:
+Known and deliberate for 2.2.0:
 
 - **One backend.** JavaScript/ESM only. The IR and emitter are separated so
   another target is possible, but none exists.
@@ -345,15 +422,31 @@ Known and deliberate for 2.1.0:
 - **Concurrency is cooperative.** `std/task` provides groups, cancellation,
   timeouts, channels and worker handles; it cannot stop promises or host calls
   that ignore cancellation.
-- **`render` blocks are not JSX.** Attributes are `with name: value`, children
-  are statements. Loops and branches inside a `render`/`element` block build
-  dynamic child lists, `element Fragment` renders sibling children without a
-  wrapper, and keys stay explicit (`with key: item.id`); there is no automatic
-  key inference.
+- **Two component surfaces.** Native JSX is expression-oriented and supports
+  classic and automatic React runtimes. `render`/`element` blocks are
+  statement-oriented: attributes are `with name: value`, children are
+  statements, and loops and branches build dynamic child lists. Neither infers
+  keys automatically. Third-party component props are `any`; only local
+  components with declared prop records are checked.
+- **Cross-language boundaries are processes, not native FFI.** The JSON-RPC
+  bridge keeps memory and crashes apart and works without a compiler plugin per
+  language, at the cost of serialisation. C, C++, Java, Kotlin, Go, Rust, C#,
+  Ruby, PHP, Swift and Dart clients are generated; only JavaScript, Python and C
+  were executed end to end in this environment. Native FFI and WebAssembly are
+  not implemented.
+- **Migration converts the JavaScript family.** Python, Rust, Go, JVM, Ruby,
+  PHP, C#, Swift and Dart modules are analysed but stay native; connect them
+  through the bridge. The migration tool does not run a project's test command
+  for you, and it does not translate non-JavaScript source line by line.
+- **No ternary expression.** PlainScript has statement conditionals (`when` /
+  `otherwise`) and expressions such as `match`; it does not have `a ? b : c`.
+  Classes, `this`, generators and decorators also remain boundary concerns.
 - **Types are erased.** No runtime reflection beyond `is` checks on primitives,
   lists, maps and variant tags. `as` is unchecked at runtime.
-- **No exceptions typing.** `catch` binds `any`; typed operational errors use
-  `OperationResult`/`OperationFailure`.
+- **Promise typing is available.** `catch` binds `any` for non-Promise values,
+  but `Promise` exposes typed `then`/`catch`/`finally` methods so rejection
+  handlers are checked. A `p.then((n: text) => …)` is rejected when `p`
+  resolves a `number`. Typed operational errors use `OperationResult`/`OperationFailure`.
 - **Database support requires an installed driver.** `std/db` is SQLite via
   Node's `node:sqlite`; PostgreSQL/MySQL adapters dynamically load
   application-installed drivers. The default suite uses driver-shaped fakes;
@@ -365,8 +458,9 @@ Known and deliberate for 2.1.0:
 - **TypeScript interop is a subset.** `plainscript interop` translates
   declarations with a direct PlainScript equivalent and reports the rest.
 - **Benchmarks are PlainScript-only.** No cross-language speed claim is made.
-- **Not published yet.** The npm registry serves 2.0.0; publishing 2.1.0 is a
-  separate, explicit release step.
+- **Publication is a separate step.** The source version is 2.2.0; npm and
+  GitHub release state depends on credentials and is recorded in the release
+  notes rather than inferred from the repository.
 
 ## Contributing
 

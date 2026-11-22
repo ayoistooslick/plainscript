@@ -1,6 +1,6 @@
 <!-- compile-examples -->
 
-# PlainScript 2.1 language reference
+# PlainScript 2.2 language reference
 
 This is the practical reference for the 2.1 dialect. The normative semantics are
 in [the specification](SPEC.md); this page shows the surface, names the 2.0
@@ -136,6 +136,7 @@ value active: boolean is true
 value missing: nothing is nothing
 value names: list of text is ["ada", "grace"]
 value lookup: map of text to number is fromEntries([{ key: "ada", value: 1 }])
+value pattern: regex is /ada/i
 
 print("{title}: {quantity} {active} {missing}")
 print(names)
@@ -527,7 +528,51 @@ print(1 is equal to 1 or 2 is equal to 3)
 2.0. `not` is unary and binds tighter than a comparison; parenthesise when in
 doubt.
 
-## 10. Modules
+## 10. Regular expressions
+
+Regex literals are native expressions typed as `regex` and emitted as native
+JavaScript `RegExp` values. A `/` is division after a value and starts a regex
+where an expression is expected.
+
+```plainscript
+#syntax 2.1
+
+import { print } from "std/io"
+
+value pattern is /item-(?<id>\d+)/i
+print(pattern.test("ITEM-42"))
+print(pattern.source)
+print(pattern.flags)
+print(pattern is regex)
+print(10 / 2)
+```
+
+`std/text` provides typed helpers for captures, named groups, replacement and
+splitting. A `RegexMatch` has `text`, `index`, positional `groups` and a `named`
+map.
+
+```plainscript
+#syntax 2.1
+
+import { print } from "std/io"
+import { findMatch, matchTexts, replaceAllMatches } from "std/text"
+
+set found to findMatch("release-2.2", /release-(?<major>\d+)\.(?<minor>\d+)/)
+when found is not equal to nothing
+    print(found.text)
+    print(found.named["major"])
+    print(found.named["minor"])
+end
+
+print(matchTexts("a1 b2", /[a-z]\d/))
+print(replaceAllMatches("a1b22", /\d+/g, "#"))
+```
+
+Invalid patterns and flags are compile-time diagnostics (`PS1006`–`PS1008`).
+The pattern engine is the host JavaScript engine; flags, lookaround, Unicode
+and replacement syntax are the host's. See [Regular expressions](REGEX.md).
+
+## 11. Modules
 
 ```plainscript
 #syntax 2.1
@@ -535,7 +580,7 @@ doubt.
 import { print } from "std/io"
 import { upper } from "std/text"
 
-export value version is "2.1.0"
+export value version is "2.2.0"
 
 export define shout(text: text) returns text
     return upper("{text}!")
@@ -553,7 +598,7 @@ Imports and exports are unchanged in both dialects:
 - `export`, `export default`, `export { a as b }`, `export { a } from "./m"`.
 - Type-only imports are erased.
 
-## 11. Components
+## 12. Components
 
 ```plainscript
 #syntax 2.1
@@ -609,7 +654,65 @@ explicit; there is no automatic key inference. Everything lowers to
 `createElement` from the module scope, so React (or another library exposing
 `createElement`) must be imported.
 
-## 12. Interop boundaries
+## 13. JSX
+
+JSX is parsed natively in a `.pln` file. The default classic runtime lowers
+elements to `createElement`; the automatic runtime imports `jsx`/`jsxs` from a
+configured package. Props on local components are checked when the component has
+a record prop type.
+
+```plainscript
+#syntax 2.1
+
+import { createElement, Fragment, useState } from "react"
+import { map } from "std/list"
+
+type TaskProps
+    title: text
+    done?: boolean
+end
+
+define Task(props: TaskProps) returns any
+    return <li className="task">
+        <span>{props.title}</span>
+        <small>{props.done ?? false}</small>
+    </li>
+end
+
+export define TaskList() returns any
+    set (tasks, setTasks) to useState([
+        { title: "write the docs", done: true },
+        { title: "ship 2.2", done: false },
+    ])
+    return <Fragment>
+        <ul>
+            {tasks |> map((task: { title: text, done: boolean }) => <Task title={task.title} done={task.done} />)}
+        </ul>
+        <button type="button" onClick={() => setTasks([])}>Clear</button>
+    </Fragment>
+end
+```
+
+The automatic mode is selected per file:
+
+```plainscript
+#syntax 2.1
+# @jsxRuntime automatic
+# @jsxImportSource react
+
+export define App() returns any
+    return <main>
+        <h1>Automatic runtime</h1>
+    </main>
+end
+```
+
+Pragmas override `plainscript.config.json`. Fragments, spread attributes,
+expression children, entities and custom classic factories are supported. JSX
+diagnostics include `PS1009`–`PS1014` and prop errors `PS3420`–`PS3422`. See
+[JSX and React](JSX.md).
+
+## 14. Interop boundaries
 
 ```plainscript
 #syntax 2.1
@@ -630,7 +733,7 @@ Declare JavaScript values with `declare`. Use `any` for values whose shape is
 not modelled, and `as` for an explicit unchecked cast. `plainscript interop`
 translates the supported TypeScript `.d.ts` subset to `.d.pln`.
 
-## 13. 2.0 alongside 2.1
+## 15. 2.0 alongside 2.1
 
 The 2.0 dialect remains fully supported. Its spelling for every concept in this
 reference is listed in the tables above, and
@@ -653,3 +756,26 @@ print(combine(20, 22))
 When migrating, add `#syntax 2.1` and then rename the constructs the compiler
 reports. `PS2030` names the 2.1 word to use. See
 [Migrating from 2.0](MIGRATION_2_1.md).
+
+## 16. Cross-language boundaries
+
+`plainscript bridge` serves exported functions over newline-delimited JSON-RPC
+2.0, and `std/bridge` calls another process that speaks the same protocol.
+Generated clients translate the manifest into Python, JavaScript, C, C++, Java,
+Kotlin, Go, Rust, Ruby, PHP, C#, Swift and Dart.
+
+```plainscript
+#syntax 2.1
+
+import { open, close } from "std/bridge"
+import { print } from "std/io"
+
+set python to open("python3", ["service.py"])
+print(await python.request("add", [2, 3]))
+close(python)
+```
+
+The other side receives `{"jsonrpc":"2.0","id":1,"method":"add","params":[2,3]}`
+and replies with a result or a structured error. The boundary is a process
+boundary: values are JSON, memory is not shared, and a crash stays on its side.
+See [Cross-language bridges](CROSS_LANGUAGE.md).

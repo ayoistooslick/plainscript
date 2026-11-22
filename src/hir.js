@@ -38,6 +38,15 @@ class Lowerer {
     this.unitVariants = options.unitVariants || new Set();
     this.variantFields = options.variantFields || new Map();
     this.typeOnlyImports = options.typeOnlyImports || new Set();
+    // JSX lowering options are resolved per file by the caller. The defaults
+    // match PlainScript's existing render blocks: a factory named
+    // createElement and a Fragment identifier in module scope.
+    this.jsx = options.jsx || {};
+    this.jsxRuntime = this.jsx.runtime === 'automatic' ? 'automatic' : 'classic';
+    this.jsxFactory = this.jsx.factory || 'createElement';
+    this.jsxFragment = this.jsx.fragment || 'Fragment';
+    this.jsxImportSource = this.jsx.importSource || 'react';
+    this.jsxHelpers = new Set();
   }
 
   program(ast) {
@@ -46,6 +55,21 @@ class Lowerer {
       const lowered = this.statement(statement);
       if (Array.isArray(lowered)) body.push(...lowered);
       else if (lowered) body.push(lowered);
+    }
+    if (this.jsxRuntime === 'automatic' && this.jsxHelpers.size) {
+      const names = [];
+      if (this.jsxHelpers.has('jsx')) names.push({ imported: 'jsx', local: '__psx_jsx' });
+      if (this.jsxHelpers.has('jsxs')) names.push({ imported: 'jsxs', local: '__psx_jsxs' });
+      if (this.jsxHelpers.has('Fragment')) names.push({ imported: 'Fragment', local: '__psx_Fragment' });
+      body.unshift({
+        kind: 'Import',
+        spec: `${this.jsxImportSource}/jsx-runtime`,
+        defaultName: null,
+        namespace: null,
+        names,
+        line: 1,
+        col: 1,
+      });
     }
     return { kind: 'Program', file: this.file, body };
   }
@@ -242,6 +266,16 @@ class Lowerer {
         return { kind: 'Number', value: node.value, line: node.line, col: node.col };
       case 'Text':
         return { kind: 'Text', value: node.value, line: node.line, col: node.col };
+      case 'Regex':
+        return { kind: 'Regex', pattern: node.pattern, flags: node.flags, line: node.line, col: node.col };
+      case 'JSXText':
+        return { kind: 'Text', value: node.value, line: node.line, col: node.col };
+      case 'JSXSpreadChild':
+        return { kind: 'Spread', value: this.expression(node.value), line: node.line, col: node.col };
+      case 'JSXElement':
+        return this.jsxElement(node);
+      case 'JSXFragment':
+        return this.jsxFragmentExpression(node);
       case 'Boolean':
         return { kind: 'Boolean', value: node.value, line: node.line, col: node.col };
       case 'Nothing':
@@ -379,6 +413,97 @@ class Lowerer {
     // A pipeline stage may be a named function, a member function, or a lambda.
     // `items |> (x: number) => x * 2` is the lambda form.
     return this.call({ kind: 'Call', callee: node.right, args: [node.left], line: node.line, col: node.col });
+  }
+
+  // -------------------------------------------------------------------- JSX
+
+  jsxTagExpression(node) {
+    return this.expression(node.tag);
+  }
+
+  jsxProps(node) {
+    const fields = [];
+    for (const attr of node.attrs || []) {
+      if (!attr) continue;
+      if (attr.kind === 'spread') {
+        fields.push({ spread: this.expression(attr.value) });
+        continue;
+      }
+      if (!attr.value) continue;
+      fields.push({ key: attr.name, value: this.expression(attr.value) });
+    }
+    return { kind: 'Record', fields, line: node.line, col: node.col };
+  }
+
+  jsxChildren(node) {
+    const children = [];
+    for (const child of node.children || []) {
+      if (!child) continue;
+      if (child.kind === 'JSXText') children.push({ kind: 'Text', value: child.value, line: child.line, col: child.col });
+      else if (child.kind === 'JSXSpreadChild') children.push({ kind: 'Spread', value: this.expression(child.value), line: child.line, col: child.col });
+      else children.push(this.expression(child));
+    }
+    return children;
+  }
+
+  jsxElement(node) {
+    if (this.jsxRuntime === 'automatic') {
+      const tag = this.jsxTagExpression(node);
+      const keyed = [];
+      const props = [];
+      for (const attr of node.attrs || []) {
+        if (attr && attr.kind === 'attribute' && attr.name === 'key') {
+          if (attr.value) keyed.push(this.expression(attr.value));
+          continue;
+        }
+        if (attr && attr.kind === 'spread') {
+          props.push({ spread: this.expression(attr.value) });
+          continue;
+        }
+        if (attr && attr.value) props.push({ key: attr.name, value: this.expression(attr.value) });
+      }
+      const children = this.jsxChildren(node);
+      const many = children.length > 1 || children.some((child) => child.kind === 'Spread');
+      if (children.length === 1 && !many) props.push({ key: 'children', value: children[0] });
+      else if (children.length > 0) props.push({ key: 'children', value: { kind: 'List', items: children, line: node.line, col: node.col } });
+      this.jsxHelpers.add(many ? 'jsxs' : 'jsx');
+      const callee = { kind: 'Name', name: many ? '__psx_jsxs' : '__psx_jsx' };
+      const args = [tag, { kind: 'Record', fields: props, line: node.line, col: node.col }, ...keyed];
+      return { kind: 'Call', callee, args, line: node.line, col: node.col };
+    }
+
+    const callee = nameExpression(this.jsxFactory);
+    const tag = this.jsxTagExpression(node);
+    const props = node.attrs && node.attrs.length ? this.jsxProps(node) : { kind: 'Nothing' };
+    const args = [tag, props, ...this.jsxChildren(node)];
+    return { kind: 'Call', callee, args, line: node.line, col: node.col };
+  }
+
+  jsxFragmentExpression(node) {
+    const children = this.jsxChildren(node);
+    if (this.jsxRuntime === 'automatic') {
+      this.jsxHelpers.add('jsx');
+      this.jsxHelpers.add('Fragment');
+      const props = { kind: 'Record', fields: [], line: node.line, col: node.col };
+      if (children.length === 1) props.fields.push({ key: 'children', value: children[0] });
+      else if (children.length > 0) props.fields.push({ key: 'children', value: { kind: 'List', items: children, line: node.line, col: node.col } });
+      return {
+        kind: 'Call',
+        callee: { kind: 'Name', name: '__psx_jsx' },
+        args: [{ kind: 'Name', name: '__psx_Fragment' }, props],
+        line: node.line,
+        col: node.col,
+      };
+    }
+    // A fragment is a factory call whose type is the fragment symbol:
+    // createElement(Fragment, null, ...children).
+    return {
+      kind: 'Call',
+      callee: nameExpression(this.jsxFactory),
+      args: [nameExpression(this.jsxFragment), { kind: 'Nothing' }, ...children],
+      line: node.line,
+      col: node.col,
+    };
   }
 
   // A render/element child is one of: a nested element, an expression, or a
@@ -582,6 +707,13 @@ function containsAwait(statements) {
   };
   walk(statements);
   return found;
+}
+
+function nameExpression(name) {
+  const parts = String(name).split('.');
+  let node = { kind: 'Name', name: parts[0] };
+  for (const part of parts.slice(1)) node = { kind: 'Member', object: node, property: part, optional: false };
+  return node;
 }
 
 function lowerProgram(ast, options) {

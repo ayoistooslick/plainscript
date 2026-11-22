@@ -21,3 +21,21 @@ export declare function padEnd(text: text, width: number, fill?: text) -> text
 export declare function indexOf(text: text, part: text) -> number
 export declare function lines(text: text) -> list of text
 export declare function parseNumber(text: text, fallback?: number) -> number
+
+# A regex match: the matched text, its start offset, positional captures and
+# named captures. Empty optional groups are empty text.
+export type RegexMatch
+    text: text
+    index: number
+    groups: list of text
+    named: map of text to text
+end
+
+export declare function matches(text: text, pattern: regex) -> boolean
+export declare function findMatch(text: text, pattern: regex) -> RegexMatch?
+export declare function findAllMatches(text: text, pattern: regex) -> list of RegexMatch
+export declare function matchTexts(text: text, pattern: regex) -> list of text
+export declare function splitMatch(text: text, pattern: regex) -> list of text
+export declare function replaceMatch(text: text, pattern: regex, replacement: text) -> text
+export declare function replaceAllMatches(text: text, pattern: regex, replacement: text) -> text
+export declare function escapeRegex(text: text) -> text

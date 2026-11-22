@@ -1,6 +1,6 @@
 # Compiler architecture
 
-PlainScript 2.0 is a single-pass-per-stage compiler with an explicit typed IR between
+PlainScript 2.2 is a single-pass-per-stage compiler with an explicit typed IR between
 checking and emission. There are no runtime dependencies, and the emitted code has no
 PlainScript runtime.
 
@@ -54,7 +54,14 @@ service helpers. Those are separate tools (Vite/webpack/Next for bundling), futu
 ## Lexer
 
 - Produces `{t, v, line, col}` tokens: `ident`, `kw`, `number`, `text`, `template`,
-  `punct`, `eof`.
+  `regex`, `jsx`, `punct`, `eof`.
+- Regex literals are scanned with expression-position disambiguation: `/` is division
+  after a value and a regex start where an expression is expected. The scanner validates
+  the pattern and flags through the host engine.
+- JSX is scanned structurally as one `jsx` token, including nested elements, quoted
+  attributes, expression containers and entities. The parser converts the token to JSX
+  AST nodes and re-tokenises expression containers, preserving line offsets for
+  diagnostics.
 - Text literals are split into interpolation parts at lex time; the parser receives
   `{text}` and `{exprTokens}` segments, so `"a {b} c"` is one `template` token.
 - Triple-quoted and raw single-quoted literals are distinct token forms.
@@ -121,6 +128,15 @@ The HIR is inspectable with `plainscript ir file.pln` and is what a future backe
 consume. It is deliberately not JavaScript: it has no statements for imports of types, no
 templates, no patterns and no render forms.
 
+## JSX lowering
+
+JSX options are resolved per file by `src/jsx.js` from project configuration and
+`# @jsx…` pragmas. Classic lowering emits `factory(type, props, ...children)` calls;
+automatic lowering emits `jsx`/`jsxs` calls and injects the runtime import from
+`${importSource}/jsx-runtime`. The checker validates local component props before
+lowering. JSX survives as a first-class expression in the AST, not as a source
+string passed to another tool.
+
 ## Emitter
 
 `src/codegen.js` walks the HIR and prints ES modules.
@@ -146,6 +162,14 @@ templates, no patterns and no render forms.
   `plainscript-lang/std/…` or as a URL base when `--std-base` is set for browser builds.
 - Writes a `package.json` with `"type": "module"` into the output directory when the
   surrounding project is not already ESM.
+
+## Cross-language bridge
+
+`src/interop/` is outside the compiler pipeline. `manifest.js` derives a JSON schema
+from the checked exports; `bridge.js` serves it over stdio or HTTP; `bindings.js`
+generates clients; `protocol.js` implements newline-delimited JSON-RPC 2.0. The
+compiler does not depend on the bridge, and the bridge executes ordinary emitted
+JavaScript. `python_server.py` is the reference host for the reverse direction.
 
 ## Standard library interface
 

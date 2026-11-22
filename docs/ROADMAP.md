@@ -2,6 +2,19 @@
 
 This roadmap reports status; it is not a promise of dates.
 
+## Available in 2.2
+
+- Native JSX with classic and automatic React runtimes, custom factories, fragments,
+  spread attributes, per-file pragmas and local component prop checking.
+- Native regex literals typed as `regex`, compile-time validation and typed
+  `std/text` matching/capture/replacement/splitting helpers.
+- JSON-RPC 2.0 bridge over stdio and HTTP; generated clients for JavaScript,
+  TypeScript, Python, C, C++, Java, Kotlin, Go, Rust, Ruby, PHP, C#, Swift and Dart;
+  `std/bridge` for calling external services from PlainScript.
+- Migration analysis, phased planning, conservative JavaScript conversion, ESM/CommonJS
+  boundary generation and Markdown/JSON reporting with a CI `--check` mode.
+- Module re-export resolution and executable declared-runtime boundaries.
+
 ## Available and verified now
 
 - Compiler pipeline: lexer, parser, type checker, typed HIR, JavaScript emitter and source
@@ -25,27 +38,34 @@ This roadmap reports status; it is not a promise of dates.
   `editors/vscode`.
 - Watch mode, module-cache invalidation, unchanged-output skipping, benchmark script, and
   end-to-end contract/database/auth/WebSocket/concurrency tests.
-- Conservative `plainscript migrate` scanning plus `plainscript interop` for the supported
-  TypeScript `.d.ts` subset, and eight tested starters.
+- `plainscript migrate` analysis/conversion/boundaries, `plainscript interop` for the
+  supported TypeScript `.d.ts` subset, and eight tested starters.
 
 ## Next engineering priorities
 
-1. A MongoDB adapter (or explicitly document remaining direct-driver use) and live
+1. Execution-tested bindings for the JVM, Go, Rust, C# and other toolchains that are
+   currently generation-tested only; native FFI or a WebAssembly adapter for hot-path
+   libraries.
+2. A MongoDB adapter (or explicitly document remaining direct-driver use) and live
    PostgreSQL/MySQL integration suites. The current adapters are tested with driver-shaped
    fakes because no database server is available in CI; see [DATABASES](DATABASES.md).
-2. A distributed worker/lease story beyond the durable in-process job queue, including
+3. A distributed worker/lease story beyond the durable in-process job queue, including
    multi-process exactly-once/idempotency guidance.
-3. Broader refactors beyond symbol rename, VS Code UI automation for the debug adapter, and
+4. Broader refactors beyond symbol rename, VS Code UI automation for the debug adapter, and
    protocol-conformance testing against real identity providers.
-4. Generated API documentation/OpenAPI from operation descriptors.
-5. Cross-language benchmark fixture with a pinned TypeScript toolchain, published with
+5. Generated API documentation/OpenAPI from operation descriptors.
+6. Cross-language benchmark fixture with a pinned TypeScript toolchain, published with
    reproducible results.
 
 ## Explicit limitations
 
-WebSocket extensions, a MongoDB `std/db` adapter, arbitrary TypeScript `.d.ts` parsing, a
-built-in browser bundler, task syntax in the grammar, optional tuple elements and general
-conditional `infer` are not implemented. The debug adapter is a minimal DAP/CDP bridge and
+Native FFI/shared-library embedding and WebAssembly are not implemented; cross-language
+integration is a JSON-RPC process boundary. Non-JavaScript source is not translated by the
+migration tool. The migration tool does not execute a project's test command. Third-party
+JSX component props are `any`. There is no ternary expression, class syntax, generator,
+decorator or runtime reflection. WebSocket extensions, a MongoDB `std/db` adapter,
+arbitrary TypeScript `.d.ts` parsing, a built-in browser bundler, task syntax in the
+grammar, optional tuple elements and general conditional `infer` are not implemented. The debug adapter is a minimal DAP/CDP bridge and
 is tested at the protocol level, not through a VS Code UI. The PostgreSQL/MySQL adapters are
 not tested against live servers in this repository. Deeply nested deferred conditional/mapped
 combinations may remain deferred rather than produce an early diagnostic. None of these is

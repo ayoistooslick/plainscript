@@ -1,0 +1,183 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Capability audit 2.2 — PlainScript 2.2 documentation."><meta name="color-scheme" content="dark"><meta name="theme-color" content="#08070b"><title>Capability audit 2.2 · PlainScript</title><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23a679ff'/%3E%3Ctext x='16' y='23' font-family='Georgia,serif' font-size='20' fill='%2308070b' text-anchor='middle'%3EP%3C/text%3E%3C/svg%3E"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=Space+Grotesk:wght@400..700&display=swap" rel="stylesheet"><link rel="stylesheet" href="style.css"></head><body><a class="skip" href="#main">Skip to content</a><div class="scrim" data-scrim></div><div class="shell"><aside class="rail" id="rail"><div class="rail-head"><a class="wordmark" href="index.html">PlainScript<span class="dot">.</span></a><div class="rail-meta">Language manual<br>Vol. 2.2 · MMXXVI</div></div><nav class="rail-nav" aria-label="Documentation"><div class="nav-group"><div class="nav-label">Start here</div><a class="nav-link " href="index.html">PlainScript</a><a class="nav-link " href="getting-started.html">Getting started</a><a class="nav-link " href="cli.html">CLI reference</a><a class="nav-link " href="templates.html">Application templates</a></div><div class="nav-group"><div class="nav-label">Language</div><a class="nav-link " href="language-reference.html">Language reference</a><a class="nav-link " href="regex.html">Regular expressions</a><a class="nav-link " href="spec.html">Language specification</a><a class="nav-link " href="syntax-design.html">Syntax design</a><a class="nav-link " href="type-system.html">Type system</a></div><div class="nav-group"><div class="nav-label">Guides</div><a class="nav-link " href="jsx.html">JSX and React</a><a class="nav-link " href="integrations.html">Integrations</a><a class="nav-link " href="migration-2-1.html">Migrating from 2.0</a><a class="nav-link " href="migration-2-2.html">Migrating to 2.2</a><a class="nav-link " href="contracts.html">Unified contracts</a><a class="nav-link " href="concurrency.html">Concurrency</a><a class="nav-link " href="jobs.html">Background jobs</a><a class="nav-link " href="databases.html">Databases</a><a class="nav-link " href="security.html">Security</a><a class="nav-link " href="debugging.html">Debugging</a><a class="nav-link " href="migration.html">Migration guide</a><a class="nav-link " href="comparison.html">Comparison with TypeScript</a></div><div class="nav-group"><div class="nav-label">Compiler</div><a class="nav-link " href="compiler.html">Compiler</a><a class="nav-link " href="architecture.html">Compiler architecture</a><a class="nav-link " href="interop.html">JavaScript interop</a><a class="nav-link " href="cross-language.html">Cross-language bridges</a><a class="nav-link " href="benchmarks.html">Benchmarks</a></div><div class="nav-group"><div class="nav-label">Project</div><a class="nav-link " href="progress.html">Engineering progress</a><a class="nav-link " href="roadmap.html">Roadmap</a><a class="nav-link " href="audit.html">Audit</a><a class="nav-link active" href="capability-audit-2-2.html" aria-current="page">Capability audit 2.2</a><a class="nav-link " href="decisions.html">Decisions</a></div></nav><div class="rail-foot"><a href="https://github.com/ayoistooslick/Plainscript">Source ↗</a><span class="sep">/</span><a href="https://github.com/ayoistooslick/Plainscript/issues">Issues ↗</a><br>MIT · built by hand</div></aside><div class="main"><header class="top"><button class="nav-toggle" type="button" data-nav-toggle aria-expanded="false" aria-controls="rail"><span aria-hidden="true">≡</span> <span class="nav-toggle-label">Contents</span></button><a class="top-brand" href="index.html">PlainScript<span>.</span></a><span class="crumb"><b>PlainScript</b><span class="slash">/</span>Project<span class="slash">/</span>Capability audit 2.2</span><div class="search-wrap"><label class="search" aria-label="Search the manual"><span class="glyph" aria-hidden="true"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg></span><input id="doc-search" type="search" placeholder="Search the manual" autocomplete="off" aria-controls="search-results" aria-expanded="false"><kbd>/</kbd></label><div id="search-results" class="search-results" role="listbox" aria-label="Search results"></div></div><a class="top-github" href="https://github.com/ayoistooslick/Plainscript">GitHub ↗</a><div class="progress" aria-hidden="true"><span></span></div></header><main id="main" class="page"><div class="article-grid"><article class="prose"><div class="chapter-head"><figure class="chapter-band" data-tilt><img src="assets/plate-hands.jpg" alt="" width="1024" height="1024" loading="lazy" decoding="async"></figure><div class="page-kicker"><span class="kicker-no">29</span><span class="kicker-section">Project</span><span class="kicker-meta">8 min read</span></div><h1 id="plainscript-2-2-capability-audit">PlainScript 2.2 capability audit</h1></div>
+<p>This audit records what was inspected for 2.2, what changed, and what remains absent. It covers the language surface, compiler, runtime, standard library, tooling, interoperability, migration and production readiness. It is a status document, not a roadmap promise.</p>
+<p>The audit was performed against this checkout with the full suite:</p>
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">sh</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="bash">npm test
+# 382 tests: 380 passed, 2 skipped, 0 failed</code></pre></figure>
+<p>The two skipped tests require a live PostgreSQL/MySQL server; they are reported as unverified here, not as passing.</p>
+<h2 id="method">Method</h2>
+<ul>
+<li>Read the lexer, parser, checker, HIR, code generator, module graph, CLI, LSP,</li>
+<p>formatter, standard library declarations, integrations, tests and docs.</p>
+<li>Ran the full suite before and after each change.</li>
+<li>Exercised JSX through React 19 server rendering and a real React + Vite</li>
+<p>integration.</p>
+<li>Exercised regex literals, captures, named groups, flags, replacement,</li>
+<p>splitting and diagnostics end to end.</p>
+<li>Exercised the JSON-RPC bridge over stdio and HTTP, Python in both directions,</li>
+<p>generated JavaScript/Python clients and a compiled C client.</p>
+<li>Exercised migration analysis, conversion, boundary generation and the CLI on</li>
+<p>fixture projects, including a generated boundary executed against a real JavaScript runtime.</p>
+<li>Audited the standard library surface and documented tooling limits from the</li>
+<p>implementation, not from README claims.</p>
+</ul>
+<h2 id="what-2-2-resolves">What 2.2 resolves</h2>
+<h3 id="native-jsx">Native JSX</h3>
+<p>The lexer scans JSX structurally, the parser produces JSX AST nodes, the checker validates component props, and the HIR lowers to a configurable runtime. Both React runtimes are supported:</p>
+<ul>
+<li>classic <code>createElement</code> / custom factory;</li>
+<li>automatic <code>jsx</code>/<code>jsxs</code> from a configurable import source.</li>
+</ul>
+<p>Fragments, attributes, spread attributes, expression children, text normalisation, entities, custom factories and per-file pragmas are implemented. Prop diagnostics <code>PS3420</code>–<code>PS3422</code> and missing-factory <code>PS3405</code> are reported. The React + Vite integration is now written in PlainScript JSX and is rendered through <code>react-dom/server</code> in the suite.</p>
+<p>Status: <strong>fixed</strong>. Remaining limitation: third-party component types are <code>any</code>; there is no TypeScript <code>JSX.IntrinsicElements</code> import.</p>
+<h3 id="native-regular-expressions">Native regular expressions</h3>
+<p>Regex literals are parsed by the lexer with expression-position disambiguation, typed as a <code>regex</code> primitive, checked, and emitted as native <code>RegExp</code> values. Flags and patterns are validated at compile time (<code>PS1006</code>–<code>PS1008</code>). <code>std/text</code> supplies typed match, capture, replacement, splitting and escaping helpers.</p>
+<p>Status: <strong>fixed</strong>. The pattern engine is the host JavaScript engine, by design.</p>
+<h3 id="universal-cross-language-interoperability">Universal cross-language interoperability</h3>
+<p>The new JSON-RPC 2.0 bridge provides a process boundary in both directions:</p>
+<ul>
+<li><code>plainscript bridge</code> serves a PlainScript module over stdio or HTTP;</li>
+<li><code>plainscript bindings</code> generates clients for JavaScript, TypeScript, Python,</li>
+<p>C, C++, Java, Kotlin, Go, Rust, Ruby, PHP, C#, Swift and Dart;</p>
+<li><code>std/bridge</code> calls a Python (or other JSON-RPC) service from PlainScript.</li>
+</ul>
+<p>JavaScript and TypeScript remain the native path through ESM, npm, Node builtins and translated declarations.</p>
+<p>Status: <strong>implemented and partially verified</strong>. JavaScript, Python and C were executed end to end. Other generated clients were generated but not compiled or run because their toolchains are absent here. Native FFI, shared-library embedding and WebAssembly are <strong>not</strong> implemented.</p>
+<h3 id="migration-tooling">Migration tooling</h3>
+<p><code>plainscript migrate</code> now performs project analysis, framework and language detection, phased planning, conservative conversion, boundary generation, Markdown/JSON reporting and CI-friendly <code>--check</code>. Boundaries are generated for ESM and CommonJS JavaScript/JSX/TS/TSX modules, and converted modules are executable.</p>
+<p>Status: <strong>implemented for the JavaScript family</strong>. Non-JavaScript modules are analysed and classified as manual; they are connected through the bridge, not source-translated. Automated execution of a project&#39;s test command is not part of the tool.</p>
+<h3 id="module-system-corrections-found-during-the-audit">Module-system corrections found during the audit</h3>
+<p>These were not on the original roadmap but blocked real use:</p>
+<ul>
+<li><code>export { name } from &quot;./module&quot;</code> was emitted but not resolved by the checker,</li>
+<p>so a re-export could not be imported. The module loader now loads re-export targets and the checker forwards their checked exports.</p>
+<li>Generated boundaries originally emitted a wrapper <code>.js</code> and copied a runtime</li>
+<p><code>.js</code> with the same path, overwriting the runtime. Boundaries now use a distinct <code>.runtime.js</code> and matching <code>.runtime.d.pln</code>.</p>
+<li>Declared JavaScript runtimes are copied into build/run output so boundaries</li>
+<p>execute, but installed package files under <code>node_modules</code> are no longer partially copied; the host resolves complete packages.</p>
+<li>JSX spread attributes and spread children included the leading <code>...</code> in the</li>
+<p>parsed expression. Both are now parsed correctly.</p>
+</ul>
+<h2 id="capability-matrix">Capability matrix</h2>
+<h3 id="language-fundamentals">Language fundamentals</h3>
+<div class="table-wrap"><table><thead><tr><th>Area</th><th>Status</th><th>Notes</th></tr></thead><tbody>
+<tr><td>Bindings, mutability, assignment</td><td>Available</td><td>2.0 and 2.1 spellings, per-file dialect</td></tr>
+<tr><td>Functions, closures, lambdas, async/await</td><td>Available</td><td>Typed parameters, inferred returns, top-level await</td></tr>
+<tr><td>Records, variants, unions, optionals</td><td>Available</td><td>Structural, erased</td></tr>
+<tr><td>Generics, constraints, predicates</td><td>Available</td><td>Including deferred indexed access</td></tr>
+<tr><td>Destructuring</td><td>Available</td><td>Bindings and parameters</td></tr>
+<tr><td>Pattern matching</td><td>Available</td><td><code>match</code>, guards, exhaustiveness</td></tr>
+<tr><td>Modules and re-exports</td><td>Available</td><td>Local, std, packages, declarations; re-exports fixed in 2.2</td></tr>
+<tr><td>Classes / <code>this</code></td><td><strong>Absent</strong></td><td>JS boundary or records and functions</td></tr>
+<tr><td>Ternary conditional expression</td><td><strong>Absent</strong></td><td>Use <code>when</code>; no <code>a ? b : c</code></td></tr>
+<tr><td>Generators / <code>yield</code></td><td><strong>Absent</strong></td><td>Async and callbacks are available</td></tr>
+<tr><td>Decorators / metadata / reflection</td><td><strong>Absent</strong></td><td>No runtime type reflection</td></tr>
+<tr><td>Operator overloading</td><td><strong>Absent</strong></td><td>Deliberate; no user-defined operators</td></tr>
+<tr><td>Exceptions typing</td><td>Partial</td><td><code>catch</code> binds <code>any</code>; typed results exist for operations</td></tr>
+</tbody></table></div>
+<h3 id="runtime-and-execution">Runtime and execution</h3>
+<div class="table-wrap"><table><thead><tr><th>Area</th><th>Status</th><th>Notes</th></tr></thead><tbody>
+<tr><td>Execution semantics</td><td>Available</td><td>Emitted ESM, no VM or runtime library</td></tr>
+<tr><td>Memory / GC</td><td>Host</td><td>JavaScript engine</td></tr>
+<tr><td>Async</td><td>Available</td><td>Promises and top-level await</td></tr>
+<tr><td>Parallelism</td><td>Partial</td><td>Cooperative <code>std/task</code>; no threads or processes API beyond host interop</td></tr>
+<tr><td>Error propagation and stack traces</td><td>Available</td><td>Source maps emitted</td></tr>
+<tr><td>Debugging</td><td>Partial</td><td>DAP bridge tested at protocol level, not through a VS Code UI</td></tr>
+<tr><td>Performance</td><td>Unmeasured cross-language</td><td>PlainScript-only benchmark script; no claim of speed parity</td></tr>
+</tbody></table></div>
+<h3 id="standard-library">Standard library</h3>
+<div class="table-wrap"><table><thead><tr><th>Area</th><th>Status</th></tr></thead><tbody>
+<tr><td>Collections (<code>std/list</code>, <code>std/map</code>)</td><td>Available</td></tr>
+<tr><td>Text, Unicode helpers, regex helpers</td><td>Available; regex helpers added in 2.2</td></tr>
+<tr><td>Dates and time (<code>std/time</code>)</td><td>Available</td></tr>
+<tr><td>Filesystem (<code>std/fs</code>)</td><td>Available</td></tr>
+<tr><td>Networking (<code>std/http</code>, <code>std/ws</code>)</td><td>Available</td></tr>
+<tr><td>Streams</td><td>Partial; Node streams usable through declarations</td></tr>
+<tr><td>Cryptography (<code>std/auth</code> scrypt, HS256)</td><td>Available</td></tr>
+<tr><td>Serialization (<code>std/json</code>)</td><td>Available</td></tr>
+<tr><td>Math (<code>std/math</code>)</td><td>Available</td></tr>
+<tr><td>Process and environment</td><td>Host APIs through declarations; no dedicated process module</td></tr>
+<tr><td>Database (<code>std/db</code>, adapters)</td><td>SQLite available; PostgreSQL/MySQL adapters require installed drivers and live-server tests are skipped here</td></tr>
+</tbody></table></div>
+<h3 id="interoperability">Interoperability</h3>
+<div class="table-wrap"><table><thead><tr><th>Area</th><th>Status</th></tr></thead><tbody>
+<tr><td>JavaScript ESM and npm</td><td>Available and tested</td></tr>
+<tr><td>CommonJS</td><td>Through Node interop and generated boundaries</td></tr>
+<tr><td>TypeScript declarations</td><td>Supported subset via <code>plainscript interop</code></td></tr>
+<tr><td>React and JSX</td><td>Available and tested</td></tr>
+<tr><td>Python</td><td>Two-way bridge tested</td></tr>
+<tr><td>C / C++</td><td>Generated C executed; C++ compiles</td></tr>
+<tr><td>JVM, Go, Rust, C#, Ruby, PHP, Swift, Dart</td><td>Clients generated; not executed here</td></tr>
+<tr><td>Native FFI / shared libraries</td><td><strong>Absent</strong></td></tr>
+<tr><td>WebAssembly</td><td><strong>Absent</strong></td></tr>
+<tr><td>LSP</td><td>Available; completion, hover, definitions, references, rename, symbols, tokens, actions</td></tr>
+</tbody></table></div>
+<h3 id="tooling-and-developer-experience">Tooling and developer experience</h3>
+<div class="table-wrap"><table><thead><tr><th>Area</th><th>Status</th><th>Notes</th></tr></thead><tbody>
+<tr><td>CLI</td><td>Available</td><td><code>run</code>, <code>build</code>, <code>check</code>, <code>fmt</code>, <code>test</code>, <code>new</code>, <code>ir</code>, <code>watch</code>, <code>lsp</code>, <code>dap</code>, <code>bridge</code>, <code>bindings</code>, <code>migrate</code>, <code>interop</code></td></tr>
+<tr><td>Diagnostics and source frames</td><td>Available</td><td>Stable codes, hints, JSX/regex-specific codes</td></tr>
+<tr><td>Source maps</td><td>Available</td><td>Emitted beside every JavaScript module</td></tr>
+<tr><td>Incremental compilation</td><td>Partial</td><td>Module cache and watch skip unchanged output; no persistent incremental cache</td></tr>
+<tr><td>Package management</td><td>npm via Node</td><td>No PlainScript registry or lockfile</td></tr>
+<tr><td>Bundling</td><td>External</td><td>Vite/Next via emitted ESM; no built-in browser bundler</td></tr>
+<tr><td>Templates</td><td>Available</td><td>CLI, API, Express, React + Vite, Next.js, library, full-stack starters</td></tr>
+<tr><td>Migration assistance</td><td>Available for JavaScript family</td><td>Non-JS modules stay native and use the bridge</td></tr>
+<tr><td>Editors</td><td>VS Code grammar and LSP client</td><td>Extension UI automation not tested</td></tr>
+</tbody></table></div>
+<h3 id="production-readiness">Production readiness</h3>
+<div class="table-wrap"><table><thead><tr><th>Area</th><th>Status</th></tr></thead><tbody>
+<tr><td>Security model</td><td>Type and module checks; bridge is local by default; no sandbox beyond host</td></tr>
+<tr><td>Backward compatibility</td><td>2.0 and 2.1 sources compile unchanged; 382-test suite</td></tr>
+<tr><td>Reproducible builds</td><td>Deterministic emission; no lockfile for PlainScript itself</td></tr>
+<tr><td>Cross-platform</td><td>Node 20+ on the host platform; test suite run on Linux</td></tr>
+<tr><td>Dependency compatibility</td><td>No runtime dependencies; npm and Node interop tested</td></tr>
+<tr><td>Production debugging</td><td>Source maps and DAP; minimal adapter</td></tr>
+<tr><td>Deployment</td><td>Node, Vite, Next and Express integrations; no PlainScript-specific deploy target</td></tr>
+</tbody></table></div>
+<h2 id="discovered-gaps-and-dispositions">Discovered gaps and dispositions</h2>
+<div class="table-wrap"><table><thead><tr><th>Gap</th><th>Classification</th><th>Disposition in 2.2</th></tr></thead><tbody>
+<tr><td>JSX could not be parsed</td><td>Language / compiler</td><td>Fixed: native JSX</td></tr>
+<tr><td>No regex literals</td><td>Language / compiler</td><td>Fixed: native regex and <code>std/text</code></td></tr>
+<tr><td>Re-export targets unresolved</td><td>Compiler / module graph</td><td>Fixed</td></tr>
+<tr><td>Boundary runtime collision</td><td>Tooling / compiler output</td><td>Fixed</td></tr>
+<tr><td>Declared JS runtimes missing from output</td><td>Compiler / module graph</td><td>Fixed</td></tr>
+<tr><td>Installed package partially copied</td><td>Compiler / module graph</td><td>Fixed</td></tr>
+<tr><td>JSX spread parsed <code>...</code> as an expression</td><td>Compiler</td><td>Fixed</td></tr>
+<tr><td>JSX summary not populated in migration reports</td><td>Tooling</td><td>Fixed</td></tr>
+<tr><td>Non-JS export detection absent</td><td>Tooling</td><td>Improved: conservative declarations for nine ecosystems</td></tr>
+<tr><td>Migration only produced findings</td><td>Tooling</td><td>Fixed: analysis, conversion, boundaries, reports</td></tr>
+<tr><td>No non-JavaScript source conversion</td><td>Tooling / language semantics</td><td>Deferred; bridge is the supported route</td></tr>
+<tr><td>No automated migration test execution</td><td>Tooling</td><td>Deferred; report lists checks, CI runs them</td></tr>
+<tr><td>No ternary expression</td><td>Language</td><td>Deferred; <code>when</code> covers statements</td></tr>
+<tr><td>No classes / <code>this</code></td><td>Language</td><td>Deferred; JS boundary or records</td></tr>
+<tr><td>No generators</td><td>Language</td><td>Deferred</td></tr>
+<tr><td>No decorators or reflection</td><td>Language</td><td>Deferred</td></tr>
+<tr><td>No native FFI / WASM</td><td>Interoperability</td><td>Deferred; JSON-RPC process boundary</td></tr>
+<tr><td>Third-party JSX prop types are <code>any</code></td><td>Type system / interop</td><td>Deferred; local props checked</td></tr>
+<tr><td>No persistent incremental cache</td><td>Compiler / DX</td><td>Deferred</td></tr>
+<tr><td>No built-in bundler or registry</td><td>Ecosystem</td><td>Deferred; Node/Vite/Next/npm</td></tr>
+</tbody></table></div>
+<h2 id="verification-limitations">Verification limitations</h2>
+<ul>
+<li>npm publication was not performed in this environment; registry state is</li>
+<p>reported separately from source state.</p>
+<li>The generated JVM, Go, Rust, C#, Ruby, PHP, Swift and Dart clients were not</li>
+<p>compiled here. They are generation-tested, not execution-tested.</p>
+<li>PostgreSQL/MySQL live suites are skipped without server URLs.</li>
+<li>The DAP server is tested at the protocol level, not through a VS Code UI.</li>
+<li>No benchmark compares PlainScript with another language; no performance claim</li>
+<p>is made.</p>
+<li>Cross-platform testing was performed on this Linux checkout only.</li>
+<li>Deyra was the motivating real-world project for JSX and regex, but its</li>
+<p>repository was not cloned or modified here. The release is validated against a real React 19 + Vite integration and a Deyra-shaped Express/React/SQLite application rather than against Deyra&#39;s production branch.</p>
+</ul>
+<h2 id="recommended-next-work">Recommended next work</h2>
+<ol>
+<li>Ternary expressions and a small class/interop story, or an explicit</li>
+<p>decision that both stay out.</p>
+<li>Execution-tested bindings for JVM, Go, Rust and C# toolchains.</li>
+<li>Native FFI or WebAssembly adapter for hot-path native libraries.</li>
+<li>Non-JavaScript migration adapters that emit bridge service stubs and tests.</li>
+<li>JSX declarations for third-party component packages.</li>
+<li>A persistent incremental build cache and published cross-language benchmark.</li>
+<li>Live database and identity-provider conformance runs.</li>
+</ol></article><aside class="toc-rail" aria-label="On this page"><div class="toc-title">On this page</div><nav class="toc"><a class="toc-h2" href="#method">Method</a><a class="toc-h2" href="#what-2-2-resolves">What 2.2 resolves</a><a class="toc-h3" href="#native-jsx">Native JSX</a><a class="toc-h3" href="#native-regular-expressions">Native regular expressions</a><a class="toc-h3" href="#universal-cross-language-interoperability">Universal cross-language interoperability</a><a class="toc-h3" href="#migration-tooling">Migration tooling</a><a class="toc-h3" href="#module-system-corrections-found-during-the-audit">Module-system corrections found during the audit</a><a class="toc-h2" href="#capability-matrix">Capability matrix</a><a class="toc-h3" href="#language-fundamentals">Language fundamentals</a><a class="toc-h3" href="#runtime-and-execution">Runtime and execution</a><a class="toc-h3" href="#standard-library">Standard library</a><a class="toc-h3" href="#interoperability">Interoperability</a><a class="toc-h3" href="#tooling-and-developer-experience">Tooling and developer experience</a><a class="toc-h3" href="#production-readiness">Production readiness</a><a class="toc-h2" href="#discovered-gaps-and-dispositions">Discovered gaps and dispositions</a><a class="toc-h2" href="#verification-limitations">Verification limitations</a><a class="toc-h2" href="#recommended-next-work">Recommended next work</a></nav></aside></div><nav class="page-nav" aria-label="Chapter navigation"><a class="pn-prev" href="audit.html"><span class="pn-label">← Previous</span><span class="pn-title">Audit</span></a><a class="pn-next" href="decisions.html"><span class="pn-label">Next →</span><span class="pn-title">Decisions</span></a></nav><footer class="colophon"><div><div class="colophon-mark">PlainScript<span>.</span></div><p>An independent, statically typed language for the JavaScript platform. This manual is set in Fraunces, Newsreader, Space Grotesk and IBM Plex Mono, with halftone plates drawn in-house. One stylesheet, no frameworks, no trackers.</p></div><nav class="colophon-links" aria-label="Project links"><a href="index.html">Manual</a><a href="https://github.com/ayoistooslick/Plainscript">Source</a><a href="https://github.com/ayoistooslick/Plainscript/issues">Issues</a><a href="https://github.com/ayoistooslick/Plainscript/blob/main/CHANGELOG.md">Changelog</a><a href="https://github.com/ayoistooslick/Plainscript/blob/main/LICENSE">MIT</a></nav></footer></main></div></div><script src="app.js"></script></body></html>

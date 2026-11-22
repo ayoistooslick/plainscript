@@ -327,6 +327,8 @@ class CodeGen {
         return Number.isFinite(node.value) ? String(node.value) : 'NaN';
       case 'Text':
         return JSON.stringify(node.value);
+      case 'Regex':
+        return `/${node.pattern}/${node.flags}`;
       case 'Boolean':
         return node.value ? 'true' : 'false';
       case 'Nothing':
@@ -416,6 +418,7 @@ class CodeGen {
           case 'number': return `(typeof ${v} === "number")`;
           case 'text': return `(typeof ${v} === "string")`;
           case 'boolean': return `(typeof ${v} === "boolean")`;
+          case 'regex': return `(${v} instanceof RegExp)`;
           case 'nothing': return `(${v} === null || ${v} === undefined)`;
           case 'any':
           case 'unknown': return 'true';

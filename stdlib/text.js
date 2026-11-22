@@ -86,3 +86,69 @@ export function parseNumber(text, fallback = 0) {
   const value = Number(String(text).trim());
   return Number.isFinite(value) ? value : fallback;
 }
+
+// ---------------------------------------------------------------------------
+// Regular expressions
+//
+// A regex literal such as /item-(\d+)/ is a native value. These helpers wrap
+// the JavaScript RegExp surface in records so captures are easy to consume
+// without relying on array-shaped match objects. Every helper clones the
+// pattern, so a global regex's lastIndex is never disturbed by a call.
+
+export function matches(text, pattern) {
+  const expression = new RegExp(pattern.source, pattern.flags.replace(/[gy]/g, ''));
+  return expression.test(String(text));
+}
+
+export function findMatch(text, pattern) {
+  const expression = new RegExp(pattern.source, pattern.flags.replace(/[gy]/g, ''));
+  const found = expression.exec(String(text));
+  if (!found) return null;
+  return {
+    text: found[0],
+    index: found.index,
+    groups: found.slice(1).map((value) => (value === undefined ? '' : value)),
+    named: found.groups ? { ...found.groups } : {},
+  };
+}
+
+export function findAllMatches(text, pattern) {
+  const flags = pattern.flags.includes('g') ? pattern.flags : `${pattern.flags}g`;
+  const expression = new RegExp(pattern.source, flags);
+  const source = String(text);
+  const found = [];
+  let current = expression.exec(source);
+  while (current) {
+    found.push({
+      text: current[0],
+      index: current.index,
+      groups: current.slice(1).map((value) => (value === undefined ? '' : value)),
+      named: current.groups ? { ...current.groups } : {},
+    });
+    // A zero-length match would otherwise leave lastIndex unchanged.
+    if (current[0] === '') expression.lastIndex += 1;
+    current = expression.exec(source);
+  }
+  return found;
+}
+
+export function matchTexts(text, pattern) {
+  return findAllMatches(text, pattern).map((found) => found.text);
+}
+
+export function splitMatch(text, pattern) {
+  return String(text).split(new RegExp(pattern.source, pattern.flags.replace(/[gy]/g, '')));
+}
+
+export function replaceMatch(text, pattern, replacement) {
+  return String(text).replace(new RegExp(pattern.source, pattern.flags.replace(/[gy]/g, '')), replacement);
+}
+
+export function replaceAllMatches(text, pattern, replacement) {
+  const flags = pattern.flags.includes('g') ? pattern.flags : `${pattern.flags}g`;
+  return String(text).replace(new RegExp(pattern.source, flags), replacement);
+}
+
+export function escapeRegex(text) {
+  return String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}

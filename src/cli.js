@@ -38,8 +38,10 @@ Commands
   watch [files...]           rebuild the project when a .pln file changes
   ir <file.pln>              print the high-level IR as JSON
   lsp                        start the language server over stdio
-  migrate [files...]         scan JavaScript/TypeScript for migration blockers
+  migrate [paths...]         analyse a project and plan an incremental migration
   interop [files...]         translate supported TypeScript .d.ts declarations to .d.pln
+  bridge [file.pln]          serve exported functions over JSON-RPC (stdio or HTTP)
+  bindings [file.pln]        generate cross-language clients for a module
   dap                        run the PlainScript Debug Adapter Protocol server
   version                    print the compiler version
   help                       show this message
@@ -52,7 +54,16 @@ Options
   --declarations    with build: also write <name>.d.pln for every module
   --template=<id>   with new: choose a bundled starter
   --syntax=<v>   compile files without a pragma as syntax <v> (2.0 or 2.1)
-  --json        with migrate/interop: print a machine-readable report
+  --json        with migrate/interop/bindings: print a machine-readable report
+  --http=<port> with bridge: serve JSON-RPC over HTTP instead of stdio
+  --host=<host> with bridge: HTTP bind address (default 127.0.0.1)
+  --manifest    with bridge: print the module manifest and exit
+  --call=<name> with bridge: run one call and print its JSON result
+  --args=<json> with --call: argument array (default [])
+  --lang=<list> with bindings: comma-separated languages (default: all supported)
+  --out=<dir>   with bindings: output directory (default: bindings)
+  --write       with migrate: write interop boundaries and converted modules
+  --report=<file> with migrate: write the full JSON report to a file
   --help        show this message
 
 Exit codes
@@ -60,7 +71,7 @@ Exit codes
 `;
 
 function parseArguments(argv) {
-  const flags = { quiet: false, verbose: false, check: false, help: false, stdBase: null, template: null, declarations: false, json: false, syntax: null };
+  const flags = { quiet: false, verbose: false, check: false, help: false, stdBase: null, template: null, declarations: false, json: false, syntax: null, manifest: false, write: false, http: null, host: '127.0.0.1', call: null, args: null, lang: null, out: null, report: null };
   const positional = [];
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
@@ -69,6 +80,21 @@ function parseArguments(argv) {
     else if (argument === '--check') flags.check = true;
     else if (argument === '--declarations') flags.declarations = true;
     else if (argument === '--json') flags.json = true;
+    else if (argument === '--manifest') flags.manifest = true;
+    else if (argument === '--write') flags.write = true;
+    else if (argument.startsWith('--http=')) flags.http = argument.slice('--http='.length);
+    else if (argument === '--http') { flags.http = argv[index + 1] || ''; index += 1; }
+    else if (argument.startsWith('--host=')) flags.host = argument.slice('--host='.length);
+    else if (argument.startsWith('--call=')) flags.call = argument.slice('--call='.length);
+    else if (argument === '--call') { flags.call = argv[index + 1] || null; index += 1; }
+    else if (argument === '--host') { flags.host = argv[index + 1] || '127.0.0.1'; index += 1; }
+    else if (argument === '--args') { flags.args = argv[index + 1] || null; index += 1; }
+    else if (argument.startsWith('--args=')) flags.args = argument.slice('--args='.length);
+    else if (argument.startsWith('--lang=')) flags.lang = argument.slice('--lang='.length);
+    else if (argument === '--lang') { flags.lang = argv[index + 1] || null; index += 1; }
+    else if (argument.startsWith('--out=')) flags.out = argument.slice('--out='.length);
+    else if (argument === '--out') { flags.out = argv[index + 1] || null; index += 1; }
+    else if (argument.startsWith('--report=')) flags.report = argument.slice('--report='.length);
     else if (argument === '--help' || argument === '-h') flags.help = true;
     else if (argument.startsWith('--std-base=')) flags.stdBase = argument.slice('--std-base='.length);
     else if (argument === '--template' || argument === '-t') {
@@ -586,62 +612,143 @@ function copyTemplate(from, to) {
   }
 }
 
-const MIGRATION_CHECKS = [
+const MIGRATION_SCAN_CHECKS = [
   { code: 'COMMONJS_REQUIRE', pattern: /\brequire\s*\(/, message: 'CommonJS require() must be replaced with an ES import.' },
   { code: 'COMMONJS_EXPORT', pattern: /\bmodule\.exports\b|\bexports\.[A-Za-z_$]/, message: 'CommonJS exports must be replaced with export declarations.' },
   { code: 'TS_INTERFACE', pattern: /\binterface\s+[A-Za-z_]/, message: 'TypeScript interfaces need a PlainScript type declaration.' },
   { code: 'TS_ENUM', pattern: /\benum\s+[A-Za-z_]/, message: 'TypeScript enums should become a PlainScript variant or literal union.' },
   { code: 'TS_NAMESPACE', pattern: /\bnamespace\s+[A-Za-z_]/, message: 'TypeScript namespaces are not part of PlainScript; use modules.' },
   { code: 'CLASS_SYNTAX', pattern: /\bclass\s+[A-Za-z_]/, message: 'Classes are JavaScript-boundary values; move the class into a .js module or rewrite it as records and functions.' },
-  { code: 'JSX_SYNTAX', pattern: /<\/?[A-Z][A-Za-z0-9]*(?:\s|>)/, message: 'JSX syntax must move to a JavaScript/JSX module reachable through the JavaScript boundary.' },
+  { code: 'JSX_SYNTAX', pattern: /<\/?[A-Z][A-Za-z0-9]*(?:\s|>)/, message: 'JSX syntax compiles natively in PlainScript, or can stay in a JavaScript/JSX module behind a boundary.' },
   { code: 'JS_COMMENT', pattern: /^\s*\/\//, message: 'PlainScript comments start with #.' },
 ];
 
-function migrationFiles(paths) {
-  const results = [];
-  const visit = (target) => {
-    let stat;
-    try { stat = fs.statSync(target); } catch { return; }
-    if (stat.isDirectory()) {
-      for (const entry of fs.readdirSync(target, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
-        if (entry.name === 'node_modules' || entry.name === 'dist' || entry.name === 'legacy' || entry.name.startsWith('.')) continue;
-        visit(path.join(target, entry.name));
+function migrationScanFindings(project, root) {
+  const findings = [];
+  for (const item of project.files) {
+    let source;
+    try { source = fs.readFileSync(path.join(root, item.path), 'utf8'); } catch { continue; }
+    source.split('\n').forEach((line, index) => {
+      for (const check of MIGRATION_SCAN_CHECKS) {
+        if (!check.pattern.test(line)) continue;
+        findings.push({ file: item.path, line: index + 1, code: check.code, message: check.message });
       }
-      return;
+    });
+    if (/\.(?:jsx|tsx)$/.test(item.path)) {
+      findings.push({ file: item.path, line: 1, code: 'JSX_FILE', message: 'JSX/TSX files can stay in React tooling or migrate to PlainScript JSX with a generated boundary.' });
     }
-    if (stat.isFile() && /\.(?:js|jsx|ts|tsx)$/.test(target)) results.push(target);
-  };
-  for (const target of paths.length ? paths : ['.']) visit(path.resolve(target));
-  return results.sort();
+  }
+  return findings;
 }
 
 function commandMigrate(positional, flags = {}) {
-  const files = migrationFiles(positional);
-  const findings = [];
-  for (const file of files) {
-    let source;
-    try { source = fs.readFileSync(file, 'utf8'); } catch { continue; }
-    const lines = source.split('\n');
-    lines.forEach((line, index) => {
-      for (const check of MIGRATION_CHECKS) {
-        if (!check.pattern.test(line)) continue;
-        findings.push({ file: path.relative(process.cwd(), file), line: index + 1, code: check.code, message: check.message });
-      }
-    });
-    if (/\.(?:jsx|tsx)$/.test(file)) {
-      findings.push({ file: path.relative(process.cwd(), file), line: 1, code: 'JSX_FILE', message: 'Keep JSX files as JavaScript modules and call them from PlainScript.' });
+  const {
+    analyseProject,
+    boundaryPlan,
+    convertJavaScript,
+    writeBoundaries,
+    writeConverted,
+    reportMarkdown,
+  } = require('./migrate');
+  const root = path.resolve(positional[0] || '.');
+  let stat;
+  try { stat = fs.statSync(root); } catch { stat = null; }
+  if (!stat || !stat.isDirectory()) {
+    process.stderr.write(`Migration target is not a directory: ${root}\n`);
+    return 2;
+  }
+
+  const project = analyseProject(root);
+  const findings = migrationScanFindings(project, root);
+  const boundaries = [];
+  const conversions = [];
+  const failures = [];
+
+  for (const item of project.files) {
+    if (item.strategy === 'interop-boundary') {
+      const boundary = boundaryPlan(project, item);
+      if (boundary) boundaries.push(boundary);
+      else failures.push({ path: item.path, diagnostics: [{ code: 'NO_EXPORTS', message: 'No exported names detected, so no boundary was generated.' }] });
+      continue;
+    }
+    if (item.strategy === 'auto-convert') {
+      let source;
+      try { source = fs.readFileSync(path.join(root, item.path), 'utf8'); } catch { continue; }
+      const result = convertJavaScript(source, item.path);
+      if (result.ok) conversions.push({ path: item.path, code: result.code });
+      else failures.push({ path: item.path, diagnostics: result.diagnostics });
+      continue;
+    }
+    if (item.strategy === 'manual') {
+      failures.push({
+        path: item.path,
+        diagnostics: [{
+          code: 'MANUAL_REVIEW',
+          message: `${item.language} modules are not source-converted. Keep the native module and connect it through a JSON-RPC bridge or generated bindings.`,
+        }],
+      });
     }
   }
+
+  let written = null;
+  if (flags.write) {
+    written = {
+      boundaries: writeBoundaries(project, boundaries),
+      conversions: writeConverted(project, conversions),
+    };
+  }
+
+  if (flags.report) {
+    const reportPath = path.resolve(flags.report);
+    fs.mkdirSync(path.dirname(reportPath), { recursive: true });
+    fs.writeFileSync(reportPath, `${JSON.stringify({
+      project,
+      boundaries: boundaries.map((boundary) => ({
+        source: boundary.path,
+        declaration: boundary.declarationPath,
+        wrapper: boundary.wrapperPath,
+        names: boundary.names,
+      })),
+      conversions: conversions.map((conversion) => conversion.path),
+      failures,
+      written,
+    }, null, 2)}\n`);
+  }
+
   if (flags.json) {
-    process.stdout.write(`${JSON.stringify({ files: files.length, findings }, null, 2)}\n`);
+    process.stdout.write(`${JSON.stringify({
+      root,
+      files: project.summary.files,
+      findings,
+      summary: project.summary,
+      stack: project.stack,
+      phases: project.phases,
+      boundaries: boundaries.map((boundary) => ({ source: boundary.path, declaration: boundary.declarationPath, wrapper: boundary.wrapperPath })),
+      conversions: conversions.map((conversion) => conversion.path),
+      failures,
+      written,
+    }, null, 2)}\n`);
   } else {
-    process.stdout.write(`Migration scan: ${files.length} file(s), ${findings.length} finding(s).\n`);
-    for (const finding of findings) {
-      process.stdout.write(`${finding.file}:${finding.line}: ${finding.code}: ${finding.message}\n`);
+    process.stdout.write(`${reportMarkdown(project, { explain: true })}\n\n`);
+    process.stdout.write('## Migration findings\n\n');
+    if (findings.length) {
+      for (const finding of findings) {
+        process.stdout.write(`${finding.file}:${finding.line}: ${finding.code}: ${finding.message}\n`);
+      }
+    } else {
+      process.stdout.write('No mechanical migration blockers found.\n');
     }
-    if (!findings.length) process.stdout.write('No mechanical migration blockers found. Review syntax before renaming files to .pln.\n');
+    process.stdout.write('\n');
+    process.stdout.write(`Safe conversions: ${conversions.length}   Interop boundaries: ${boundaries.length}   Unresolved: ${failures.length}\n`);
+    if (flags.write && written) {
+      process.stdout.write(`Wrote ${written.conversions.length} converted module(s) and ${written.boundaries.length} boundary pair(s).\n`);
+    } else if (conversions.length || boundaries.length) {
+      process.stdout.write('Re-run with --write to generate converted modules and interop boundaries.\n');
+    }
   }
-  return flags.check && findings.length ? 1 : 0;
+
+  if (flags.check && (findings.length || failures.length || project.summary.manual)) return 1;
+  return 0;
 }
 
 function findDeclarationFiles(directory, output = []) {
@@ -699,6 +806,155 @@ function commandInterop(positional, flags = {}) {
     process.stdout.write(`TypeScript declaration interop: ${written} file(s) written, ${errors} error(s).\n`);
   }
   return errors ? 1 : 0;
+}
+
+function bridgeEntryFor(positional) {
+  const candidate = positional.length ? path.resolve(positional[0]) : path.resolve(process.cwd(), 'src', 'main.pln');
+  return candidate;
+}
+
+async function commandBridge(positional, flags = {}) {
+  const { loadBridgeModule, createHandler, serveStdio, serveHttp } = require('./interop/bridge');
+  const entry = bridgeEntryFor(positional);
+  if (!isFile(entry)) {
+    process.stderr.write(`No such PlainScript entry: ${entry}\n`);
+    return 2;
+  }
+  const root = findProjectRoot(entry);
+  let loaded;
+  try {
+    loaded = await loadBridgeModule(entry, { root });
+  } catch (failure) {
+    process.stderr.write(`${failure.message}\n`);
+    return 1;
+  }
+  const handle = createHandler({ module: loaded.module, manifest: loaded.manifest, debug: Boolean(flags.verbose) });
+
+  if (flags.manifest) {
+    process.stdout.write(`${JSON.stringify(loaded.manifest, null, 2)}\n`);
+    return 0;
+  }
+
+  if (flags.call) {
+    let args;
+    try {
+      args = flags.args ? JSON.parse(flags.args) : [];
+    } catch (failure) {
+      process.stderr.write(`--args must be a JSON array: ${failure.message}\n`);
+      return 2;
+    }
+    const response = await handle({ jsonrpc: '2.0', id: 1, method: flags.call, params: args });
+    if (response && response.error) {
+      process.stderr.write(`${response.error.message}\n`);
+      return 1;
+    }
+    process.stdout.write(`${JSON.stringify(response ? response.result : null)}\n`);
+    return 0;
+  }
+
+  if (flags.http !== null && flags.http !== undefined) {
+    const port = Number(flags.http);
+    if (!Number.isInteger(port) || port < 0) {
+      process.stderr.write(`--http expects a port number, found "${flags.http}".\n`);
+      return 2;
+    }
+    const server = await serveHttp(handle, { manifest: loaded.manifest, port, host: flags.host });
+    status(`PlainScript bridge for ${path.relative(root, entry)} listening on ${server.url}`, flags);
+    await new Promise((resolve) => {
+      const shutdown = () => server.server.close(() => resolve());
+      process.on('SIGINT', shutdown);
+      process.on('SIGTERM', shutdown);
+    });
+    return 0;
+  }
+
+  status(`PlainScript bridge for ${path.relative(root, entry)} ready on stdio (${loaded.manifest.functions.length} function(s))`, flags);
+  serveStdio(handle, { onClose: () => process.exit(0) });
+  return new Promise(() => {});
+}
+
+async function commandBindings(positional, flags = {}) {
+  const { loadBridgeModule } = require('./interop/bridge');
+  const { generateBindings, SUPPORTED } = require('./interop/bindings');
+  const entry = bridgeEntryFor(positional);
+  if (!isFile(entry)) {
+    process.stderr.write(`No such PlainScript entry: ${entry}\n`);
+    return 2;
+  }
+  const root = findProjectRoot(entry);
+  let loaded;
+  try {
+    loaded = await loadBridgeModule(entry, { root });
+  } catch (failure) {
+    process.stderr.write(`${failure.message}\n`);
+    return 1;
+  }
+  const requested = flags.lang && flags.lang !== 'all' ? flags.lang.split(',').map((item) => item.trim()).filter(Boolean) : SUPPORTED;
+  let files;
+  try {
+    files = generateBindings(loaded.manifest, requested, entry);
+  } catch (failure) {
+    process.stderr.write(`${failure.message}\n`);
+    return 2;
+  }
+  const directory = path.resolve(flags.out || 'bindings');
+  fs.mkdirSync(directory, { recursive: true });
+  const written = [];
+  for (const file of files) {
+    const target = path.join(directory, file.name);
+    fs.writeFileSync(target, file.code);
+    written.push({ language: file.language, file: path.relative(process.cwd(), target) });
+  }
+  fs.writeFileSync(path.join(directory, 'plainscript.manifest.json'), `${JSON.stringify(loaded.manifest, null, 2)}\n`);
+  fs.writeFileSync(path.join(directory, 'README.md'), bindingsReadme(loaded.manifest, files, entry));
+  if (flags.json) {
+    process.stdout.write(`${JSON.stringify({ module: loaded.manifest.module, directory, files: written }, null, 2)}\n`);
+  } else {
+    process.stdout.write(`Interop bindings for ${loaded.manifest.module} (${loaded.manifest.functions.length} function(s)):\n`);
+    for (const file of written) process.stdout.write(`  ${file.language.padEnd(11)} ${file.file}\n`);
+    process.stdout.write(`Manifest and protocol notes written to ${path.relative(process.cwd(), directory)}/.\n`);
+  }
+  return 0;
+}
+
+function bindingsReadme(manifest, files, entry) {
+  const lines = [
+    `# ${manifest.module} — cross-language bindings`,
+    '',
+    `Generated by PlainScript ${manifest.version} for ${manifest.functions.length} exported function(s).`,
+    '',
+    'Every client speaks newline-delimited JSON-RPC 2.0 to:',
+    '',
+    '```',
+    `plainscript bridge ${entry}`,
+    '```',
+    '',
+    'or the same messages over HTTP with `--http=<port>` (`POST /rpc`, `GET /manifest`, `GET /health`).',
+    '',
+    '## Files',
+    '',
+  ];
+  for (const file of files) lines.push(`- \`${file.name}\` — ${file.language}`);
+  lines.push(
+    '',
+    '## Runtime status',
+    '',
+    'The Python and JavaScript clients are exercised end-to-end by the PlainScript test suite.',
+    'Go and Rust clients use only their standard JSON facilities plus serde_json (Rust). Java,',
+    'Kotlin, Swift and Dart clients target the HTTP bridge; C# uses the bundled System.Text.Json.',
+    'The C/C++ client is a POSIX one-shot helper built on popen(3). The remaining clients are',
+    'generated from the same manifest and should be compiled with their own toolchain before use.',
+    '',
+    '## Protocol',
+    '',
+    'Request:  `{"jsonrpc":"2.0","id":1,"method":"name","params":[...]}`',
+    '',
+    'Response: `{"jsonrpc":"2.0","id":1,"result":...}` or `{"jsonrpc":"2.0","id":1,"error":{"code":-32000,"message":"..."}}`',
+    '',
+    'The `__manifest` method returns this module\'s manifest; `__ping` is a health check.',
+    '',
+  );
+  return lines.join('\n');
 }
 
 function commandNew(positional, flags = {}) {
@@ -832,6 +1088,8 @@ function main(argv) {
     dap: commandDap,
     migrate: commandMigrate,
     interop: commandInterop,
+    bridge: commandBridge,
+    bindings: commandBindings,
     new: commandNew,
     version: () => { process.stdout.write(`${VERSION}\n`); return 0; },
   };

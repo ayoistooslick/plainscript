@@ -1,6 +1,6 @@
 {
   "name": "plainscript-lang",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "PlainScript: an independent, statically typed full-stack language for the JavaScript platform.",
   "author": {
     "name": "Ayodele Ayokunle David",

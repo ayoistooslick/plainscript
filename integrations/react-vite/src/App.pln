@@ -1,10 +1,10 @@
 #syntax 2.1
 
-# A React component written in PlainScript 2.1.
+# A React component written in PlainScript 2.1 with native JSX.
 #
-# `render` and `element` lower to createElement calls from the module scope, so
-# the component is an ordinary function component: hooks, events and keys all
-# behave exactly as they do in React.
+# JSX lowers to createElement calls (classic runtime by default), so hooks,
+# events and keys behave exactly as they do in a JavaScript React component.
+# The generated module is an ordinary ES module that Vite bundles.
 
 import { createElement, useState } from "react"
 import { append, count, filter } from "std/list"
@@ -50,38 +50,25 @@ export define App() returns any
     define rows() returns list of any
         set built: list of any to []
         for each task in tasks
-            change built to append(built, element "li" with key: task.id, className: "row"
-                element "span" with className: "title"
-                    "{task.title}"
-                end
-                element "button" with type: "button", onClick: () => toggle(task.id)
-                    "{statusOf(task)}"
-                end
-            end)
+            change built to append(built, <li key={task.id} className="row">
+                <span className="title">{task.title}</span>
+                <button type="button" onClick={() => toggle(task.id)}>
+                    {statusOf(task)}
+                </button>
+            </li>)
         end
         return built
     end
 
-    render
-        element "main" with className: "app"
-            element "h1"
-                "PlainScript + React + Vite"
-            end
-            element "p" with className: "muted"
-                "{remaining()} of {count(tasks)} task(s) remaining"
-            end
-            element "form" with onSubmit: submit
-                element "input" with value: draft, placeholder: "What needs doing?", onChange: (event: any) => setDraft(event.target.value)
-                end
-                element "button" with type: "submit"
-                    "Add task"
-                end
-            end
-            element "ul"
-                ...rows()
-            end
-        end
-    end
+    return <main className="app">
+        <h1>PlainScript + React + Vite</h1>
+        <p className="muted">{remaining()} of {count(tasks)} task(s) remaining</p>
+        <form onSubmit={submit}>
+            <input value={draft} placeholder="What needs doing?" onChange={(event: any) => setDraft(event.target.value)} />
+            <button type="submit">Add task</button>
+        </form>
+        <ul>{rows()}</ul>
+    </main>
 end
 
 define statusOf(task: Task) returns text

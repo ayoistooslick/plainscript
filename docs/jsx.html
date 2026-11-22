@@ -1,0 +1,199 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="JSX and React — PlainScript 2.2 documentation."><meta name="color-scheme" content="dark"><meta name="theme-color" content="#08070b"><title>JSX and React · PlainScript</title><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23a679ff'/%3E%3Ctext x='16' y='23' font-family='Georgia,serif' font-size='20' fill='%2308070b' text-anchor='middle'%3EP%3C/text%3E%3C/svg%3E"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=Space+Grotesk:wght@400..700&display=swap" rel="stylesheet"><link rel="stylesheet" href="style.css"></head><body><a class="skip" href="#main">Skip to content</a><div class="scrim" data-scrim></div><div class="shell"><aside class="rail" id="rail"><div class="rail-head"><a class="wordmark" href="index.html">PlainScript<span class="dot">.</span></a><div class="rail-meta">Language manual<br>Vol. 2.2 · MMXXVI</div></div><nav class="rail-nav" aria-label="Documentation"><div class="nav-group"><div class="nav-label">Start here</div><a class="nav-link " href="index.html">PlainScript</a><a class="nav-link " href="getting-started.html">Getting started</a><a class="nav-link " href="cli.html">CLI reference</a><a class="nav-link " href="templates.html">Application templates</a></div><div class="nav-group"><div class="nav-label">Language</div><a class="nav-link " href="language-reference.html">Language reference</a><a class="nav-link " href="regex.html">Regular expressions</a><a class="nav-link " href="spec.html">Language specification</a><a class="nav-link " href="syntax-design.html">Syntax design</a><a class="nav-link " href="type-system.html">Type system</a></div><div class="nav-group"><div class="nav-label">Guides</div><a class="nav-link active" href="jsx.html" aria-current="page">JSX and React</a><a class="nav-link " href="integrations.html">Integrations</a><a class="nav-link " href="migration-2-1.html">Migrating from 2.0</a><a class="nav-link " href="migration-2-2.html">Migrating to 2.2</a><a class="nav-link " href="contracts.html">Unified contracts</a><a class="nav-link " href="concurrency.html">Concurrency</a><a class="nav-link " href="jobs.html">Background jobs</a><a class="nav-link " href="databases.html">Databases</a><a class="nav-link " href="security.html">Security</a><a class="nav-link " href="debugging.html">Debugging</a><a class="nav-link " href="migration.html">Migration guide</a><a class="nav-link " href="comparison.html">Comparison with TypeScript</a></div><div class="nav-group"><div class="nav-label">Compiler</div><a class="nav-link " href="compiler.html">Compiler</a><a class="nav-link " href="architecture.html">Compiler architecture</a><a class="nav-link " href="interop.html">JavaScript interop</a><a class="nav-link " href="cross-language.html">Cross-language bridges</a><a class="nav-link " href="benchmarks.html">Benchmarks</a></div><div class="nav-group"><div class="nav-label">Project</div><a class="nav-link " href="progress.html">Engineering progress</a><a class="nav-link " href="roadmap.html">Roadmap</a><a class="nav-link " href="audit.html">Audit</a><a class="nav-link " href="capability-audit-2-2.html">Capability audit 2.2</a><a class="nav-link " href="decisions.html">Decisions</a></div></nav><div class="rail-foot"><a href="https://github.com/ayoistooslick/Plainscript">Source ↗</a><span class="sep">/</span><a href="https://github.com/ayoistooslick/Plainscript/issues">Issues ↗</a><br>MIT · built by hand</div></aside><div class="main"><header class="top"><button class="nav-toggle" type="button" data-nav-toggle aria-expanded="false" aria-controls="rail"><span aria-hidden="true">≡</span> <span class="nav-toggle-label">Contents</span></button><a class="top-brand" href="index.html">PlainScript<span>.</span></a><span class="crumb"><b>PlainScript</b><span class="slash">/</span>Guides<span class="slash">/</span>JSX and React</span><div class="search-wrap"><label class="search" aria-label="Search the manual"><span class="glyph" aria-hidden="true"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg></span><input id="doc-search" type="search" placeholder="Search the manual" autocomplete="off" aria-controls="search-results" aria-expanded="false"><kbd>/</kbd></label><div id="search-results" class="search-results" role="listbox" aria-label="Search results"></div></div><a class="top-github" href="https://github.com/ayoistooslick/Plainscript">GitHub ↗</a><div class="progress" aria-hidden="true"><span></span></div></header><main id="main" class="page"><div class="article-grid"><article class="prose"><div class="chapter-head"><figure class="chapter-band" data-tilt><img src="assets/plate-figure.jpg" alt="" width="1024" height="1024" loading="lazy" decoding="async"></figure><div class="page-kicker"><span class="kicker-no">04</span><span class="kicker-section">Guides</span><span class="kicker-meta">4 min read</span></div><h1 id="jsx-and-react">JSX and React</h1></div>
+<p>PlainScript parses JSX as native syntax. A <code>.pln</code> file can contain React components directly: there is no separate <code>.jsx</code> layer, no Babel step and no runtime wrapper. The compiler parses elements and fragments, type-checks props where it can, and lowers the tree to either the classic <code>createElement</code> factory or the automatic JSX runtime.</p>
+<p>JSX is available in 2.1 source, including files without an explicit pragma, because the dialect and the JSX transform are independent. Components can still use the ordinary PlainScript constructs around the markup.</p>
+<h2 id="a-first-component">A first component</h2>
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
+
+import { createElement } from &quot;react&quot;
+
+export type GreetingProps
+    name: text
+    excited?: boolean
+end
+
+define mark(excited: boolean) returns text
+    when excited
+        return &quot;!&quot;
+    end
+    return &quot;.&quot;
+end
+
+export define Greeting(props: GreetingProps) returns any
+    return &lt;p className=&quot;greeting&quot;&gt;
+        Hello, {props.name}{mark(props.excited ?? false)}
+    &lt;/p&gt;
+end</code></pre></figure>
+<p>The default runtime is <strong>classic</strong>: JSX becomes <code>createElement(type, props, ...children)</code>. React projects therefore need <code>createElement</code> in scope, exactly as a classic-runtime JavaScript component does. <code>Fragment</code> is also required when the component uses <code>&lt;&gt;…&lt;/&gt;</code>.</p>
+<p><code>return any</code> is the normal type for a React element here. React&#39;s own types are not modelled by the checker; the boundary type is <code>any</code>, while the component&#39;s props are fully checked at PlainScript call sites.</p>
+<h2 id="fragments-and-children">Fragments and children</h2>
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
+
+import { createElement, Fragment } from &quot;react&quot;
+import { map } from &quot;std/list&quot;
+
+export type Item
+    id: number
+    title: text
+end
+
+export define ItemList(props: { items: list of Item }) returns any
+    return &lt;&gt;
+        &lt;h2&gt;Items&lt;/h2&gt;
+        &lt;ul&gt;
+            {map(props.items, (item: Item) =&gt; &lt;li key={item.id}&gt;{item.title}&lt;/li&gt;)}
+        &lt;/ul&gt;
+    &lt;/&gt;
+end</code></pre></figure>
+<p>Fragments have no wrapper element. Expression containers may contain any expression, including a call that returns an array of elements. Keys are not inferred; pass <code>key</code> explicitly inside a mapped list, as in JavaScript React.</p>
+<h2 id="attributes">Attributes</h2>
+<p>All ordinary JSX attribute forms are supported:</p>
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
+
+import { createElement } from &quot;react&quot;
+
+export define Link(props: { href: text, label: text }) returns any
+    value extra is { target: &quot;_blank&quot;, rel: &quot;noreferrer&quot; }
+    return &lt;a href={props.href} {...extra} data-kind=&quot;external&quot;&gt;
+        {props.label}
+    &lt;/a&gt;
+end</code></pre></figure>
+<ul>
+<li><code>name=&quot;text&quot;</code> and <code>name={expression}</code> are equivalent to React props.</li>
+<li>A bare attribute such as <code>disabled</code> becomes <code>true</code>.</li>
+<li><code>{...record}</code> spreads a record into the props object.</li>
+<li>HTML entities in text (<code>&amp;amp;</code>, <code>&amp;nbsp;</code>, numeric entities) are decoded.</li>
+<li>Text-only children are whitespace-normalised the way React&#39;s transform does:</li>
+<p>newlines and indentation around text collapse, while meaningful spaces inside a line are kept.</p>
+<li><code>{/<em> … </em>/}</code> comments are allowed inside a JSX tree.</li>
+</ul>
+<p>Attribute names are emitted verbatim. React&#39;s <code>className</code>, <code>htmlFor</code> and <code>onClick</code> spellings are therefore the ones to use; PlainScript does not rename attributes.</p>
+<h2 id="events-and-hooks">Events and hooks</h2>
+<p>Hooks are ordinary imported functions, and event handlers are ordinary PlainScript lambdas:</p>
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
+
+import { createElement, useState } from &quot;react&quot;
+
+export define Counter() returns any
+    set (count, setCount) to useState(0)
+    return &lt;button type=&quot;button&quot; onClick={() =&gt; setCount(count + 1)}&gt;
+        Clicked {count} time(s)
+    &lt;/button&gt;
+end</code></pre></figure>
+<p>The generated module is a normal ES module, so hooks, context, refs, suspense and third-party components work exactly as they do in JavaScript React. A component imported from an npm package is typed <code>any</code>; local components with a record prop type are checked.</p>
+<h2 id="automatic-runtime">Automatic runtime</h2>
+<p>Set the automatic runtime per file with pragmas:</p>
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
+# @jsxRuntime automatic
+# @jsxImportSource react
+
+export define App() returns any
+    return &lt;main&gt;
+        &lt;h1&gt;Automatic runtime&lt;/h1&gt;
+        &lt;p&gt;No createElement import is needed.&lt;/p&gt;
+    &lt;/main&gt;
+end</code></pre></figure>
+<p>The emitted module imports <code>jsx</code>/<code>jsxs</code> from <code>react/jsx-runtime</code> (or from <code>&lt;importSource&gt;/jsx-runtime</code>). Components, props, children and keys behave the same; only the factory changes.</p>
+<p>For Preact or another compatible runtime:</p>
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
+# @jsxRuntime automatic
+# @jsxImportSource preact
+
+export define Island() returns any
+    return &lt;section class=&quot;island&quot;&gt;Preact island&lt;/section&gt;
+end</code></pre></figure>
+<p>Automatic JSX accepts <code>class</code> as an attribute because Preact does. React&#39;s automatic runtime expects <code>className</code>; the compiler does not rewrite either.</p>
+<h2 id="project-configuration">Project configuration</h2>
+<p>Per-file pragmas override project defaults. Defaults live in <code>plainscript.config.json</code>, either under a top-level <code>jsx</code> object or under <code>compilerOptions.jsx</code>:</p>
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">json</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="json">{
+  &quot;jsx&quot;: {
+    &quot;jsxRuntime&quot;: &quot;automatic&quot;,
+    &quot;jsxImportSource&quot;: &quot;react&quot;
+  }
+}</code></pre></figure>
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">json</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="json">{
+  &quot;compilerOptions&quot;: {
+    &quot;jsx&quot;: {
+      &quot;jsxRuntime&quot;: &quot;classic&quot;,
+      &quot;jsxFactory&quot;: &quot;createElement&quot;,
+      &quot;jsxFragment&quot;: &quot;Fragment&quot;
+    }
+  }
+}</code></pre></figure>
+<p>Supported pragmas, read from the first lines of a file:</p>
+<div class="table-wrap"><table><thead><tr><th>Pragma</th><th>Effect</th></tr></thead><tbody>
+<tr><td><code># @jsx h</code></td><td>Classic factory function, for example Preact&#39;s <code>h</code></td></tr>
+<tr><td><code># @jsxFrag Fragment</code></td><td>Fragment factory and forces the classic runtime</td></tr>
+<tr><td><code># @jsxRuntime automatic</code></td><td>Select the automatic runtime</td></tr>
+<tr><td><code># @jsxRuntime classic</code></td><td>Select the classic runtime</td></tr>
+<tr><td><code># @jsxImportSource preact</code></td><td>Automatic runtime package; also selects automatic</td></tr>
+</tbody></table></div>
+<p>The precedence is: built-in default → <code>plainscript.config.json</code> → file pragma. JSX options are resolved per file, so a React page and a Preact island can live in one repository.</p>
+<p>A custom classic factory works with any function of the shape <code>(type, props, ...children) =&gt; value</code>:</p>
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
+# @jsx h
+# @jsxFrag Group
+
+import { print } from &quot;std/io&quot;
+import { join } from &quot;std/text&quot;
+
+define h(tag: any, props: any, ...children: list of any) returns text
+    return &quot;&lt;{tag}&gt;{join(children, \&quot;\&quot;)}&lt;/{tag}&gt;&quot;
+end
+
+define Group(props: any, ...children: list of any) returns text
+    return join(children, &quot;&quot;)
+end
+
+print(&lt;main&gt;&lt;Group&gt;&lt;b&gt;custom&lt;/b&gt;&lt;/Group&gt;&lt;/main&gt;)</code></pre></figure>
+<h2 id="prop-checking">Prop checking</h2>
+<p>When a component has a declared record prop type, the checker validates its call sites:</p>
+<ul>
+<li><code>PS3421</code> — a prop value has the wrong type.</li>
+<li><code>PS3420</code> — a prop name is not declared.</li>
+<li><code>PS3422</code> — a required prop is missing.</li>
+<li><code>PS3405</code> — classic JSX is used without the factory in scope.</li>
+</ul>
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">output</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="text">type CardProps
+    title: text
+    count: number
+end
+
+define Card(props: CardProps) returns any …
+
+&lt;Card title={1} count={2} /&gt;      # PS3421: title expects text
+&lt;Card title=&quot;x&quot; /&gt;                # PS3422: count is required
+&lt;Card title=&quot;x&quot; count={2} extra=&quot;y&quot; /&gt;  # PS3420: extra is not declared</code></pre></figure>
+<p>Optional props end in <code>?</code>; spread props are not checked member by member because their record type may not be statically known.</p>
+<h2 id="diagnostics">Diagnostics</h2>
+<div class="table-wrap"><table><thead><tr><th>Code</th><th>Meaning</th></tr></thead><tbody>
+<tr><td><code>PS1009</code></td><td>Invalid JSX character or malformed tag name</td></tr>
+<tr><td><code>PS1010</code></td><td>Unclosed JSX expression container</td></tr>
+<tr><td><code>PS1011</code></td><td>Invalid JSX attribute</td></tr>
+<tr><td><code>PS1012</code></td><td>Unclosed JSX element</td></tr>
+<tr><td><code>PS1013</code></td><td>Closing tag does not match the opening tag</td></tr>
+<tr><td><code>PS1014</code></td><td>Invalid JSX entity</td></tr>
+<tr><td><code>PS3405</code></td><td>Classic factory is not in scope</td></tr>
+<tr><td><code>PS3420</code></td><td>Unknown component prop</td></tr>
+<tr><td><code>PS3421</code></td><td>Prop type mismatch</td></tr>
+<tr><td><code>PS3422</code></td><td>Missing required component prop</td></tr>
+</tbody></table></div>
+<h2 id="react-tooling">React tooling</h2>
+<p>The <code>integrations/react-vite</code> project is a React 19 + Vite application whose component is written in PlainScript JSX. Its test renders the component through <code>react-dom/server</code> and its production path runs the normal Vite build; no Babel JSX plugin or separate JavaScript component is maintained.</p>
+<p>For a Vite project:</p>
+<ol>
+<li>Write the component in <code>src/App.pln</code> with <code>#syntax 2.1</code>.</li>
+<li>Import React&#39;s <code>createElement</code> (classic) or use the automatic pragmas.</li>
+<li>Run <code>plainscript build</code> to emit <code>generated/App.js</code>.</li>
+<li>Let Vite import the generated module as usual.</li>
+</ol>
+<p>Source maps are emitted beside the generated module, so browser and Node stack traces point back to the <code>.pln</code> source.</p>
+<h2 id="what-is-deliberately-not-supported">What is deliberately not supported</h2>
+<ul>
+<li><code>.tsx</code> files are not parsed; PlainScript&#39;s own <code>.pln</code> files contain JSX. Use</li>
+<p><code>plainscript migrate</code> to wrap an existing TSX component behind a boundary, or rewrite it as PlainScript JSX.</p>
+<li>TypeScript&#39;s JSX type namespace (<code>JSX.IntrinsicElements</code>) is not imported.</li>
+<p>Only component props declared in PlainScript are checked.</p>
+<li>There is no automatic key insertion, and no compiler-managed React state.</li>
+<li>Vue templates and Svelte components are not JSX; only JSX factory runtimes</li>
+<p>are supported. A framework that compiles JSX through a compatible factory or automatic runtime works.</p>
+</ul></article><aside class="toc-rail" aria-label="On this page"><div class="toc-title">On this page</div><nav class="toc"><a class="toc-h2" href="#a-first-component">A first component</a><a class="toc-h2" href="#fragments-and-children">Fragments and children</a><a class="toc-h2" href="#attributes">Attributes</a><a class="toc-h2" href="#events-and-hooks">Events and hooks</a><a class="toc-h2" href="#automatic-runtime">Automatic runtime</a><a class="toc-h2" href="#project-configuration">Project configuration</a><a class="toc-h2" href="#prop-checking">Prop checking</a><a class="toc-h2" href="#diagnostics">Diagnostics</a><a class="toc-h2" href="#react-tooling">React tooling</a><a class="toc-h2" href="#what-is-deliberately-not-supported">What is deliberately not supported</a></nav></aside></div><nav class="page-nav" aria-label="Chapter navigation"><a class="pn-prev" href="regex.html"><span class="pn-label">← Previous</span><span class="pn-title">Regular expressions</span></a><a class="pn-next" href="compiler.html"><span class="pn-label">Next →</span><span class="pn-title">Compiler</span></a></nav><footer class="colophon"><div><div class="colophon-mark">PlainScript<span>.</span></div><p>An independent, statically typed language for the JavaScript platform. This manual is set in Fraunces, Newsreader, Space Grotesk and IBM Plex Mono, with halftone plates drawn in-house. One stylesheet, no frameworks, no trackers.</p></div><nav class="colophon-links" aria-label="Project links"><a href="index.html">Manual</a><a href="https://github.com/ayoistooslick/Plainscript">Source</a><a href="https://github.com/ayoistooslick/Plainscript/issues">Issues</a><a href="https://github.com/ayoistooslick/Plainscript/blob/main/CHANGELOG.md">Changelog</a><a href="https://github.com/ayoistooslick/Plainscript/blob/main/LICENSE">MIT</a></nav></footer></main></div></div><script src="app.js"></script></body></html>

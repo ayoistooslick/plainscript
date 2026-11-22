@@ -2,7 +2,110 @@
 
 All notable changes to PlainScript are documented here.
 
-## [Unreleased]
+## [2.2.0] — 2026-11-22
+
+### Native JSX and React components
+
+- Parse JSX natively in `.pln` files: elements, fragments, nested children, expression
+  containers, text/entities, quoted and expression attributes, boolean attributes and
+  `{...record}` spread attributes.
+- Add classic and automatic runtimes. Classic lowers to a configurable
+  `factory(type, props, ...children)` (default `createElement`); automatic lowers to
+  `jsx`/`jsxs` imported from `${importSource}/jsx-runtime`.
+- Add per-file `# @jsx`, `# @jsxFrag`, `# @jsxRuntime` and `# @jsxImportSource` pragmas,
+  plus `jsx` and `compilerOptions.jsx` project configuration. Pragmas override project
+  defaults per file.
+- Add component prop checking for local components with record props: unknown prop
+  (`PS3420`), wrong type (`PS3421`), missing required prop (`PS3422`) and missing classic
+  factory (`PS3405`). JSX lexical errors use `PS1009`–`PS1014`.
+- Add JSX AST nodes and HIR lowering with source-line preservation. Rewrite
+  `integrations/react-vite/src/App.pln` to native JSX and render it through
+  `react-dom/server` in the test suite.
+- Fix spread attributes and spread children, which previously passed the leading `...`
+  to the expression parser.
+
+### Native regular expressions
+
+- Add regex literals `/pattern/flags` as native expressions with expression-position
+  disambiguation: `/` is division after a value and a regex start where an expression is
+  expected.
+- Add the `regex` primitive type, member typing (`test`, `source`, `flags`, `global`,
+  `ignoreCase`, `multiline`, `dotAll`, `unicode`, `sticky`, `hasIndices`) and emitted
+  native `RegExp` values.
+- Validate patterns and flags at compile time: `PS1006` unterminated literal, `PS1007`
+  invalid flags, `PS1008` invalid pattern.
+- Add `std/text` helpers `matches`, `findMatch`, `findAllMatches`, `matchTexts`,
+  `splitMatch`, `replaceMatch`, `replaceAllMatches`, `escapeRegex` and the `RegexMatch`
+  record (full text, index, positional groups, named groups).
+- Cover captures, named groups, flags, replacement, splitting, zero-length matches,
+  Unicode and division disambiguation in the test suite.
+
+### Cross-language interoperability
+
+- Add `plainscript bridge`, serving a module's checked exports over newline-delimited
+  JSON-RPC 2.0 on stdio or HTTP (`--http`, `--call`, `--args`, `--manifest`).
+- Add manifests describing exported functions, params, return types, records, lists, maps
+  and async status.
+- Add `plainscript bindings`, generating clients for JavaScript, TypeScript, Python, C,
+  C++, Java, Kotlin, Go, Rust, Ruby, PHP, C#, Swift and Dart.
+- Add `std/bridge` (`open`, `call`, `close`, `Bridge`) and the reference Python server.
+- Verify JavaScript and Python clients end to end and compile/run the C client. Document
+  that JVM, Go, Rust, C#, Ruby, PHP, Swift and Dart clients are generated but not executed
+  in this environment.
+- Add support for JSON-RPC batches and notifications in the stdio transport.
+
+### Migration tooling
+
+- Rewrite `plainscript migrate` as a project analysis and incremental migration tool:
+  language, framework, module-system, package-manager and marker detection; exports and
+  imports; phased plan; safe conversion; boundary generation; Markdown/JSON reports.
+- Add conservative JavaScript conversion for eligible modules. The converter refuses
+  classes, JSX, CommonJS, default exports, wildcard re-exports, generators, decorators,
+  dynamic import and `eval` rather than mistranslating them.
+- Add boundary triplets for JSX/TS/TSX/CommonJS modules:
+  `bridges/Name.pln`, `Name.runtime.js`, `Name.runtime.d.pln`. The original module stays
+  authoritative.
+- Add conservative export detection for Python, Rust, Go, Java, Kotlin, Ruby, PHP, C#,
+  Swift and Dart modules; these stay native and are connected through the bridge.
+- Add CLI flags `--write`, `--report`, `--json` and `--check`, retaining the 2.1
+  `files`/`findings` JSON fields and scan codes.
+- Add migration tests covering analysis, conversion, refusal, boundaries, a boundary
+  executed against a real JS runtime and the CLI workflow.
+
+### Module system and compiler output
+
+- Resolve value re-exports (`export { name } from "./module"`) in the checker and module
+  loader. Previously they were emitted but not importable.
+- Copy project-local declared JavaScript runtimes into build/run output so generated
+  boundaries execute.
+- Do not copy installed package files under `node_modules`; the host resolves complete
+  packages. This fixes a regression where only one package runtime file was emitted.
+- Give generated boundary runtimes distinct names so compiling the wrapper cannot
+  overwrite its runtime adapter.
+- Keep JSX options per module when compiling graphs.
+
+### Tooling, documentation and tests
+
+- Add `docs/JSX.md`, `docs/REGEX.md`, `docs/CROSS_LANGUAGE.md`,
+  `docs/MIGRATION_2_2.md` and `docs/CAPABILITY_AUDIT_2_2.md`; add them to the generated
+  documentation site navigation and search.
+- Update the README, language reference, specification, CLI, architecture, integration,
+  getting-started, interop, progress, roadmap, audit index and AI field guide for 2.2.
+- Add compile-tested examples for the new guides and update language-reference examples.
+- Add `tests/jsx.test.js`, `tests/regex.test.js`, `tests/interop.test.js` and
+  `tests/migration.test.js`. The suite is now 382 tests (380 pass, 2 live-database tests
+  skipped without server URLs).
+- Update the React + Vite integration to native PlainScript JSX.
+
+### Compatibility
+
+- No source migration is required from 2.1. 2.0 and 2.1 files compile unchanged.
+- Classic JSX requires a factory in scope, matching JavaScript's classic runtime. Use the
+  automatic runtime pragmas if a `createElement` import is undesirable.
+- Regex semantics are the host JavaScript engine's semantics; the compiler validates
+  literals but does not replace the engine.
+- Non-JavaScript interop is a JSON-RPC process boundary, not native FFI. See
+  `docs/CAPABILITY_AUDIT_2_2.md` for remaining limitations.
 
 ### `val` alias
 

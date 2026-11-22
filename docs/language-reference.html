@@ -1,4 +1,4 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Language reference — PlainScript 2.1 documentation."><meta name="color-scheme" content="dark"><meta name="theme-color" content="#08070b"><title>Language reference · PlainScript</title><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23a679ff'/%3E%3Ctext x='16' y='23' font-family='Georgia,serif' font-size='20' fill='%2308070b' text-anchor='middle'%3EP%3C/text%3E%3C/svg%3E"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=Space+Grotesk:wght@400..700&display=swap" rel="stylesheet"><link rel="stylesheet" href="style.css"></head><body><a class="skip" href="#main">Skip to content</a><div class="scrim" data-scrim></div><div class="shell"><aside class="rail" id="rail"><div class="rail-head"><a class="wordmark" href="index.html">PlainScript<span class="dot">.</span></a><div class="rail-meta">Language manual<br>Vol. 2.1 · MMXXVI</div></div><nav class="rail-nav" aria-label="Documentation"><div class="nav-group"><div class="nav-label">Start here</div><a class="nav-link " href="index.html">PlainScript</a><a class="nav-link " href="getting-started.html">Getting started</a><a class="nav-link " href="cli.html">CLI reference</a><a class="nav-link " href="templates.html">Application templates</a></div><div class="nav-group"><div class="nav-label">Language</div><a class="nav-link active" href="language-reference.html" aria-current="page">Language reference</a><a class="nav-link " href="spec.html">Language specification</a><a class="nav-link " href="syntax-design.html">Syntax design</a><a class="nav-link " href="type-system.html">Type system</a></div><div class="nav-group"><div class="nav-label">Compiler</div><a class="nav-link " href="compiler.html">Compiler</a><a class="nav-link " href="architecture.html">Compiler architecture</a><a class="nav-link " href="interop.html">JavaScript interoperability</a><a class="nav-link " href="benchmarks.html">Benchmarks</a></div><div class="nav-group"><div class="nav-label">Guides</div><a class="nav-link " href="integrations.html">Integrations</a><a class="nav-link " href="migration-2-1.html">Migrating from 2.0</a><a class="nav-link " href="contracts.html">Unified contracts</a><a class="nav-link " href="concurrency.html">Concurrency</a><a class="nav-link " href="jobs.html">Background jobs</a><a class="nav-link " href="databases.html">Databases</a><a class="nav-link " href="security.html">Security</a><a class="nav-link " href="debugging.html">Debugging</a><a class="nav-link " href="migration.html">Migration guide</a><a class="nav-link " href="comparison.html">Comparison with TypeScript</a></div><div class="nav-group"><div class="nav-label">Project</div><a class="nav-link " href="progress.html">Engineering progress</a><a class="nav-link " href="roadmap.html">Roadmap</a><a class="nav-link " href="audit.html">Audit</a><a class="nav-link " href="decisions.html">Decisions</a></div></nav><div class="rail-foot"><a href="https://github.com/ayoistooslick/Plainscript">Source ↗</a><span class="sep">/</span><a href="https://github.com/ayoistooslick/Plainscript/issues">Issues ↗</a><br>MIT · built by hand</div></aside><div class="main"><header class="top"><button class="nav-toggle" type="button" data-nav-toggle aria-expanded="false" aria-controls="rail"><span aria-hidden="true">≡</span> <span class="nav-toggle-label">Contents</span></button><a class="top-brand" href="index.html">PlainScript<span>.</span></a><span class="crumb"><b>PlainScript</b><span class="slash">/</span>Language<span class="slash">/</span>Language reference</span><div class="search-wrap"><label class="search" aria-label="Search the manual"><span class="glyph" aria-hidden="true"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg></span><input id="doc-search" type="search" placeholder="Search the manual" autocomplete="off" aria-controls="search-results" aria-expanded="false"><kbd>/</kbd></label><div id="search-results" class="search-results" role="listbox" aria-label="Search results"></div></div><a class="top-github" href="https://github.com/ayoistooslick/Plainscript">GitHub ↗</a><div class="progress" aria-hidden="true"><span></span></div></header><main id="main" class="page"><div class="article-grid"><article class="prose"><div class="chapter-head"><figure class="chapter-band" data-tilt><img src="assets/plate-eye.jpg" alt="" width="1024" height="1024" loading="lazy" decoding="async"></figure><div class="page-kicker"><span class="kicker-no">02</span><span class="kicker-section">Language</span><span class="kicker-meta">5 min read</span></div><h1 id="plainscript-2-1-language-reference">PlainScript 2.1 language reference</h1></div>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Language reference — PlainScript 2.2 documentation."><meta name="color-scheme" content="dark"><meta name="theme-color" content="#08070b"><title>Language reference · PlainScript</title><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23a679ff'/%3E%3Ctext x='16' y='23' font-family='Georgia,serif' font-size='20' fill='%2308070b' text-anchor='middle'%3EP%3C/text%3E%3C/svg%3E"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=Space+Grotesk:wght@400..700&display=swap" rel="stylesheet"><link rel="stylesheet" href="style.css"></head><body><a class="skip" href="#main">Skip to content</a><div class="scrim" data-scrim></div><div class="shell"><aside class="rail" id="rail"><div class="rail-head"><a class="wordmark" href="index.html">PlainScript<span class="dot">.</span></a><div class="rail-meta">Language manual<br>Vol. 2.2 · MMXXVI</div></div><nav class="rail-nav" aria-label="Documentation"><div class="nav-group"><div class="nav-label">Start here</div><a class="nav-link " href="index.html">PlainScript</a><a class="nav-link " href="getting-started.html">Getting started</a><a class="nav-link " href="cli.html">CLI reference</a><a class="nav-link " href="templates.html">Application templates</a></div><div class="nav-group"><div class="nav-label">Language</div><a class="nav-link active" href="language-reference.html" aria-current="page">Language reference</a><a class="nav-link " href="regex.html">Regular expressions</a><a class="nav-link " href="spec.html">Language specification</a><a class="nav-link " href="syntax-design.html">Syntax design</a><a class="nav-link " href="type-system.html">Type system</a></div><div class="nav-group"><div class="nav-label">Guides</div><a class="nav-link " href="jsx.html">JSX and React</a><a class="nav-link " href="integrations.html">Integrations</a><a class="nav-link " href="migration-2-1.html">Migrating from 2.0</a><a class="nav-link " href="migration-2-2.html">Migrating to 2.2</a><a class="nav-link " href="contracts.html">Unified contracts</a><a class="nav-link " href="concurrency.html">Concurrency</a><a class="nav-link " href="jobs.html">Background jobs</a><a class="nav-link " href="databases.html">Databases</a><a class="nav-link " href="security.html">Security</a><a class="nav-link " href="debugging.html">Debugging</a><a class="nav-link " href="migration.html">Migration guide</a><a class="nav-link " href="comparison.html">Comparison with TypeScript</a></div><div class="nav-group"><div class="nav-label">Compiler</div><a class="nav-link " href="compiler.html">Compiler</a><a class="nav-link " href="architecture.html">Compiler architecture</a><a class="nav-link " href="interop.html">JavaScript interop</a><a class="nav-link " href="cross-language.html">Cross-language bridges</a><a class="nav-link " href="benchmarks.html">Benchmarks</a></div><div class="nav-group"><div class="nav-label">Project</div><a class="nav-link " href="progress.html">Engineering progress</a><a class="nav-link " href="roadmap.html">Roadmap</a><a class="nav-link " href="audit.html">Audit</a><a class="nav-link " href="capability-audit-2-2.html">Capability audit 2.2</a><a class="nav-link " href="decisions.html">Decisions</a></div></nav><div class="rail-foot"><a href="https://github.com/ayoistooslick/Plainscript">Source ↗</a><span class="sep">/</span><a href="https://github.com/ayoistooslick/Plainscript/issues">Issues ↗</a><br>MIT · built by hand</div></aside><div class="main"><header class="top"><button class="nav-toggle" type="button" data-nav-toggle aria-expanded="false" aria-controls="rail"><span aria-hidden="true">≡</span> <span class="nav-toggle-label">Contents</span></button><a class="top-brand" href="index.html">PlainScript<span>.</span></a><span class="crumb"><b>PlainScript</b><span class="slash">/</span>Language<span class="slash">/</span>Language reference</span><div class="search-wrap"><label class="search" aria-label="Search the manual"><span class="glyph" aria-hidden="true"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg></span><input id="doc-search" type="search" placeholder="Search the manual" autocomplete="off" aria-controls="search-results" aria-expanded="false"><kbd>/</kbd></label><div id="search-results" class="search-results" role="listbox" aria-label="Search results"></div></div><a class="top-github" href="https://github.com/ayoistooslick/Plainscript">GitHub ↗</a><div class="progress" aria-hidden="true"><span></span></div></header><main id="main" class="page"><div class="article-grid"><article class="prose"><div class="chapter-head"><figure class="chapter-band" data-tilt><img src="assets/plate-eye.jpg" alt="" width="1024" height="1024" loading="lazy" decoding="async"></figure><div class="page-kicker"><span class="kicker-no">02</span><span class="kicker-section">Language</span><span class="kicker-meta">7 min read</span></div><h1 id="plainscript-2-2-language-reference">PlainScript 2.2 language reference</h1></div>
 <p>This is the practical reference for the 2.1 dialect. The normative semantics are in <a href="spec.html">the specification</a>; this page shows the surface, names the 2.0 equivalent, and states the rules the compiler enforces.</p>
 <p>Every <code>plainscript</code> example on this page is a complete program compiled by the test suite.</p>
 <h2 id="1-files-and-dialects">1. Files and dialects</h2>
@@ -89,6 +89,7 @@ value active: boolean is true
 value missing: nothing is nothing
 value names: list of text is [&quot;ada&quot;, &quot;grace&quot;]
 value lookup: map of text to number is fromEntries([{ key: &quot;ada&quot;, value: 1 }])
+value pattern: regex is /ada/i
 
 print(&quot;{title}: {quantity} {active} {missing}&quot;)
 print(names)
@@ -385,13 +386,41 @@ print(2 is at most 2)
 print(true and not false)
 print(1 is equal to 1 or 2 is equal to 3)</code></pre></figure>
 <p><code>and</code>, <code>or</code>, <code>not</code>, <code>??</code>, <code>?.</code>, <code>|&gt;</code> and all arithmetic operators are shared with 2.0. <code>not</code> is unary and binds tighter than a comparison; parenthesise when in doubt.</p>
-<h2 id="10-modules">10. Modules</h2>
+<h2 id="10-regular-expressions">10. Regular expressions</h2>
+<p>Regex literals are native expressions typed as <code>regex</code> and emitted as native JavaScript <code>RegExp</code> values. A <code>/</code> is division after a value and starts a regex where an expression is expected.</p>
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
+
+import { print } from &quot;std/io&quot;
+
+value pattern is /item-(?&lt;id&gt;\d+)/i
+print(pattern.test(&quot;ITEM-42&quot;))
+print(pattern.source)
+print(pattern.flags)
+print(pattern is regex)
+print(10 / 2)</code></pre></figure>
+<p><code>std/text</code> provides typed helpers for captures, named groups, replacement and splitting. A <code>RegexMatch</code> has <code>text</code>, <code>index</code>, positional <code>groups</code> and a <code>named</code> map.</p>
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
+
+import { print } from &quot;std/io&quot;
+import { findMatch, matchTexts, replaceAllMatches } from &quot;std/text&quot;
+
+set found to findMatch(&quot;release-2.2&quot;, /release-(?&lt;major&gt;\d+)\.(?&lt;minor&gt;\d+)/)
+when found is not equal to nothing
+    print(found.text)
+    print(found.named[&quot;major&quot;])
+    print(found.named[&quot;minor&quot;])
+end
+
+print(matchTexts(&quot;a1 b2&quot;, /[a-z]\d/))
+print(replaceAllMatches(&quot;a1b22&quot;, /\d+/g, &quot;#&quot;))</code></pre></figure>
+<p>Invalid patterns and flags are compile-time diagnostics (<code>PS1006</code>–<code>PS1008</code>). The pattern engine is the host JavaScript engine; flags, lookaround, Unicode and replacement syntax are the host&#39;s. See <a href="regex.html">Regular expressions</a>.</p>
+<h2 id="11-modules">11. Modules</h2>
 <figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
 
 import { print } from &quot;std/io&quot;
 import { upper } from &quot;std/text&quot;
 
-export value version is &quot;2.1.0&quot;
+export value version is &quot;2.2.0&quot;
 
 export define shout(text: text) returns text
     return upper(&quot;{text}!&quot;)
@@ -407,7 +436,7 @@ print(shout(&quot;hello&quot;))</code></pre></figure>
 <li><code>export</code>, <code>export default</code>, <code>export { a as b }</code>, <code>export { a } from &quot;./m&quot;</code>.</li>
 <li>Type-only imports are erased.</li>
 </ul>
-<h2 id="11-components">11. Components</h2>
+<h2 id="12-components">12. Components</h2>
 <figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
 
 import { createElement, useState } from &quot;react&quot;
@@ -448,7 +477,49 @@ export define TaskList() returns any
     end
 end</code></pre></figure>
 <p><code>element Fragment</code> renders sibling children without a wrapper element. Keys are explicit; there is no automatic key inference. Everything lowers to <code>createElement</code> from the module scope, so React (or another library exposing <code>createElement</code>) must be imported.</p>
-<h2 id="12-interop-boundaries">12. Interop boundaries</h2>
+<h2 id="13-jsx">13. JSX</h2>
+<p>JSX is parsed natively in a <code>.pln</code> file. The default classic runtime lowers elements to <code>createElement</code>; the automatic runtime imports <code>jsx</code>/<code>jsxs</code> from a configured package. Props on local components are checked when the component has a record prop type.</p>
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
+
+import { createElement, Fragment, useState } from &quot;react&quot;
+import { map } from &quot;std/list&quot;
+
+type TaskProps
+    title: text
+    done?: boolean
+end
+
+define Task(props: TaskProps) returns any
+    return &lt;li className=&quot;task&quot;&gt;
+        &lt;span&gt;{props.title}&lt;/span&gt;
+        &lt;small&gt;{props.done ?? false}&lt;/small&gt;
+    &lt;/li&gt;
+end
+
+export define TaskList() returns any
+    set (tasks, setTasks) to useState([
+        { title: &quot;write the docs&quot;, done: true },
+        { title: &quot;ship 2.2&quot;, done: false },
+    ])
+    return &lt;Fragment&gt;
+        &lt;ul&gt;
+            {tasks |&gt; map((task: { title: text, done: boolean }) =&gt; &lt;Task title={task.title} done={task.done} /&gt;)}
+        &lt;/ul&gt;
+        &lt;button type=&quot;button&quot; onClick={() =&gt; setTasks([])}&gt;Clear&lt;/button&gt;
+    &lt;/Fragment&gt;
+end</code></pre></figure>
+<p>The automatic mode is selected per file:</p>
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
+# @jsxRuntime automatic
+# @jsxImportSource react
+
+export define App() returns any
+    return &lt;main&gt;
+        &lt;h1&gt;Automatic runtime&lt;/h1&gt;
+    &lt;/main&gt;
+end</code></pre></figure>
+<p>Pragmas override <code>plainscript.config.json</code>. Fragments, spread attributes, expression children, entities and custom classic factories are supported. JSX diagnostics include <code>PS1009</code>–<code>PS1014</code> and prop errors <code>PS3420</code>–<code>PS3422</code>. See <a href="jsx.html">JSX and React</a>.</p>
+<h2 id="14-interop-boundaries">14. Interop boundaries</h2>
 <figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
 
 import { print } from &quot;std/io&quot;
@@ -462,7 +533,7 @@ setTimeout(() =&gt; do
 end, 1)
 print(started != nothing)</code></pre></figure>
 <p>Declare JavaScript values with <code>declare</code>. Use <code>any</code> for values whose shape is not modelled, and <code>as</code> for an explicit unchecked cast. <code>plainscript interop</code> translates the supported TypeScript <code>.d.ts</code> subset to <code>.d.pln</code>.</p>
-<h2 id="13-2-0-alongside-2-1">13. 2.0 alongside 2.1</h2>
+<h2 id="15-2-0-alongside-2-1">15. 2.0 alongside 2.1</h2>
 <p>The 2.0 dialect remains fully supported. Its spelling for every concept in this reference is listed in the tables above, and <a href="spec.html">the specification</a> describes both. A module written in each style can share types and values:</p>
 <figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
 
@@ -474,4 +545,15 @@ define combine(left: number, right: number) returns number
 end
 
 print(combine(20, 22))</code></pre></figure>
-<p>When migrating, add <code>#syntax 2.1</code> and then rename the constructs the compiler reports. <code>PS2030</code> names the 2.1 word to use. See <a href="migration-2-1.html">Migrating from 2.0</a>.</p></article><aside class="toc-rail" aria-label="On this page"><div class="toc-title">On this page</div><nav class="toc"><a class="toc-h2" href="#1-files-and-dialects">1. Files and dialects</a><a class="toc-h2" href="#2-bindings">2. Bindings</a><a class="toc-h2" href="#3-text-and-interpolation">3. Text and interpolation</a><a class="toc-h2" href="#4-types">4. Types</a><a class="toc-h3" href="#primitives-and-collections">Primitives and collections</a><a class="toc-h3" href="#records">Records</a><a class="toc-h3" href="#variants-and-unions">Variants and unions</a><a class="toc-h3" href="#optionals-and-type-tests">Optionals and type tests</a><a class="toc-h3" href="#generics-constraints-and-predicates">Generics, constraints and predicates</a><a class="toc-h3" href="#function-types-tuples-and-advanced-types">Function types, tuples and advanced types</a><a class="toc-h2" href="#5-functions">5. Functions</a><a class="toc-h2" href="#6-conditionals-and-match">6. Conditionals and match</a><a class="toc-h2" href="#7-loops">7. Loops</a><a class="toc-h2" href="#8-errors">8. Errors</a><a class="toc-h2" href="#9-operators">9. Operators</a><a class="toc-h2" href="#10-modules">10. Modules</a><a class="toc-h2" href="#11-components">11. Components</a><a class="toc-h2" href="#12-interop-boundaries">12. Interop boundaries</a><a class="toc-h2" href="#13-2-0-alongside-2-1">13. 2.0 alongside 2.1</a></nav></aside></div><nav class="page-nav" aria-label="Chapter navigation"><a class="pn-prev" href="getting-started.html"><span class="pn-label">← Previous</span><span class="pn-title">Getting started</span></a><a class="pn-next" href="compiler.html"><span class="pn-label">Next →</span><span class="pn-title">Compiler</span></a></nav><footer class="colophon"><div><div class="colophon-mark">PlainScript<span>.</span></div><p>An independent, statically typed language for the JavaScript platform. This manual is set in Fraunces, Newsreader, Space Grotesk and IBM Plex Mono, with halftone plates drawn in-house. One stylesheet, no frameworks, no trackers.</p></div><nav class="colophon-links" aria-label="Project links"><a href="index.html">Manual</a><a href="https://github.com/ayoistooslick/Plainscript">Source</a><a href="https://github.com/ayoistooslick/Plainscript/issues">Issues</a><a href="https://github.com/ayoistooslick/Plainscript/blob/main/CHANGELOG.md">Changelog</a><a href="https://github.com/ayoistooslick/Plainscript/blob/main/LICENSE">MIT</a></nav></footer></main></div></div><script src="app.js"></script></body></html>
+<p>When migrating, add <code>#syntax 2.1</code> and then rename the constructs the compiler reports. <code>PS2030</code> names the 2.1 word to use. See <a href="migration-2-1.html">Migrating from 2.0</a>.</p>
+<h2 id="16-cross-language-boundaries">16. Cross-language boundaries</h2>
+<p><code>plainscript bridge</code> serves exported functions over newline-delimited JSON-RPC 2.0, and <code>std/bridge</code> calls another process that speaks the same protocol. Generated clients translate the manifest into Python, JavaScript, C, C++, Java, Kotlin, Go, Rust, Ruby, PHP, C#, Swift and Dart.</p>
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
+
+import { open, close } from &quot;std/bridge&quot;
+import { print } from &quot;std/io&quot;
+
+set python to open(&quot;python3&quot;, [&quot;service.py&quot;])
+print(await python.request(&quot;add&quot;, [2, 3]))
+close(python)</code></pre></figure>
+<p>The other side receives <code>{&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;id&quot;:1,&quot;method&quot;:&quot;add&quot;,&quot;params&quot;:[2,3]}</code> and replies with a result or a structured error. The boundary is a process boundary: values are JSON, memory is not shared, and a crash stays on its side. See <a href="cross-language.html">Cross-language bridges</a>.</p></article><aside class="toc-rail" aria-label="On this page"><div class="toc-title">On this page</div><nav class="toc"><a class="toc-h2" href="#1-files-and-dialects">1. Files and dialects</a><a class="toc-h2" href="#2-bindings">2. Bindings</a><a class="toc-h2" href="#3-text-and-interpolation">3. Text and interpolation</a><a class="toc-h2" href="#4-types">4. Types</a><a class="toc-h3" href="#primitives-and-collections">Primitives and collections</a><a class="toc-h3" href="#records">Records</a><a class="toc-h3" href="#variants-and-unions">Variants and unions</a><a class="toc-h3" href="#optionals-and-type-tests">Optionals and type tests</a><a class="toc-h3" href="#generics-constraints-and-predicates">Generics, constraints and predicates</a><a class="toc-h3" href="#function-types-tuples-and-advanced-types">Function types, tuples and advanced types</a><a class="toc-h2" href="#5-functions">5. Functions</a><a class="toc-h2" href="#6-conditionals-and-match">6. Conditionals and match</a><a class="toc-h2" href="#7-loops">7. Loops</a><a class="toc-h2" href="#8-errors">8. Errors</a><a class="toc-h2" href="#9-operators">9. Operators</a><a class="toc-h2" href="#10-regular-expressions">10. Regular expressions</a><a class="toc-h2" href="#11-modules">11. Modules</a><a class="toc-h2" href="#12-components">12. Components</a><a class="toc-h2" href="#13-jsx">13. JSX</a><a class="toc-h2" href="#14-interop-boundaries">14. Interop boundaries</a><a class="toc-h2" href="#15-2-0-alongside-2-1">15. 2.0 alongside 2.1</a><a class="toc-h2" href="#16-cross-language-boundaries">16. Cross-language boundaries</a></nav></aside></div><nav class="page-nav" aria-label="Chapter navigation"><a class="pn-prev" href="getting-started.html"><span class="pn-label">← Previous</span><span class="pn-title">Getting started</span></a><a class="pn-next" href="regex.html"><span class="pn-label">Next →</span><span class="pn-title">Regular expressions</span></a></nav><footer class="colophon"><div><div class="colophon-mark">PlainScript<span>.</span></div><p>An independent, statically typed language for the JavaScript platform. This manual is set in Fraunces, Newsreader, Space Grotesk and IBM Plex Mono, with halftone plates drawn in-house. One stylesheet, no frameworks, no trackers.</p></div><nav class="colophon-links" aria-label="Project links"><a href="index.html">Manual</a><a href="https://github.com/ayoistooslick/Plainscript">Source</a><a href="https://github.com/ayoistooslick/Plainscript/issues">Issues</a><a href="https://github.com/ayoistooslick/Plainscript/blob/main/CHANGELOG.md">Changelog</a><a href="https://github.com/ayoistooslick/Plainscript/blob/main/LICENSE">MIT</a></nav></footer></main></div></div><script src="app.js"></script></body></html>

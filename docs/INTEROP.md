@@ -12,6 +12,11 @@ import "./style.css"                                 # bundler asset
 import { helper } from "./helper.pln"                # PlainScript module
 ```
 
+For projects written in other languages, see
+[Cross-language bridges](CROSS_LANGUAGE.md). The JSON-RPC bridge is a process
+boundary for Python, C/C++, JVM, Go, Rust and other runtimes; it does not replace the
+native ESM path described here.
+
 Types at the boundary are `any` unless declared:
 
 ```plainscript

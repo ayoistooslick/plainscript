@@ -18,6 +18,10 @@ const DOCUMENTS = [
   'docs/COMPILER.md',
   'docs/INTEGRATIONS.md',
   'docs/MIGRATION_2_1.md',
+  'docs/MIGRATION_2_2.md',
+  'docs/JSX.md',
+  'docs/REGEX.md',
+  'docs/CROSS_LANGUAGE.md',
 ];
 
 function examplesIn(file) {

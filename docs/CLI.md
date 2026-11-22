@@ -165,22 +165,60 @@ starter. The available templates are:
 For example: `plainscript new my-store --template ecommerce`. An unknown id lists the
 available templates and exits with the usage code.
 
-### `plainscript migrate [files…]`
+### `plainscript migrate [path]`
 
-Scans JavaScript and TypeScript files for constructs that cannot be renamed to `.pln`
-safely: CommonJS `require`/`module.exports`, TypeScript interfaces/enums/namespaces,
-classes, JSX and `//` comments. It reports file, line, code and a suggested replacement. It
-**does not rewrite source files**; conversion remains a reviewable manual step.
+Analyses a project and plans an incremental migration. With no path it uses the current
+directory. It detects languages, module system, package manager, frameworks and ecosystem
+markers; classifies files into phases; scans for mechanical blockers; and reports safe
+conversions, interoperability boundaries and unresolved work.
 
 ```bash
-plainscript migrate src --check     # exit 1 when any finding exists
-plainscript migrate src --json      # machine-readable report
+plainscript migrate .                         # Markdown plan
+plainscript migrate . --json                  # machine-readable report
+plainscript migrate . --write                 # write .pln conversions and bridges/
+plainscript migrate . --report=plan.json      # write the full JSON report
+plainscript migrate . --check                 # exit 1 while findings/manual work remain
 ```
 
-With no paths it scans the current directory, skipping `node_modules`, `dist`, `legacy` and
-dot-directories. `--check` is a CI gate; without it the command reports findings and exits
-0. Transform one file at a time, keep JavaScript modules at the boundary, and run
-`plainscript check` after each conversion. See [MIGRATION](MIGRATION.md).
+- `--write` converts eligible JavaScript modules to `.pln` beside the source and emits
+  boundary triplets (`bridges/Name.pln`, `Name.runtime.js`, `Name.runtime.d.pln`) for
+  JSX/TS/TSX/CommonJS modules. The original module stays authoritative.
+- `--json` includes the 2.1-compatible `files` count and `findings` array plus `summary`,
+  `stack`, `phases`, `boundaries`, `conversions`, `failures` and `written`.
+- `--check` includes findings, failed conversions and manual (non-JavaScript) modules.
+- Non-JavaScript modules are detected but not source-translated; they stay native and are
+  connected through the bridge.
+
+See [Migrating to 2.2](MIGRATION_2_2.md).
+
+### `plainscript bridge <file.pln>`
+
+Serves a module's exported functions over newline-delimited JSON-RPC 2.0.
+
+```bash
+plainscript bridge src/service.pln                       # stdio
+plainscript bridge src/service.pln --http=8787           # POST /rpc, GET /health, /manifest
+plainscript bridge src/service.pln --manifest            # print the manifest
+plainscript bridge src/service.pln --call=add --args='[2, 3]'
+```
+
+`--call` performs one call, prints the JSON result and exits. A thrown PlainScript value
+exits non-zero with the message on stderr. `--http` binds to `127.0.0.1`. The protocol
+supports requests, notifications, batches, named or positional params and standard
+JSON-RPC errors.
+
+### `plainscript bindings <file.pln>`
+
+Generates clients from a bridge manifest.
+
+```bash
+plainscript bindings src/service.pln --out=bindings
+plainscript bindings src/service.pln --lang=python,javascript --out=bindings
+```
+
+Supported languages: `javascript`, `typescript`, `python`, `c`, `cpp`, `java`, `kotlin`,
+`go`, `rust`, `ruby`, `php`, `csharp`, `swift`, `dart`. The output includes
+`plainscript.manifest.json` and a README. See [Cross-language bridges](CROSS_LANGUAGE.md).
 
 ### `plainscript interop [files…]`
 
@@ -229,9 +267,17 @@ TypeScript toolchain is installed separately; see [BENCHMARKS](BENCHMARKS.md).
 | --- | --- |
 | `--quiet` | Suppress progress output; errors still print. |
 | `--verbose` | Print each compilation stage. |
-| `--check` | With `fmt`: report instead of write; with `migrate`: exit 1 on findings. |
+| `--check` | With `fmt`: report instead of write; with `migrate`: exit 1 while findings, failed conversions or manual modules remain. |
 | `--declarations` | With `build`: also emit `<name>.d.pln`. |
-| `--json` | With `migrate` or `interop`: print a JSON report. |
+| `--json` | With `migrate`, `interop` or `bindings`: print a JSON report. |
+| `--write` | With `migrate`: write converted modules and interoperability boundaries. |
+| `--report=<file>` | With `migrate`: write the full JSON report. |
+| `--http=<port>` | With `bridge`: serve HTTP instead of stdio. |
+| `--manifest` | With `bridge`: print the manifest and exit. |
+| `--call=<method>` | With `bridge`: perform one call and exit. |
+| `--args=<json>` | With `bridge --call`: positional JSON argument array. |
+| `--lang=<list>` | With `bindings`: comma-separated target languages. |
+| `--out=<dir>` | With `bindings`: output directory. |
 | `--template=<id>`, `-t <id>` | With `new`: select a bundled starter. |
 | `--std-base=<url>` | With `build`: browser base URL for `std` imports. |
 | `--syntax=<v>` | Compile files without a pragma as `2.0` or `2.1` for this run. |
@@ -256,6 +302,20 @@ Defaults: sources under `src/` when it exists (otherwise the current directory),
 `syntax` is the default dialect for files without a pragma. It may also appear at
 the top level of the file. A `#syntax 2.0` or `#syntax 2.1` line in a file takes
 precedence, and `--syntax` overrides the configuration for one command.
+
+JSX defaults can be set under `jsx` or `compilerOptions.jsx`:
+
+```json
+{
+  "jsx": {
+    "jsxRuntime": "automatic",
+    "jsxImportSource": "react"
+  }
+}
+```
+
+Per-file `# @jsx`, `# @jsxFrag`, `# @jsxRuntime` and `# @jsxImportSource` pragmas override
+these defaults. See [JSX and React](JSX.md).
 
 Paths are relative to the config file's directory (`rootDir`, `outDir`, `exclude` entries).
 `rootDir` determines output paths: `src/api/server.pln` becomes `dist/api/server.js`.

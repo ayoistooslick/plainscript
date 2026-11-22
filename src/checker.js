@@ -4,7 +4,7 @@ const T = require('./types');
 const { Span, error } = require('./diagnostics');
 const { CONTEXTUAL_WORDS, PRAGMA } = require('./dialect');
 
-const PRIMITIVES = new Set(['number', 'text', 'boolean', 'nothing', 'any', 'unknown', 'never']);
+const PRIMITIVES = new Set(['number', 'text', 'boolean', 'nothing', 'any', 'unknown', 'never', 'regex']);
 
 class Scope {
   constructor(parent) {
@@ -92,6 +92,11 @@ class Checker {
     this.typeOnlyImports = new Set();
     this.defaultExport = null;
     this.inferredFunctions = new Map();
+    // Values re-exported from another module, keyed by the exported name.
+    this.reexports = new Map();
+    // Resolved JSX settings (runtime, factory, fragment, import source). The
+    // compiler resolves them per file before checking.
+    this.jsx = options.jsx || { runtime: 'classic', factory: 'createElement', fragment: 'Fragment' };
   }
 
   report(code, message, node, hint) {
@@ -789,8 +794,21 @@ class Checker {
   collectExports() {
     for (const statement of this.program.body) {
       if (statement.kind === 'ExportNamed') {
+        if (statement.spec) {
+          // A re-export forwards the target module's checked exports. The
+          // module loader has already resolved the specifier.
+          const target = this.resolveImportFn(statement.spec, statement);
+          for (const name of statement.names) {
+            const entry = target && target.values ? target.values.get(name.local) : null;
+            if (!entry) {
+              this.report('PS3205', `"${name.local}" is not exported by "${statement.spec}".`, statement);
+              continue;
+            }
+            this.reexports.set(name.exported, entry);
+          }
+          continue;
+        }
         for (const name of statement.names) {
-          if (statement.spec) continue; // re-exports are resolved by the module graph
           if (!this.lookup(name.local)) {
             this.report('PS3206', `Cannot export "${name.local}": it is not declared in this module.`, statement);
             continue;
@@ -815,6 +833,9 @@ class Checker {
     for (const [exported, local] of this.exports) {
       const entry = this.lookup(local);
       if (!entry) continue;
+      values.set(exported, { kind: entry.kind, type: entry.type, overloads: entry.overloads || null });
+    }
+    for (const [exported, entry] of this.reexports) {
       values.set(exported, { kind: entry.kind, type: entry.type, overloads: entry.overloads || null });
     }
     if (this.defaultExportType) {
@@ -1332,20 +1353,119 @@ class Checker {
     }
   }
 
+  // JSX is typed at the component boundary. An intrinsic tag (lowercase) has
+  // no compile-time prop contract; a component whose first parameter is a
+  // record type is checked attribute by attribute, including required fields.
+  checkJSXElement(node) {
+    if (this.jsx.runtime !== 'automatic') {
+      const factoryRoot = String(this.jsx.factory || 'createElement').split('.')[0];
+      if (!this.lookup(factoryRoot)) {
+        this.report('PS3405', `JSX needs "${factoryRoot}" in scope. Import it from React, another JSX runtime, or "std/dom".`, node);
+      }
+    }
+
+    const tagType = T.deref(this.typeOf(node.tag));
+    const attrValues = [];
+    let hasSpread = false;
+    for (const attr of node.attrs || []) {
+      if (!attr) continue;
+      if (attr.kind === 'spread') {
+        hasSpread = true;
+        this.typeOf(attr.value);
+        continue;
+      }
+      const valueType = attr.value ? this.typeOf(attr.value) : T.PRIM.any;
+      attrValues.push({ name: attr.name, type: valueType, node: attr.value || node });
+    }
+    for (const child of node.children || []) this.typeOf(child);
+
+    if (tagType.k !== 'fn') return T.PRIM.any;
+    const param = tagType.params[0];
+    const props = param ? T.deref(param.type) : null;
+    if (!props || props.k !== 'record') return T.PRIM.any;
+
+    const provided = new Set(attrValues.map((attr) => attr.name));
+    if (node.children && node.children.length) provided.add('children');
+    for (const attr of attrValues) {
+      if (attr.name === 'key' || attr.name === 'ref') continue;
+      const field = props.fields.get(attr.name);
+      if (!field) {
+        const known = [...props.fields.keys()].slice(0, 6).join(', ');
+        this.report('PS3420', `Component <${node.tagName}> has no property "${attr.name}".`, attr.node,
+          known ? `Declared properties: ${known}.` : null);
+        continue;
+      }
+      if (attr.type && !T.isAny(attr.type) && !T.assignable(attr.type, field.type)) {
+        this.report('PS3421', `Property "${attr.name}" of <${node.tagName}> expects ${T.showType(field.type)}, found ${T.showType(attr.type)}.`, attr.node);
+      }
+    }
+    if (!hasSpread) {
+      for (const [name, field] of props.fields) {
+        if (field.optional || name === 'children') continue;
+        if (!provided.has(name)) {
+          this.report('PS3422', `Component <${node.tagName}> is missing required property "${name}".`, node);
+        }
+      }
+    }
+    return T.PRIM.any;
+  }
+
+  checkFragmentFactory(node) {
+    if (this.jsx.runtime === 'automatic') return;
+    const fragmentRoot = String(this.jsx.fragment || 'Fragment').split('.')[0];
+    if (!this.lookup(fragmentRoot)) {
+      this.report('PS3405', `A JSX fragment needs "${fragmentRoot}" in scope. Import Fragment from React or another JSX runtime.`, node);
+    }
+  }
+
   checkRender(node) {
     const factory = this.lookup('createElement');
     if (!factory) {
       this.report('PS3405', 'A render block needs "createElement" in scope. Import it from React or "std/dom".', node);
     }
-    for (const child of node.children) {
-      // A render child must produce markup. Loops and branches are allowed and
-      // contribute the children they create; a control-transfer statement can
-      // never be a child, and reporting it here avoids an emitter crash.
-      if (child.kind === 'Return' || child.kind === 'Throw' || child.kind === 'Break' || child.kind === 'Continue') {
-        this.report('PS3410', `A "${child.kind.toLowerCase()}" statement cannot appear directly inside a render block.`, child);
+    // Recursively check all statements in the render subtree so that returns,
+    // throws, breaks, and continues nested inside loops or branches inside the
+    // render block are caught and reported as PS3410 rather than silently
+    // corrupting the generated child-list closure.
+    this.checkRenderChildren(node.children);
+  }
+
+  // Walks the render subtree recursively, checking each statement and any
+  // nested statements inside control-flow blocks (ForEach/ForRange/While/Conditional/Match).
+  checkRenderChildren(statements) {
+    for (const stmt of statements) {
+      if (stmt.kind === 'Return' || stmt.kind === 'Throw' || stmt.kind === 'Break' || stmt.kind === 'Continue') {
+        this.report('PS3410', `A "${stmt.kind.toLowerCase()}" statement cannot appear inside a render block.`, stmt);
         continue;
       }
-      this.checkStatement(child);
+      if (stmt.kind === 'Render') {
+        this.checkRenderChildren(stmt.children);
+        continue;
+      }
+      if (stmt.kind === 'ForEach' || stmt.kind === 'ForRange' || stmt.kind === 'While') {
+        this.checkRenderChildren(stmt.body);
+        continue;
+      }
+      if (stmt.kind === 'Conditional') {
+        // stmt.branches is an array of {condition, body};
+        // stmt.otherwise is the body of the otherwise branch.
+        for (const branch of stmt.branches) {
+          this.checkRenderChildren(branch.body);
+        }
+        if (stmt.otherwise) {
+          this.checkRenderChildren(stmt.otherwise);
+        }
+        continue;
+      }
+      if (stmt.kind === 'Match') {
+        // stmt.cases is an array of {pattern, guard, body}.
+        for (const branch of stmt.cases) {
+          this.checkRenderChildren(branch.body);
+        }
+        continue;
+      }
+      // For any other statement type, recurse into its checked children.
+      this.checkStatement(stmt);
     }
   }
 
@@ -1355,6 +1475,18 @@ class Checker {
     if (!node) return T.PRIM.nothing;
     switch (node.kind) {
       case 'Number': return this.primitiveOrLiteral(T.PRIM.number, node.value, expected);
+      case 'Regex': {
+        // The lexer validates the pattern and flags; a literal that reached the
+        // checker is a usable RegExp value.
+        return T.PRIM.regex;
+      }
+      case 'JSXText': return T.PRIM.text;
+      case 'JSXSpreadChild': return this.typeOf(node.value);
+      case 'JSXFragment':
+        this.checkFragmentFactory(node);
+        for (const child of node.children) this.typeOf(child);
+        return T.PRIM.any;
+      case 'JSXElement': return this.checkJSXElement(node);
       case 'Text': return this.primitiveOrLiteral(T.PRIM.text, node.value, expected);
       case 'Boolean': return this.primitiveOrLiteral(T.PRIM.boolean, node.value, expected);
       case 'Nothing': return T.PRIM.nothing;
@@ -1604,6 +1736,31 @@ class Checker {
     }
     if (objectType.k === 'prim' && objectType.name === 'text') {
       this.report('PS3336', 'Text has no fields. Use functions from "std/text".', node);
+      return T.PRIM.error;
+    }
+    if (objectType.k === 'prim' && objectType.name === 'regex') {
+      // A regex value exposes the parts of the JavaScript RegExp surface that
+      // are useful without leaking array-shaped match objects into the type
+      // system. Captures are read with std/text helpers, which return records.
+      const fields = {
+        source: T.PRIM.text,
+        flags: T.PRIM.text,
+        global: T.PRIM.boolean,
+        ignoreCase: T.PRIM.boolean,
+        multiline: T.PRIM.boolean,
+        sticky: T.PRIM.boolean,
+        unicode: T.PRIM.boolean,
+        dotAll: T.PRIM.boolean,
+        lastIndex: T.PRIM.number,
+      };
+      if (Object.prototype.hasOwnProperty.call(fields, node.property)) return fields[node.property];
+      if (node.property === 'test') {
+        return T.fnType([{ name: 'text', type: T.PRIM.text }], T.PRIM.boolean);
+      }
+      if (node.property === 'toString') {
+        return T.fnType([], T.PRIM.text);
+      }
+      this.report('PS3335', `A regex has no field "${node.property}"; use test() or the helpers in "std/text".`, node);
       return T.PRIM.error;
     }
     if (objectType.k === 'promise') {

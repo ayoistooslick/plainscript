@@ -1,0 +1,150 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Regular expressions — PlainScript 2.2 documentation."><meta name="color-scheme" content="dark"><meta name="theme-color" content="#08070b"><title>Regular expressions · PlainScript</title><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23a679ff'/%3E%3Ctext x='16' y='23' font-family='Georgia,serif' font-size='20' fill='%2308070b' text-anchor='middle'%3EP%3C/text%3E%3C/svg%3E"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&family=Space+Grotesk:wght@400..700&display=swap" rel="stylesheet"><link rel="stylesheet" href="style.css"></head><body><a class="skip" href="#main">Skip to content</a><div class="scrim" data-scrim></div><div class="shell"><aside class="rail" id="rail"><div class="rail-head"><a class="wordmark" href="index.html">PlainScript<span class="dot">.</span></a><div class="rail-meta">Language manual<br>Vol. 2.2 · MMXXVI</div></div><nav class="rail-nav" aria-label="Documentation"><div class="nav-group"><div class="nav-label">Start here</div><a class="nav-link " href="index.html">PlainScript</a><a class="nav-link " href="getting-started.html">Getting started</a><a class="nav-link " href="cli.html">CLI reference</a><a class="nav-link " href="templates.html">Application templates</a></div><div class="nav-group"><div class="nav-label">Language</div><a class="nav-link " href="language-reference.html">Language reference</a><a class="nav-link active" href="regex.html" aria-current="page">Regular expressions</a><a class="nav-link " href="spec.html">Language specification</a><a class="nav-link " href="syntax-design.html">Syntax design</a><a class="nav-link " href="type-system.html">Type system</a></div><div class="nav-group"><div class="nav-label">Guides</div><a class="nav-link " href="jsx.html">JSX and React</a><a class="nav-link " href="integrations.html">Integrations</a><a class="nav-link " href="migration-2-1.html">Migrating from 2.0</a><a class="nav-link " href="migration-2-2.html">Migrating to 2.2</a><a class="nav-link " href="contracts.html">Unified contracts</a><a class="nav-link " href="concurrency.html">Concurrency</a><a class="nav-link " href="jobs.html">Background jobs</a><a class="nav-link " href="databases.html">Databases</a><a class="nav-link " href="security.html">Security</a><a class="nav-link " href="debugging.html">Debugging</a><a class="nav-link " href="migration.html">Migration guide</a><a class="nav-link " href="comparison.html">Comparison with TypeScript</a></div><div class="nav-group"><div class="nav-label">Compiler</div><a class="nav-link " href="compiler.html">Compiler</a><a class="nav-link " href="architecture.html">Compiler architecture</a><a class="nav-link " href="interop.html">JavaScript interop</a><a class="nav-link " href="cross-language.html">Cross-language bridges</a><a class="nav-link " href="benchmarks.html">Benchmarks</a></div><div class="nav-group"><div class="nav-label">Project</div><a class="nav-link " href="progress.html">Engineering progress</a><a class="nav-link " href="roadmap.html">Roadmap</a><a class="nav-link " href="audit.html">Audit</a><a class="nav-link " href="capability-audit-2-2.html">Capability audit 2.2</a><a class="nav-link " href="decisions.html">Decisions</a></div></nav><div class="rail-foot"><a href="https://github.com/ayoistooslick/Plainscript">Source ↗</a><span class="sep">/</span><a href="https://github.com/ayoistooslick/Plainscript/issues">Issues ↗</a><br>MIT · built by hand</div></aside><div class="main"><header class="top"><button class="nav-toggle" type="button" data-nav-toggle aria-expanded="false" aria-controls="rail"><span aria-hidden="true">≡</span> <span class="nav-toggle-label">Contents</span></button><a class="top-brand" href="index.html">PlainScript<span>.</span></a><span class="crumb"><b>PlainScript</b><span class="slash">/</span>Language<span class="slash">/</span>Regular expressions</span><div class="search-wrap"><label class="search" aria-label="Search the manual"><span class="glyph" aria-hidden="true"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg></span><input id="doc-search" type="search" placeholder="Search the manual" autocomplete="off" aria-controls="search-results" aria-expanded="false"><kbd>/</kbd></label><div id="search-results" class="search-results" role="listbox" aria-label="Search results"></div></div><a class="top-github" href="https://github.com/ayoistooslick/Plainscript">GitHub ↗</a><div class="progress" aria-hidden="true"><span></span></div></header><main id="main" class="page"><div class="article-grid"><article class="prose"><div class="chapter-head"><figure class="chapter-band" data-tilt><img src="assets/plate-eye.jpg" alt="" width="1024" height="1024" loading="lazy" decoding="async"></figure><div class="page-kicker"><span class="kicker-no">03</span><span class="kicker-section">Language</span><span class="kicker-meta">4 min read</span></div><h1 id="regular-expressions">Regular expressions</h1></div>
+<p>Regular expressions are values in PlainScript. A literal is parsed by the lexer, assigned the primitive type <code>regex</code>, and compiled to a native JavaScript <code>RegExp</code>. The pattern engine is therefore the host&#39;s engine: V8 in Node and in Chromium, with the same capture, lookaround, Unicode and replacement semantics as the JavaScript running beside it.</p>
+<p>PlainScript adds a type, a literal syntax and compiler diagnostics. It does not wrap matches in a second engine.</p>
+<h2 id="literals">Literals</h2>
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
+
+import { print } from &quot;std/io&quot;
+
+set pattern to /item-(?&lt;id&gt;\d+)/i
+print(pattern.test(&quot;ITEM-42&quot;))
+print(pattern.source)
+print(pattern.flags)</code></pre></figure>
+<p>A literal has the form <code>/pattern/flags</code>. The parser records both parts:</p>
+<ul>
+<li><code>pattern</code> is the text between the slashes, with backslashes preserved.</li>
+<li><code>flags</code> is the suffix drawn from <code>d</code>, <code>g</code>, <code>i</code>, <code>m</code>, <code>s</code>, <code>u</code>, <code>v</code> and <code>y</code>.</li>
+<p>Flags are validated by the host engine, so an unsupported or duplicated flag is a compile-time error rather than a runtime surprise.</p>
+<li>Empty patterns (<code>//</code>) are legal; they match at every position.</li>
+</ul>
+<h3 id="slash-versus-division">Slash versus division</h3>
+<p>The lexer decides by expression position. A <code>/</code> after a value is division; a <code>/</code> where an expression is expected starts a regex:</p>
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
+
+import { print } from &quot;std/io&quot;
+
+set width to 10
+set ratio to width / 2
+set matcher to /a\/b/
+
+print(ratio)
+print(matcher.test(&quot;a/b&quot;))</code></pre></figure>
+<p>After identifiers, literals, calls, member access, closing brackets and <code>nothing</code>, <code>/</code> is division. After operators, commas, opening brackets, <code>return</code> and similar expression starts, it begins a regex. Write <code>width / 2</code> with spaces if a pattern is ever visually ambiguous; escaping a slash inside the pattern as <code>\/</code> is always valid.</p>
+<h2 id="the-regex-type">The <code>regex</code> type</h2>
+<p><code>regex</code> is a primitive in the checker:</p>
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
+
+import { print } from &quot;std/io&quot;
+
+set pattern to /^[a-z]+$/i
+print(pattern is regex)
+print(&quot;text&quot; is regex)
+print(pattern.ignoreCase)</code></pre></figure>
+<p>The following members are typed:</p>
+<div class="table-wrap"><table><thead><tr><th>Member</th><th>Type</th><th>Meaning</th></tr></thead><tbody>
+<tr><td><code>test(text)</code></td><td><code>boolean</code></td><td>Whether the pattern matches</td></tr>
+<tr><td><code>source</code></td><td><code>text</code></td><td>Pattern source</td></tr>
+<tr><td><code>flags</code></td><td><code>text</code></td><td>Active flags</td></tr>
+<tr><td><code>global</code></td><td><code>boolean</code></td><td><code>g</code> is set</td></tr>
+<tr><td><code>ignoreCase</code></td><td><code>boolean</code></td><td><code>i</code> is set</td></tr>
+<tr><td><code>multiline</code></td><td><code>boolean</code></td><td><code>m</code> is set</td></tr>
+<tr><td><code>dotAll</code></td><td><code>boolean</code></td><td><code>s</code> is set</td></tr>
+<tr><td><code>unicode</code></td><td><code>boolean</code></td><td><code>u</code> or <code>v</code> is set</td></tr>
+<tr><td><code>sticky</code></td><td><code>boolean</code></td><td><code>y</code> is set</td></tr>
+<tr><td><code>hasIndices</code></td><td><code>boolean</code></td><td><code>d</code> is set</td></tr>
+</tbody></table></div>
+<p>A regex is JSON-serialisable as <code>{}</code> like a JavaScript <code>RegExp</code>; do not send it across a process boundary expecting pattern text. Send <code>source</code> and <code>flags</code> and reconstruct on the other side.</p>
+<p>Because <code>test</code> delegates to the native object, a global or sticky regex keeps <code>lastIndex</code> between calls. Use a fresh literal for a stateless test, or use the <code>std/text</code> helpers, which reset the index for each call.</p>
+<h2 id="matching-and-captures">Matching and captures</h2>
+<p><code>std/text</code> provides typed helpers that return records rather than native match arrays. They are usually clearer than unpacking JavaScript&#39;s array shape.</p>
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
+
+import { print } from &quot;std/io&quot;
+import { matches, findMatch, findAllMatches, matchTexts } from &quot;std/text&quot;
+
+set content to &quot;release-2.1 then release-2.2&quot;
+
+print(matches(content, /release-\d+\.\d+/))
+
+set first to findMatch(content, /release-(?&lt;major&gt;\d+)\.(?&lt;minor&gt;\d+)/)
+when first is not equal to nothing
+    print(first.text)
+    print(first.index)
+    print(first.groups[0])
+    print(first.named[&quot;major&quot;])
+    print(first.named[&quot;minor&quot;])
+end
+
+print(matchTexts(content, /release-\d+\.\d+/))</code></pre></figure>
+<p><code>RegexMatch</code> is a record:</p>
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">export type RegexMatch
+    text: text
+    index: number
+    groups: list of text
+    named: map of text to text
+end</code></pre></figure>
+<ul>
+<li><code>groups[0]</code> is the first positional capture, matching JavaScript&#39;s</li>
+<p><code>match[1]</code> convention. <code>text</code> is the full match.</p>
+<li><code>named</code> contains named captures by group name.</li>
+<li>A participating empty group is <code>&quot;&quot;</code>. A group that did not participate is also</li>
+<p>an empty string, because the record stores text rather than nullable slots.</p>
+<li><code>findMatch</code> returns <code>nothing</code> when there is no match.</li>
+<li><code>findAllMatches</code> and <code>matchTexts</code> reset <code>lastIndex</code>, so a global literal is</li>
+<p>safe to reuse.</p>
+</ul>
+<h2 id="replacement-and-splitting">Replacement and splitting</h2>
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
+
+import { print } from &quot;std/io&quot;
+import { replaceMatch, replaceAllMatches, splitMatch, escapeRegex } from &quot;std/text&quot;
+
+print(replaceMatch(&quot;a1b22&quot;, /\d+/, &quot;#&quot;))
+print(replaceAllMatches(&quot;a1b22&quot;, /\d+/g, &quot;#&quot;))
+print(replaceAllMatches(&quot;2026-11-22&quot;, /(?&lt;year&gt;\d{4})-(?&lt;month&gt;\d{2})-(?&lt;day&gt;\d{2})/g, &quot;$&lt;day&gt;/$&lt;month&gt;/$&lt;year&gt;&quot;))
+print(splitMatch(&quot;a, b,c&quot;, /,\s*/))
+print(escapeRegex(&quot;a.b*c&quot;))</code></pre></figure>
+<p>Replacement strings use JavaScript&#39;s native substitution syntax: <code>$&amp;</code> for the whole match, <code>$1</code> for a capture and <code>$&lt;name&gt;</code> for a named capture. <code>replaceMatch</code> replaces the first match; <code>replaceAllMatches</code> replaces every match and adds the <code>g</code> behaviour itself. <code>splitMatch</code> splits on every match and returns a <code>list of text</code>.</p>
+<p><code>escapeRegex</code> escapes the characters that have special meaning in a pattern. It is for building a literal from user text, not for turning arbitrary input into a trusted pattern.</p>
+<h2 id="unicode-multiline-and-zero-length-matches">Unicode, multiline and zero-length matches</h2>
+<p>The flags are the host&#39;s:</p>
+<ul>
+<li><code>u</code> enables Unicode code-point matching; <code>v</code> enables the Unicode sets mode in</li>
+<p>engines that support it.</p>
+<li><code>m</code> makes <code>^</code> and <code>$</code> match at line boundaries.</li>
+<li><code>s</code> makes <code>.</code> match newlines.</li>
+<li><code>i</code> uses Unicode-aware case folding when combined with <code>u</code>.</li>
+<li><code>g</code> and <code>y</code> are stateful on the native <code>RegExp</code>; the <code>std/text</code> helpers reset</li>
+<p>the index.</p>
+</ul>
+<p>Zero-length patterns are valid. A global zero-length match advances by one position in JavaScript, and PlainScript inherits that behaviour:</p>
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">pln</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="plainscript">#syntax 2.1
+
+import { print } from &quot;std/io&quot;
+import { count } from &quot;std/list&quot;
+import { findAllMatches } from &quot;std/text&quot;
+
+print(count(findAllMatches(&quot;ab&quot;, /(?:)/)))</code></pre></figure>
+<h2 id="diagnostics">Diagnostics</h2>
+<div class="table-wrap"><table><thead><tr><th>Code</th><th>Meaning</th></tr></thead><tbody>
+<tr><td><code>PS1006</code></td><td>Unterminated regex literal</td></tr>
+<tr><td><code>PS1007</code></td><td>Invalid or duplicated flag</td></tr>
+<tr><td><code>PS1008</code></td><td>Invalid pattern for the host engine</td></tr>
+</tbody></table></div>
+<p>Pattern validation runs when the literal is lexed. The diagnostic includes the engine&#39;s reason, for example <code>Unterminated group</code> or <code>Invalid group</code>, so a bad pattern fails <code>plainscript check</code> before any module executes.</p>
+<figure class="specimen-code"><figcaption class="specimen-bar"><span class="specimen-lang">output</span><button class="copy-btn" type="button" data-copy aria-label="Copy code to clipboard">copy</button></figcaption><pre><code data-lang="text">value pattern is /(/      # PS1008: Invalid regular expression: Unterminated group
+value pattern is /abc     # PS1006: Unterminated regular expression literal
+value pattern is /a/gg    # PS1007: Invalid regular expression flags</code></pre></figure>
+<h2 id="differences-from-javascript">Differences from JavaScript</h2>
+<ul>
+<li>There is no <code>RegExp</code> constructor in the language surface. Use a literal, or</li>
+<p>call a declared host API if a truly dynamic pattern is required. Dynamic patterns cannot receive compile-time validation.</p>
+<li>A regex is typed <code>regex</code>, not <code>object</code> or <code>any</code>. This is a PlainScript</li>
+<p>addition; the emitted value is a native <code>RegExp</code>.</p>
+<li>The checker rejects reading native array-shaped match properties directly</li>
+<p>from a <code>regex</code>; use <code>std/text</code> helpers for captures.</p>
+<li>The pattern language is exactly the host&#39;s. PlainScript does not claim</li>
+<p>cross-engine portability for features one engine lacks.</p>
+</ul>
+<h2 id="runtime-compatibility">Runtime compatibility</h2>
+<p>The emitted code uses a JavaScript regex literal, so it runs in Node and every browser that V8 or another supported engine runs. There is no regex polyfill and no runtime dependency. Replacement and split helpers live in <code>std/text</code> and are plain JavaScript functions.</p></article><aside class="toc-rail" aria-label="On this page"><div class="toc-title">On this page</div><nav class="toc"><a class="toc-h2" href="#literals">Literals</a><a class="toc-h3" href="#slash-versus-division">Slash versus division</a><a class="toc-h2" href="#the-regex-type">The regex type</a><a class="toc-h2" href="#matching-and-captures">Matching and captures</a><a class="toc-h2" href="#replacement-and-splitting">Replacement and splitting</a><a class="toc-h2" href="#unicode-multiline-and-zero-length-matches">Unicode, multiline and zero-length matches</a><a class="toc-h2" href="#diagnostics">Diagnostics</a><a class="toc-h2" href="#differences-from-javascript">Differences from JavaScript</a><a class="toc-h2" href="#runtime-compatibility">Runtime compatibility</a></nav></aside></div><nav class="page-nav" aria-label="Chapter navigation"><a class="pn-prev" href="language-reference.html"><span class="pn-label">← Previous</span><span class="pn-title">Language reference</span></a><a class="pn-next" href="jsx.html"><span class="pn-label">Next →</span><span class="pn-title">JSX and React</span></a></nav><footer class="colophon"><div><div class="colophon-mark">PlainScript<span>.</span></div><p>An independent, statically typed language for the JavaScript platform. This manual is set in Fraunces, Newsreader, Space Grotesk and IBM Plex Mono, with halftone plates drawn in-house. One stylesheet, no frameworks, no trackers.</p></div><nav class="colophon-links" aria-label="Project links"><a href="index.html">Manual</a><a href="https://github.com/ayoistooslick/Plainscript">Source</a><a href="https://github.com/ayoistooslick/Plainscript/issues">Issues</a><a href="https://github.com/ayoistooslick/Plainscript/blob/main/CHANGELOG.md">Changelog</a><a href="https://github.com/ayoistooslick/Plainscript/blob/main/LICENSE">MIT</a></nav></footer></main></div></div><script src="app.js"></script></body></html>

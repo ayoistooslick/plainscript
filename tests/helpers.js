@@ -8,6 +8,7 @@ const { Compiler } = require('../src/modules');
 const { parse } = require('../src/parser');
 const { checkModule } = require('../src/checker');
 const { CompileError } = require('../src/diagnostics');
+const { resolveJsxOptions } = require('../src/jsx');
 
 const ROOT = path.resolve(__dirname, '..');
 const SANDBOX = path.join(ROOT, '.plainscript', 'tests');
@@ -63,7 +64,7 @@ function diagnosticsOf(source, options = {}) {
   const { file = 'test.pln' } = options;
   try {
     const ast = parse(source, file);
-    const checked = checkModule({ file, source, program: ast, resolveImport: () => null });
+    const checked = checkModule({ file, source, program: ast, resolveImport: () => null, jsx: resolveJsxOptions(source, options.jsx || {}) });
     return checked.diagnostics;
   } catch (failure) {
     if (failure instanceof CompileError) return failure.diagnostics;
