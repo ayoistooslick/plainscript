@@ -5,6 +5,7 @@ const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
+const { pathToFileURL } = require('url');
 
 const {
   ROOT, sandbox, writeFiles, compileProject, runSource, diagnosticsOf,
@@ -339,7 +340,7 @@ end
   assert.deepStrictEqual(result.diagnostics, []);
   assert.strictEqual(result.ok, true);
   fs.writeFileSync(outFile, result.code);
-  const child = spawnSync(process.execPath, ['--input-type=module', '-e', `import { compute } from ${JSON.stringify(outFile)}; process.stdout.write(compute());`], { encoding: 'utf8' });
+  const child = spawnSync(process.execPath, ['--input-type=module', '-e', `import { compute } from ${JSON.stringify(pathToFileURL(outFile).href)}; process.stdout.write(compute());`], { encoding: 'utf8' });
   assert.strictEqual(child.status, 0, child.stderr);
   assert.strictEqual(child.stdout, 'box 12 factor=3');
 });

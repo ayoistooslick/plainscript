@@ -7,6 +7,7 @@ const http = require('node:http');
 const { pathToFileURL } = require('node:url');
 
 const ROOT = path.resolve(__dirname, '..');
+const hasWebSocketClient = typeof WebSocket === 'function';
 
 test('WebSocket authorization rejects an upgrade before the handshake', async () => {
   const ws = await import(pathToFileURL(path.join(ROOT, 'stdlib', 'ws.js')).toString());
@@ -36,7 +37,7 @@ test('WebSocket authorization rejects an upgrade before the handshake', async ()
   }
 });
 
-test('WebSocket server upgrades, echoes text, handles JSON and closes cleanly', async () => {
+test('WebSocket server upgrades, echoes text, handles JSON and closes cleanly', { skip: hasWebSocketClient ? false : 'the WebSocket client requires Node 22' }, async () => {
   const ws = await import(pathToFileURL(path.join(ROOT, 'stdlib', 'ws.js')).toString());
   const closed = [];
   const server = await ws.serve(0, (connection) => {

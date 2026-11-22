@@ -21,7 +21,7 @@ Created by **Ayodele Ayokunle David**. PlainScript is MIT licensed.
 
 ## Quick start
 
-PlainScript needs Node.js 20 or newer and has no runtime dependencies.
+PlainScript's compiler and generated programs need Node.js 20 or newer and have no runtime dependencies. SQLite-backed persistence, the debug adapter and the built-in WebSocket test client use Node 22 APIs; `docs/DATABASES.md`, `docs/DEBUGGING.md` and `docs/STDLIB.md` call those cases out.
 
 ```plainscript
 #syntax 2.1

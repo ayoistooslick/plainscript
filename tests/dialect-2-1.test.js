@@ -45,6 +45,15 @@ test('a file without a pragma stays on the 2.0 dialect', () => {
   assert.strictEqual(detectDialect('#syntax 2.1\n').version, '2.1');
   assert.strictEqual(detectDialect('# syntax 2.1\n').version, '2.1');
   assert.strictEqual(detectDialect('\uFEFF#syntax 2.1\n').version, '2.1');
+  // A Windows checkout must not silently fall back to 2.0.
+  assert.strictEqual(detectDialect('#syntax 2.1\r\nvalue x is 1\r\n').version, '2.1');
+  assert.strictEqual(detectDialect('\uFEFF# syntax 2.1\r\n').version, '2.1');
+});
+
+test('a CRLF file keeps its 2.1 pragma end to end', () => {
+  const result = runSource(BASIC.replace(/\n/g, '\r\n'));
+  assert.strictEqual(result.status, 0, result.stderr);
+  assert.match(result.stdout, /Hello: done/);
 });
 
 test('the pragma must be the first line', () => {

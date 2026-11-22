@@ -3,6 +3,8 @@
 // Minimal Source Map v3 writer (VLQ + base64). No dependencies, so the
 // compiler stays installable with zero runtime packages.
 
+const { fileURLToPath } = require('url');
+
 const BASE64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
 function encodeVlq(value) {
@@ -139,9 +141,27 @@ function decodeSourceMap(map) {
   return mappings;
 }
 
+// Source maps can name a source as a relative path, an absolute POSIX path, a
+// Windows path or a file URL. Compare all of them in one spelling: forward
+// slashes, percent-decoded, with a lower-case Windows drive letter.
 function normalizePath(value) {
   if (!value) return value;
-  return String(value).replace(/^file:\/\//, '');
+  let text = String(value);
+  if (/^file:\/\//i.test(text)) {
+    try {
+      text = fileURLToPath(text);
+    } catch {
+      text = text.replace(/^file:\/\//i, '');
+    }
+  }
+  try {
+    text = decodeURIComponent(text);
+  } catch {
+    // Leave malformed escapes untouched so the comparison still has a chance.
+  }
+  text = text.replace(/\\/g, '/').replace(/\/{2,}/g, '/');
+  if (/^[A-Za-z]:\//.test(text)) text = text[0].toLowerCase() + text.slice(1);
+  return text;
 }
 
 function sourceMatches(actual, requested) {

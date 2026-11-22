@@ -36,9 +36,12 @@ async function exercise(database, id) {
     const inserted = await database.run(`INSERT INTO ${table} (id, title, done) VALUES (?, ?, ?)`, [1, 'live row', 0]);
     assert.equal(inserted.changes, 1);
 
-    // Parameterised lookup, including a value that looks like SQL.
-    const rows = await database.query(`SELECT id, title, done FROM ${table} WHERE title = ?`, ["live row'; DROP TABLE users; --"]);
+    // Parameterised lookup. A value that looks like SQL is bound as data and
+    // must not match the row or execute.
+    const rows = await database.query(`SELECT id, title, done FROM ${table} WHERE title = ?`, ['live row']);
     assert.deepEqual(rows, [{ id: 1, title: 'live row', done: 0 }]);
+    const injected = await database.query(`SELECT id, title, done FROM ${table} WHERE title = ?`, ["live row'; DROP TABLE users; --"]);
+    assert.deepEqual(injected, []);
 
     await assert.rejects(
       () => database.query(`SELECT * FROM ${table} WHERE missing = ?`, [1]),

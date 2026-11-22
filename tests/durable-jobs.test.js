@@ -8,6 +8,9 @@ const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { ROOT } = require('./helpers');
 
+const supported = Number(process.versions.node.split('.')[0]) >= 22;
+const sqliteSkip = !supported ? 'node:sqlite requires Node 22' : false;
+
 async function jobsModule() {
   return import(pathToFileURL(path.join(ROOT, 'stdlib', 'jobs.js')).toString());
 }
@@ -31,7 +34,7 @@ test('a memory store recovers pending jobs and preserves their attempts', async 
   assert.equal(q.get(7).attempts, 2);
 });
 
-test('SQLite persistence survives reopening and keeps completed status records', async () => {
+test('SQLite persistence survives reopening and keeps completed status records', { skip: sqliteSkip }, async () => {
   const { queue, sqliteStore } = await jobsModule();
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'plainscript-jobs-'));
   const file = path.join(directory, 'jobs.sqlite');
@@ -52,7 +55,7 @@ test('SQLite persistence survives reopening and keeps completed status records',
   await q2.close();
 });
 
-test('a durable queue records retries and failures', async () => {
+test('a durable queue records retries and failures', { skip: sqliteSkip }, async () => {
   const { queue, sqliteStore } = await jobsModule();
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'plainscript-jobs-retry-'));
   const store = await sqliteStore(path.join(directory, 'jobs.sqlite'));

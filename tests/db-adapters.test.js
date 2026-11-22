@@ -110,6 +110,16 @@ test('mysql adapter parses a connection URI into mysql2 options', async () => {
   assert.equal(received.charset, 'utf8mb4');
 });
 
+test('mysql adapter wraps a connection failure at creation time', async () => {
+  const mysql = await load('db-mysql.js');
+  await assert.rejects(
+    () => mysql.open('mysql://example', {
+      driver: { createConnection: async () => { throw new Error('connect ECONNREFUSED 127.0.0.1:1'); } },
+    }),
+    (error) => /could not connect to MySQL/.test(error.message),
+  );
+});
+
 test('mysql adapter uses execute for writes, maps affected rows and closes', async () => {
   const mysql = await load('db-mysql.js');
   const db = await load('db.js');

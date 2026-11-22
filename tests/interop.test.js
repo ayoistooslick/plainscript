@@ -10,6 +10,7 @@ const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
 const { spawn, spawnSync } = require('child_process');
+const { pathToFileURL } = require('url');
 
 const { ROOT, sandbox, writeFiles, runProject } = require('./helpers');
 const protocol = require('../src/interop/protocol');
@@ -221,10 +222,10 @@ with Client(command=sys.argv[1], args=[sys.argv[2], "bridge", sys.argv[3]]) as c
         print(type(error).__name__, str(error))
 `, process.execPath, CLI, entry], { encoding: 'utf8' });
   assert.strictEqual(python.status, 0, python.stderr);
-  assert.strictEqual(python.stdout, "5\nHello, Ada!\n{'count': 3, 'total': 6}\n42\nBridgeError bridge exploded\n");
+  assert.strictEqual(python.stdout.replace(/\r\n/g, '\n'), "5\nHello, Ada!\n{'count': 3, 'total': 6}\n42\nBridgeError bridge exploded\n");
 
   const javascript = spawnSync(process.execPath, ['--input-type=module', '-e', `
-import { Client } from ${JSON.stringify(path.join(output, 'main_bridge.mjs'))};
+import { Client } from ${JSON.stringify(pathToFileURL(path.join(output, 'main_bridge.mjs')).href)};
 const client = new Client(${JSON.stringify(process.execPath)}, [${JSON.stringify(CLI)}, "bridge", ${JSON.stringify(entry)}]);
 console.log(await client.add(4, 6));
 console.log(await client.greet("JS"));
@@ -260,7 +261,7 @@ print("closed")
   assert.strictEqual(run.stdout, 'true\n5\nHello from Python, PlainScript!\ncaught: python exploded\nclosed\n');
 });
 
-test('the generated C client compiles and calls the bridge', { skip: !hasGcc ? 'gcc is not installed' : false }, () => {
+test('the generated C client compiles and calls the bridge', { skip: process.platform === 'win32' ? 'the generated C client is POSIX-only (popen)' : (!hasGcc ? 'gcc is not installed' : false) }, () => {
   const { directory, entry } = fixture();
   const output = path.join(directory, 'bindings');
   const generated = spawnSync(process.execPath, [CLI, 'bindings', entry, '--lang=c', `--out=${output}`], { encoding: 'utf8' });

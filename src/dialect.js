@@ -37,7 +37,8 @@ const LEGACY_DIALECT = '2.0';
 
 // The pragma must be the first line. It is an ordinary `#` comment to every
 // other tool, so a 2.1 file still looks like a PlainScript file to editors.
-const PRAGMA = /^\uFEFF?[ \t]*#[ \t]*syntax[ \t]+([0-9]+\.[0-9]+)[ \t]*$/;
+// `\r` is accepted so a file checked out with CRLF endings still opts in.
+const PRAGMA = /^\uFEFF?[ \t]*#[ \t]*syntax[ \t]+([0-9]+\.[0-9]+)[ \t\r]*$/;
 
 const KEYWORD_RENAMES = Object.freeze({
   when: 'if',
@@ -65,7 +66,7 @@ function isDialect(value) {
 // per-file pragma always wins, so a project can standardise on 2.1 while a
 // single legacy module keeps its `#syntax 2.0` line.
 function detectDialect(source, file = '<input>', fallback = null) {
-  const firstLine = String(source).split('\n', 1)[0];
+  const firstLine = String(source).split(/\r?\n/, 1)[0];
   const match = PRAGMA.exec(firstLine);
   if (!match) {
     if (fallback === null || fallback === undefined) {

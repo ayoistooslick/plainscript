@@ -17,6 +17,9 @@ const { spawn } = require('child_process');
 
 const { ROOT, compileProject } = require('./helpers');
 
+const sqliteSupported = Number(process.versions.node.split('.')[0]) >= 22;
+const sqliteSkip = !sqliteSupported ? 'node:sqlite requires Node 22' : false;
+
 function integrationSource(...parts) {
   return fs.readFileSync(path.join(ROOT, 'integrations', ...parts), 'utf8');
 }
@@ -71,7 +74,7 @@ function start(project, env = {}) {
   };
 }
 
-test('SQLite integration inserts, queries, aggregates and rolls back', () => {
+test('SQLite integration inserts, queries, aggregates and rolls back', { skip: sqliteSkip }, () => {
   const project = compileIntegration('sqlite', 'src', 'main.pln');
   const child = require('child_process').spawnSync(process.execPath, [project.entryOut], {
     cwd: project.directory,
@@ -258,7 +261,7 @@ set cart to addItem(cart, "keyboard", "expensive", 2)
   assert.ok(errors.every((diagnostic) => diagnostic.span.file.endsWith('main.pln')));
 });
 
-test('the full-stack project serves SQLite-backed notes and renders the React client', { timeout: 90000 }, async () => {
+test('the full-stack project serves SQLite-backed notes and renders the React client', { timeout: 90000, skip: sqliteSkip }, async () => {
   const directory = path.join(ROOT, 'integrations', 'fullstack');
   const cli = path.join(ROOT, 'src', 'cli.js');
   const port = await freePort();

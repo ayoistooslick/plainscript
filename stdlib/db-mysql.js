@@ -31,10 +31,14 @@ export async function open(connectionString = '', options = {}) {
   const mysql = await loadMysql(options);
   const create = mysql.createConnection || mysql.default?.createConnection;
   if (typeof create !== 'function') throw new DatabaseError('mysql2 does not expose createConnection');
-  const connection = await create(mysqlOptions(connectionString, options));
+  let connection;
   try {
+    connection = await create(mysqlOptions(connectionString, options));
     await connection.ping();
   } catch (cause) {
+    if (connection) {
+      try { await connection.end(); } catch { /* preserve the connection error */ }
+    }
     throw new DatabaseError('could not connect to MySQL', cause);
   }
   return mysqlDatabase(connection, { file: connectionString || '<mysql>' });

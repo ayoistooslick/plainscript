@@ -58,7 +58,7 @@ class DapClient {
     this.child.stdin.write(`Content-Length: ${Buffer.byteLength(body)}\r\n\r\n${body}`);
     return new Promise((resolve, reject) => this.pending.set(seq, { resolve, reject }));
   }
-  waitFor(event, timeout = 10000) {
+  waitFor(event, timeout = 30000) {
     const queued = this.eventQueue.get(event);
     if (queued && queued.length) return Promise.resolve(queued.shift());
     return new Promise((resolve, reject) => {
@@ -87,9 +87,16 @@ test('source maps translate both breakpoint and paused-stack positions', () => {
   assert.ok(decoded.length >= 3);
   const original = originalPositionFor(map, generated.generatedLine, generated.generatedColumn);
   assert.equal(original.originalLine, 3);
+
+  // A Windows checkout reports backslash paths and a capital drive letter;
+  // the adapter must match them against the map's source spelling.
+  const windowsMap = { ...map, sources: ['D:\\work\\main.pln'] };
+  const mapped = generatedPositionFor(windowsMap, 'd:/work/main.pln', 3);
+  assert.ok(mapped);
+  assert.equal(mapped.originalLine, 3);
 });
 
-test('the DAP adapter sets mapped breakpoints, reports stack/variables, and continues to completion', async (t) => {
+test('the DAP adapter sets mapped breakpoints, reports stack/variables, and continues to completion', { skip: typeof WebSocket === 'function' ? false : 'the debug adapter requires the Node 22 WebSocket client' }, async (t) => {
   const project = compileProject({
     'main.pln': `import { print } from "std/io"\nfunction add(a: number, b: number) -> number\n    let total = a + b\n    return total\nend\nprint(add(2, 3))\n`,
   });

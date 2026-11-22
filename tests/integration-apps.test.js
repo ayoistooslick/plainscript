@@ -11,6 +11,9 @@ const { spawn } = require('child_process');
 
 const { runSource, compileProject } = require('./helpers');
 
+const sqliteSupported = Number(process.versions.node.split('.')[0]) >= 22;
+const sqliteSkip = !sqliteSupported ? 'node:sqlite requires Node 22' : false;
+
 function freePort() {
   return new Promise((resolve, reject) => {
     const server = net.createServer();
@@ -36,7 +39,7 @@ async function waitForServer(url, timeoutMs = 8000) {
   return false;
 }
 
-test('node:sqlite is usable through new and prepared statements', () => {
+test('node:sqlite is usable through new and prepared statements', { skip: sqliteSkip }, () => {
   const result = runSource(`import { print } from "std/io"
 import { DatabaseSync } from "node:sqlite"
 

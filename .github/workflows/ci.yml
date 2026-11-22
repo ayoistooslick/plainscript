@@ -33,7 +33,9 @@ jobs:
 
   bindings:
     name: Cross-language bindings
-    runs-on: ubuntu-latest
+    # Ubuntu 26.04 is newer than the Swift setup action supports; pin the
+    # last runner image with a supported Swift 6 toolchain.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
