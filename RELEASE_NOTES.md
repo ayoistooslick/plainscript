@@ -146,12 +146,12 @@ the suite.
 
 As of 2026-11-22:
 
-- **GitHub:** `main` is pushed at `8711da9`, and the `v2.2.0` release is
-  published at <https://github.com/ayoistooslick/plainscript/releases/tag/v2.2.0>,
-  with the tag created at that commit.
-- **npm:** not published. The public registry still reports `2.1.0` as latest,
-  and this environment is not authenticated (`npm whoami` returns `ENEEDAUTH`).
-  The dry-run package is `plainscript-lang@2.2.0`, 201 files, 2.63 MB unpacked.
-  To publish, from a clean checkout of `v2.2.0`, run `npm login` (or provide a
-  publish-scoped npm token), confirm `npm whoami`, then run `npm publish`.
-  No registry publication is claimed here.
+- **GitHub:** the `v2.2.0` release is published at
+  <https://github.com/ayoistooslick/plainscript/releases/tag/v2.2.0>; the tag
+  points at `8711da9`. The documentation workflow deployed the 2.2 manual to
+  <https://ayoistooslick.github.io/plainscript/>.
+- **npm:** `plainscript-lang@2.2.0` is published and is the `latest` dist-tag
+  (registry timestamp `2026-11-22T21:26:05.522Z`). The publish workflow's
+  `npm publish` step succeeded with a 201-file, 1.2 MB tarball; the run was
+  afterwards marked failed only because its redundant tag step tried to create
+  the already-existing `v2.2.0` tag. Publication itself is complete.
