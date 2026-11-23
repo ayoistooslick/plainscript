@@ -580,7 +580,7 @@ and replacement syntax are the host's. See [Regular expressions](REGEX.md).
 import { print } from "std/io"
 import { upper } from "std/text"
 
-export value version is "2.3.0"
+export value version is "2.3.1"
 
 export define shout(text: text) returns text
     return upper("{text}!")

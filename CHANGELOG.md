@@ -2,6 +2,35 @@
 
 All notable changes to PlainScript are documented here.
 
+## [2.3.1] — 2026-11-23
+
+### Windows, macOS and live-database fixes
+
+- Accept a CRLF first line in the `#syntax` pragma and tolerate a trailing
+  `\r`, so a 2.1 file checked out with Windows endings still opts in to the
+  dialect instead of reporting `PS3301`.
+- Normalize source-map source names before matching: relative paths, absolute
+  POSIX paths, Windows paths and `file:` URLs are compared with forward
+  slashes, percent-decoded and a lower-case drive letter. `plainscript dap`
+  now maps breakpoints and stack frames in a Windows checkout.
+- Wrap MySQL connection creation and the initial ping in `DatabaseError` and
+  close a half-open connection when the ping fails, so a refused or failing
+  connection reports the adapter error rather than a raw driver exception.
+- Add `scripts/run-tests.js`, the file-list test runner behind `npm test`. Node
+  20 does not expand `tests/*.test.js` and Node 22 rejects a directory argument
+  for `--test`; the runner works on both, on Linux, macOS and Windows.
+- Compile documentation examples from Markdown normalized to LF, so a CRLF
+  checkout does not fail the docs-example suite.
+- Skip Node 22-only capabilities on Node 20 with an explicit reason
+  (`node:sqlite` persistence, the debug adapter, the WebSocket test client) and
+  keep them covered on Node 22.
+- Pin the cross-language bindings CI job to `ubuntu-24.04`, the newest runner
+  image with a Swift toolchain the setup action supports.
+
+### Compatibility
+
+No source or API change. 2.3.0 programs compile and run unchanged.
+
 ## [2.3.0] — 2026-11-22
 
 ### Classes and objects

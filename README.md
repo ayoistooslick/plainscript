@@ -457,7 +457,7 @@ Express/React/SQLite/HTTP execution and the documentation examples.
 
 ## Limitations
 
-Known and deliberate for 2.3.0:
+Known and deliberate for 2.3.1:
 
 - **One backend.** JavaScript/ESM only. The IR and emitter are separated so
   another target is possible, but none exists.
@@ -509,7 +509,7 @@ Known and deliberate for 2.3.0:
   constructors, and reports the rest.
 - **Benchmarks are PlainScript-only.** The synthetic numbers in
   [docs/BENCHMARKS.md](docs/BENCHMARKS.md) make no cross-language speed claim.
-- **Publication is a separate step.** The source version is 2.3.0; npm and
+- **Publication is a separate step.** The source version is 2.3.1; npm and
   GitHub release state is verified against the registry and release page rather
   than inferred from the repository.
 

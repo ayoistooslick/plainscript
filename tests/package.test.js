@@ -12,7 +12,7 @@ const packageJson = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 
 
 test('the compiler version and package version agree', () => {
   assert.strictEqual(packageJson.version, VERSION);
-  assert.strictEqual(VERSION, '2.3.0');
+  assert.strictEqual(VERSION, '2.3.1');
 });
 
 test('the package exposes an API entry point and the standard library', () => {

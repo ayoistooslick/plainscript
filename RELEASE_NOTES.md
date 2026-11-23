@@ -1,3 +1,50 @@
+# PlainScript 2.3.1 — Windows, macOS and live-database fixes
+
+PlainScript 2.3.1 is a patch release for the 2.3.0 compiler. It carries the
+fixes made after 2.3.0 was published, so an install from npm now behaves the
+same as the repository. There is no source or API change.
+
+## Fixes
+
+- **CRLF dialect pragma.** `#syntax 2.1` on the first line of a file checked
+  out with CRLF endings is recognised again; previously the carriage return
+  stopped the pragma from matching and the file fell back to the 2.0 dialect.
+- **Windows source maps.** Source names are normalized before matching
+  (separators, percent-encoding, `file:` URLs and drive-letter case), so the
+  debug adapter resolves breakpoints and stack frames from a Windows checkout.
+- **MySQL connection errors.** Connection creation and the initial ping are
+  wrapped in `DatabaseError`, and a half-open connection is closed when the
+  ping fails, instead of surfacing a raw driver exception.
+
+## Tooling and CI
+
+- `npm test` now runs through `scripts/run-tests.js`, a file-list runner that
+  works on Node 20 and Node 22 on Linux, macOS and Windows. Node 20 does not
+  expand `tests/*.test.js` and Node 22 rejects a directory argument for
+  `--test`.
+- Documentation examples are compiled from LF-normalized Markdown, so a CRLF
+  checkout does not fail the docs suite.
+- Node 22-only capabilities (`node:sqlite` persistence, the debug adapter and
+  the WebSocket test client) are skipped on Node 20 with an explicit reason and
+  stay covered on Node 22.
+- The cross-language bindings job is pinned to `ubuntu-24.04`, the newest runner
+  image with a Swift toolchain the setup action supports.
+
+## Verification
+
+- `npm test`: 401 tests, 399 passed, 2 live PostgreSQL/MySQL tests skipped in
+  this checkout; the same suite passes on Node 20 (387 passed, 14 skipped) and
+  Node 22 (399 passed, 2 skipped), and from a CRLF checkout.
+- CI run #50 on `main` is green for Ubuntu, Windows and macOS on Node 20 and 22,
+  for live PostgreSQL and MySQL, and for all 14 bindings targets.
+- The published tarball was installed from the registry into a clean directory
+  and reported `2.3.1`; `plainscript version` and a compile/run check were
+  repeated against that install.
+
+## Upgrading
+
+Install `plainscript-lang@2.3.1`. No source change is required from 2.3.0.
+
 # PlainScript 2.3.0 — classes, generators, typed errors and a faster toolchain
 
 PlainScript 2.3 is a language and tooling release. The language gains an object
