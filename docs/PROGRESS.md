@@ -99,3 +99,15 @@ the service environment described in the workflow.
   including the restored Fig. 01–05 captions, the migration guide and the
   standard library page. The deployed pages were fetched and checked after the
   deployment.
+
+## 2.3.1 publication
+
+- npm: `plainscript-lang@2.3.1` is the `latest` tag (registry timestamp
+  `2026-11-23T00:26:03.018Z`). A clean install from the registry reported
+  `2.3.1`, carried the CRLF pragma, source-map and MySQL fixes, and compiled and
+  ran a CRLF 2.1 program.
+- GitHub: tag `v2.3.1` points at `4056466` and the `v2.3.1` release carries the
+  2.3.1 notes.
+- CI: the publish workflow run `45088547527` completed successfully; the tests,
+  cross-platform matrix and live PostgreSQL/MySQL suites were already green on
+  `main` before it ran.
